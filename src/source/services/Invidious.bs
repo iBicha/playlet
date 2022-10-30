@@ -1,0 +1,38 @@
+' TODO: remove Requests.brs and import it from installed package
+import "pkg:/source/services/Requests.brs"
+
+namespace RokuYoutube.Services.Invidious
+    const API_URL = "https://invidious.esmailelbob.xyz"
+    const POPULAR_ENDPOINT = "/api/v1/popular"
+    const TRENDING_ENDPOINT = "/api/v1/trending"
+    const VIDEOS_ENDPOINT = "/api/v1/videos"
+
+    function GetPopular()
+        url = `${API_URL}${POPULAR_ENDPOINT}`
+        response = Requests().get(url)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+    end function
+
+    function GetTrending()
+        url = `${API_URL}${TRENDING_ENDPOINT}`
+        response = Requests().get(url)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+    end function
+
+    function GetVideoMetadataForVideo(videoId as string)
+        url = `${API_URL}${VIDEOS_ENDPOINT}/${videoId}`
+        response = Requests().get(url)
+
+        ' TODO: handle 500 {"error":"This video is unavailable"}
+        if response.statuscode = 200
+            return response.json
+        end if
+    end function
+
+end namespace
