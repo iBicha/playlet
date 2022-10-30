@@ -1,4 +1,4 @@
-# Youbtube for Roku
+# Youtube for Roku
 Unofficial Youtube client for Roku.
 
 ## Features
