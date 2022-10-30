@@ -15,7 +15,7 @@ Using your Roku remote, enter the following sequence:
 
 ![DevSequence](https://image.roku.com/ZHZscHItMTc2/dev-startup1.png)
 
-For full instructions, see [Steps to set up the development environment](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md)
+For full instructions, see [Set up your Roku device to enable Developer Settings](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md#step-1-set-up-your-roku-device-to-enable-developer-settings)
 
 ### Gather your info
 By now, you show have the following
