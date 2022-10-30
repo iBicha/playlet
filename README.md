@@ -33,3 +33,5 @@ curl -OL https://github.com/iBicha/roku-youtube/releases/download/v0.1.0/roku-yo
 	curl --user rokudev:REPLACE_PASSWORD_HERE --digest --silent --show-error -F "mysubmit=Install" -F "archive=@./roku-youtube.zip" --write-out "%{http_code}" http://REPLACE_IP_ADDRESS_HERE/plugin_install
 ```
 If successful, you should see some output on your terminal, ending with 200%.
+
+You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll get this thing a logo)
