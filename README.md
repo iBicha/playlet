@@ -35,3 +35,17 @@ curl -OL https://github.com/iBicha/roku-youtube/releases/latest/download/roku-yo
 If successful, you should see some output on your terminal, ending with 200%.
 
 You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll get this thing a logo)
+
+
+## Development
+1. `git clone https://github.com/iBicha/roku-youtube.git`
+1. `cd roku-youtube`
+1. `npm install`
+
+Create a file under `roku-youtube/.vscode/.env` containing:
+```
+ROKU_DEV_TARGET=REPLACE_IP_ADDRESS_HERE
+ROKU_DEVPASSWORD=REPLACE_PASSWORD_HERE
+```
+
+Then you can open the project using VS Code and deploy to your Roku TV using the Debug button.
