@@ -18,7 +18,7 @@
 '    - Configure Invidious Backend (allow self-hosted)
 '    - Closed caption settings?
 '  - Search page
-'  - Channel page 
+'  - Channel page
 '  - Comments page? (especially on live videos)
 '  - Dislike count?
 '  - Closed caption
