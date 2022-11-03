@@ -1,10 +1,16 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/models/SearchSuggestionResult.bs"
+import "pkg:/source/models/SearchFilter.bs"
 
 namespace RokuYoutube.Services.Invidious
     const API_URL = "https://invidious.esmailelbob.xyz"
     const POPULAR_ENDPOINT = "/api/v1/popular"
     const TRENDING_ENDPOINT = "/api/v1/trending"
+
     const VIDEOS_ENDPOINT = "/api/v1/videos"
+
+    const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+    const SEARCH_ENDPOINT = "/api/v1/search"
 
     function GetPopular()
         url = `${API_URL}${POPULAR_ENDPOINT}`
@@ -34,4 +40,54 @@ namespace RokuYoutube.Services.Invidious
         end if
     end function
 
+    function SearchSuggestions(q as string) as SearchSuggestionResult
+        url = `${API_URL}${SEARCH_SUGGEST_ENDPOINT}`
+        args = {
+            params: {
+                q: q
+            }
+        }
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+    end function
+
+    function Search(q as string, page = invalid as integer, sort_by = invalid as RokuYoutube.Models.Invidious.SearchFilter.SortBy, date = invalid as RokuYoutube.Models.Invidious.SearchFilter.Date, duration = invalid as RokuYoutube.Models.Invidious.SearchFilter.Duration, _type = invalid as RokuYoutube.Models.Invidious.SearchFilter.SearchType, features = invalid as RokuYoutube.Models.Invidious.SearchFilter.Features)
+        url = `${API_URL}${SEARCH_ENDPOINT}`
+
+        params = {
+            q: q
+        }
+
+        if page <> invalid
+            params.page = Str(page)
+        end if
+        if sort_by <> invalid
+            params.sort_by = sort_by
+        end if
+        if date <> invalid
+            params.date = date
+        end if
+        if duration <> invalid
+            params.duration = duration
+        end if
+        if _type <> invalid
+            params.type = _type
+        end if
+        if features <> invalid
+            params.features = features.join(",")
+        end if
+
+        args = {
+            params: params
+        }
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+    end function
 end namespace
