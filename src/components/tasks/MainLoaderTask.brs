@@ -38,13 +38,19 @@ function GetCategoryContent(category as string, json as object) as object
         row.children = []
         for each item in json ' parse items and push them to row
             itemData = GetItemData(item)
-            row.children.Push(itemData)
+            if itemData <> invalid
+                row.children.Push(itemData)
+            end if
         end for
         return row
     end if
 end function
 
 function GetItemData(video as object) as object
+    ' TODO: handle playlists and channels
+    if video.videoId = invalid
+        return invalid
+    end if
     item = {}
 
     item.title = video.title
