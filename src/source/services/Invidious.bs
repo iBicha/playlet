@@ -1,5 +1,6 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/models/SearchSuggestionResult.bs"
+import "pkg:/source/models/SearchFilter.bs"
 
 namespace RokuYoutube.Services.Invidious
     const API_URL = "https://invidious.esmailelbob.xyz"
@@ -53,7 +54,7 @@ namespace RokuYoutube.Services.Invidious
         end if
     end function
 
-    function Search(q as string, page = invalid, sort_by = invalid, date = invalid, duration = invalid, _type = invalid, features = invalid)
+    function Search(q as string, page = invalid as integer, sort_by = invalid as RokuYoutube.Models.Invidious.SearchFilter.SortBy, date = invalid as RokuYoutube.Models.Invidious.SearchFilter.Date, duration = invalid as RokuYoutube.Models.Invidious.SearchFilter.Duration, _type = invalid as RokuYoutube.Models.Invidious.SearchFilter.SearchType, features = invalid as RokuYoutube.Models.Invidious.SearchFilter.Features)
         url = `${API_URL}${SEARCH_ENDPOINT}`
 
         params = {
@@ -61,7 +62,7 @@ namespace RokuYoutube.Services.Invidious
         }
 
         if page <> invalid
-            params.page = page
+            params.page = Str(page)
         end if
         if sort_by <> invalid
             params.sort_by = sort_by
@@ -79,9 +80,7 @@ namespace RokuYoutube.Services.Invidious
             params.features = features.join(",")
         end if
 
-        args = {
-            params: params
-        }
+        args = { params: params }
 
         response = Requests().get(url, args)
 
