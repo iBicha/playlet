@@ -1,3 +1,5 @@
+' Credits to https://github.com/kazuhikoarase/qrcode-generator/pull/110
+
 sub init()
 	print "Init: "; m.top.subtype()
 
