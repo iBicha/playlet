@@ -1,3 +1,5 @@
+import "pkg:/source/utils/Registry.bs"
+
 namespace RokuYoutube.Http
   function GetHttpReplyId()
     m.http_reply_id = validint(m.http_reply_id) + 1
@@ -58,6 +60,18 @@ namespace RokuYoutube.Http
       ' work out path of file being requested
       req = m.request
       uri = req.uri
+
+      ' TODO: move to proper middleware system
+      if uri.StartsWith("/token_callback")
+        components = UrlQueryComponents(uri)
+        if components["token"] <> invalid
+          RokuYoutube.Utils.Registry.Write("token", components["token"] )
+          print("Got Token!")
+        end if
+        m.Default(200, "OK")
+        return true
+      end if
+
       decoded_uri = UrlUnescape(uri)
       path = CreateObject("roPath", m.settings.WwwRoot + decoded_uri)
       fs = CreateObject("roFilesystem")

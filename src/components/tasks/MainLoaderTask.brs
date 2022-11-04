@@ -21,6 +21,12 @@ sub GetContent()
         rootChildren.Push(popular)
     end if
 
+    feedJson = RokuYoutube.Services.Invidious.GetUserFeed()
+    feed = GetCategoryContent("Subscriptions", feedJson)
+    if feed <> invalid
+        rootChildren.Push(feed)
+    end if
+
     ' set up a root ContentNode to represent rowList on the GridScreen
     contentNode = CreateObject("roSGNode", "ContentNode")
     contentNode.Update({
