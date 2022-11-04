@@ -1,27 +1,3 @@
-function Global(name="" as String) as Dynamic
-    this = m.globals
-    if this=invalid
-        this = CreateObject("roAssociativeArray")
-        m.globals = this
-    end if
-    return this[name]
-end function
-
-function SetGlobal(name as String, value as Dynamic)
-    Global()
-    m.globals[name] = value
-end function
-
-function IncrGlobal(name as String, amount as Integer)
-    old = validint(Global(name))
-    SetGlobal(name,old+amount)
-end function
-
-function AddGlobals(aa as Object)
-    Global()
-    m.globals.append(aa)
-end function
-
 function min(a as Integer, b as Integer) as Integer
     if a<b then return a else return b
 end function
@@ -30,7 +6,7 @@ function dbg(obj as Object, level as String, message as String, code=0 as Intege
     tag = ""
     if isstr(obj)
         tag = obj
-    else    
+    else
         class = obj.class
         id    = obj.id
         if class<>invalid then tag = tag + class
@@ -188,7 +164,9 @@ function MimeType(uri="" as String) as String
             js:"text/javascript",
             txt:"text/plain",
             asc:"text/plain",
-'            brs:"text/plain", ' for brightscript code
+            brs:"text/plain",
+            bs:"text/plain",
+            map:"text/plain",
             mpeg:"video/mpeg",
             mpe:"video/mpeg",
             mpg:"video/mpeg",
@@ -208,7 +186,7 @@ function GetExtension(fn as String) as String
     if l.count()>0 then return l.GetTail() else return ""
 end function
 
-function deduceType(val as String, force=invalid as Dynamic) as Dynamic 
+function deduceType(val as String, force=invalid as Dynamic) as Dynamic
     if isstr(force)
         tforce = lcase(force)
         if tforce.right(6)="string" then return val
@@ -222,58 +200,4 @@ function deduceType(val as String, force=invalid as Dynamic) as Dynamic
     tval = strtoi(val)
     if tval<>0 then return tval
     return val
-end function
-
-function XMLToAA(xml as Object, aa as Object) as Boolean
-    if lcase(type(xml))<>"roxmlelement"
-        print "XMLToAA: "; type(xml); " is not roXMLElement"
-        return false
-    end if
-    name = xml.GetName()
-    body = xml.GetBody()
-    etype = lcase(type(body))
-    if isstr(name)
-        if etype = "roxmllist"
-            node = aa[name]
-            ' create only if doesn't exist
-            if lcase(type(node))<>"roassociativearray"
-                node= CreateObject("roAssociativeArray")
-                aa[name] = node
-            end if
-            for each elem in body
-                XMLtoAA(elem,node)
-            end for
-        else if etype.right(6)="string"
-            attr = xml.GetAttributes()
-            ftype = attr.type
-            val = deduceType(body,ftype)
-            aa[name] = val
-        else
-            print "XMLToAA: Unexpected element type "; type(body)
-        end if
-    end if
-    return true
-end function
-
-function GetXMLConfig(file as String, config as Object)
-    ' could be called very early as part of global setup,
-    ' so be sure not to use anything that relies on that setup.
-    configTxt = ReadAsciiFile("pkg:/"+file)
-    if configTxt<>invalid and GetInterface(configTxt,"ifString")<>invalid
-        xml = CreateObject("roXmlElement")
-        if xml.Parse(configTxt)
-            print "GetXMLConfig: config '"; xml.GetName(); "'"
-            sections = xml.GetBody()
-            if islist(sections)
-                for each section in sections
-                    XMLToAA(section,config)
-                end for
-            end if
-        else
-            print "GetXMLConfig: couldn't parse config text:"
-            print configTxt
-        end if
-    else
-        print "GetXMLConfig: no file "; file
-    end if
 end function

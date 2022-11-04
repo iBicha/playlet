@@ -1,0 +1,309 @@
+namespace RokuYoutube.Http
+  function GetHttpReplyId()
+    m.http_reply_id = validint(m.http_reply_id) + 1
+    return m.http_reply_id
+  end function
+
+  class HttpReply
+    private source = HttpReplySource.NONE
+
+    ' members
+    private buf = invalid
+    private header = invalid
+    private path = invalid
+    private request = invalid
+    private id = 0
+    ' copy-initializable members
+    private start = 0
+    private length = 0
+    private sent = 0
+    private header_sent = 0
+    private header_only = false
+    private buf_start = 0
+    private http_code = 0
+    private mimetype = "text/html" ' for errors
+
+    private settings = invalid as HttpSettings
+
+    function new(request as HttpRequest, settings as HttpSettings)
+      m.id = GetHttpReplyId()
+      m.settings = settings
+      m.Init(request)
+    end function
+
+    function Init(request as HttpRequest)
+      m.buf = CreateObject("roByteArray")
+      m.request = request
+    end function
+
+    function Process()
+      m.now = rfc1123_date(Now())
+      method = m.request.method
+      if method = ""
+        m.Default(400, "You sent a request that the server couldn't understand.")
+      else if method = "GET"
+        m.ProcessGetOrHead()
+      else if method = "HEAD"
+        m.ProcessGetOrHead()
+        m.header_only = true
+      else if method = "OPTIONS" or method = "POST" or method = "PUT" or method = "DELETE" or method = "TRACE" or method = "CONNECT"
+        m.Default(501, "The method you specified (" + method + ") is not implemented.")
+      else
+        m.Default(400, method + " is not a valid HTTP/1.1 method.")
+      end if
+
+    end function
+
+    function ProcessGetOrHead() as Boolean
+      ' work out path of file being requested
+      req = m.request
+      uri = req.uri
+      decoded_uri = UrlUnescape(uri)
+      path = CreateObject("roPath", m.settings.WwwRoot + decoded_uri)
+      fs = CreateObject("roFilesystem")
+
+      ' make sure it's safe
+      if not path.isValid()
+        m.Default(400, "You requested an invalid URI: " + uri)
+        return false
+      else if not fs.exists(path)
+        m.Default(404, "The URI you requested (" + uri + ") was not found.")
+        return false
+      end if
+
+      stat = fs.stat(path)
+      if stat = invalid
+        m.Default(500, "fstat() failed.")
+        return false
+      end if
+      m.path = path
+
+      if stat.type = "directory"
+        m.mimetype = MimeType(m.settings.IndexName)
+        m.GenerateDirectoryListing()
+        return true
+      else if stat.type = "file"
+        m.mimetype = MimeType(decoded_uri)
+        m.fileLength = stat.size
+        info(m, "uri=" + uri + ", target=" + path + ", content-type=" + m.mimetype + ", content-length=" + Stri(m.fileLength).trim())
+      else
+        m.Default(403, "Not a regular file.")
+        return false
+      end if
+
+      m.source = HttpReplySource.FROMFILE
+      m.lastmod = Now() ' stat.mtime (mod date not yet available)
+      fileFinish = m.fileLength - 1
+
+      ' check for If-Modified-Since, may not have to send */
+      if_mod_since = req.fields["If-Modified-Since"]
+      if if_mod_since <> invalid
+        reqDate = date_rfc1123(if_mod_since)
+        if reqDate <> invalid and reqDate.toSeconds() >= m.lastMod.toSeconds()
+          m.header_only = true
+          lastMod = rfc1123_date(m.lastMod)
+          info(m, "not modified since " + lastMod)
+          m.Default(304, "not modified since " + lastMod)
+          return true
+        end if
+      end if
+
+      if req.range_begin_given or req.range_end_given
+        if req.range_begin_given and req.range_end_given
+          ' 100-200
+          start = req.range_begin
+          finish = req.range_end
+          ' clamp finish to fileFinish
+          if finish > fileFinish then finish = fileFinish
+        else if req.range_begin_given and not req.range_end_given
+          ' 100- :: yields 100 to end
+          start = req.range_begin
+          finish = fileFinish
+        else if not req.range_begin_given and req.range_end_given
+          ' -200 :: yields last 200
+          finish = fileFinish
+          start = finish - req.range_end + 1
+          ' check for wrapping
+          if start > finish start = 0
+        else
+          errx(1, "internal error - range start/finish logic inconsistency")
+        end if
+
+        m.start = start
+        m.length = finish - start + 1
+        m.http_code = 206
+
+        info(m, "sending range " + MakeRange(start, m.length, m.fileLength))
+      else ' no range stuff
+        m.length = m.fileLength
+        m.http_code = 200
+      end if
+
+      m.GenerateHeader()
+      return true
+    end function
+
+    function Default(errcode as integer, reason as string)
+      errname = HttpTitle(errcode)
+
+      buf = "<html><head><title>" + Stri(errcode).trim() + " " + errname + "</title></head><body>" + UnixNL()
+      buf = buf + "<h1>" + errname + "</h1>" + UnixNL()
+      buf = buf + reason + UnixNL()
+      buf = buf + "<hr>" + UnixNL()
+      buf = buf + m.GeneratedBy() + UnixNL()
+      buf = buf + "</body></html>" + UnixNL()
+
+      m.buf.fromasciistring(buf)
+      m.length = m.buf.count()
+
+      m.GenerateHeader(true)
+      m.source = HttpReplySource.GENERATED
+    end function
+
+    function Redirect(where as string)
+      m.location = where
+      message = "Moved to: <a href=" + Quote() + where + Quote() + ">" + where + "</a>"
+      m.Default(301, message)
+    end function
+
+    function Send(sock as object, bufsize as integer) as integer
+      sent = -1
+      if m.source = HttpReplySource.FROMFILE
+        if m.start + m.sent >= m.buf_start + m.buf.count()
+          m.buf_start = m.start + m.sent
+          m.buf.ReadFile(m.path, m.buf_start, bufsize)
+          info(m, "Read" + Stri(m.buf.count()) + " bytes from source file @" + itostr(m.buf_start))
+        end if
+      end if
+      buf_pos = m.start + m.sent - m.buf_start
+      buf_remaining = m.buf.count() - buf_pos
+      if buf_remaining = 0 then info(m, "source buf is empty")
+      req_remaining = m.length - m.sent
+      if buf_remaining > req_remaining then buf_remaining = req_remaining
+      sent = sock.send(m.buf, buf_pos, buf_remaining)
+      m.Log(sent, m.buf_start + buf_pos, m.length)
+      if sent > 0 then m.sent = m.sent + sent
+      return sent
+    end function
+
+    function SendHeader(sock as object, bufsize as integer) as integer
+      if m.header_sent = 0
+        sent = sock.sendStr(m.header)
+      else
+        sent = sock.sendStr(m.header.mid(m.header_sent))
+      end if
+      m.log(sent, m.header_sent, m.header_length)
+      if sent > 0 then m.header_sent = m.header_sent + sent
+      return sent
+    end function
+
+    function GenerateDirectoryListing()
+      fs = CreateObject("roFilesystem")
+      dirList = fs.GetDirectoryListing(m.path)
+      if dirList = invalid
+        m.default(500, "Couldn't list directory")
+        return false
+      end if
+
+      ' for tabbed alignment of file sizes
+      maxlen = 0
+      for each item in dirList
+        il = item.len()
+        if maxlen < il maxlen = il
+      end for
+
+      listing = "<html>" + UnixNL()
+      listing = listing + "<head>" + UnixNL()
+      listing = listing + "<title>" + m.settings.ServerName + "</title>" + UnixNL()
+      listing = listing + "</head>" + UnixNL()
+      listing = listing + "<body>" + UnixNL()
+      listing = listing + "<h1>" + URLUnescape(m.request.uri) + "</h1>" + UnixNL()
+      listing = listing + "<tt><pre>" + UnixNL()
+
+      dir = m.path.getString()
+      if dir.len() > 0 and dir.right(1) <> "/" then dir = dir + "/"
+      uriDir = m.request.uri
+      if uriDir.len() > 0 and uriDir.right(1) <> "/" then uriDir = uriDir + "/"
+
+      for each item in dirList
+        if item.left(1) <> "."
+          indicator = invalid
+          stat = fs.stat(dir + item)
+          if stat <> invalid
+            if stat.doesexist("type") and stat.type = "directory"
+              indicator = "/"
+            else if stat.doesexist("size")
+              indicator = string(maxlen - item.len(), " ") + Stri(stat.size)
+            end if
+          end if
+          if indicator <> invalid
+            uri = uriDir + item
+            safe_url = uri ' UrlEncode(uri) ' too much encoding
+            listing = listing + "<a href=" + Quote() + safe_url + Quote() + ">" + item
+            listing = listing + indicator
+            listing = listing + "</a>" + UnixNL()
+          else
+            warn(m, "insufficient stat info to include '" + dir + item + "'")
+          end if
+        end if
+      end for
+
+      listing = listing + "</pre></tt>" + UnixNL()
+      listing = listing + "<hr>" + UnixNL()
+
+      listing = listing + m.GeneratedBy() + UnixNL()
+      listing = listing + "</body>" + UnixNL()
+      listing = listing + "</html>" + UnixNL()
+
+      m.buf.FromAsciiString(listing)
+      m.length = m.buf.count()
+
+      m.http_code = 200
+      m.GenerateHeader()
+      m.source = HttpReplySource.GENERATED
+      return true
+    end function
+
+    function GenerateHeader(close = false as boolean)
+      code = m.http_code
+      title = HttpTitle(code)
+      m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
+      m.header = m.header + "Date: " + m.now + WinNL()
+      m.header = m.header + "Server: " + m.settings.PackageName + WinNL()
+      if isstr(m.location) then m.header = m.header + "Location: " + m.location + WinNL()
+      m.header = m.header + m.KeepAlive(close) + WinNL()
+      m.header = m.header + "Content-Length:" + Stri(m.length) + WinNL()
+      if code = 206 then m.header = m.header + "Content-Range: bytes" + m.MakeRange(m.start, m.length, m.filelength) + WinNL()
+      m.header = m.header + "Content-Type: " + m.mimetype + WinNL()
+      m.header = m.header + "Accept-Ranges: bytes" + WinNL()
+      m.header = m.header + WinNL()
+      m.header_length = m.header.len()
+    end function
+
+    function Done()
+      return m.sent = m.length
+    end function
+
+    function DoneHeader()
+      return m.header_sent = m.header_length
+    end function
+
+    function Log(recent as integer, from as integer, total as integer)
+      info(m, "Sent" + Stri(recent) + " [" + m.MakeRange(from, recent, total) + "]")
+    end function
+
+    function KeepAlive(close as boolean) as string
+      if close then base = "Connection: close" else base = "Keep-Alive: timeout=" + Stri(m.settings.Idletime).trim()
+      return base
+    end function
+
+    function GeneratedBy()
+      return "generated by " + m.settings.PackageName + " on " + m.now
+    end function
+
+    function MakeRange(start as integer, length as integer, total as integer)
+      return itostr(start) + "-" + itostr(start + length - 1) + "/" + itostr(total)
+    end function
+
+  end class
+end namespace
