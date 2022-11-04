@@ -97,11 +97,11 @@ namespace RokuYoutube.Services.Invidious
     function GetAuthorizeTokenLink()
         'https://<invidious_host>/authorize_token?scopes=<SCOPE>&callback_url=<LOCAL_ROKU_SERVER>&expire=<EXPIRE>
         invidiousHost = strReplace(API_URL, "https://", "http://")
-        scope = "GET:feed"
+        scope = ":*"
 
         localIp = "192.168.1.107"
         webServerPort = 8888
-        expire = 60 * 60 * 24 * 30
+        expire = Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
 
         callbackUrl = UrlEncode(`http://${localIp}:${webServerPort}/token_callback`)
         return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
@@ -113,7 +113,7 @@ namespace RokuYoutube.Services.Invidious
             return invalid
         end if
         return {
-            "Authentication": `Bearer ${token}`
+            "Authorization": `Bearer ${token}`
         }
     end function
 
@@ -125,7 +125,10 @@ namespace RokuYoutube.Services.Invidious
 
         url = `${API_URL}${AUTH_FEED}`
 
-        args = { headers: headers }
+        args = {
+            headers: headers,
+            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
+        }
 
         response = Requests().get(url, args)
         if response.statuscode = 200
