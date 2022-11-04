@@ -1,3 +1,5 @@
+import "pkg:/source/utils/Registry.bs"
+
 namespace RokuYoutube.Http
   function GetHttpReplyId()
     m.http_reply_id = validint(m.http_reply_id) + 1
@@ -58,6 +60,20 @@ namespace RokuYoutube.Http
       ' work out path of file being requested
       req = m.request
       uri = req.uri
+
+      ' TODO: move to proper middleware system
+      if uri.StartsWith("/token_callback")
+        components = UrlQueryComponents(uri)
+        if components["token"] <> invalid
+          ' Token is encoded twice for some reason
+          token = UrlUnescape(components["token"]).DecodeUriComponent()
+          print(`Got Token: ${token}`)
+          RokuYoutube.Utils.Registry.Write("token", token)
+        end if
+        m.Default(200, "OK")
+        return true
+      end if
+
       decoded_uri = UrlUnescape(uri)
       path = CreateObject("roPath", m.settings.WwwRoot + decoded_uri)
       fs = CreateObject("roFilesystem")

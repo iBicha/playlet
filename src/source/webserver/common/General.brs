@@ -37,3 +37,10 @@ Function IsHD()
     return false
 End Function
 
+Function GetLocalIpAddress()
+    di = CreateObject("roDeviceInfo")
+    ips = di.GetIPAddrs()
+    for each ip in ips
+        return ips[ip]
+    end for
+End Function

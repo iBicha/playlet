@@ -1,9 +1,10 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/models/SearchSuggestionResult.bs"
 import "pkg:/source/models/SearchFilter.bs"
+import "pkg:/source/utils/Registry.bs"
 
 namespace RokuYoutube.Services.Invidious
-    const API_URL = "https://invidious.esmailelbob.xyz"
+    const API_URL = "https://vid.puffyan.us"
     const POPULAR_ENDPOINT = "/api/v1/popular"
     const TRENDING_ENDPOINT = "/api/v1/trending"
 
@@ -11,6 +12,8 @@ namespace RokuYoutube.Services.Invidious
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
+
+    const AUTH_FEED = "/api/v1/auth/feed"
 
     function GetPopular()
         url = `${API_URL}${POPULAR_ENDPOINT}`
@@ -88,6 +91,48 @@ namespace RokuYoutube.Services.Invidious
 
         if response.statuscode = 200
             return response.json
+        end if
+    end function
+
+    function GetAuthorizeTokenLink()
+        ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
+        invidiousHost = strReplace(API_URL, "https://", "http://")
+        scope = ":*"
+
+        localIp = GetLocalIpAddress()
+        webServerPort = 8888
+        expire = Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
+
+        callbackUrl = UrlEncode(`http://${localIp}:${webServerPort}/token_callback`)
+        return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
+    end function
+
+    function GetAuthenticationHeaders()
+        token = RokuYoutube.Utils.Registry.Read("token")
+        if token = invalid
+            return invalid
+        end if
+        return {
+            "Authorization": `Bearer ${token}`
+        }
+    end function
+
+    function GetUserFeed()
+        headers = GetAuthenticationHeaders()
+        if headers = invalid
+            return invalid
+        end if
+
+        url = `${API_URL}${AUTH_FEED}`
+
+        args = {
+            headers: headers,
+            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
+        }
+
+        response = Requests().get(url, args)
+        if response.statuscode = 200
+            return response.json.videos
         end if
     end function
 end namespace

@@ -139,6 +139,22 @@ function UrlUnescape(url as String) as String
     return ue.unescape(url)
 end function
 
+function UrlQueryComponents(url as String)
+    query = {}
+    index = Instr(0, url, "?")
+    url = Mid(url, index+1)
+    components = url.split("&")
+    for each component in components
+        if Instr(0, component, "=")
+            keyValue = component.split("=")
+            query[keyValue[0]] = keyValue[1]
+        else
+            query[keyValue[0]] = ""
+        end if
+    end for
+    return query
+end function
+
 function MimeType(uri="" as String) as String
     map = m.MimeTypes
     if map = invalid
