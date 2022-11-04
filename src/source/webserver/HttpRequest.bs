@@ -1,0 +1,100 @@
+namespace RokuYoutube.Http
+  function GetHttpRequestId()
+    m.http_request_id = validint(m.http_request_id) + 1
+    return m.http_request_id
+  end function
+
+  class HttpRequest
+    const Unix2NewLine = UnixNL() + UnixNL()
+    const Windows2NewLine = WinNL() + WinNL()
+
+    ' members
+    private method = invalid
+    private uri = invalid
+    private protocol = invalid
+    private buf = invalid
+    private fields = invalid
+    private id = 0
+    ' copied members
+    private range_begin = 0
+    private range_end = 0
+    private range_begin_given = false
+    private range_end_given = false
+    private ok = true
+
+    function new()
+      m.id = GetHttpRequestId()
+      m.fields = CreateObject("roAssociativeArray")
+    end function
+
+    function Add(incoming as string)
+      if isstr(m.buf) then m.buf = m.buf + incoming else m.buf = incoming
+    end function
+
+    function IsComplete() as boolean
+      buf = m.buf
+      complete = isstr(buf) and (right(buf, 2) = m.Unix2NewLine) or (right(buf, 4) = m.Windows2NewLine)
+      'if complete then info(m,"header:"+UnixNL()+buf)
+      return complete
+
+    end function
+
+    function Parse(connection as HttpConnection) as boolean
+      lines = m.buf.tokenize(WinNL())
+      operation = lines.RemoveHead()
+      if operation <> invalid
+        parts = operation.tokenize(" ")
+        if parts.count() = 3
+          m.method = Ucase(parts.RemoveHead())
+          m.uri = parts.RemoveHead()
+          m.protocol = Ucase(parts.RemoveHead())
+          info(m, m.method + " '" + m.uri + "'")
+          for each line in lines
+            av = line.tokenize(": ")
+            if av.count() = 2 then m.fields[av.GetHead()] = av.GetTail()
+          end for
+          ' interpret some fields if present
+          m.ParseRange()
+          m.ParseConnection(connection)
+        else
+          err(m, "invalid request: " + operation)
+          m.ok = false
+        end if
+      else
+        err(m, "empty request")
+        m.ok = false
+      end if
+      return m.ok
+    end function
+
+    function ParseRange()
+      range = m.fields.range
+      if range <> invalid
+        endpoints = lcase(range).tokenize("=")
+        if endpoints.count() = 2 and endpoints.GetHead() = "bytes"
+          range = endpoints.GetTail().Trim()
+          hyphen = range.instr("-")
+          if hyphen > 0
+            m.range_begin = strtoi(range.left(hyphen))
+            m.range_begin_given = true
+          end if
+          last = range.len() - 1
+          if hyphen < last
+            m.range_end = strtoi(range.right(last - hyphen))
+            m.range_end_given = true
+          end if
+        end if
+        info(m, "range request begin" + Stri(m.range_begin) + " end" + Stri(m.range_end))
+      end if
+    end function
+
+    function ParseConnection(connection as HttpConnection) as boolean
+      connectionStr = m.fields.connection
+      if connectionStr <> invalid then connection.close = (lcase(connectionStr.trim()) = "close")
+    end function
+
+    function Process(connection as HttpConnection) as boolean
+      return m.Parse(connection)
+    end function
+  end class
+end namespace

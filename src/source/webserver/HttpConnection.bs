@@ -1,0 +1,165 @@
+namespace RokuYoutube.Http
+  class HttpConnection
+    const BUFSIZE = 65536
+
+    private total_received = 0
+    private total_sent = 0
+    private id = "<uninit>"
+    private close = true
+    private state = HttpConnectionState.INIT
+
+    private settings = invalid as HttpSettings
+
+    function new(settings as HttpSettings)
+      m.settings = settings
+      m.Reset()
+    end function
+
+    function Reset()
+      ' re-initializes all instance members
+      m.socket = invalid
+      m.addr = invalid
+      m.Restart()
+    end function
+
+    function Restart()
+      ' re-initializes members for next request-reply
+      m.last_active = CreateObject("roTimespan")
+      m.request = new HttpRequest()
+      m.header = invalid
+      m.reply = invalid
+      m.header_only = false
+      m.http_code = 0
+      m.close = true
+      m.SetState(HttpConnectionState.INIT)
+    end function
+
+    function Recycle()
+      info(m, "recycle")
+      m.Restart()
+      m.SetState(HttpConnectionState.RECV_REQUEST) ' ready for another
+    end function
+
+    function Accepted(server as HttpServer, socket as object)
+      m.socket = socket
+      m.id = Stri(socket.getID()).trim()
+      m.SetState(HttpConnectionState.RECV_REQUEST)
+      m.client = m.socket.getReceivedFromAddress().getAddress()
+
+      info(m, "accepted connection @" + m.client)
+
+      ' try to read right away rather than going through another iteration
+      ' of the poll loop.
+      m.PollRequest(server)
+    end function
+
+    function PollRequest(server as HttpServer)
+      if m.state <> HttpConnectionState.RECV_REQUEST then errx(m, "illegal request state @" + m.client)
+
+      rcvStr = m.socket.receiveStr(m.BUFSIZE)
+      received = rcvStr.len()
+
+      if m.CheckResult(received, "receive request")
+        m.total_received = m.total_received + received
+        server.total_in = server.total_in + received
+      end if
+
+      ' append to connection request
+      m.request.add(rcvStr)
+
+      if m.request.IsComplete()
+        server.num_requests = validint(server.num_requests) + 1
+        if m.request.Process(m)
+          m.reply = new HttpReply(m.request, m.settings)
+          m.reply.Process()
+          m.SetState(HttpConnectionState.SEND_HEADER)
+        else
+          m.setState(HttpConnectionState.DONE)
+          m.close = true
+          err(m, "couldn't process request or reply, closing @" + m.client)
+        end if
+      else if m.request.buf.len() > m.settings.MaxRequestLength ' die if it's too long
+        m.reply = new HttpReply(m.request, m.settings)
+        m.reply.Default(413, "Your request was dropped because it was too long.")
+        m.SetState(HttpConnectionState.SEND_HEADER)
+      end if
+
+      ' if we've moved on to the next state, try to send right away, instead of
+      ' going through another iteration of the poll loop.
+      '
+      if m.state = HttpConnectionState.SEND_HEADER then m.PollHeader(server)
+
+    end function
+
+    function PollHeader(server as HttpServer) as boolean
+      if m.state <> HttpConnectionState.SEND_HEADER errx(m, "illegal header state @" + m.client)
+
+      sent = m.reply.SendHeader(m.socket, m.BUFSIZE)
+
+      if m.CheckResult(sent, "send header")
+        m.total_sent = m.total_sent + sent
+        server.total_out = server.total_out + sent
+      end if
+
+      if m.reply.DoneHeader()
+        if m.reply.header_only
+          m.SetState(HttpConnectionState.DONE)
+        else
+          m.SetState(HttpConnectionState.SEND_REPLY)
+          m.PollReply(server)
+        end if
+      end if
+    end function
+
+    function PollReply(server as HttpServer)
+      if m.state <> HttpConnectionState.SEND_REPLY or m.reply.header_only then errx(m, "illegal reply state @" + m.client)
+
+      sent = m.reply.Send(m.socket, m.BUFSIZE)
+      if m.CheckResult(sent, "send reply")
+        m.total_sent = m.total_sent + sent
+        server.total_out = server.total_out + sent
+      end if
+
+      if m.reply.Done() then m.SetState(HttpConnectionState.DONE)
+    end function
+
+    function CheckTimeout(timeout as integer)
+      if m.last_active.totalSeconds() > timeout
+        m.close = true
+        m.SetState(HttpConnectionState.DONE)
+      end if
+    end function
+
+    function CheckResult(byteCount as integer, op as string) as boolean
+      gotSome = false
+      if byteCount > 0
+        m.last_active.mark()
+        gotSome = true
+      else if m.socket.eOK() and not m.socket.eSuccess()
+        'info(m,op + " would have blocked @"+m.client)
+      else
+        if m.socket.eSuccess()
+          info(m, op + " peer closed @" + m.client)
+        else
+          err(m, op + " transfer error @" + m.client, m.socket.status())
+        end if
+        m.close = true
+        m.SetState(HttpConnectionState.DONE)
+      end if
+      return gotSome
+    end function
+
+    function SetState(newState as HttpConnectionState)
+      if m.state <> newState
+        'info(m,"state change" + Stri(m.state) + " ->" + Stri(newState))
+        m.state = newState
+      end if
+    end function
+
+    function Log()
+      if m.http_code <> 0 and isnonemptystr(m.method)
+        print m.last_active.totalSeconds(); " client:"; m.client; " meth:"; m.method; " uri:"; m.uri; " code:"; m.code; " sent:"; m.total_sent; " referer:"; m.referer; " user agent:"; m.user_agent
+      end if
+    end function
+  end class
+end namespace
