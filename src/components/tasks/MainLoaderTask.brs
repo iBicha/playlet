@@ -78,5 +78,6 @@ function GetItemData(video as object) as object
     item.releaseDate = video.publishedText
     item.id = video.videoId
     item.length = video.lengthSeconds
+    item.author = video.author
     return item
 end function
