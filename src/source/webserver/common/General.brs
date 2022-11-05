@@ -39,6 +39,7 @@ end function
 
 function GetLocalIpAddress()
     if m.ipAddress = invalid or m.ipAddress = "" then
+        di = CreateObject("roDeviceInfo")
         ips = di.GetIPAddrs()
         for each ip in ips
             m.ipAddress = ips[ip]
