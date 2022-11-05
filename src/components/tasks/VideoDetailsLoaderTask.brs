@@ -23,7 +23,18 @@ end sub
 function GetVideoMetadata()
     videoId = m.top.getField("videoid")
 
-    return RokuYoutube.Services.Invidious.GetVideoMetadataForVideo(videoId)
+    videoMetadata = RokuYoutube.Services.Invidious.GetVideoMetadata(videoId)
+    lastItag = videoMetadata.formatStreams[videoMetadata.formatStreams.Count() - 1].itag
+
+    ' GetVideoUrl returns a url with the local=true, leading to less change of rate limit (403) - maybe?
+    ' TODO: is this reliable?
+    videoUrl = RokuYoutube.Services.Invidious.GetVideoUrl(videoId, lastItag)
+    videoMetadata.formatStreams.push({
+        itag: lastItag,
+        url: videoUrl
+    })
+
+    return videoMetadata
 end function
 
 function GetVideoSponsorBlock()
