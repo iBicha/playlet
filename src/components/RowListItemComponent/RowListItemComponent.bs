@@ -7,6 +7,7 @@ sub OnContentSet()
         m.top.FindNode("titleLabel").text = content.title
         m.top.FindNode("authorLabel").text = content.author
         m.top.FindNode("dateLabel").text = content.releaseDate
+        m.top.FindNode("viewCountLabel").text = FormatViewCount(content.viewCount)
         m.top.FindNode("poster").uri = content.hdPosterUrl
         if content.length <> invalid and content.length <> 0
             m.top.FindNode("durationLabel").text = RokuYoutube.Utils.GetFormattedTime(content.length)
@@ -15,3 +16,25 @@ sub OnContentSet()
         end if
     end if
 end sub
+
+function FormatViewCount(viewCount)
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)} views`
+    end if
+
+    viewCount = viewCount / 1000
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)}K views`
+    end if
+
+    viewCount = viewCount / 1000
+    return `${FormatFloat(viewCount)}M views`
+end function
+
+function FormatFloat(X)
+    X = X * 10
+    X = X + 0.5
+    X = Fix(X)
+    X = X / 10
+    return X
+end function
