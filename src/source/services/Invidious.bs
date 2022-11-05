@@ -14,6 +14,7 @@ namespace RokuYoutube.Services.Invidious
     const SEARCH_ENDPOINT = "/api/v1/search"
 
     const AUTH_FEED = "/api/v1/auth/feed"
+    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
 
     function GetCountryCode()
         if m.countryCode = invalid or m.countryCode = "" then
@@ -164,5 +165,29 @@ namespace RokuYoutube.Services.Invidious
         if response.statuscode = 200
             return response.json.videos
         end if
+    end function
+
+    function GetUserPlaylists()
+        headers = GetAuthenticationHeaders()
+        if headers = invalid
+            return invalid
+        end if
+
+        url = `${API_URL}${AUTH_PLAYLISTS}`
+
+        args = {
+            headers: headers,
+            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
+        }
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 403
+            RokuYoutube.Utils.Registry.Delete("token")
+        end if
+        if response.statuscode = 200
+            return response.json
+        end if
+
     end function
 end namespace

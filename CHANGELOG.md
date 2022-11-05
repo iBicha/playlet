@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web server allowing the recption of the token through call back
   - The web server can also be used to serve a web app, facilitating the
     configuration of the Roku app, as well as controlling the app itself
-- Added `auth/feed`, to read the subscriptions of the current user
+- `auth/feed`, to read the subscriptions of the current user
 - Video information (Author, view count, release date)
-- Added trending categories, subscription view, and custom (hardcoded) search categories
+- Trending categories, subscription view, and custom (hardcoded) search categories
+- User Playlist support
 
 ## [0.1.0] - 2022-10-30
 ### Added

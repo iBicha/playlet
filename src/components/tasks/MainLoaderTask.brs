@@ -40,6 +40,17 @@ sub GetContent()
         end if
     end for
 
+    playlists = RokuYoutube.Services.Invidious.GetUserPlaylists()
+    if playlists <> invalid
+        for each playlist in playlists
+            data = GetCategoryContent(`Playlist - ${playlist.title}`, playlist.videos)
+            if data <> invalid
+                rootChildren.Push(data)
+            end if
+
+        end for
+    end if
+
     ' set up a root ContentNode to represent rowList on the GridScreen
     contentNode = CreateObject("roSGNode", "ContentNode")
     contentNode.Update({
