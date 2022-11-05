@@ -33,7 +33,7 @@ sub GetContent()
 
     keywords = ["Funny Animals", "News"]
     for each keyword in keywords
-        json = RokuYoutube.Services.Invidious.Search(keyword, 0, RokuYoutube.Models.Invidious.SearchFilter.SortBy.UploadDate)
+        json = RokuYoutube.Services.Invidious.Search(keyword, invalid, RokuYoutube.Models.Invidious.SearchFilter.SortBy.UploadDate)
         data = GetCategoryContent(keyword, json)
         if data <> invalid
             rootChildren.Push(data)
