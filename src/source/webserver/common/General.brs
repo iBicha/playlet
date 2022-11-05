@@ -9,38 +9,40 @@ REM
 '******************************************************
 'Get our device version
 '******************************************************
-Function GetDeviceVersion()
-    if m.softwareVersion = invalid OR m.softwareVersion = "" then
+function GetDeviceVersion()
+    if m.softwareVersion = invalid or m.softwareVersion = "" then
         m.softwareVersion = CreateObject("roDeviceInfo").GetVersion()
     end if
     return m.softwareVersion
-End Function
+end function
 
 
 '******************************************************
 'Get our serial number
 '******************************************************
-Function GetDeviceESN()
-    if m.serialNumber = invalid OR m.serialNumber = "" then
+function GetDeviceESN()
+    if m.serialNumber = invalid or m.serialNumber = "" then
         m.serialNumber = CreateObject("roDeviceInfo").GetDeviceUniqueId()
     end if
     return m.serialNumber
-End Function
+end function
 
 
 '******************************************************
 'Determine if the UI is displayed in SD or HD mode
 '******************************************************
-Function IsHD()
+function IsHD()
     di = CreateObject("roDeviceInfo")
     if di.GetDisplayMode() = "720p" then return true
     return false
-End Function
+end function
 
-Function GetLocalIpAddress()
-    di = CreateObject("roDeviceInfo")
-    ips = di.GetIPAddrs()
-    for each ip in ips
-        return ips[ip]
-    end for
-End Function
+function GetLocalIpAddress()
+    if m.ipAddress = invalid or m.ipAddress = "" then
+        ips = di.GetIPAddrs()
+        for each ip in ips
+            m.ipAddress = ips[ip]
+            return m.ipAddress
+        end for
+    end if
+end function

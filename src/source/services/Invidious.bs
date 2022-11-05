@@ -15,9 +15,26 @@ namespace RokuYoutube.Services.Invidious
 
     const AUTH_FEED = "/api/v1/auth/feed"
 
+    function GetCountryCode()
+        if m.countryCode = invalid or m.countryCode = "" then
+            m.countryCode = CreateObject("roDeviceInfo").GetUserCountryCode()
+        end if
+        return m.countryCode
+    end function
+
+    function DefaultArgs()
+        return {
+            params: {
+                region: GetCountryCode()
+            }
+        }
+    end function
+
     function GetPopular()
         url = `${API_URL}${POPULAR_ENDPOINT}`
-        response = Requests().get(url)
+
+        args = DefaultArgs()
+        response = Requests().get(url, args)
 
         if response.statuscode = 200
             return response.json
@@ -27,7 +44,7 @@ namespace RokuYoutube.Services.Invidious
     function GetTrending(trendingType = invalid as string)
         url = `${API_URL}${TRENDING_ENDPOINT}`
 
-        args = { params: {} }
+        args = DefaultArgs()
         if trendingType <> invalid
             args.params.type = trendingType
         end if
@@ -45,7 +62,9 @@ namespace RokuYoutube.Services.Invidious
 
     function GetVideoMetadata(videoId as string)
         url = `${API_URL}${VIDEOS_ENDPOINT}/${videoId}`
-        response = Requests().get(url)
+
+        args = DefaultArgs()
+        response = Requests().get(url, args)
 
         ' TODO: handle 500 {"error":"This video is unavailable"}
         if response.statuscode = 200
@@ -55,11 +74,9 @@ namespace RokuYoutube.Services.Invidious
 
     function SearchSuggestions(q as string) as SearchSuggestionResult
         url = `${API_URL}${SEARCH_SUGGEST_ENDPOINT}`
-        args = {
-            params: {
-                q: q
-            }
-        }
+
+        args = DefaultArgs()
+        args.params.q = q
         response = Requests().get(url, args)
 
         if response.statuscode = 200
@@ -70,32 +87,27 @@ namespace RokuYoutube.Services.Invidious
     function Search(q as string, page = invalid as integer, sort_by = invalid as RokuYoutube.Models.Invidious.SearchFilter.SortBy, date = invalid as RokuYoutube.Models.Invidious.SearchFilter.Date, duration = invalid as RokuYoutube.Models.Invidious.SearchFilter.Duration, _type = invalid as RokuYoutube.Models.Invidious.SearchFilter.SearchType, features = invalid as RokuYoutube.Models.Invidious.SearchFilter.Features)
         url = `${API_URL}${SEARCH_ENDPOINT}`
 
-        params = {
-            q: q
-        }
+        args = DefaultArgs()
+        args.params.q = q
 
         if page <> invalid
-            params.page = Str(page)
+            args.params.page = Str(page)
         end if
         if sort_by <> invalid
-            params.sort_by = sort_by
+            args.params.sort_by = sort_by
         end if
         if date <> invalid
-            params.date = date
+            args.params.date = date
         end if
         if duration <> invalid
-            params.duration = duration
+            args.params.duration = duration
         end if
         if _type <> invalid
-            params.type = _type
+            args.params.type = _type
         end if
         if features <> invalid
-            params.features = features.join(",")
+            args.params.features = features.join(",")
         end if
-
-        args = {
-            params: params
-        }
 
         response = Requests().get(url, args)
 
