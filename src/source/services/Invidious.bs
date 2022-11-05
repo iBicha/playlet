@@ -94,6 +94,10 @@ namespace RokuYoutube.Services.Invidious
         end if
     end function
 
+    function GetCurrentHost()
+        return API_URL
+    end function
+
     function GetAuthorizeTokenLink()
         ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
         invidiousHost = strReplace(API_URL, "https://", "http://")
@@ -131,6 +135,10 @@ namespace RokuYoutube.Services.Invidious
         }
 
         response = Requests().get(url, args)
+
+        if response.statuscode = 403
+            RokuYoutube.Utils.Registry.Delete("token")
+        end if
         if response.statuscode = 200
             return response.json.videos
         end if
