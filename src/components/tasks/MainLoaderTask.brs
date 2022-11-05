@@ -9,11 +9,15 @@ end sub
 sub GetContent()
     rootChildren = []
 
-    trendingJson = RokuYoutube.Services.Invidious.GetTrending()
-    trending = GetCategoryContent("Trending", trendingJson)
-    if trending <> invalid
-        rootChildren.Push(trending)
-    end if
+    trendingTypes = [invalid, "Music", "Gaming", "Movies"]
+    for each trendingType in trendingTypes
+        trendingJson = RokuYoutube.Services.Invidious.GetTrending(trendingType)
+        title = trendingType <> invalid ? `Trending - ${trendingType}` : "Trending"
+        trending = GetCategoryContent(title, trendingJson)
+        if trending <> invalid
+            rootChildren.Push(trending)
+        end if
+    end for
 
     popularJson = RokuYoutube.Services.Invidious.GetPopular()
     popular = GetCategoryContent("Popular", popularJson)
@@ -27,6 +31,15 @@ sub GetContent()
         rootChildren.Push(feed)
     end if
 
+    keywords = ["Funny Animals", "News"]
+    for each keyword in keywords
+        json = RokuYoutube.Services.Invidious.Search(keyword, 0, RokuYoutube.Models.Invidious.SearchFilter.SortBy.UploadDate)
+        data = GetCategoryContent(keyword, json)
+        if data <> invalid
+            rootChildren.Push(data)
+        end if
+    end for
+
     ' set up a root ContentNode to represent rowList on the GridScreen
     contentNode = CreateObject("roSGNode", "ContentNode")
     contentNode.Update({
@@ -38,7 +51,7 @@ sub GetContent()
 end sub
 
 function GetCategoryContent(category as string, json as object) as object
-    if json <> invalid
+    if json <> invalid and json.Count() > 0
         row = {}
         row.title = category
         row.children = []
