@@ -45,12 +45,11 @@ You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll
 
 ### Install Youbtube for Roku (Manual)
 1. Go to `https://github.com/iBicha/roku-youtube/releases` and download `roku-youtube.zip`
-2. Open `http://REPLACE_IP_ADDRESS_HERE/ (e.g. http://192.168.1.2/) in your browser
+2. Open `http://REPLACE_IP_ADDRESS_HERE/` (e.g. http://192.168.1.2/) in your browser
 3. If prompted for username and password
   - The username is `rokudev`
   - The password is whatever you set when you enabled Developer mode
-4. Click on `Upload` button
-5. Select `roku-youtube.zip` you downloaded
+4. Click on `Upload` button and select the `roku-youtube.zip` file you downloaded in step 1
 6. Click `Install with zip` button
   - If you're updating the app (or you already have a dev channel) the button would say `Replace with zip`
 
