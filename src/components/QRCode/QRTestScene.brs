@@ -1,28 +1,17 @@
 ' Credits to https://github.com/kazuhikoarase/qrcode-generator/pull/110
+import "pkg:/source/services/Invidious.bs"
 
 sub init()
-	print "Init: "; m.top.subtype()
+	m.instructions = m.top.findNode("instructions")
 
-	timer = CreateObject("roTimespan")
-	timer.mark()
+	text = "- Scan the QR Code" + chr(10)
+	text += "- Login (Create account if needed)" + chr(10)
+	text += "- Scan the QR Code again" + chr(10)
+	text += "- Click ""Authorize""" + chr(10)
+	text += "- If the error ""Invalid signature"" shows, press back and ""Authorize"" again" + chr(10)
+	text += "- Your TV should go to home screen automatically" + chr(10)
+	text += chr(10) + chr(10) + chr(10)
+	text += "Invidious instance: " + RokuYoutube.Services.Invidious.GetCurrentHost()
 
-	m.QRCode = createObject("roSGNode", "TestQRCode")
-
-	print "Creating QRCode took:", timer.TotalMilliseconds().ToStr();"ms"
-
-	timer.mark()
-
-	m.QRPoster = m.top.findNode("TestQRPoster")
-	m.QRPoster.qrcode = m.QRCode
-
-	print "Creating PNG took:", timer.TotalMilliseconds().ToStr();"ms"
-	print "QRCode image created as:", m.QRPoster.uri
-
-	timer.mark()
-
-	m.QRPrinter = createObject("roSGNode", "QRPrinter")
-	m.QRPrinter.qrcode = m.QRCode
-	print m.QRPrinter.qrstring
-
-	print "Printing to console took:", timer.TotalMilliseconds().ToStr();"ms"
+	m.instructions.text = text
 end sub

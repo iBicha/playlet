@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video information (Author, view count, release date)
 - Trending categories, subscription view, and custom (hardcoded) search categories
 - User Playlist support
+- Added basic instructions
 
 ## [0.1.0] - 2022-10-30
 ### Added
