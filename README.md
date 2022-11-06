@@ -17,13 +17,15 @@ Using your Roku remote, enter the following sequence:
 
 For full instructions, see [Set up your Roku device to enable Developer Settings](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md#step-1-set-up-your-roku-device-to-enable-developer-settings)
 
+Make sure to remember the password you set during this step, you will need it later.
+
 ### Gather your info
 By now, you show have the following
 - Your Roku Dev password (setup in the previous step)
 - Your Roku TV local IP address
   - You can find this information in your TV network settings. It should look like 192.168.X.X or so
 
-### Install Youbtube for Roku
+### Install Youbtube for Roku (command line)
 
 Install Youbtube for Roku as a dev channel using this command, and replace:
 - `REPLACE_PASSWORD_HERE` : with your Roku Dev password
@@ -37,10 +39,20 @@ curl https://raw.githubusercontent.com/iBicha/roku-youtube/main/install.sh | ROK
 ```
 
 
-If successful, you should see some output on your terminal, ending with 200%.
+If successful, you should see some output on your terminal, with `Status: 200`.
 
 You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll get this thing a logo)
 
+### Install Youbtube for Roku (Manual)
+1. Go to `https://github.com/iBicha/roku-youtube/releases` and download `roku-youtube.zip`
+2. Open `http://REPLACE_IP_ADDRESS_HERE/ (e.g. http://192.168.1.2/) in your browser
+3. If prompted for username and password
+  - The username is `rokudev`
+  - The password is whatever you set when you enabled Developer mode
+4. Click on `Upload` button
+5. Select `roku-youtube.zip` you downloaded
+6. Click `Install with zip` button
+  - If you're updating the app (or you already have a dev channel) the button would say `Replace with zip`
 
 ## Development
 1. `git clone https://github.com/iBicha/roku-youtube.git`
