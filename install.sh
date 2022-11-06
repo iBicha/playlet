@@ -23,8 +23,8 @@ curl -L https://github.com/iBicha/roku-youtube/releases/latest/download/roku-you
 
 echo "Installing app on device at $ROKU_DEV_TARGET ..."
 
-curl --user rokudev:$DEVPASSWORD --digest --silent --show-error -F "mysubmit=Install" -F "archive=@$tmp_zip_file" --output $tmp_http_response_file --write-out "%{http_code}" http://$ROKU_DEV_TARGET/plugin_install
+curl --user rokudev:$DEVPASSWORD --digest --silent --show-error -F "mysubmit=Install" -F "archive=@$tmp_zip_file" --output $tmp_http_response_file --write-out "Status: %{http_code}" http://$ROKU_DEV_TARGET/plugin_install
 
-echo "\nDeleting temprary folder ..."
+echo "\nDeleting temporary folder ..."
 
 rm -rf $tmp_folder
