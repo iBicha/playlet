@@ -25,6 +25,6 @@ echo "Installing app on device at $ROKU_DEV_TARGET ..."
 
 curl --user rokudev:$DEVPASSWORD --digest --silent --show-error -F "mysubmit=Install" -F "archive=@$tmp_zip_file" --output $tmp_http_response_file --write-out "%{http_code}" http://$ROKU_DEV_TARGET/plugin_install
 
-echo "Deleting temprary folder ..."
+echo "\nDeleting temprary folder ..."
 
 rm -rf $tmp_folder
