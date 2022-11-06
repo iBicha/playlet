@@ -68,7 +68,7 @@ sub OnVideoPlayerStateChange()
         end if
     end if
 
-    if state = "finished" and m.ignoreNextFinishedState
+    if state = "finished" and m.ignoreNextFinishedState = true
         m.ignoreNextFinishedState = false
         return
     end if
