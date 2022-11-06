@@ -6,7 +6,7 @@ sub ShowVideoScreen(videoMetadata as object, videoSponsorBlock as object)
     SetCaptions(videoMetadata, m.videoPlayer, rowNode)
     m.videoPlayer.content = rowNode
 
-    ShowScreen(m.videoPlayer) 
+    ShowScreen(m.videoPlayer)
     m.videoPlayer.control = "play"
     m.videoPlayer.ObserveField("state", "OnVideoPlayerStateChange")
     m.videoPlayer.ObserveField("visible", "OnVideoVisibleChange")
@@ -46,8 +46,30 @@ sub SetCaptions(videoMetadata as object, videoPlayer as object, contentNode as o
     }
 end sub
 
-sub OnVideoPlayerStateChange() 
+sub OnVideoPlayerStateChange()
     state = m.videoPlayer.state
+
+    ' A hack to see if we could use the proxy here
+    if state = "error"
+        errorInfo = m.videoPlayer.errorInfo
+        if errorInfo.category = "http"
+            url = m.videoPlayer.content.url
+            if url.InStr("local=true") = -1
+                print(`Video ${url} failed to play. Trying a proxy (local=true)`)
+                m.videoPlayer.content.url = url + "&local=true"
+                ' This video errored, and is about to finish, so don't close the video yet
+                ' TODO: perhaps creating a second player is better?
+                m.ignoreNextFinishedState = true
+                m.videoPlayer.control = "play"
+                return
+            end if
+        end if
+    end if
+
+    if state = "finished" and m.ignoreNextFinishedState
+        m.ignoreNextFinishedState = false
+        return
+    end if
 
     if state = "error" or state = "finished"
         CloseScreen(m.videoPlayer)
@@ -64,7 +86,7 @@ sub OnVideoVisibleChange()
     end if
 end sub
 
-sub OnVideoPositionChange() 
+sub OnVideoPositionChange()
     SkipSponsorBlockSections()
 end sub
 
