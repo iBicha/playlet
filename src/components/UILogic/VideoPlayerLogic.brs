@@ -1,3 +1,5 @@
+import "pkg:/source/services/Invidious.bs"
+
 sub ShowVideoScreen(videoMetadata as object, videoSponsorBlock as object)
     m.videoPlayer = CreateObject("roSGNode", "Video")
     rowNode = CreateObject("roSGNode", "ContentNode")
@@ -42,7 +44,7 @@ sub SetCaptions(videoMetadata as object, videoPlayer as object, contentNode as o
 
     contentNode.SubtitleConfig = {
         ShowSubtitle: 1,
-        TrackName: "https://invidious.esmailelbob.xyz" + selectedCaption.url
+        TrackName: RokuYoutube.Services.Invidious.GetCurrentHost() + selectedCaption.url
     }
 end sub
 
