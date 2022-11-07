@@ -73,7 +73,17 @@ namespace RokuYoutube.Services.Invidious
 
         ' TODO: handle 500 {"error":"This video is unavailable"}
         if response.statuscode = 200
-            return response.json
+            videoMetadata = response.json
+            lastItag = videoMetadata.formatStreams[videoMetadata.formatStreams.Count() - 1].itag
+
+            ' GetVideoUrl returns a url that redirects to the video stream
+            ' TODO: is this reliable?
+            videoUrl = RokuYoutube.Services.Invidious.GetVideoUrl(videoId, lastItag, false)
+
+            videoMetadata.formatStreams.push({
+                itag: lastItag,
+                url: videoUrl
+            })
         end if
     end function
 

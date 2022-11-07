@@ -23,19 +23,7 @@ end sub
 function GetVideoMetadata()
     videoId = m.top.getField("videoid")
 
-    videoMetadata = RokuYoutube.Services.Invidious.GetVideoMetadata(videoId)
-    lastItag = videoMetadata.formatStreams[videoMetadata.formatStreams.Count() - 1].itag
-
-    ' GetVideoUrl returns a url that redirects to the video stream
-    ' TODO: is this reliable?
-    videoUrl = RokuYoutube.Services.Invidious.GetVideoUrl(videoId, lastItag, false)
-
-    videoMetadata.formatStreams.push({
-        itag: lastItag,
-        url: videoUrl
-    })
-
-    return videoMetadata
+    return RokuYoutube.Services.Invidious.GetVideoMetadata(videoId)
 end function
 
 function GetVideoSponsorBlock()
