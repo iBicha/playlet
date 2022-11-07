@@ -51,8 +51,14 @@ end sub
 sub OnVideoPlayerStateChange()
     state = m.videoPlayer.state
 
+    ' If we successfully played the video, then any error that comes later is not due to rate limiting.
+    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
+    if state = "playing"
+        m.videoPlayingSuccess = true
+    end if
+
     ' A hack to see if we could use the proxy here
-    if state = "error"
+    if state = "error" and m.videoPlayingSuccess <> true
         errorInfo = m.videoPlayer.errorInfo
         if errorInfo.category = "http"
             url = m.videoPlayer.content.url
