@@ -10,7 +10,7 @@ REM
 'Get our device version
 '******************************************************
 function GetDeviceVersion()
-    if m.softwareVersion = invalid or m.softwareVersion = "" then
+    if m.softwareVersion = invalid or m.softwareVersion = ""
         m.softwareVersion = CreateObject("roDeviceInfo").GetVersion()
     end if
     return m.softwareVersion
@@ -21,7 +21,7 @@ end function
 'Get our serial number
 '******************************************************
 function GetDeviceESN()
-    if m.serialNumber = invalid or m.serialNumber = "" then
+    if m.serialNumber = invalid or m.serialNumber = ""
         m.serialNumber = CreateObject("roDeviceInfo").GetDeviceUniqueId()
     end if
     return m.serialNumber
@@ -38,7 +38,7 @@ function IsHD()
 end function
 
 function GetLocalIpAddress()
-    if m.ipAddress = invalid or m.ipAddress = "" then
+    if m.ipAddress = invalid or m.ipAddress = ""
         di = CreateObject("roDeviceInfo")
         ips = di.GetIPAddrs()
         for each ip in ips

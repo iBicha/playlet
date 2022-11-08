@@ -8,16 +8,16 @@ REM     isbool
 REM     isfloat
 REM     validstr
 REM     validateParam
-REM     
+REM
 
 '******************************************************
 'isxmlelement
 '
 'Determine if the given object supports the ifXMLElement interface
 '******************************************************
-Function isxmlelement(obj as dynamic) As Boolean
-    return obj <> invalid and  GetInterface(obj, "ifXMLElement") <> invalid
-End Function
+function isxmlelement(obj as dynamic) as boolean
+    return obj <> invalid and GetInterface(obj, "ifXMLElement") <> invalid
+end function
 
 
 '******************************************************
@@ -25,9 +25,9 @@ End Function
 '
 'Determine if the given object supports the ifList interface
 '******************************************************
-Function islist(obj as dynamic) As Boolean
+function islist(obj as dynamic) as boolean
     return obj <> invalid and GetInterface(obj, "ifArray") <> invalid
-End Function
+end function
 
 
 '******************************************************
@@ -35,9 +35,9 @@ End Function
 '
 'Determine if the given object supports the ifInt interface
 '******************************************************
-Function isint(obj as dynamic) As Boolean
+function isint(obj as dynamic) as boolean
     return obj <> invalid and GetInterface(obj, "ifInt") <> invalid
-End Function
+end function
 
 
 '******************************************************
@@ -45,10 +45,10 @@ End Function
 '
 'Determine if the given object supports the function interface
 '******************************************************
-Function isfunc(obj as dynamic) As Boolean
+function isfunc(obj as dynamic) as boolean
     tf = type(obj)
-    return tf="Function" or tf="roFunction"
-End Function
+    return tf = "Function" or tf = "roFunction"
+end function
 
 
 '******************************************************
@@ -56,9 +56,9 @@ End Function
 '
 'Determine if the given object supports the ifString interface
 '******************************************************
-Function isstr(obj as dynamic) As Boolean
-    return obj <> invalid and  GetInterface(obj, "ifString") <>invalid
-End Function
+function isstr(obj as dynamic) as boolean
+    return obj <> invalid and GetInterface(obj, "ifString") <> invalid
+end function
 
 
 '******************************************************
@@ -66,11 +66,11 @@ End Function
 '
 'Determine if the given object supports the ifBoolean interface
 '******************************************************
-Function isbool(obj as dynamic) As Boolean
+function isbool(obj as dynamic) as boolean
     if obj = invalid return false
     if GetInterface(obj, "ifBoolean") = invalid return false
     return true
-End Function
+end function
 
 
 '******************************************************
@@ -78,62 +78,62 @@ End Function
 '
 'Determine if the given object supports the ifFloat interface
 '******************************************************
-Function isfloat(obj as dynamic) As Boolean
+function isfloat(obj as dynamic) as boolean
     if obj = invalid return false
     if GetInterface(obj, "ifFloat") = invalid return false
     return true
-End Function
+end function
 
 
 '******************************************************
 ' validstr
 '
-' always return a valid string. if the argument is 
+' always return a valid string. if the argument is
 ' invalid or not a string, return an empty string.
 '******************************************************
-Function validstr(obj As Object) As String
+function validstr(obj as object) as string
     if obj <> invalid and GetInterface(obj, "ifString") <> invalid
         return obj
     else
         return ""
-    endif
-End Function 
+    end if
+end function
 
 
 '******************************************************
 ' validint
 '
-' Always return a valid integer. If the argument is 
+' Always return a valid integer. If the argument is
 ' invalid or not an integer, return zero.
 '******************************************************
-Function validint(obj As Dynamic) As Integer
+function validint(obj as dynamic) as integer
     if obj <> invalid and GetInterface(obj, "ifInt") <> invalid
         return obj
     else
         return 0
     end if
-End Function 
+end function
 
 
 '******************************************************
 'Validate parameter is the correct type
 '******************************************************
-Function validateParam(param As Object, paramType As String,functionName As String, allowInvalid = false) As Boolean
-    if paramType = "roString" or paramType = "String" then
-        if type(param) = "roString" or type(param) = "String" then
+function validateParam(param as object, paramType as string, functionName as string, allowInvalid = false) as boolean
+    if paramType = "roString" or paramType = "String"
+        if type(param) = "roString" or type(param) = "String"
             return true
         end if
-    else if type(param) = paramType then
+    else if type(param) = paramType
         return true
-    endif
+    end if
 
-    if allowInvalid = true then
-        if type(param) = invalid then
+    if allowInvalid = true
+        if type(param) = invalid
             return true
-        endif
-    endif
+        end if
+    end if
 
-    print "invalid parameter of type "; type(param); " for "; paramType; " in function "; functionName 
+    print "invalid parameter of type "; type(param); " for "; paramType; " in function "; functionName
     return false
-End Function
+end function
 

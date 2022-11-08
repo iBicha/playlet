@@ -1,15 +1,15 @@
 import "pkg:/source/services/Invidious.bs"
 
-sub Init()
+function Init()
     ' set the name of the function in the Task node component to be executed when the state field changes to RUN
     ' in our case this method executed after the following cmd: m.contentTask.control = "run"(see Init method in MainScene)
     m.top.functionName = "GetContent"
-end sub
+end function
 
-sub GetContent()
+function GetContent()
     rootChildren = []
 
-    trendingTypes = [invalid, "Music", "Gaming", "Movies"]
+    trendingTypes = ["", "Music", "Gaming", "Movies"]
     for each trendingType in trendingTypes
         trendingJson = RokuYoutube.Services.Invidious.GetTrending(trendingType)
         title = trendingType <> invalid ? `Trending - ${trendingType}` : "Trending"
@@ -33,7 +33,7 @@ sub GetContent()
 
     keywords = ["Funny Animals", "News"]
     for each keyword in keywords
-        json = RokuYoutube.Services.Invidious.Search(keyword, invalid, RokuYoutube.Models.Invidious.SearchFilter.SortBy.UploadDate)
+        json = RokuYoutube.Services.Invidious.Search(keyword, {sort_by: RokuYoutube.Models.Invidious.SearchFilter.SortBy.UploadDate})
         data = GetCategoryContent(keyword, json)
         if data <> invalid
             rootChildren.Push(data)
@@ -59,7 +59,7 @@ sub GetContent()
     ' populate content field with root content node.
     ' Observer(see OnMainContentLoaded in MainScene.brs) is invoked at that moment
     m.top.content = contentNode
-end sub
+end function
 
 function GetCategoryContent(category as string, json as object) as object
     if json <> invalid and json.Count() > 0
@@ -74,6 +74,7 @@ function GetCategoryContent(category as string, json as object) as object
         end for
         return row
     end if
+    return invalid
 end function
 
 function GetItemData(video as object) as object

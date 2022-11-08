@@ -7,10 +7,12 @@ function Main(args as dynamic)
     initScreen()
 end function
 
-sub loginServer()
+function loginServer() as void
     ' TODO: check expiry of token
     token = RokuYoutube.Utils.Registry.Read("token")
-    if token <> invalid then return
+    if token <> invalid
+        return
+    end if
 
     scene = m.screen.CreateScene("QRTestScene")
     m.screen.show()
@@ -27,9 +29,8 @@ sub loginServer()
     server = new RokuYoutube.Http.HttpServer(settings)
 
     timeout = validint(settings.Timeout)
-    update = true
 
-    while (true)
+    while true
         server.PreWait()
         if settings.ShouldClose
             exit while
@@ -41,31 +42,33 @@ sub loginServer()
         end if
         ' TODO: this does not work. Need a better exit strategy
         if msgType = "roSGScreenEvent"
-            if msg.isScreenClosed() then exit while
+            if msg.isScreenClosed()
+                exit while
+            end if
         end if
     end while
 
     server.Close()
     ' screen.close()
-end sub
+end function
 
-sub initScreen()
-    previousScreen = m.screen
-
+function initScreen() as void
     m.screen = CreateObject("roSGScreen")
     m.screen.setMessagePort(m.msgPort)
 
-    scene = m.screen.CreateScene("MainScene")
+    m.screen.CreateScene("MainScene")
     m.screen.show()
 
     ' TODO: proper control flow between screens...
     ' previousScreen.close()
 
-    while(true)
+    while true
         msg = wait(0, m.msgPort)
         msgType = type(msg)
         if msgType = "roSGScreenEvent"
-            if msg.isScreenClosed() then return
+            if msg.isScreenClosed()
+                return
+            end if
         end if
     end while
-end sub
+end function

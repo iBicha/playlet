@@ -6,7 +6,7 @@ REM     itostr
 REM     strTrim
 REM     strTokenize
 REM     strReplace
-REM     
+REM
 
 '******************************************************
 'isnonemptystr
@@ -14,9 +14,9 @@ REM
 'Determine if the given object supports the ifString interface
 'and returns a string of non zero length
 '******************************************************
-Function isnonemptystr(obj)
-    return ((obj <> invalid) AND (GetInterface(obj, "ifString") <> invalid) AND (Len(obj) > 0))
-End Function
+function isnonemptystr(obj)
+    return ((obj <> invalid) and (GetInterface(obj, "ifString") <> invalid) and (Len(obj) > 0))
+end function
 
 
 '******************************************************
@@ -25,9 +25,9 @@ End Function
 'Determine if the given object is invalid or supports
 'the ifString interface and returns a string of zero length
 '******************************************************
-Function isnullorempty(obj)
-    return ((obj = invalid) OR (GetInterface(obj, "ifString") = invalid) OR (Len(obj) = 0))
-End Function
+function isnullorempty(obj)
+    return ((obj = invalid) or (GetInterface(obj, "ifString") = invalid) or (Len(obj) = 0))
+end function
 
 
 '******************************************************
@@ -36,7 +36,7 @@ End Function
 'Convert string to boolean safely. Don't crash
 'Looks for certain string values
 '******************************************************
-Function strtobool(obj As dynamic) As Boolean
+function strtobool(obj as dynamic) as boolean
     if obj = invalid return false
     if type(obj) <> "roString" and type(obj) <> "String" return false
     o = strTrim(obj)
@@ -46,17 +46,17 @@ Function strtobool(obj As dynamic) As Boolean
     if o = "y" return true
     if o = "1" return true
     return false
-End Function
+end function
 
 '******************************************************
 'booltostr
 '
 'Converts a boolean value to a cannonical string value
 '******************************************************
-Function booltostr(bool As Boolean) As String
+function booltostr(bool as boolean) as string
     if bool = true then return "true"
     return "false"
-End Function
+end function
 
 '******************************************************
 'itostr
@@ -64,54 +64,54 @@ End Function
 'Convert int to string. This is necessary because
 'the builtin Stri(x) prepends whitespace
 '******************************************************
-Function itostr(i As Integer) As String
+function itostr(i as integer) as string
     str = Stri(i)
     return strTrim(str)
-End Function
+end function
 
 
 '******************************************************
 'Trim a string
 '******************************************************
-Function strTrim(str As String) As String
-    st=CreateObject("roString")
+function strTrim(str as string) as string
+    st = CreateObject("roString")
     st.SetString(str)
     return st.Trim()
-End Function
+end function
 
 
 '******************************************************
 'Tokenize a string. Return roList of strings
 '******************************************************
-Function strTokenize(str As String, delim As String) As Object
-    st=CreateObject("roString")
+function strTokenize(str as string, delim as string) as object
+    st = CreateObject("roString")
     st.SetString(str)
     return st.Tokenize(delim)
-End Function
+end function
 
 
 '******************************************************
 'Replace substrings in a string. Return new string
 '******************************************************
-Function strReplace(basestr As String, oldsub As String, newsub As String) As String
+function strReplace(basestr as string, oldsub as string, newsub as string) as string
     newstr = ""
 
     i = 1
     while i <= Len(basestr)
         x = Instr(i, basestr, oldsub)
-        if x = 0 then
+        if x = 0
             newstr = newstr + Mid(basestr, i)
             exit while
-        endif
+        end if
 
-        if x > i then
-            newstr = newstr + Mid(basestr, i, x-i)
+        if x > i
+            newstr = newstr + Mid(basestr, i, x - i)
             i = x
-        endif
+        end if
 
         newstr = newstr + newsub
         i = i + Len(oldsub)
     end while
 
     return newstr
-End Function
+end function

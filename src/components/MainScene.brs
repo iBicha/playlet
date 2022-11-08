@@ -1,10 +1,10 @@
-sub Init()
+function Init()
     m.top.backgroundColor = "0x1c1c1c"
     m.loadingIndicator = m.top.FindNode("loadingIndicator")
     InitScreenStack()
     ShowGridScreen()
     RunContentTask()
-end sub
+end function
 
 ' The OnKeyEvent() function receives remote control key events
 function OnkeyEvent(key as string, press as boolean) as boolean

@@ -1,6 +1,6 @@
 import "pkg:/source/services/Invidious.bs"
 
-sub ShowVideoScreen(videoMetadata as object, videoSponsorBlock as object)
+function ShowVideoScreen(videoMetadata as object, videoSponsorBlock as object)
     m.videoPlayer = CreateObject("roSGNode", "Video")
     rowNode = CreateObject("roSGNode", "ContentNode")
 
@@ -21,9 +21,9 @@ sub ShowVideoScreen(videoMetadata as object, videoSponsorBlock as object)
         m.videoPlayer.ObserveField("position", "OnVideoPositionChange")
     end if
 
-end sub
+end function
 
-sub SetCaptions(videoMetadata as object, videoPlayer as object, contentNode as object)
+function SetCaptions(videoMetadata as object, videoPlayer as object, contentNode as object) as void
     ' TODO: check if we have caption settings ON
     ' TODO: read favorate language from system settings
     ' TODO: populate list of caption tracks
@@ -46,9 +46,9 @@ sub SetCaptions(videoMetadata as object, videoPlayer as object, contentNode as o
         ShowSubtitle: 1,
         TrackName: RokuYoutube.Services.Invidious.GetCurrentHost() + selectedCaption.url
     }
-end sub
+end function
 
-sub OnVideoPlayerStateChange()
+function OnVideoPlayerStateChange() as void
     state = m.videoPlayer.state
 
     ' If we successfully played the video, then any error that comes later is not due to rate limiting.
@@ -82,9 +82,9 @@ sub OnVideoPlayerStateChange()
     if state = "error" or state = "finished"
         CloseScreen(m.videoPlayer)
     end if
-end sub
+end function
 
-sub OnVideoVisibleChange()
+function OnVideoVisibleChange()
     if m.videoPlayer.visible = false and m.top.visible = true
         m.videoPlayer.control = "stop"
 
@@ -92,13 +92,13 @@ sub OnVideoVisibleChange()
         screen = GetCurrentScreen()
         screen.SetFocus(true)
     end if
-end sub
+end function
 
-sub OnVideoPositionChange()
+function OnVideoPositionChange()
     SkipSponsorBlockSections()
-end sub
+end function
 
-sub SkipSponsorBlockSections()
+function SkipSponsorBlockSections() as void
     segments = m.videoPlayer.getField("sponsorblock")
     for each segment in segments
         if segment["actionType"] = "skip"
@@ -114,4 +114,4 @@ sub SkipSponsorBlockSections()
             end if
         end if
     end for
-end sub
+end function

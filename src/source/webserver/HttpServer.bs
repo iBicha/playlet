@@ -1,137 +1,137 @@
 namespace RokuYoutube.Http
-  function InitGlobals()
-    MimeType()
-    HttpTitle()
-  end function
-
-  class HttpServer
-    ' members
-    private connections = invalid
-    private sockin = invalid
-    private uptime = invalid
-
-    ' initializable (copied) members
-    private num_requests = 0
-    private total_in = 0
-    private total_out = 0
-
-    private settings = invalid as HttpSettings
-
-    function new(settings as HttpSettings)
-      m.settings = settings
-      InitGlobals()
-      m.Init()
+    function InitGlobals()
+        MimeType()
+        HttpTitle()
     end function
 
-    function Init()
-      m.uptime = CreateObject("roTimespan")
-      m.connections = CreateObject("roAssociativeArray")
+    class HttpServer
+        ' members
+        private connections = invalid
+        private sockin = invalid
+        private uptime = invalid
 
-      ' create incoming socket
-      sockin = CreateObject("roStreamSocket")
-      if sockin = invalid then errx(m, "socket()")
+        ' initializable (copied) members
+        private num_requests = 0
+        private total_in = 0
+        private total_out = 0
 
-      ' reuse address
-      if not sockin.setReuseAddr(true) then errx(m, "setsockopt(SO_REUSEADDR)", sockin.status())
+        private settings = invalid as HttpSettings
 
-      ' bind socket
-      addrin = CreateObject("roSocketAddress")
-      addrin.setPort(m.settings.Port)
-      if not sockin.setAddress(addrin) then errx(m, "bind(port" + Stri(m.settings.Port) + ")", sockin.status())
+        function new(settings as HttpSettings)
+            m.settings = settings
+            InitGlobals()
+            m.Init()
+        end function
 
-      ' listen on socket
-      if not sockin.listen(m.settings.MaxConnections) then errx(m, "listen()", sockin.status())
+        function Init()
+            m.uptime = CreateObject("roTimespan")
+            m.connections = CreateObject("roAssociativeArray")
 
-      ' monitor socket
-      sockin.setMessagePort(m.settings.MessagePort))
-      sockin.notifyReadable(true)
+            ' create incoming socket
+            sockin = CreateObject("roStreamSocket")
+            if sockin = invalid then errx(m, "socket()")
 
-      m.sockin = sockin
+            ' reuse address
+            if not sockin.setReuseAddr(true) then errx(m, "setsockopt(SO_REUSEADDR)", sockin.status())
 
-      info(m, "listening on " + addrin.getAddress())
-    end function
+            ' bind socket
+            addrin = CreateObject("roSocketAddress")
+            addrin.setPort(m.settings.Port)
+            if not sockin.setAddress(addrin) then errx(m, "bind(port" + Stri(m.settings.Port) + ")", sockin.status())
 
-    function PreWait()
-      connections = m.connections
-      for each id in connections
-        conn = connections[id]
-        conn.CheckTimeout(m.settings.Timeout)
-        cs = conn.state
-        if cs = HttpConnectionState.DONE
-          conn.socket.notifyReadable(false)
-          conn.socket.notifyWritable(false)
-        else if cs = HttpConnectionState.RECV_REQUEST
-          conn.socket.notifyReadable(true)
-          conn.socket.notifyWritable(false)
-        else if cs = HttpConnectionState.SEND_HEADER or cs = HttpConnectionState.SEND_REPLY
-          conn.socket.notifyWritable(true)
-          conn.socket.notifyReadable(false)
-        else
-          errx(m, "invalid state")
-        end if
-      end for
-    end function
+            ' listen on socket
+            if not sockin.listen(m.settings.MaxConnections) then errx(m, "listen()", sockin.status())
 
-    function PostWait()
-      connections = m.connections
-      if m.sockin.isReadable()
-        conn = m.AcceptHttpConnection()
-        if conn <> invalid then connections[conn.id] = conn
-      end if
-      for each id in connections
-        conn = connections[id]
-        cs = conn.state
-        if cs = HttpConnectionState.RECV_REQUEST
-          if conn.socket.isReadable() then conn.PollRequest(m)
-        else if cs = HttpConnectionState.SEND_HEADER
-          if conn.socket.isWritable() then conn.PollHeader(m)
-        else if cs = HttpConnectionState.SEND_REPLY
-          if conn.socket.isWritable() then conn.PollReply(m)
-        else if cs = HttpConnectionState.DONE
-          ' handle with other connections that might transition to done
-        else
-          errx(m, "invalid state")
-        end if
-        cs = conn.state
-        if cs = HttpConnectionState.DONE
-          if conn.close
-            conn.socket.close()
-            connections.delete(id)
-          else
-            conn.Recycle()
-            conn.PollRequest(m)
-          end if
-        end if
-      end for
-    end function
+            ' monitor socket
+            sockin.setMessagePort(m.settings.MessagePort))
+            sockin.notifyReadable(true)
 
-    function AcceptHttpConnection() as HttpConnection
-      sockin = m.sockin
-      socket = sockin.accept()
-      if not sockin.eOK() err(m, "accept()", sockin.status())
-      if socket = invalid then return invalid
-      conn = new HttpConnection(m.settings)
-      conn.Accepted(m, socket)
-      return conn
-    end function
+            m.sockin = sockin
 
-    function Close()
-      ' close all the sockets
-      m.sockin.close()
-      connections = m.connections
-      for each id in connections
-        conn = connections[id]
-        conn.socket.close()
-      end for
-      ' final stats
-      info(m, UnixNL() + m.stats())
-    end function
+            info(m, "listening on " + addrin.getAddress())
+        end function
 
-    function Stats() as string
-      stats = "  Uptime" + Stri(m.uptime.totalSeconds()) + " secs" + UnixNL()
-      stats = stats + "  Requests" + Stri(m.num_requests) + UnixNL()
-      stats = stats + "  Bytes" + Stri(m.total_in) + " in," + Stri(m.total_out) + " out"
-      return stats
-    end function
-  end class
+        function PreWait()
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.CheckTimeout(m.settings.Timeout)
+                cs = conn.state
+                if cs = HttpConnectionState.DONE
+                    conn.socket.notifyReadable(false)
+                    conn.socket.notifyWritable(false)
+                else if cs = HttpConnectionState.RECV_REQUEST
+                    conn.socket.notifyReadable(true)
+                    conn.socket.notifyWritable(false)
+                else if cs = HttpConnectionState.SEND_HEADER or cs = HttpConnectionState.SEND_REPLY
+                    conn.socket.notifyWritable(true)
+                    conn.socket.notifyReadable(false)
+                else
+                    errx(m, "invalid state")
+                end if
+            end for
+        end function
+
+        function PostWait()
+            connections = m.connections
+            if m.sockin.isReadable()
+                conn = m.AcceptHttpConnection()
+                if conn <> invalid then connections[conn.id] = conn
+            end if
+            for each id in connections
+                conn = connections[id]
+                cs = conn.state
+                if cs = HttpConnectionState.RECV_REQUEST
+                    if conn.socket.isReadable() then conn.PollRequest(m)
+                else if cs = HttpConnectionState.SEND_HEADER
+                    if conn.socket.isWritable() then conn.PollHeader(m)
+                else if cs = HttpConnectionState.SEND_REPLY
+                    if conn.socket.isWritable() then conn.PollReply(m)
+                else if cs = HttpConnectionState.DONE
+                    ' handle with other connections that might transition to done
+                else
+                    errx(m, "invalid state")
+                end if
+                cs = conn.state
+                if cs = HttpConnectionState.DONE
+                    if conn.close
+                        conn.socket.close()
+                        connections.delete(id)
+                    else
+                        conn.Recycle()
+                        conn.PollRequest(m)
+                    end if
+                end if
+            end for
+        end function
+
+        function AcceptHttpConnection() as HttpConnection
+            sockin = m.sockin
+            socket = sockin.accept()
+            if not sockin.eOK() err(m, "accept()", sockin.status())
+            if socket = invalid then return invalid
+            conn = new HttpConnection(m.settings)
+            conn.Accepted(m, socket)
+            return conn
+        end function
+
+        function Close()
+            ' close all the sockets
+            m.sockin.close()
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.socket.close()
+            end for
+            ' final stats
+            info(m, UnixNL() + m.stats())
+        end function
+
+        function Stats() as string
+            stats = "  Uptime" + Stri(m.uptime.totalSeconds()) + " secs" + UnixNL()
+            stats = stats + "  Requests" + Stri(m.num_requests) + UnixNL()
+            stats = stats + "  Bytes" + Stri(m.total_in) + " in," + Stri(m.total_out) + " out"
+            return stats
+        end function
+    end class
 end namespace

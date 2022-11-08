@@ -1,10 +1,10 @@
-sub ShowGridScreen()
+function ShowGridScreen()
     m.GridScreen = CreateObject("roSGNode", "GridScreen")
     m.GridScreen.ObserveField("rowItemSelected", "OnGridScreenItemSelected")
     ShowScreen(m.GridScreen)
-end sub
+end function
 
-sub OnGridScreenItemSelected(event as object)
+function OnGridScreenItemSelected(event as object)
     grid = event.GetRoSGNode()
 
     selectedPair = event.GetData()
@@ -17,4 +17,4 @@ sub OnGridScreenItemSelected(event as object)
     videoId = itemContent.id
 
     RunVideoDetailsTask(videoId)
-end sub
+end function
