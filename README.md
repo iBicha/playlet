@@ -3,8 +3,8 @@ Unofficial Youtube client for Roku.
 
 ## Features
 - No Ads (I guess that's a feature)
-- Privacy driven (uses Invidious backend)
-- SponsorBlock integration (skips undesirable sections in videos)
+- Privacy driven (uses [Invidious](https://invidious.io/) backend)
+- [SponsorBlock](https://sponsor.ajay.app/) integration (skips undesirable sections in videos)
 
 ## Preview
 <img src="https://user-images.githubusercontent.com/17722782/200855947-7b648dc1-8cbd-4e78-b1c0-bffe8677a02e.jpg" alt="preview" width="500"/>
