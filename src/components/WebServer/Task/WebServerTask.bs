@@ -1,0 +1,37 @@
+import "pkg:/components/WebServer/HttpSettings.bs"
+import "pkg:/components/WebServer/HttpServer.bs"
+import "pkg:/components/WebServer/Middleware/HttpStaticFilesRouter.bs"
+import "pkg:/components/WebServer/Middleware/HttpDefaultRouter.bs"
+import "pkg:/components/WebServer/Middleware/InvidiousRouter.bs"
+import "pkg:/components/WebServer/Middleware/RegistryApiRouter.bs"
+
+function Init()
+    m.top.functionName = "WebServerLoop"
+end function
+
+function WebServerLoop()
+    m.webServerPort = CreateObject("roMessagePort")
+
+    m.settings = new Http.HttpSettings(m.webServerPort)
+    ' Root at www to get http://IP_ADDRESS:PORT/index.html
+    ' TODO: implement HttpStaticFilesRouter as middleware instead
+    m.settings.WwwRoot = "pkg:/www"
+    m.server = new Http.HttpServer(m.settings)
+
+    m.server.UseRouter(new Http.RegistryApiRouter())
+    m.server.UseRouter(new Http.InvidiousRouter())
+    m.server.UseRouter(new Http.HttpStaticFilesRouter(m.settings.WwwRoot))
+    m.server.UseRouter(new Http.HttpDefaultRouter())
+
+    timeout = m.settings.Timeout
+    msgPort = m.settings.MessagePort
+
+    while true
+        m.server.PreWait()
+        msg = wait(timeout, msgPort)
+        tm = type(msg)
+        if tm = "roSocketEvent" or msg = invalid
+            m.server.PostWait()
+        end if
+    end while
+end function

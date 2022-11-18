@@ -1,0 +1,212 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/General.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/WebUtils.bs"
+
+namespace Invidious
+    const API_URL = "https://vid.puffyan.us"
+
+    const POPULAR_ENDPOINT = "/api/v1/popular"
+    const TRENDING_ENDPOINT = "/api/v1/trending"
+
+    const VIDEOS_ENDPOINT = "/api/v1/videos"
+
+    const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+    const SEARCH_ENDPOINT = "/api/v1/search"
+
+    const AUTH_SCOPE = "GET:feed,GET:playlists"
+    const AUTH_FEED = "/api/v1/auth/feed"
+    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
+
+    function DefaultArgs() as object
+        return {
+            params: {
+                region: GetUserCountryCode()
+            }
+        }
+    end function
+
+    function GetPopular() as object
+        url = `${Invidious.API_URL}${Invidious.POPULAR_ENDPOINT}`
+
+        args = Invidious.DefaultArgs()
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function GetTrending(trendingType = "" as string) as object
+        url = `${Invidious.API_URL}${Invidious.TRENDING_ENDPOINT}`
+
+        args = Invidious.DefaultArgs()
+        if trendingType <> ""
+            args.params.type = trendingType
+        end if
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function GetVideoUrl(videoId as string, itag as string, local as boolean) as string
+        url = `${Invidious.API_URL}/latest_version?id=${videoId}&itag=${itag}`
+        if local
+            url = url + "&local=true"
+        end if
+        return url
+    end function
+
+    function GetVideoMetadata(videoId as string) as object
+        url = `${Invidious.API_URL}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+        args = Invidious.DefaultArgs()
+        response = Requests().get(url, args)
+
+        ' TODO: handle 500 {"error":"This video is unavailable"}
+        if response.statuscode = 200
+            videoMetadata = response.json
+            lastItag = videoMetadata.formatStreams[videoMetadata.formatStreams.Count() - 1].itag
+
+            ' GetVideoUrl returns a url that redirects to the video stream
+            ' TODO: is this reliable?
+            videoUrl = Invidious.GetVideoUrl(videoId, lastItag, false)
+
+            videoMetadata.formatStreams.push({
+                itag: lastItag,
+                url: videoUrl
+            })
+            return videoMetadata
+        end if
+        return invalid
+    end function
+
+    function SearchSuggestions(q as string) as object 'SearchSuggestionResult
+        url = `${Invidious.API_URL}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
+
+        args = Invidious.DefaultArgs()
+        args.params.q = q
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function Search(q as string, args = invalid as dynamic) as object
+        'page = invalid as integer, sort_by = invalid as RokuYoutube.Models.Invidious.SearchFilter.SortBy, date = invalid as RokuYoutube.Models.Invidious.SearchFilter.Date, duration = invalid as RokuYoutube.Models.Invidious.SearchFilter.Duration, _type = invalid as RokuYoutube.Models.Invidious.SearchFilter.SearchType, features = invalid as RokuYoutube.Models.Invidious.SearchFilter.Features) as object
+        url = `${Invidious.API_URL}${Invidious.SEARCH_ENDPOINT}`
+
+        _args = Invidious.DefaultArgs()
+        _args.params.q = q
+
+        if args <> invalid
+            if args.page <> invalid
+                _args.params.page = Str(args.page).Trim()
+            end if
+            if args.sort_by <> invalid
+                _args.params.sort_by = args.sort_by
+            end if
+            if args.date <> invalid
+                _args.params.date = args.date
+            end if
+            if args.duration <> invalid
+                _args.params.duration = args.duration
+            end if
+            if args.type <> invalid
+                _args.params.type = args.type
+            end if
+            if args.features <> invalid
+                _args.params.features = args.features.join(",")
+            end if
+        end if
+        response = Requests().get(url, _args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function GetCurrentHost() as string
+        return Invidious.API_URL
+    end function
+
+    function GetAuthorizeTokenLink() as string
+        ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
+        invidiousHost = `${Invidious.API_URL}`.Replace("https://", "http://")
+
+        localIp = GetLocalIpAddress()
+        webServerPort = 8888
+        expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
+
+        callbackUrl = WebUtils.UrlEncode(`http://${localIp}:${webServerPort}/token_callback`)
+        return `${invidiousHost}/authorize_token?scopes=${Invidious.AUTH_SCOPE}&callback_url=${callbackUrl}&expire=${expire}`
+    end function
+
+    function GetAuthenticationHeaders() as object
+        token = RegistryUtils.Read("token")
+        if token = invalid
+            return invalid
+        end if
+        return {
+            "Authorization": `Bearer ${token}`
+        }
+    end function
+
+    function GetUserFeed() as object
+        headers = Invidious.GetAuthenticationHeaders()
+        if headers = invalid
+            return invalid
+        end if
+
+        url = `${Invidious.API_URL}${Invidious.AUTH_FEED}`
+
+        args = {
+            headers: headers,
+            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
+        }
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 403
+            RegistryUtils.Delete("token")
+        end if
+        if response.statuscode = 200
+            return response.json.videos
+        end if
+        return invalid
+    end function
+
+    function GetUserPlaylists() as object
+        headers = Invidious.GetAuthenticationHeaders()
+        if headers = invalid
+            return invalid
+        end if
+
+        url = `${Invidious.API_URL}${Invidious.AUTH_PLAYLISTS}`
+
+        args = {
+            headers: headers,
+            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
+        }
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 403
+            RegistryUtils.Delete("token")
+        end if
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+end namespace

@@ -1,0 +1,132 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/General.bs"
+
+class InvidiousService
+    API_URL = "https://vid.puffyan.us"
+
+    private endpoints
+    private responseHanlders
+
+    function new()
+        apiDefnitions = ParseJson(ReadAsciiFile("pkg:/config/invidious_video_api.json"))
+        m.endpoints = {}
+
+        for each apiDefnition in apiDefnitions.endpoints
+            m.endpoints[apiDefnition.name] = apiDefnition
+        end for
+
+        m.responseHanlders = {
+            DefaultHandler: m.DefaultHandler,
+            AuthFeedHandler: m.AuthFeedHandler,
+            AuthPlaylistsHandler: m.AuthPlaylistsHandler
+        }
+    end function
+
+    function MakeRequest(requestData as object) as object
+        endpoint = m.endpoints[requestData.endpoint]
+        if endpoint = invalid
+            return invalid
+        end if
+
+        url = m.API_URL + endpoint.url
+
+        args = { params: {} }
+
+        if endpoint.authenticated = true
+            auth_headers = m.GetAuthenticationHeaders()
+            if auth_headers = invalid
+                return invalid
+            end if
+            args.headers = auth_headers
+        end if
+
+        if endpoint.queryParams <> invalid
+            for each queryParamKey in endpoint.queryParams
+                queryParam = endpoint.queryParams[queryParamKey]
+                if queryParam.default <> invalid
+                    if queryParam.type = "string"
+                        args.params[queryParamKey] = queryParam.default
+                    else if queryParam.type = "#ISO3166"
+                        if queryParam.default = "GetUserCountryCode"
+                            args.params[queryParamKey] = GetUserCountryCode()
+                        else
+                            args.params[queryParamKey] = queryParam.default
+                        end if
+                    end if
+                end if
+            end for
+        end if
+
+        if requestData.queryParams <> invalid
+            args.params.append(requestData.queryParams)
+        end if
+
+        if endpoint.requestArgs <> invalid
+            args.append(endpoint.requestArgs)
+        end if
+
+        response = Requests().get(url, args)
+
+        responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+
+        return responseHandler(m, requestData, response)
+    end function
+
+    function GetAuthenticationHeaders() as object
+        token = RegistryUtils.Read("token")
+        if token = invalid
+            return invalid
+        end if
+        return {
+            "Authorization": `Bearer ${token}`
+        }
+    end function
+
+    function DefaultHandler(m as object, requestData as object, response as object) as object
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function AuthFeedHandler(m as object, requestData as object, response as object) as object
+        m.DeleteExpiredToken(response)
+
+        if response.statuscode = 200
+            return response.json.videos
+        end if
+        return invalid
+    end function
+
+    function AuthPlaylistsHandler(m as object, requestData as object, response as object) as object
+        m.DeleteExpiredToken(response)
+        if response.statuscode = 200
+            playlists = response.json
+            result = {}
+            for each playlist in playlists
+                title = requestData.title
+                title = m.ProcessTemplate(title, playlist)
+                result[title] = playlist.videos
+            end for
+            return result
+        end if
+        return invalid
+    end function
+
+    function DeleteExpiredToken(response as object)
+        if response.statuscode = 403
+            print(`Server responded with 403: ${response.text}`)
+            print("deleting token...")
+            RegistryUtils.Delete("token")
+        end if
+    end function
+
+    function ProcessTemplate(template as string, data as object) as string
+        for each key in data
+            template = template.Replace(`%${key}%`, `${data[key]}`)
+        end for
+        return template
+    end function
+
+end class

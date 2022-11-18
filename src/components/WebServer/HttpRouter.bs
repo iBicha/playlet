@@ -1,0 +1,59 @@
+namespace Http
+
+    class HttpRouter
+
+        private routes
+
+        function new()
+            m.routes = []
+        end function
+
+        function Get(path as string, handler as function)
+            m.routes.push({ method: "GET", path: path, handler: handler })
+        end function
+
+        function Head(path as string, handler as function)
+            m.routes.push({ method: "HEAD", path: path, handler: handler })
+        end function
+
+        function Post(path as string, handler as function)
+            m.routes.push({ method: "POST", path: path, handler: handler })
+        end function
+
+        function Put(path as string, handler as function)
+            m.routes.push({ method: "PUT", path: path, handler: handler })
+        end function
+
+        function Delete(path as string, handler as function)
+            m.routes.push({ method: "DELETE", path: path, handler: handler })
+        end function
+
+        function All(path as string, handler as function)
+            m.routes.push({ method: "*", path: path, handler: handler })
+        end function
+
+        private function OnRequest(request as object, response as HttpResponse) as boolean
+            for each route in m.routes
+                if m.RouteMatchesRequest(route, request)
+                    if route.handler(m, request, response) = true
+                        return true
+                    end if
+                end if
+            end for
+            return false
+        end function
+
+        private function RouteMatchesRequest(route as object, request as HttpRequest) as boolean
+            if route.method <> "*" and route.method <> request.method
+                return false
+            end if
+
+            if route.path <> "*" and route.path <> request.uri
+                return false
+            end if
+
+            return true
+        end function
+    end class
+
+end namespace

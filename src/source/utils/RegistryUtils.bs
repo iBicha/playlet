@@ -1,0 +1,38 @@
+namespace RegistryUtils
+
+    const DEFAULT_SECTION = "Playlet"
+
+    function Read(key as string, section = DEFAULT_SECTION as string) as dynamic
+        sec = CreateObject("roRegistrySection", section)
+        if sec.Exists(key)
+            return sec.Read(key)
+        end if
+        return invalid
+    end function
+
+    function Write(key as string, value as string, section = DEFAULT_SECTION as string)
+        sec = CreateObject("roRegistrySection", section)
+        sec.Write(key, value)
+        sec.Flush()
+    end function
+
+    function Delete(key as string, section = DEFAULT_SECTION as string)
+        sec = CreateObject("roRegistrySection", section)
+        sec.Delete(key)
+        sec.Flush()
+    end function
+
+    function ReadAll() as object
+        result = {}
+        registry = CreateObject("roRegistry")
+        sectionNames = registry.GetSectionList()
+        for each sectionName in sectionNames
+            section = CreateObject("roRegistrySection", sectionName)
+            keys = section.GetKeyList()
+            values = section.ReadMulti(keys)
+            result[sectionName] = values
+        end for
+        return result
+    end function
+
+end namespace

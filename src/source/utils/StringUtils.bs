@@ -1,0 +1,115 @@
+REM Functions in this file:
+REM     isnonemptystr
+REM     isnullorempty
+REM     strtobool
+REM     itostr
+REM     strTrim
+REM     strTokenize
+REM
+
+'******************************************************
+'isnonemptystr
+'
+'Determine if the given object supports the ifString interface
+'and returns a string of non zero length
+'******************************************************
+function isnonemptystr(obj as dynamic) as boolean
+    return ((obj <> invalid) and (GetInterface(obj, "ifString") <> invalid) and (Len(obj) > 0))
+end function
+
+
+'******************************************************
+'isnullorempty
+'
+'Determine if the given object is invalid or supports
+'the ifString interface and returns a string of zero length
+'******************************************************
+function isnullorempty(obj as dynamic) as boolean
+    return ((obj = invalid) or (GetInterface(obj, "ifString") = invalid) or (Len(obj) = 0))
+end function
+
+
+'******************************************************
+'strtobool
+'
+'Convert string to boolean safely. Don't crash
+'Looks for certain string values
+'******************************************************
+function strtobool(obj as dynamic) as boolean
+    if obj = invalid
+        return false
+    end if
+    if type(obj) <> "roString" and type(obj) <> "String"
+        return false
+    end if
+    o = strTrim(obj)
+    o = Lcase(o)
+    if o = "true"
+        return true
+    end if
+    if o = "t"
+        return true
+    end if
+    if o = "y"
+        return true
+    end if
+    if o = "1"
+        return true
+    end if
+    return false
+end function
+
+'******************************************************
+'booltostr
+'
+'Converts a boolean value to a cannonical string value
+'******************************************************
+function booltostr(bool as boolean) as string
+    if bool = true
+        return "true"
+    end if
+    return "false"
+end function
+
+'******************************************************
+'itostr
+'
+'Convert int to string. This is necessary because
+'the builtin Stri(x) prepends whitespace
+'******************************************************
+function itostr(i as integer) as string
+    str = Stri(i)
+    return strTrim(str)
+end function
+
+
+'******************************************************
+'Trim a string
+'******************************************************
+function strTrim(str as string) as string
+    st = CreateObject("roString")
+    st.SetString(str)
+    return st.Trim()
+end function
+
+
+'******************************************************
+'Tokenize a string. Return roList of strings
+'******************************************************
+function strTokenize(str as string, delim as string) as object
+    st = CreateObject("roString")
+    st.SetString(str)
+    return st.Tokenize(delim)
+end function
+
+function UnixNL() as string
+    return chr(10)
+end function
+
+function WinNL() as string
+    return chr(13) + chr(10)
+end function
+
+function Quote() as string
+    return chr(34)
+end function

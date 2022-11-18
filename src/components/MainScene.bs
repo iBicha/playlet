@@ -1,0 +1,70 @@
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+
+function Init()
+    log.initializeLogManager(["log_PrintTransport"], 2)
+
+    m.top.backgroundColor = "0x242424FF"
+    m.top.backgroundURI = ""
+
+    ' m.top.backgroundUri = "pkg:/images/youtube.jpg"
+
+    loadingIndicator = m.top.findNode("LoadingIndicator")
+    m.global.addFields({ loadingIndicator: loadingIndicator })
+    m.global.loadingIndicator.visible = true
+
+    m.homeGridScreen = m.top.findNode("HomeGridScreen")
+    m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
+    m.homeGridScreen.SetFocus(true)
+
+    m.settingsScreen = m.top.findNode("SettingsScreen")
+    m.searchScreen = m.top.findNode("SearchScreen")
+
+    m.navBar = m.top.findNode("NavBar")
+    m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
+    m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
+
+    InitWebServer()
+end function
+
+function InitWebServer()
+    m.serverTask = createObject("roSGNode", "WebServerTask")
+    m.serverTask.control = "RUN"
+end function
+
+function OnHomeGridScreenEscape()
+    m.navBar.SetFocus(true)
+    m.navBar.focusIndex = 1
+end function
+
+function OnNavBarEscape()
+    index = m.navBar.escapeIndex
+    'TODO: search at index 0
+    if index = 0
+        m.searchScreen.focus = true
+    else if index = 1
+        m.homeGridScreen.focus = true
+    else if index = 2
+        m.settingsScreen.focus = true
+    end if
+end function
+
+function OnNavIndexChange() as void
+    index = m.navBar.focusIndex
+    if index = -1
+        return
+    end if
+    'TODO: search at index 0
+    if index = 0
+        m.searchScreen.visible = true
+        m.homeGridScreen.visible = false
+        m.settingsScreen.visible = false
+    else if index = 1
+        m.searchScreen.visible = false
+        m.homeGridScreen.visible = true
+        m.settingsScreen.visible = false
+    else if index = 2
+        m.searchScreen.visible = false
+        m.homeGridScreen.visible = false
+        m.settingsScreen.visible = true
+    end if
+end function
