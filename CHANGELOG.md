@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - Pending
+### Changed
+- App name! new name: **Playlet**
+
+### Added
+- Nav bar / menu
+- Web server now always on
+- Settings page with QR Code
+- API Refactor
+- New UI
+
 ## [0.2.0] - 2022-11-06
 ### Added
 - QrCode component to take user to invidious token page
