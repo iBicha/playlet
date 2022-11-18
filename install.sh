@@ -19,7 +19,7 @@ tmp_http_response_file="$tmp_folder/roku-response.html"
 echo "Downloading archive to temporary folder ..."
 
 # TODO: Check for curl, use wget if curl is not available
-curl -L https://github.com/iBicha/roku-youtube/releases/latest/download/playlet.zip -o $tmp_zip_file
+curl -L https://github.com/iBicha/playlet/releases/latest/download/playlet.zip -o $tmp_zip_file
 
 echo "Installing app on device at $ROKU_DEV_TARGET ..."
 
