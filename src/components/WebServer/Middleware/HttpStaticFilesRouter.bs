@@ -13,9 +13,16 @@ namespace Http
             m.root = root
             m.filesOnly = filesOnly
 
-            m.Get("*", function(router as object, request as HttpRequest, response as HttpResponse) as boolean
+            m.Get("*", function(context as object) as boolean
+                router = context.router
+                request = context.request
+                response = context.response
+
                 uri = request.uri
                 decoded_uri = WebUtils.UrlUnescape(uri)
+                if decoded_uri.instr("?")
+                    decoded_uri = decoded_uri.Tokenize("?")[0]
+                end if
                 path = CreateObject("roPath", router.root + decoded_uri)
                 fs = CreateObject("roFilesystem")
 

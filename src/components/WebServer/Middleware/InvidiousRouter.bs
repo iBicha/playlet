@@ -5,17 +5,23 @@ namespace Http
         function new()
             super()
 
-            m.Get("*", function(router as object, request as Http.HttpRequest, response as Http.HttpResponse) as boolean
+            m.Get("*", function(context as object) as boolean
+                router = context.router
+                request = context.request
+                response = context.response
+                server = context.server
+
                 uri = request.uri
-                if uri.StartsWith("/token_callback")
+                if uri.StartsWith(Invidious.TOKEN_CALLBACK)
                     components = WebUtils.UrlQueryComponents(uri)
                     if components["token"] <> invalid
                         ' Token is encoded twice for some reason
                         token = WebUtils.UrlUnescape(components["token"]).DecodeUriComponent()
                         print(`Got Token: ${token}`)
                         RegistryUtils.Write("token", token)
+                        server.task.top.login = true
                     end if
-                    response.Redirect(Invidious.GetCurrentHost())
+                    response.Redirect("/index.html?tab=settings")
                     return true
                 end if
                 return false

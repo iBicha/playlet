@@ -1,11 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Playlet</title>
-  </head>
-  <body>
-	<div>Hello! This is an HTML file served from Playlet Roku app.</div>
-  </body>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Playlet</title>
+</head>
+
+<body>
+  <h2>Playlet - Youtube Player for Roku</h2>
+  <h4>Invidious Instance: <a id="host" target="_blank">None</a></h4>
+  <h4 id="logged-in">Logged In: </h4>
+  <button style="visibility: hidden" id="login-button" onclick="Login()">Login</button>
+  <button style="visibility: hidden" id="logout-button">Logout</button>
+
+  <h5>Instructions</h5>
+  <ul>
+    <li>Make sure you are logged in the Invidious instance before logging in on this page</li>
+    <li>If this is your first time using this invidious Instance, you might want to create an account</li>
+    <li>Once you are logged in to your current instance, click "Login" on this page, and authorize the token</li>
+    <li>Once logged in, this page should show "Logged In: true"</li>
+    <li>After login, the home page should refresh automatically. You should then be able to see your Subscription feed
+      and Playlists, if you have any.</li>
+  </ul>
+  <p>
+    This is a barebone page for now, stay tuned for a redesigned page!
+  </p>
+  <h5>Feedback is welcome over at: <a href="https://github.com/iBicha/playlet"
+      target="_blank">https://github.com/iBicha/playlet</a></h5>
+
+  <script>
+    function RequestGet(url, cb) {
+      const req = new XMLHttpRequest();
+      req.addEventListener("load", function () {
+        try {
+          cb(null, JSON.parse(this.responseText));
+        }
+        catch (err) {
+          cb(err)
+        }
+      });
+      req.open("GET", url);
+      req.send();
+    }
+
+    function Login() {
+      if (!window.appState) {
+        alert("Error with login, please refresh the page.")
+      }
+      window.location = window.appState.invidious.auth_url
+    }
+
+    RequestGet("/api/state", function (err, response) {
+      if (err) {
+        alert(err)
+        return
+      }
+      window.appState = response
+      console.log(response)
+      document.getElementById("logged-in").innerText = `Logged In: ${response.invidious.logged_in}`
+      document.getElementById("host").innerText = response.invidious.host
+      document.getElementById("host").href = response.invidious.host
+
+      document.getElementById("login-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
+      // document.getElementById("logout-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
+    })
+  </script>
+</body>
+
 </html>

@@ -28,6 +28,8 @@ end function
 
 function InitWebServer()
     m.serverTask = createObject("roSGNode", "WebServerTask")
+    m.serverTask.id = "WebServerTask"
+    m.serverTask.ObserveField("login", "OnWebServerLogin")
     m.serverTask.control = "RUN"
 end function
 
@@ -67,4 +69,27 @@ function OnNavIndexChange() as void
         m.homeGridScreen.visible = false
         m.settingsScreen.visible = true
     end if
+end function
+
+function OnWebServerLogin()
+    ' TODO: refresh same component instead of creating a new one
+    m.global.loadingIndicator.visible = true
+    homeIndex = GetIndexOfChild(m.top, m.homeGridScreen.id)
+    newHomeGridScreen = CreateObject("roSGNode", "HomeGridScreen")
+    m.top.replaceChild(newHomeGridScreen, homeIndex)
+    m.homeGridScreen = newHomeGridScreen
+    m.homeGridScreen.id = "HomeGridScreen"
+    m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
+    m.homeGridScreen.SetFocus(true)
+end function
+
+function GetIndexOfChild(parent as object, childId as string) as integer
+    count = parent.getChildCount()
+    for i = 0 to count - 1
+        child = parent.getChild(i)
+        if child.id = childId
+            return i
+        end if
+    end for
+    return -1
 end function

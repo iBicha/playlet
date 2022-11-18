@@ -4,6 +4,7 @@ import "pkg:/components/WebServer/Middleware/HttpStaticFilesRouter.bs"
 import "pkg:/components/WebServer/Middleware/HttpDefaultRouter.bs"
 import "pkg:/components/WebServer/Middleware/InvidiousRouter.bs"
 import "pkg:/components/WebServer/Middleware/RegistryApiRouter.bs"
+import "pkg:/components/WebServer/Middleware/StateApiRouter.bs"
 
 function Init()
     m.top.functionName = "WebServerLoop"
@@ -14,10 +15,10 @@ function WebServerLoop()
 
     m.settings = new Http.HttpSettings(m.webServerPort)
     ' Root at www to get http://IP_ADDRESS:PORT/index.html
-    ' TODO: implement HttpStaticFilesRouter as middleware instead
     m.settings.WwwRoot = "pkg:/www"
-    m.server = new Http.HttpServer(m.settings)
+    m.server = new Http.HttpServer(m.settings, m)
 
+    m.server.UseRouter(new Http.StateApiRouter())
     m.server.UseRouter(new Http.RegistryApiRouter())
     m.server.UseRouter(new Http.InvidiousRouter())
     m.server.UseRouter(new Http.HttpStaticFilesRouter(m.settings.WwwRoot))
