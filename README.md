@@ -1,5 +1,5 @@
 # Playlet
-Unofficial Youtube client for Roku.
+Unofficial Youtube client for Roku 📺
 
 <img src="screenshot.jpg" alt="Screenshot of Playlet" width="350"/>
 
@@ -17,7 +17,7 @@ First, you need to enable developer mode on your Roku TV (if you have not done t
 
 Using your Roku remote, enter the following sequence:
 
-![DevSequence](https://image.roku.com/ZHZscHItMTc2/dev-startup1.png)
+<img src="https://image.roku.com/ZHZscHItMTc2/dev-startup1.png" alt="DevSequence" width="350"/>
 
 For full instructions, see [Set up your Roku device to enable Developer Settings](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md#step-1-set-up-your-roku-device-to-enable-developer-settings)
 
