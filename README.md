@@ -1,6 +1,9 @@
 # Playlet
 Unofficial Youtube client for Roku.
 
+<img src="screenshot.jpg" alt="Screenshot of Playlet" width="350"/>
+
+
 ## Features
 - No Ads (I guess that's a feature)
 - Privacy driven (uses Invidious backend)
