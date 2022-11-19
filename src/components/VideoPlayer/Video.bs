@@ -1,0 +1,197 @@
+import "pkg:/source/services/Invidious.bs"
+
+function ShowVideoScreenEmbedded(videoId as string, thumbnailNode as object)
+    m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
+    AddVideoFields()
+    m.videoPlayer.embedded = true
+
+    m.videoPlayer.enableUI = false
+    m.videoPlayer.width = thumbnailNode.width
+    m.videoPlayer.height = thumbnailNode.height
+    thumbnailNode.AppendChild(m.videoPlayer)
+    ShowVideoScreen(videoId)
+end function
+
+function ShowVideoScreenFull(videoId as string)
+    m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
+    AddVideoFields()
+    m.videoPlayer.embedded = false
+
+    ' TODO: make sure video is at right node
+    m.top.getParent().AppendChild(m.videoPlayer)
+    ShowVideoScreen(videoId)
+end function
+
+function AddVideoFields()
+    m.videoPlayer.addFields({
+        embedded: false,
+        sponsorBlockTask: false,
+        videoPlayingSuccess: false,
+        ignoreNextFinishedState: false
+    })
+end function
+
+function ExpandVideoScreenFull()
+    m.videoPlayer.embedded = true
+    m.videoPlayer.reparent(m.top, false)
+    m.videoPlayer.enableUI = true
+    m.videoPlayer.width = 1280
+    m.videoPlayer.height = 720
+    m.videoPlayer.SetFocus(true)
+    StartSponsorBlockTask(m.videoPlayer.videoId)
+end function
+
+function ShowVideoScreen(videoId as string)
+    m.videoPlayer.addFields({ videoId: videoId })
+    m.videoPlayer.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
+    m.videoPlayer.bufferingBar.filledBarBlendColor = "0xFF0000FF"
+    m.videoPlayer.retrievingBar.filledBarBlendColor = "0xFF0000FF"
+
+    if not m.videoPlayer.embedded
+        m.videoPlayer.visible = true
+        m.videoPlayer.SetFocus(true)
+    else
+        m.videoPlayer.visible = false
+    end if
+
+    m.videoPlayer.ObserveField("state", "OnVideoPlayerStateChange")
+
+    StartVideoDetailsTask(videoId)
+    if not m.videoPlayer.embedded
+        StartSponsorBlockTask(videoId)
+    end if
+end function
+
+function OnVideoPlayerStateChange() as void
+    state = m.videoPlayer.state
+
+    ' If we successfully played the video, then any error that comes later is not due to rate limiting.
+    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
+    if state = "playing"
+        m.videoPlayer.videoPlayingSuccess = true
+
+        if m.videoPlayer.visible = false and m.videoPlayer.embedded = true
+            m.videoPlayer.visible = true
+        end if
+    end if
+
+    if state = "error"
+        ' A hack to see if we could use the proxy here
+        if m.videoPlayingSuccess <> true
+            errorInfo = m.videoPlayer.errorInfo
+            if errorInfo.category = "http"
+                videoId = m.videoPlayer.videoId
+                itag = m.videoPlayer.content.itag
+                url = m.videoPlayer.content.url
+                if url.InStr("local=true") = -1
+                    print(`Video ${url} failed to play. Trying a proxy (local=true)`)
+                    m.videoPlayer.content.url = Invidious.GetVideoUrl(videoId, itag, true)
+                    ' This video errored, and is about to finish, so don't close the video yet
+                    ' TODO: perhaps creating a second player is better?
+                    m.videoPlayer.ignoreNextFinishedState = true
+                    m.videoPlayer.control = "play"
+                    return
+                end if
+            end if
+        end if
+    end if
+
+    if state = "finished" and m.videoPlayer.ignoreNextFinishedState = true
+        m.videoPlayer.ignoreNextFinishedState = false
+        return
+    end if
+
+    if state = "error" or state = "finished"
+        CloseVideoPlayer()
+    end if
+end function
+
+function CloseVideoPlayer()
+    m.videoPlayer.control = "stop"
+    m.videoPlayer.visible = false
+    m.videoPlayer.getParent().RemoveChild(m.videoPlayer)
+    m.videoPlayer = invalid
+    m.top.focus = true
+end function
+
+function StartVideoDetailsTask(videoId as string)
+    createTaskPromise("VideoDetailsTask", {
+        input: {
+            videoId: videoId
+        }
+    }).then(function(task as object)
+        videoId = task.output.videoId
+        metadata = task.output.metadata
+        if metadata <> invalid
+            stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
+            contentNode = CreateObject("roSGNode", "ContentNode")
+            contentNode.addFields({ videoId: videoId, itag: stream.itag })
+            contentNode.url = stream.url
+            SetCaptions(metadata, m.videoPlayer, contentNode)
+            m.videoPlayer.content = contentNode
+            m.videoPlayer.control = "play"
+        else
+            print "FAILED TO LOAD VIDEO " + videoId
+            CloseVideoPlayer()
+        end if
+    end function)
+end function
+
+function StartSponsorBlockTask(videoId as string)
+    m.videoPlayer.sponsorBlockTask = true
+    createTaskPromise("SponsorBlockTask", {
+        input: {
+            videoId: videoId
+        }
+    }).then(function(task as object)
+        skipSegments = task.output.skipSegments
+        if skipSegments <> invalid
+            m.videoPlayer.addFields({ skipSegments: skipSegments })
+            m.videoPlayer.seekMode = "accurate"
+            m.videoPlayer.ObserveField("position", "OnPositionChangeSkipSponsorBlockSections")
+        end if
+    end function)
+end function
+
+function SetCaptions(metadata as object, videoPlayer as object, contentNode as object) as void
+    ' TODO: check if we have caption settings ON
+    ' TODO: read favorate language from system settings
+    ' TODO: populate list of caption tracks
+    if metadata.captions.Count() = 0
+        return
+    end if
+    videoPlayer.globalCaptionMode = "ON"
+    contentNode.ClosedCaptions = True
+    selectedCaption = metadata.captions[0]
+
+    ' Use favorite caption langauage, or the first one
+    for each caption in metadata.captions
+        if caption.language_code = "en"
+            selectedCaption = caption
+            exit for
+        end if
+    end for
+
+    contentNode.SubtitleConfig = {
+        ShowSubtitle: 1,
+        TrackName: Invidious.GetCurrentHost() + selectedCaption.url
+    }
+end function
+
+function OnPositionChangeSkipSponsorBlockSections() as void
+    segments = m.videoPlayer.skipSegments
+    for each segment in segments
+        if segment["actionType"] = "skip"
+            segmentRange = segment["segment"]
+            segmentStart = segmentRange[0]
+            segmentEnd = segmentRange[1]
+            currentPosition = m.videoPlayer.position
+            if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
+                ' TODO: if segmentEnd is at the end of the video, close video
+                m.videoPlayer.seek = segmentEnd
+                print("Skiping section:" + segment["category"])
+                return
+            end if
+        end if
+    end for
+end function

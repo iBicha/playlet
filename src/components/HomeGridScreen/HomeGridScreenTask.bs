@@ -1,0 +1,82 @@
+import "pkg:/source/services/InvidiousService.bs"
+
+function Init()
+    m.top.functionName = "TaskMain"
+end function
+
+function TaskMain()
+    rootChildren = []
+
+    invidious = new InvidiousService()
+
+    input = m.top.getField("input")
+    requestData = input.requestData
+
+    response = invidious.MakeRequest(requestData)
+    if response <> invalid
+        if type(response) = "roAssociativeArray"
+            for each key in response
+                rowContent = GetCategoryContent(key, response[key])
+                if rowContent <> invalid
+                    rootChildren.Push(rowContent)
+                end if
+            end for
+        else
+            rowContent = GetCategoryContent(requestData.title, response)
+            if rowContent <> invalid
+                rootChildren.Push(rowContent)
+            end if
+        end if
+    end if
+
+    m.top.setField("output", {
+        index: input.index,
+        rootChildren: rootChildren
+    })
+end function
+
+function GetCategoryContent(category as string, json as object) as object
+    if json <> invalid and json.Count() > 0
+        row = {}
+        row.title = category
+        row.children = []
+        for each item in json ' parse items and push them to row
+            itemData = GetItemData(item)
+            if itemData <> invalid
+                row.children.Push(itemData)
+            end if
+        end for
+        return row
+    end if
+    return invalid
+end function
+
+function GetItemData(video as object) as object
+    ' TODO: handle playlists and channels
+    if video.videoId = invalid
+        return invalid
+    end if
+    item = {}
+
+    item.title = video.title
+    item.description = video.description
+    item.hdPosterURL = GetThumbnailUrl(video.videoThumbnails)
+    item.releaseDate = video.publishedText
+    item.id = video.videoId
+    item.length = video.lengthSeconds
+    item.author = video.author
+    item.viewCount = video.viewCount
+    return item
+end function
+
+function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string) as string
+    if videoThumbnails.Count() = 0
+        return ""
+    end if
+    for each thumbnail in videoThumbnails
+        if thumbnail.quality = quality
+            return thumbnail.url
+        end if
+    end for
+    return videoThumbnails[0].url
+end function

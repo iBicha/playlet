@@ -1,0 +1,52 @@
+import "pkg:/source/utils/TimeUtils.bs"
+
+function OnContentSet()
+    content = m.top.itemContent
+
+    if content <> invalid
+        m.top.FindNode("titleLabel").text = content.title
+        m.top.FindNode("authorLabel").text = content.author
+
+        releaseDate = validstr(content.releaseDate)
+        viewCount = FormatViewCount(content.viewCount)
+        if releaseDate = "" and viewCount = ""
+            m.top.FindNode("viewCountDateLabel").text = ""
+        else
+            m.top.FindNode("viewCountDateLabel").text = `${releaseDate} • ${viewCount}`
+        end if
+
+        thumbnail = m.top.FindNode("thumbnail")
+        thumbnail.uri = content.hdPosterUrl
+        thumbnail.id = `thumbnail-${content.id}`
+        if content.length <> invalid and content.length <> 0
+            m.top.FindNode("durationLabel").text = TimeUtils.GetFormattedTime(content.length)
+        else
+            m.top.FindNode("durationRect").visible = false
+        end if
+    end if
+end function
+
+function FormatViewCount(viewCount as dynamic) as string
+    if viewCount = invalid
+        return ""
+    end if
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)} views`
+    end if
+
+    viewCount = viewCount / 1000
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)}K views`
+    end if
+
+    viewCount = viewCount / 1000
+    return `${FormatFloat(viewCount)}M views`
+end function
+
+function FormatFloat(X as integer) as integer
+    X = X * 10
+    X = X + 0.5
+    X = Fix(X)
+    X = X / 10
+    return X
+end function

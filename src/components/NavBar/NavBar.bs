@@ -1,0 +1,50 @@
+function Init()
+    m.buttonGroup = m.top.findNode("NavBarButtonGroup")
+    m.top.observeField("focusIndex", "OnFocusIndexChange")
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+    if key = "down"
+        i = m.top.focusIndex
+        target = i + 1
+        if target >= m.buttonGroup.getChildCount()
+            return false
+        end if
+        m.top.focusIndex = target
+        return true
+    else if key = "up"
+        i = m.top.focusIndex
+        target = i - 1
+        if target < 0
+            return false
+        end if
+        m.top.focusIndex = target
+        return true
+    else if key = "right"
+        ' Can only escape to home screen, at index 1
+        allowedEscapes = { "1": true }
+        if allowedEscapes[StrI(m.top.focusIndex).Trim()] = true
+            m.top.escapeIndex = m.top.focusIndex
+            m.top.focusIndex = -1
+            return true
+        end if
+    end if
+
+    return false
+end function
+
+function OnFocusIndexChange()
+    focusIndex = m.top.focusIndex
+    childCount = m.buttonGroup.getChildCount()
+    for i = 0 to childCount - 1
+        if i <> focusIndex
+            m.buttonGroup.getChild(i).focus = false
+        end if
+    end for
+    if focusIndex <> -1
+        m.buttonGroup.getChild(focusIndex).focus = true
+    end if
+end function

@@ -1,0 +1,112 @@
+namespace WebUtils
+    function UrlEncode(url as string) as string
+        ue = m.UrlEncoder
+        if ue = invalid
+            ue = CreateObject("roUrlTransfer")
+            m.UrlEncoder = ue
+        end if
+        return ue.UrlEncode(url)
+    end function
+
+    function UrlEscape(url as string) as string
+        ue = m.UrlEncoder
+        if ue = invalid
+            ue = CreateObject("roUrlTransfer")
+            m.UrlEncoder = ue
+        end if
+        return ue.escape(url)
+    end function
+
+    function UrlUnescape(url as string) as string
+        ue = m.UrlEncoder
+        if ue = invalid
+            ue = CreateObject("roUrlTransfer")
+            m.UrlEncoder = ue
+        end if
+        return ue.unescape(url)
+    end function
+
+    function UrlQueryComponents(url as string) as object
+        query = {}
+        index = Instr(0, url, "?")
+        url = Mid(url, index + 1)
+        components = url.split("&")
+        for each component in components
+            if Instr(0, component, "=")
+                keyValue = component.split("=")
+                query[keyValue[0]] = keyValue[1]
+            else
+                query[keyValue[0]] = ""
+            end if
+        end for
+        return query
+    end function
+
+    function MimeType(uri = "" as string) as string
+        map = m.MimeTypes
+        if map = invalid
+            map = {
+                ' Default mimetype mappings
+                ogg: "application/ogg",
+                pdf: "application/pdf",
+                xsl: "application/xml",
+                xml: "application/xml",
+                dtd: "application/xml-dtd",
+                xslt: "application/xslt+xml",
+                zip: "application/zip",
+                mp2: "audio/mpeg",
+                mp3: "audio/mpeg",
+                mpga: "audio/mpeg",
+                gif: "image/gif",
+                jpeg: "image/jpeg",
+                jpe: "image/jpeg",
+                jpg: "image/jpeg",
+                png: "image/png",
+                css: "text/css",
+                html: "text/html",
+                js: "text/javascript",
+                txt: "text/plain",
+                asc: "text/plain",
+                brs: "text/plain",
+                bs: "text/plain",
+                map: "text/plain",
+                mpeg: "video/mpeg",
+                mpe: "video/mpeg",
+                mpg: "video/mpeg",
+                qt: "video/quicktime",
+                mov: "video/quicktime",
+                avi: "video/x-msvideo",
+                default: "application/octet-stream"
+            }
+            m.MimeTypes = map
+        end if
+        ext = WebUtils.GetExtension(uri)
+        if map.doesexist(ext)
+            return map[ext]
+        else
+            return map.default
+        end if
+    end function
+
+    function GetExtension(fn as string) as string
+        l = fn.tokenize(".")
+        if l.count() > 0
+            return l.GetTail()
+        else
+            return ""
+        end if
+    end function
+
+    function HttpTitle(code = 0 as integer) as string
+        hcm = m.HttpTitles
+        if hcm = invalid
+            hcm = { n200: "OK", n206: "Partial Content" }
+            hcm.append({ n301: "Moved Permanently", n304: "Not Modified" })
+            hcm.append({ n400: "Bad Request", n403: "Forbidden", n404: "Not Found", n413: "Request Entity Too Large" })
+            hcm.append({ n500: "Internal Server Error", n501: "Not Implemented" })
+            m.HttpTitles = hcm
+        end if
+        return validstr(hcm["n" + Stri(code).trim()])
+    end function
+
+end namespace

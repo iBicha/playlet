@@ -1,4 +1,4 @@
-# Installs the roku-youtube.zip app as a dev channel
+# Installs the playlet.zip app as a dev channel
 
 if [ -z "$ROKU_DEV_TARGET" ];
 then
@@ -13,13 +13,13 @@ then
 fi
 
 tmp_folder=$(mktemp -d)
-tmp_zip_file="$tmp_folder/roku-youtube.zip"
+tmp_zip_file="$tmp_folder/playlet.zip"
 tmp_http_response_file="$tmp_folder/roku-response.html"
 
 echo "Downloading archive to temporary folder ..."
 
 # TODO: Check for curl, use wget if curl is not available
-curl -L https://github.com/iBicha/roku-youtube/releases/latest/download/roku-youtube.zip -o $tmp_zip_file
+curl -L https://github.com/iBicha/playlet/releases/latest/download/playlet.zip -o $tmp_zip_file
 
 echo "Installing app on device at $ROKU_DEV_TARGET ..."
 

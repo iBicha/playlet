@@ -1,0 +1,32 @@
+namespace Http
+
+    class InvidiousRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("*", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                server = context.server
+
+                uri = request.uri
+                if uri.StartsWith(Invidious.TOKEN_CALLBACK)
+                    components = WebUtils.UrlQueryComponents(uri)
+                    if components["token"] <> invalid
+                        ' Token is encoded twice for some reason
+                        token = WebUtils.UrlUnescape(components["token"]).DecodeUriComponent()
+                        print(`Got Token: ${token}`)
+                        RegistryUtils.Write("invidious_token", token)
+                        server.task.top.login = true
+                    end if
+                    response.Redirect("/index.html?tab=settings")
+                    return true
+                end if
+                return false
+            end function)
+        end function
+
+    end class
+
+end namespace

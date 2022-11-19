@@ -1,13 +1,10 @@
-# Youtube for Roku
+# Playlet
 Unofficial Youtube client for Roku.
 
 ## Features
 - No Ads (I guess that's a feature)
-- Privacy driven (uses [Invidious](https://invidious.io/) backend)
-- [SponsorBlock](https://sponsor.ajay.app/) integration (skips undesirable sections in videos)
-
-## Preview
-<img src="https://user-images.githubusercontent.com/17722782/200855947-7b648dc1-8cbd-4e78-b1c0-bffe8677a02e.jpg" alt="preview" width="500"/>
+- Privacy driven (uses Invidious backend)
+- SponsorBlock integration (skips undesirable sections in videos)
 
 ## Installation
 
@@ -16,7 +13,7 @@ First, you need to enable developer mode on your Roku TV (if you have not done t
 
 Using your Roku remote, enter the following sequence:
 
-<img src="https://image.roku.com/ZHZscHItMTc2/dev-startup1.png" alt="DevSequence" width="350"/>
+![DevSequence](https://image.roku.com/ZHZscHItMTc2/dev-startup1.png)
 
 For full instructions, see [Set up your Roku device to enable Developer Settings](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md#step-1-set-up-your-roku-device-to-enable-developer-settings)
 
@@ -28,40 +25,38 @@ By now, you show have the following
 - Your Roku TV local IP address
   - You can find this information in your TV network settings. It should look like 192.168.X.X or so
 
-### Install Youbtube for Roku (command line)
+### Install Playlet (command line)
 
-Install Youbtube for Roku as a dev channel using this command, and replace:
+Install Playlet as a dev channel using this command, and replace:
 - `REPLACE_PASSWORD_HERE` : with your Roku Dev password
 - `REPLACE_IP_ADDRESS_HERE` : with your Roku TV local IP address
 ```
-curl https://raw.githubusercontent.com/iBicha/roku-youtube/main/install.sh | ROKU_DEV_TARGET=REPLACE_IP_ADDRESS_HERE DEVPASSWORD=REPLACE_PASSWORD_HERE sh
+curl https://raw.githubusercontent.com/iBicha/playlet/main/install.sh | ROKU_DEV_TARGET=REPLACE_IP_ADDRESS_HERE DEVPASSWORD=REPLACE_PASSWORD_HERE sh
 ```
 Example:
 ```
-curl https://raw.githubusercontent.com/iBicha/roku-youtube/main/install.sh | ROKU_DEV_TARGET=192.168.1.2 DEVPASSWORD=1234 sh
+curl https://raw.githubusercontent.com/iBicha/playlet/main/install.sh | ROKU_DEV_TARGET=192.168.1.2 DEVPASSWORD=1234 sh
 ```
 
 
 If successful, you should see some output on your terminal, with `Status: 200`.
 
-You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll get this thing a logo)
-
-### Install Youbtube for Roku (Manual)
-1. Go to `https://github.com/iBicha/roku-youtube/releases` and download `roku-youtube.zip`
+### Install Playlet (Manual)
+1. Go to `https://github.com/iBicha/playlet/releases` and download `playlet.zip`
 2. Open `http://REPLACE_IP_ADDRESS_HERE/` (e.g. http://192.168.1.2/) in your browser
 3. If prompted for username and password
   - The username is `rokudev`
   - The password is whatever you set when you enabled Developer mode
-4. Click on `Upload` button and select the `roku-youtube.zip` file you downloaded in step 1
+4. Click on `Upload` button and select the `playlet.zip` file you downloaded in step 1
 6. Click `Install with zip` button
   - If you're updating the app (or you already have a dev channel) the button would say `Replace with zip`
 
 ## Development
-1. `git clone https://github.com/iBicha/roku-youtube.git`
-1. `cd roku-youtube`
+1. `git clone https://github.com/iBicha/playlet.git`
+1. `cd playlet`
 1. `npm install`
 
-Create a file under `roku-youtube/.vscode/.env` containing:
+Create a file under `playlet/.vscode/.env` containing:
 ```
 ROKU_DEV_TARGET=REPLACE_IP_ADDRESS_HERE
 ROKU_DEVPASSWORD=REPLACE_PASSWORD_HERE

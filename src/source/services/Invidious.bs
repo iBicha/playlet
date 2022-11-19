@@ -1,10 +1,15 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
-import "pkg:/source/models/SearchSuggestionResult.bs"
-import "pkg:/source/models/SearchFilter.bs"
-import "pkg:/source/utils/Registry.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/General.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/WebUtils.bs"
 
-namespace RokuYoutube.Services.Invidious
+namespace Invidious
     const API_URL = "https://vid.puffyan.us"
+
+    const TOKEN_CALLBACK = "/invidious/token_callback"
+
     const POPULAR_ENDPOINT = "/api/v1/popular"
     const TRENDING_ENDPOINT = "/api/v1/trending"
 
@@ -13,40 +18,35 @@ namespace RokuYoutube.Services.Invidious
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
 
+    const AUTH_SCOPE = "GET:feed,GET:playlists"
     const AUTH_FEED = "/api/v1/auth/feed"
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
 
-    function GetCountryCode()
-        if m.countryCode = invalid or m.countryCode = "" then
-            m.countryCode = CreateObject("roDeviceInfo").GetUserCountryCode()
-        end if
-        return m.countryCode
-    end function
-
-    function DefaultArgs()
+    function DefaultArgs() as object
         return {
             params: {
-                region: GetCountryCode()
+                region: GetUserCountryCode()
             }
         }
     end function
 
-    function GetPopular()
-        url = `${API_URL}${POPULAR_ENDPOINT}`
+    function GetPopular() as object
+        url = `${Invidious.API_URL}${Invidious.POPULAR_ENDPOINT}`
 
-        args = DefaultArgs()
+        args = Invidious.DefaultArgs()
         response = Requests().get(url, args)
 
         if response.statuscode = 200
             return response.json
         end if
+        return invalid
     end function
 
-    function GetTrending(trendingType = invalid as string)
-        url = `${API_URL}${TRENDING_ENDPOINT}`
+    function GetTrending(trendingType = "" as string) as object
+        url = `${Invidious.API_URL}${Invidious.TRENDING_ENDPOINT}`
 
-        args = DefaultArgs()
-        if trendingType <> invalid
+        args = Invidious.DefaultArgs()
+        if trendingType <> ""
             args.params.type = trendingType
         end if
 
@@ -55,20 +55,21 @@ namespace RokuYoutube.Services.Invidious
         if response.statuscode = 200
             return response.json
         end if
+        return invalid
     end function
 
-    function GetVideoUrl(videoId as string, itag as string, local as bool)
-        url = `${API_URL}/latest_version?id=${videoId}&itag=${itag}`
+    function GetVideoUrl(videoId as string, itag as string, local as boolean) as string
+        url = `${Invidious.API_URL}/latest_version?id=${videoId}&itag=${itag}`
         if local
             url = url + "&local=true"
         end if
         return url
     end function
 
-    function GetVideoMetadata(videoId as string)
-        url = `${API_URL}${VIDEOS_ENDPOINT}/${videoId}`
+    function GetVideoMetadata(videoId as string) as object
+        url = `${Invidious.API_URL}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
-        args = DefaultArgs()
+        args = Invidious.DefaultArgs()
         response = Requests().get(url, args)
 
         ' TODO: handle 500 {"error":"This video is unavailable"}
@@ -78,79 +79,82 @@ namespace RokuYoutube.Services.Invidious
 
             ' GetVideoUrl returns a url that redirects to the video stream
             ' TODO: is this reliable?
-            videoUrl = RokuYoutube.Services.Invidious.GetVideoUrl(videoId, lastItag, false)
+            videoUrl = Invidious.GetVideoUrl(videoId, lastItag, false)
 
             videoMetadata.formatStreams.push({
                 itag: lastItag,
                 url: videoUrl
             })
+            return videoMetadata
         end if
-        return videoMetadata
+        return invalid
     end function
 
-    function SearchSuggestions(q as string) as SearchSuggestionResult
-        url = `${API_URL}${SEARCH_SUGGEST_ENDPOINT}`
+    function SearchSuggestions(q as string) as object 'SearchSuggestionResult
+        url = `${Invidious.API_URL}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
-        args = DefaultArgs()
+        args = Invidious.DefaultArgs()
         args.params.q = q
         response = Requests().get(url, args)
 
         if response.statuscode = 200
             return response.json
         end if
+        return invalid
     end function
 
-    function Search(q as string, page = invalid as integer, sort_by = invalid as RokuYoutube.Models.Invidious.SearchFilter.SortBy, date = invalid as RokuYoutube.Models.Invidious.SearchFilter.Date, duration = invalid as RokuYoutube.Models.Invidious.SearchFilter.Duration, _type = invalid as RokuYoutube.Models.Invidious.SearchFilter.SearchType, features = invalid as RokuYoutube.Models.Invidious.SearchFilter.Features)
-        url = `${API_URL}${SEARCH_ENDPOINT}`
+    function Search(q as string, args = invalid as dynamic) as object
+        url = `${Invidious.API_URL}${Invidious.SEARCH_ENDPOINT}`
 
-        args = DefaultArgs()
-        args.params.q = q
+        _args = Invidious.DefaultArgs()
+        _args.params.q = q
 
-        if page <> invalid
-            args.params.page = Str(page).Trim()
+        if args <> invalid
+            if args.page <> invalid
+                _args.params.page = Str(args.page).Trim()
+            end if
+            if args.sort_by <> invalid
+                _args.params.sort_by = args.sort_by
+            end if
+            if args.date <> invalid
+                _args.params.date = args.date
+            end if
+            if args.duration <> invalid
+                _args.params.duration = args.duration
+            end if
+            if args.type <> invalid
+                _args.params.type = args.type
+            end if
+            if args.features <> invalid
+                _args.params.features = args.features.join(",")
+            end if
         end if
-        if sort_by <> invalid
-            args.params.sort_by = sort_by
-        end if
-        if date <> invalid
-            args.params.date = date
-        end if
-        if duration <> invalid
-            args.params.duration = duration
-        end if
-        if _type <> invalid
-            args.params.type = _type
-        end if
-        if features <> invalid
-            args.params.features = features.join(",")
-        end if
-
-        response = Requests().get(url, args)
+        response = Requests().get(url, _args)
 
         if response.statuscode = 200
             return response.json
         end if
+        return invalid
     end function
 
-    function GetCurrentHost()
-        return API_URL
+    function GetCurrentHost() as string
+        return Invidious.API_URL
     end function
 
-    function GetAuthorizeTokenLink()
+    function GetAuthorizeTokenLink() as string
         ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
-        invidiousHost = strReplace(API_URL, "https://", "http://")
-        scope = ":*"
+        invidiousHost = `${Invidious.API_URL}`.Replace("https://", "http://")
 
         localIp = GetLocalIpAddress()
         webServerPort = 8888
-        expire = Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
+        expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
 
-        callbackUrl = UrlEncode(`http://${localIp}:${webServerPort}/token_callback`)
-        return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
+        callbackUrl = WebUtils.UrlEncode(`http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}`)
+        return `${invidiousHost}/authorize_token?scopes=${Invidious.AUTH_SCOPE}&callback_url=${callbackUrl}&expire=${expire}`
     end function
 
-    function GetAuthenticationHeaders()
-        token = RokuYoutube.Utils.Registry.Read("token")
+    function GetAuthenticationHeaders() as object
+        token = RegistryUtils.Read("invidious_token")
         if token = invalid
             return invalid
         end if
@@ -159,13 +163,13 @@ namespace RokuYoutube.Services.Invidious
         }
     end function
 
-    function GetUserFeed()
-        headers = GetAuthenticationHeaders()
+    function GetUserFeed() as object
+        headers = Invidious.GetAuthenticationHeaders()
         if headers = invalid
             return invalid
         end if
 
-        url = `${API_URL}${AUTH_FEED}`
+        url = `${Invidious.API_URL}${Invidious.AUTH_FEED}`
 
         args = {
             headers: headers,
@@ -175,20 +179,21 @@ namespace RokuYoutube.Services.Invidious
         response = Requests().get(url, args)
 
         if response.statuscode = 403
-            RokuYoutube.Utils.Registry.Delete("token")
+            RegistryUtils.Delete("invidious_token")
         end if
         if response.statuscode = 200
             return response.json.videos
         end if
+        return invalid
     end function
 
-    function GetUserPlaylists()
-        headers = GetAuthenticationHeaders()
+    function GetUserPlaylists() as object
+        headers = Invidious.GetAuthenticationHeaders()
         if headers = invalid
             return invalid
         end if
 
-        url = `${API_URL}${AUTH_PLAYLISTS}`
+        url = `${Invidious.API_URL}${Invidious.AUTH_PLAYLISTS}`
 
         args = {
             headers: headers,
@@ -198,11 +203,11 @@ namespace RokuYoutube.Services.Invidious
         response = Requests().get(url, args)
 
         if response.statuscode = 403
-            RokuYoutube.Utils.Registry.Delete("token")
+            RegistryUtils.Delete("invidious_token")
         end if
         if response.statuscode = 200
             return response.json
         end if
-
+        return invalid
     end function
 end namespace
