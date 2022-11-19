@@ -25,9 +25,9 @@ By now, you show have the following
 - Your Roku TV local IP address
   - You can find this information in your TV network settings. It should look like 192.168.X.X or so
 
-### Install Youbtube for Roku (command line)
+### Install Playlet (command line)
 
-Install Youbtube for Roku as a dev channel using this command, and replace:
+Install Playlet as a dev channel using this command, and replace:
 - `REPLACE_PASSWORD_HERE` : with your Roku Dev password
 - `REPLACE_IP_ADDRESS_HERE` : with your Roku TV local IP address
 ```
@@ -41,9 +41,7 @@ curl https://raw.githubusercontent.com/iBicha/playlet/main/install.sh | ROKU_DEV
 
 If successful, you should see some output on your terminal, with `Status: 200`.
 
-You should see a new channel on your Roku TV, with "Roku Developers" Logo (we'll get this thing a logo)
-
-### Install Youbtube for Roku (Manual)
+### Install Playlet (Manual)
 1. Go to `https://github.com/iBicha/playlet/releases` and download `playlet.zip`
 2. Open `http://REPLACE_IP_ADDRESS_HERE/` (e.g. http://192.168.1.2/) in your browser
 3. If prompted for username and password
