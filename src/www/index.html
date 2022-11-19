@@ -27,7 +27,7 @@
   <p>
     This is a barebone page for now, stay tuned for a redesigned page!
   </p>
-  <h5>Feedback is welcome over at: <a href="https://github.com/iBicha/playlet"
+  <h5>Feedback is welcome over at: <a id="feedback-url" href="https://github.com/iBicha/playlet"
       target="_blank">https://github.com/iBicha/playlet</a></h5>
 
   <script>
@@ -52,6 +52,23 @@
       window.location = window.appState.invidious.auth_url
     }
 
+    function CreateGithubIssueUrl() {
+      title = "[Feedback] Playlet"
+      body = `### Feedback
+_insert feedback here_
+
+#### App Info
+\`\`\`
+${JSON.stringify(window.appState.app, null, 2)}
+\`\`\`
+
+#### Device Info
+\`\`\`
+${JSON.stringify(window.appState.device, null, 2)}
+\`\`\``;
+      return `https://github.com/iBicha/playlet/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
+    }
+
     RequestGet("/api/state", function (err, response) {
       if (err) {
         alert(err)
@@ -59,7 +76,7 @@
       }
       window.appState = response
       console.log(response)
-      document.getElementById("app-version").innerText = `Version: ${response.version}`
+      document.getElementById("app-version").innerText = `Version: ${response.app.version}`
       document.getElementById("logged-in").innerText = `Logged In: ${response.invidious.logged_in}`
       document.getElementById("host").innerText = response.invidious.host
       document.getElementById("host").href = response.invidious.host
@@ -67,6 +84,8 @@
       document.getElementById("login-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
       // TODO: log out feature
       // document.getElementById("logout-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
+
+      document.getElementById("feedback-url").href = CreateGithubIssueUrl()
     })
   </script>
 </body>
