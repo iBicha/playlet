@@ -66,3 +66,23 @@ ROKU_DEVPASSWORD=REPLACE_PASSWORD_HERE
 ```
 
 Then you can open the project using VS Code and deploy to your Roku TV using the Debug button.
+
+## Why Playlet
+```
+playlet - noun
+play•let /ˈplālət/
+: a short play
+```
+
+**Playlet** is about keeping the time you spend on Youtube short and useful. It values your time, so it does not show you ads, and allows you to skip sponsored sections and other irrelevant information that's designed to monitize you and/or waste your time.
+
+There's a cliché about how a lot of open source software is **`"Made with ♡"`**. This project in particular is **not**.<br/>
+**Playlet** was created out of **spite**, because I believe I have watched enough back-to-back, unskippable Youtube ads for a lifetime.
+
+By removing all the bloat, the ads, the tracking, we could end up with an even faster app than the official one.
+
+In any case, I hope you find **Playlet** useful, and pleasant to use.
+
+## Disclaimer
+**Playlet** does not serve or distribute any material from unauthorized sources.<br/>
+**Playlet** is simply a frontend to other systems (such as https://github.com/iv-org/invidious), bringing the watching experience to the TV, as opposed to the existing frontends that are web and mobile focused.
