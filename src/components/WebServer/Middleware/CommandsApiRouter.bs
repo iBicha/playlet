@@ -1,0 +1,35 @@
+namespace Http
+
+    class CommandsApiRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("*", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                server = context.server
+
+                route = request.uri
+
+                if route.StartsWith("/api/command/play")
+                    components = WebUtils.UrlQueryComponents(route)
+                    if components["v"] = invalid
+                        response.Default(400, "Missing arg 'v'")
+                        return true
+                    end if
+
+                    server.task.top.command = `play:${components["v"]}`
+                    response.Redirect(`${Invidious.GetCurrentHost()}/watch?v=${components["v"]}`)
+                    ' 302 to prevent redirection to current host permanently 
+                    response.http_code = 302
+                    return true
+                end if
+
+                return false
+            end function)
+        end function
+
+    end class
+
+end namespace
