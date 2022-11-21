@@ -36,20 +36,6 @@
       target="_blank">https://github.com/iBicha/playlet</a></h5>
 
   <script>
-    function RequestGet(url, cb) {
-      const req = new XMLHttpRequest();
-      req.addEventListener("load", function () {
-        try {
-          cb(null, JSON.parse(this.responseText));
-        }
-        catch (err) {
-          cb(err)
-        }
-      });
-      req.open("GET", url);
-      req.send();
-    }
-
     function Login() {
       if (!window.appState) {
         alert("Error with login, please refresh the page.")
@@ -66,11 +52,10 @@
         alert("Please set video id")
         return
       }
-      RequestGet(`/api/command/play?v=${v}`, function (err, response) {
-        if (err) {
+      fetch(`/api/command/play?v=${v}`)
+        .catch(function (err) {
           alert(err)
-        }
-      })
+        });
     }
 
     function CreateGithubIssueUrl() {
@@ -129,24 +114,28 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return urlSearchParams.get('v')
     }
 
-    RequestGet("/api/state", function (err, response) {
-      if (err) {
+    fetch("/api/state")
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (appState) {
+        window.appState = appState
+        console.log(appState)
+
+        document.getElementById("app-version").innerText = `Version: ${appState.app.version}`
+        document.getElementById("logged-in").innerText = `Logged In: ${appState.invidious.logged_in}`
+        document.getElementById("host").innerText = appState.invidious.host
+        document.getElementById("host").href = appState.invidious.host
+
+        document.getElementById("login-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
+        // TODO: log out feature
+        // document.getElementById("logout-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
+
+        document.getElementById("feedback-url").href = CreateGithubIssueUrl()
+      })
+      .catch(function (err) {
         alert(err)
-        return
-      }
-      window.appState = response
-      console.log(response)
-      document.getElementById("app-version").innerText = `Version: ${response.app.version}`
-      document.getElementById("logged-in").innerText = `Logged In: ${response.invidious.logged_in}`
-      document.getElementById("host").innerText = response.invidious.host
-      document.getElementById("host").href = response.invidious.host
-
-      document.getElementById("login-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
-      // TODO: log out feature
-      // document.getElementById("logout-button").style.visibility = response.invidious.logged_in ? "hidden" : "visible";
-
-      document.getElementById("feedback-url").href = CreateGithubIssueUrl()
-    })
+      });
 
     function drop_handler(event) {
       for (var i in event.dataTransfer.items) {
