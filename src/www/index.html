@@ -7,14 +7,14 @@
   <title>Playlet</title>
 </head>
 
-<body>
+<body ondrop="drop_handler(event);" ondragover="dragover_handler(event);">
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
   <h4>Invidious Instance: <a id="host" target="_blank">None</a></h4>
 
-  <label for="video-id">Video ID:</label>
-  <input type="text" id="video-id" name="video-id">
   <button onclick="PlayVideo()">Play Video</button>
+  <label for="video-id">Video ID:</label>
+  <input type="text" id="video-id" name="video-id" style="min-width:300px;">
 
   <h4 id="logged-in">Logged In: </h4>
   <button style="visibility: hidden" id="login-button" onclick="Login()">Login</button>
@@ -59,10 +59,8 @@
 
     function PlayVideo() {
       let v = document.getElementById('video-id').value
-      if (v.startsWith("http")) {
-        const url = new URL(v)
-        const urlSearchParams = new URLSearchParams(url.search);
-        v = urlSearchParams.get('v')
+      if (isValidHttpUrl(v)) {
+        v = getVideoId(v)
       }
       if (!v || v.length < 8) {
         alert("Please set video id")
@@ -92,6 +90,31 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return `https://github.com/iBicha/playlet/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
     }
 
+    function isValidHttpUrl(string) {
+      let url;
+      try {
+        url = new URL(string);
+      } catch (_) {
+        return false;
+      }
+      return url.protocol === "http:" || url.protocol === "https:";
+    }
+
+    function getVideoId(url) {
+      // Short url
+      if (url.startsWith("https://youtu.be/") || url.startsWith("http://youtu.be/")) {
+        url = url.replace("https://youtu.be/", "").replace("http://youtu.be/", "")
+        if (url.includes("?")) {
+          url = url.substring(0, url.indexOf("?"))
+        }
+        return url
+      }
+      // regular url
+      url = new URL(url)
+      const urlSearchParams = new URLSearchParams(url.search);
+      return urlSearchParams.get('v')
+    }
+
     RequestGet("/api/state", function (err, response) {
       if (err) {
         alert(err)
@@ -110,6 +133,23 @@ ${JSON.stringify(window.appState.device, null, 2)}
 
       document.getElementById("feedback-url").href = CreateGithubIssueUrl()
     })
+
+    function drop_handler(event) {
+      for (var i in event.dataTransfer.items) {
+        let item = event.dataTransfer.items[i]
+        if (item.kind = 'string' && item.getAsString) {
+          item.getAsString((dataString) => {
+            if (isValidHttpUrl(dataString)) {
+              document.getElementById('video-id').value = dataString
+            }
+          });
+        }
+      }
+      event.preventDefault();
+    }
+    function dragover_handler(event) {
+      event.preventDefault();
+    }
   </script>
 </body>
 
