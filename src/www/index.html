@@ -11,6 +11,11 @@
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
   <h4>Invidious Instance: <a id="host" target="_blank">None</a></h4>
+
+  <label for="video-id">Video ID:</label>
+  <input type="text" id="video-id" name="video-id">
+  <button onclick="PlayVideo()">Play Video</button>
+
   <h4 id="logged-in">Logged In: </h4>
   <button style="visibility: hidden" id="login-button" onclick="Login()">Login</button>
   <button style="visibility: hidden" id="logout-button">Logout</button>
@@ -50,6 +55,24 @@
         alert("Error with login, please refresh the page.")
       }
       window.location = window.appState.invidious.auth_url
+    }
+
+    function PlayVideo() {
+      let v = document.getElementById('video-id').value
+      if (v.startsWith("http")) {
+        const url = new URL(v)
+        const urlSearchParams = new URLSearchParams(url.search);
+        v = urlSearchParams.get('v')
+      }
+      if (!v || v.length < 8) {
+        alert("Please set video id")
+        return
+      }
+      RequestGet(`/api/command/play?v=${v}`, function (err, response) {
+        if (err) {
+          alert(err)
+        }
+      })
     }
 
     function CreateGithubIssueUrl() {
