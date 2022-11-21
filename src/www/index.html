@@ -7,7 +7,7 @@
   <title>Playlet</title>
 </head>
 
-<body ondrop="drop_handler(event);" ondragover="dragover_handler(event);">
+<body ondrop="OnDrop(event);" ondragover="OnDragover(event);">
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
   <h4>Invidious Instance: <a id="host" target="_blank">None</a></h4>
@@ -45,8 +45,8 @@
 
     function PlayVideo() {
       let v = document.getElementById('video-id').value
-      if (isValidHttpUrl(v)) {
-        v = getVideoId(v)
+      if (IsValidHttpUrl(v)) {
+        v = GetVideoId(v)
       }
       if (!v || v.length < 8) {
         alert("Please set video id")
@@ -75,7 +75,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return `https://github.com/iBicha/playlet/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`
     }
 
-    function isValidHttpUrl(string) {
+    function IsValidHttpUrl(string) {
       let url;
       try {
         url = new URL(string);
@@ -85,7 +85,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return url.protocol === "http:" || url.protocol === "https:";
     }
 
-    function getVideoId(url) {
+    function GetVideoId(url) {
       // Share/Short url
       const YoutubeUrls = [
         "https://youtu.be/",
@@ -114,35 +114,37 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return urlSearchParams.get('v')
     }
 
-    fetch("/api/state")
-      .then(function (response) {
-        return response.json();
-      })
-      .then(function (appState) {
-        window.appState = appState
-        console.log(appState)
+    function Initialize() {
+      fetch("/api/state")
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (appState) {
+          window.appState = appState
+          console.log(appState)
 
-        document.getElementById("app-version").innerText = `Version: ${appState.app.version}`
-        document.getElementById("logged-in").innerText = `Logged In: ${appState.invidious.logged_in}`
-        document.getElementById("host").innerText = appState.invidious.host
-        document.getElementById("host").href = appState.invidious.host
+          document.getElementById("app-version").innerText = `Version: ${appState.app.version}`
+          document.getElementById("logged-in").innerText = `Logged In: ${appState.invidious.logged_in}`
+          document.getElementById("host").innerText = appState.invidious.host
+          document.getElementById("host").href = appState.invidious.host
 
-        document.getElementById("login-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
-        // TODO: log out feature
-        // document.getElementById("logout-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
+          document.getElementById("login-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
+          // TODO: log out feature
+          // document.getElementById("logout-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
 
-        document.getElementById("feedback-url").href = CreateGithubIssueUrl()
-      })
-      .catch(function (err) {
-        alert(err)
-      });
+          document.getElementById("feedback-url").href = CreateGithubIssueUrl()
+        })
+        .catch(function (err) {
+          alert(err)
+        });
+    }
 
-    function drop_handler(event) {
+    function OnDrop(event) {
       for (var i in event.dataTransfer.items) {
         let item = event.dataTransfer.items[i]
         if (item.kind = 'string' && item.getAsString) {
           item.getAsString((dataString) => {
-            if (isValidHttpUrl(dataString)) {
+            if (IsValidHttpUrl(dataString)) {
               document.getElementById('video-id').value = dataString
             }
           });
@@ -150,9 +152,12 @@ ${JSON.stringify(window.appState.device, null, 2)}
       }
       event.preventDefault();
     }
-    function dragover_handler(event) {
+
+    function OnDragover(event) {
       event.preventDefault();
     }
+
+    Initialize();
   </script>
 </body>
 
