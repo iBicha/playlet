@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Play video API
 - Play video by ID/URL in web app
 - Metadata to Video Player
+- Support for DASH and Live videos
 
 ### Fixed
 - Bug where Settings page and home page are both visible, if settings page is selected, and user logs in.

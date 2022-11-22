@@ -79,13 +79,17 @@ function OnVideoPlayerStateChange() as void
         ' A hack to see if we could use the proxy here
         if m.videoPlayingSuccess <> true
             errorInfo = m.videoPlayer.errorInfo
-            if errorInfo.category = "http"
-                videoId = m.videoPlayer.videoId
-                itag = m.videoPlayer.content.itag
+            ' http for stream format, mediaerror for DASH
+            if errorInfo.category = "http" or errorInfo.category = "mediaerror"
                 url = m.videoPlayer.content.url
                 if url.InStr("local=true") = -1
                     print(`Video ${url} failed to play. Trying a proxy (local=true)`)
-                    m.videoPlayer.content.url = Invidious.GetVideoUrl(videoId, itag, true)
+                    if url.InStr("?") = -1
+                        url += "?local=true"
+                    else
+                        url += "&local=true"
+                    end if
+                    m.videoPlayer.content.url = url
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' TODO: perhaps creating a second player is better?
                     m.videoPlayer.ignoreNextFinishedState = true
@@ -123,10 +127,20 @@ function StartVideoDetailsTask(videoId as string)
         videoId = task.output.videoId
         metadata = task.output.metadata
         if metadata <> invalid
-            stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
             contentNode = CreateObject("roSGNode", "ContentNode")
-            contentNode.addFields({ videoId: videoId, itag: stream.itag })
-            contentNode.url = stream.url
+            contentNode.addFields({ videoId: videoId })
+
+            if metadata.hlsUrl <> invalid
+                contentNode.url = metadata.hlsUrl
+            else if metadata.dashUrl <> invalid
+                contentNode.url = metadata.dashUrl
+            else
+                stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
+                itag = stream.itag
+                ' Use an url relative to the host, so we can proxy(local=true) in case it fails
+                contentNode.url = Invidious.GetVideoUrl(videoId, itag)
+            end if
+
             contentNode.title = metadata.title
             contentNode.secondaryTitle = metadata.author
             SetCaptions(metadata, m.videoPlayer, contentNode)
