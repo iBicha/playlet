@@ -7,23 +7,51 @@ function OnContentSet()
         m.top.FindNode("titleLabel").text = content.title
         m.top.FindNode("authorLabel").text = content.author
 
-        releaseDate = validstr(content.releaseDate)
+        publishedText = validstr(content.publishedText)
         viewCount = FormatViewCount(content.viewCount)
-        if releaseDate = "" and viewCount = ""
+        if publishedText = "" and viewCount = ""
             m.top.FindNode("viewCountDateLabel").text = ""
         else
-            m.top.FindNode("viewCountDateLabel").text = `${releaseDate} • ${viewCount}`
+            m.top.FindNode("viewCountDateLabel").text = `${publishedText} • ${viewCount}`
         end if
 
         thumbnail = m.top.FindNode("thumbnail")
-        thumbnail.uri = content.hdPosterUrl
-        thumbnail.id = `thumbnail-${content.id}`
-        if content.length <> invalid and content.length <> 0
-            m.top.FindNode("durationLabel").text = TimeUtils.GetFormattedTime(content.length)
-        else
+        thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
+        thumbnail.id = `thumbnail-${content.videoId}`
+
+        if IsVideoLive(content)
+            m.top.FindNode("liveRect").visible = true
             m.top.FindNode("durationRect").visible = false
+        else
+            m.top.FindNode("liveRect").visible = false
+            if content.lengthSeconds <> invalid and content.lengthSeconds <> 0
+                m.top.FindNode("durationLabel").text = TimeUtils.GetFormattedTime(content.lengthSeconds)
+                m.top.FindNode("durationRect").visible = true
+            else
+                m.top.FindNode("durationRect").visible = false
+            end if
         end if
     end if
+end function
+
+function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string) as string
+    if videoThumbnails.Count() = 0
+        return ""
+    end if
+    for each thumbnail in videoThumbnails
+        if thumbnail.quality = quality
+            return thumbnail.url
+        end if
+    end for
+    return videoThumbnails[0].url
+end function
+
+function IsVideoLive(metadata as object) as boolean
+    if metadata.liveNow = true
+        return true
+    end if
+    ' TODO: metadata.liveNow is returning false for live videos...
+    return metadata.lengthSeconds = 0 and metadata.viewCount = 0
 end function
 
 function FormatViewCount(viewCount as dynamic) as string
