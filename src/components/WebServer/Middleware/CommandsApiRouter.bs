@@ -5,6 +5,18 @@ namespace Http
         function new()
             super()
 
+            m.Get("/api/command/logout", function(context as object) as boolean
+                response = context.response
+                server = context.server
+
+                if Invidious.Logout()
+                    server.task.top.login = false
+                end if
+
+                response.Default(204, "OK")
+                return true
+            end function)
+
             m.Get("*", function(context as object) as boolean
                 request = context.request
                 response = context.response
@@ -24,7 +36,7 @@ namespace Http
                         ' 302 to prevent redirection to current host permanently
                         response.Redirect(`${Invidious.GetCurrentHost()}/watch?v=${components["v"]}`, 302)
                     else
-                        response.Default(200, "OK")
+                        response.Default(204, "OK")
                     end if
                     return true
                 end if

@@ -19,9 +19,10 @@ namespace Invidious
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
 
-    const AUTH_SCOPE = "GET:feed,GET:playlists"
+    const AUTH_SCOPE = "GET:feed,GET:playlists,POST:tokens/unregister"
     const AUTH_FEED = "/api/v1/auth/feed"
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
+    const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
 
     function DefaultArgs() as object
         return {
@@ -199,5 +200,27 @@ namespace Invidious
             return response.json
         end if
         return invalid
+    end function
+
+    function Logout() as boolean
+        headers = Invidious.GetAuthenticationHeaders()
+        if headers = invalid
+            return false
+        end if
+
+        url = `${Invidious.API_URL}${Invidious.AUTH_TOKENS_UNREGISTER}`
+
+        ' token is already valid json that contains the "session" key needed by the unregister endpoint
+        token = RegistryUtils.Read("invidious_token")
+        headers["Content-Type"] = "application/json"
+        args = {
+            headers: headers,
+            data: token
+        }
+
+        Requests().post(url, args)
+
+        RegistryUtils.Delete("invidious_token")
+        return true
     end function
 end namespace

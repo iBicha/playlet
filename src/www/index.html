@@ -17,8 +17,8 @@
   <input type="text" id="video-id" name="video-id" style="min-width:300px;">
 
   <h4 id="logged-in">Logged In: </h4>
-  <button style="visibility: hidden" id="login-button" onclick="Login()">Login</button>
-  <button style="visibility: hidden" id="logout-button">Logout</button>
+  <button style="display: none" id="login-button" onclick="Login()">Login</button>
+  <button style="display: none" id="logout-button" onclick="Logout()">Logout</button>
 
   <h5>Instructions</h5>
   <ul>
@@ -41,6 +41,16 @@
         alert("Error with login, please refresh the page.")
       }
       window.location = window.appState.invidious.auth_url
+    }
+
+    function Logout() {
+      fetch('/api/command/logout')
+        .then(function (response) {
+          window.location.reload();
+        })
+        .catch(function (err) {
+          alert(err)
+        });
     }
 
     function PlayVideo() {
@@ -128,9 +138,8 @@ ${JSON.stringify(window.appState.device, null, 2)}
           document.getElementById("host").innerText = appState.invidious.host
           document.getElementById("host").href = appState.invidious.host
 
-          document.getElementById("login-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
-          // TODO: log out feature
-          // document.getElementById("logout-button").style.visibility = appState.invidious.logged_in ? "hidden" : "visible";
+          document.getElementById("login-button").style.display = appState.invidious.logged_in ? "none" : "block";
+          document.getElementById("logout-button").style.display = !appState.invidious.logged_in ? "none" : "block";
 
           document.getElementById("feedback-url").href = CreateGithubIssueUrl()
         })
