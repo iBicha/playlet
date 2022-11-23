@@ -1,21 +1,31 @@
 import "pkg:/source/roku_modules/rokupromise/Promise.brs"
+import "pkg:/components/VideoPlayer/Video.bs"
 
 function Init()
+    m.container = m.top.FindNode("container")
     m.keyboard = m.top.FindNode("keyboard")
     m.suggestions = m.top.FindNode("suggestions")
+    m.rowList = m.top.FindNode("rowList")
+
     m.keyboard.ObserveField("text", "OnTextChange")
     m.suggestions.ObserveField("buttonSelected", "OnSearchButtonSelected")
+    m.rowList.ObserveField("rowItemSelected", "OnSearchVideoSelected")
     m.top.ObserveField("focus", "OnFocusChange")
     m.top.ObserveField("visible", "OnVisibilityChange")
 end function
 
-function OnFocusChange()
+function OnFocusChange() as void
     if m.top.focus = true
+        if m.rowlist.content <> invalid
+            m.rowlist.SetFocus(true)
+            ScrollDown()
+            return
+        end if
         if m.suggestions.buttons.Count() > 0
             m.suggestions.SetFocus(true)
-        else
-            m.keyboard.SetFocus(true)
+            return
         end if
+        m.keyboard.SetFocus(true)
     end if
 end function
 
@@ -36,6 +46,7 @@ function OnTextChange() as void
         end if
         searchSuggestsions = task.output.response
         if searchSuggestsions <> invalid
+            ' TODO: fix race condition where button group gains focus before suggestions are set
             m.suggestions.buttons = searchSuggestsions.suggestions
         end if
     end function)
@@ -44,7 +55,24 @@ end function
 function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
-    print(text)
+    Search(text)
+end function
+
+function Search(text as string)
+    createTaskPromise("SearchTask", {
+        input: {
+            q: text
+        }
+    }).then(function(task as object) as void
+        rootChildren = task.output.rootChildren
+        contentNode = CreateObject("roSGNode", "ContentNode")
+        contentNode.Update({
+            children: rootChildren
+        }, true)
+        m.rowList.content = contentNode
+        m.rowList.SetFocus(true)
+        ScrollDown()
+    end function)
 end function
 
 function OnVisibilityChange()
@@ -56,6 +84,34 @@ end function
 function ClearSearch()
     m.keyboard.text = ""
     m.suggestions.buttons = []
+    m.rowlist.content = invalid
+    ScrollUp()
+end function
+
+function IsNodeFocused(id as string) as boolean
+    return m.top.focusedChild.id = id or m.container.focusedChild.id = id
+end function
+
+function ScrollUp()
+    m.container.translation = [0, 0]
+end function
+
+function ScrollDown()
+    m.container.translation = [0, -320]
+end function
+
+function OnSearchVideoSelected(event as object)
+    grid = event.GetRoSGNode()
+
+    selectedPair = event.GetData()
+    selectedRow = selectedPair[0]
+    selectedRowItem = selectedPair[1]
+
+    rowContent = grid.content.GetChild(selectedRow)
+    itemContent = rowContent.GetChild(selectedRowItem)
+
+    videoId = itemContent.videoId
+    ShowVideoScreenFull(videoId, m.top)
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -63,20 +119,38 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return false
     end if
     if key = "back"
+        ScrollUp()
         m.top.escape = key
         return true
     end if
     if key = "left"
-        if m.top.focusedChild.id = "keyboard" and m.suggestions.buttons.Count() > 0
+        if IsNodeFocused("keyboard") and m.suggestions.buttons.Count() > 0
             m.suggestions.SetFocus(true)
             return true
         end if
+        ScrollUp()
         m.top.escape = key
         return true
     end if
     if key = "right"
-        if m.top.focusedChild.id = "suggestions"
+        if IsNodeFocused("suggestions")
             m.keyboard.SetFocus(true)
+            return true
+        end if
+        return false
+    end if
+    if key = "down"
+        if m.rowlist.content <> invalid
+            ScrollDown()
+            m.rowlist.SetFocus(true)
+            return true
+        end if
+        return false
+    end if
+    if key = "up"
+        if IsNodeFocused("rowList")
+            ScrollUp()
+            m.suggestions.SetFocus(true)
             return true
         end if
         return false
