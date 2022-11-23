@@ -1,5 +1,6 @@
 import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 import "pkg:/components/VideoPlayer/Video.bs"
+import "pkg:/components/SearchScreen/SearchHistory.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
@@ -12,6 +13,9 @@ function Init()
     m.rowList.ObserveField("rowItemSelected", "OnSearchVideoSelected")
     m.top.ObserveField("focus", "OnFocusChange")
     m.top.ObserveField("visible", "OnVisibilityChange")
+
+    ' Trigger suggestions
+    OnTextChange()
 end function
 
 function OnFocusChange() as void
@@ -31,9 +35,6 @@ end function
 
 function OnTextChange() as void
     text = m.keyboard.text
-    if text = ""
-        return
-    end if
 
     createTaskPromise("SearchSuggestionsTask", {
         input: {
@@ -44,10 +45,10 @@ function OnTextChange() as void
         if task.output.q <> m.keyboard.text
             return
         end if
-        searchSuggestsions = task.output.response
-        if searchSuggestsions <> invalid
+        suggestions = task.output.response
+        if suggestions <> invalid
             ' TODO: fix race condition where button group gains focus before suggestions are set
-            m.suggestions.buttons = searchSuggestsions.suggestions
+            m.suggestions.buttons = suggestions
         end if
     end function)
 end function
@@ -59,6 +60,7 @@ function OnSearchButtonSelected()
 end function
 
 function Search(text as string)
+    SaveSearchHistory(text)
     createTaskPromise("SearchTask", {
         input: {
             q: text
@@ -83,7 +85,6 @@ end function
 
 function ClearSearch()
     m.keyboard.text = ""
-    m.suggestions.buttons = []
     m.rowlist.content = invalid
     ScrollUp()
 end function
