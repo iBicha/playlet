@@ -15,7 +15,9 @@ function Init()
     m.homeGridScreen.SetFocus(true)
 
     m.settingsScreen = m.top.findNode("SettingsScreen")
+
     m.searchScreen = m.top.findNode("SearchScreen")
+    m.searchScreen.ObserveField("escape", "OnSearchScreenEscape")
 
     m.navBar = m.top.findNode("NavBar")
     m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
@@ -30,6 +32,11 @@ function InitWebServer()
     m.serverTask.ObserveField("login", "OnWebServerLogin")
     m.serverTask.ObserveField("command", "OnWebServerCommand")
     m.serverTask.control = "RUN"
+end function
+
+function OnSearchScreenEscape()
+    m.navBar.SetFocus(true)
+    m.navBar.focusIndex = 0
 end function
 
 function OnHomeGridScreenEscape()
@@ -78,6 +85,7 @@ function OnWebServerLogin()
     m.homeGridScreen.id = "HomeGridScreen"
     m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
 
+    ' Selecting home
     m.navBar.focusIndex = -1
     m.homeGridScreen.focus = true
 
@@ -88,6 +96,15 @@ end function
 
 function OnWebServerCommand()
     if m.serverTask.command.StartsWith("play:")
+        ' Selecting home
+        m.navBar.focusIndex = -1
+        m.homeGridScreen.focus = true
+
+        m.searchScreen.visible = false
+        m.homeGridScreen.visible = true
+        m.settingsScreen.visible = false
+        ' Trigger play video from home
+        ' TODO: allow returning to current screen, instead of home
         m.homeGridScreen.playvideo = m.serverTask.command.Mid(5)
     end if
 end function
