@@ -4,6 +4,8 @@ import "pkg:/components/SearchScreen/SearchHistory.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
+    m.scrollAnimation = m.top.FindNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
     m.keyboard = m.top.FindNode("keyboard")
     m.suggestions = m.top.FindNode("suggestions")
     m.rowList = m.top.FindNode("rowList")
@@ -73,6 +75,7 @@ function Search(text as string)
         }, true)
         m.rowList.content = contentNode
         m.rowList.SetFocus(true)
+        m.rowList.jumpToRowItem = [0, 0]
         ScrollDown()
     end function)
 end function
@@ -93,12 +96,24 @@ function IsNodeFocused(id as string) as boolean
     return m.top.focusedChild.id = id or m.container.focusedChild.id = id
 end function
 
-function ScrollUp()
-    m.container.translation = [0, 0]
+function ScrollUp() as void
+    destination = m.scrollAnimationInterpolator.keyValue[0][1]
+    current = m.container.translation[1]
+    if current = destination
+        return 
+    end if
+    m.scrollAnimationInterpolator.reverse = true
+    m.scrollAnimation.control = "start"
 end function
 
-function ScrollDown()
-    m.container.translation = [0, -320]
+function ScrollDown() as void
+    destination = m.scrollAnimationInterpolator.keyValue[2][1]
+    current = m.container.translation[1]
+    if current = destination
+        return 
+    end if
+    m.scrollAnimationInterpolator.reverse = false
+    m.scrollAnimation.control = "start"
 end function
 
 function OnSearchVideoSelected(event as object)
