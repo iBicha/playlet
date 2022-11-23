@@ -1,0 +1,75 @@
+import "pkg:/source/roku_modules/rokupromise/Promise.brs"
+
+function Init()
+    m.keyboard = m.top.FindNode("keyboard")
+    m.suggestions = m.top.FindNode("suggestions")
+    m.keyboard.ObserveField("text", "OnTextChange")
+    m.suggestions.ObserveField("buttonSelected", "OnSearchButtonSelected")
+    m.top.ObserveField("focus", "OnFocusChange")
+end function
+
+function OnFocusChange()
+    if m.top.focus = true
+        if m.suggestions.buttons.Count() > 0
+            m.suggestions.SetFocus(true)
+        else
+            m.keyboard.SetFocus(true)
+        end if
+    end if
+end function
+
+function OnTextChange() as void
+    text = m.keyboard.text
+    if text = ""
+        return
+    end if
+
+    createTaskPromise("SearchSuggestionsTask", {
+        input: {
+            q: text
+        }
+    }).then(function(task as object) as void
+        ' In case this is an old request, discard suggestions
+        if task.output.q <> m.keyboard.text
+            return
+        end if
+        searchSuggestsions = task.output.response
+        if searchSuggestsions <> invalid
+            m.suggestions.buttons = searchSuggestsions.suggestions
+        end if
+    end function)
+end function
+
+function OnSearchButtonSelected()
+    selected = m.suggestions.buttonSelected
+    text = m.suggestions.buttons[selected]
+    print(text)
+end function
+
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+    if key = "back"
+        m.top.escape = key
+        return true
+    end if
+    if key = "left"
+        if m.top.focusedChild.id = "keyboard" and m.suggestions.buttons.Count() > 0
+            m.suggestions.SetFocus(true)
+            return true
+        end if
+        m.top.escape = key
+        return true
+    end if
+    if key = "right"
+        if m.top.focusedChild.id = "suggestions"
+            m.keyboard.SetFocus(true)
+            return true
+        end if
+        return false
+    end if
+
+    return false
+end function
