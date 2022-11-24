@@ -11,13 +11,16 @@ namespace Http
             m.Get("/api/state", function(context as object) as boolean
                 response = context.response
 
+                authToken = InvidiousSettings.GetAuthToken()
                 state = {
                     app: GetAppInfo(),
                     device: GetDeviceInfo(),
                     invidious: {
-                        host: Invidious.GetCurrentHost(),
+                        instances: InvidiousSettings.GetCurrentInstances(),
+                        selected_instance: InvidiousSettings.GetSelectedInstance(),
                         auth_url: Invidious.GetAuthorizeTokenLink(),
-                        logged_in: Invidious.GetAuthenticationHeaders() <> invalid
+                        logged_in: authToken <> invalid,
+                        logged_in_instance: authToken <> invalid ? authToken.instance : invalid
                     }
                 }
                 response.Json(state)

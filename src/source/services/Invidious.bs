@@ -4,11 +4,10 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/General.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/WebUtils.bs"
+import "pkg:/source/services/InvidiousSettings.bs"
 
 namespace Invidious
     ' TODO: query server status, check if it supports APIs and/or signups
-    const API_URL = "https://vid.puffyan.us"
-
     const TOKEN_CALLBACK = "/invidious/token_callback"
 
     const POPULAR_ENDPOINT = "/api/v1/popular"
@@ -33,7 +32,8 @@ namespace Invidious
     end function
 
     function GetPopular() as object
-        url = `${Invidious.API_URL}${Invidious.POPULAR_ENDPOINT}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.POPULAR_ENDPOINT}`
 
         args = Invidious.DefaultArgs()
         response = Requests().get(url, args)
@@ -45,7 +45,8 @@ namespace Invidious
     end function
 
     function GetTrending(trendingType = "" as string) as object
-        url = `${Invidious.API_URL}${Invidious.TRENDING_ENDPOINT}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.TRENDING_ENDPOINT}`
 
         args = Invidious.DefaultArgs()
         if trendingType <> ""
@@ -61,7 +62,8 @@ namespace Invidious
     end function
 
     function GetVideoUrl(videoId as string, itag as string, local as boolean) as string
-        url = `${Invidious.API_URL}/latest_version?id=${videoId}&itag=${itag}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}/latest_version?id=${videoId}&itag=${itag}`
         if local
             url = url + "&local=true"
         end if
@@ -69,7 +71,8 @@ namespace Invidious
     end function
 
     function GetVideoMetadata(videoId as string) as object
-        url = `${Invidious.API_URL}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
         args = Invidious.DefaultArgs()
         response = Requests().get(url, args)
@@ -82,7 +85,8 @@ namespace Invidious
     end function
 
     function SearchSuggestions(q as string) as object 'SearchSuggestionResult
-        url = `${Invidious.API_URL}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
         args = Invidious.DefaultArgs()
         args.params.q = q
@@ -95,7 +99,8 @@ namespace Invidious
     end function
 
     function Search(q as string, args = invalid as dynamic) as object
-        url = `${Invidious.API_URL}${Invidious.SEARCH_ENDPOINT}`
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.SEARCH_ENDPOINT}`
 
         _args = Invidious.DefaultArgs()
         _args.params.q = q
@@ -128,39 +133,33 @@ namespace Invidious
         return invalid
     end function
 
-    function GetCurrentHost() as string
-        return Invidious.API_URL
-    end function
-
     function GetAuthorizeTokenLink() as string
+        instance = InvidiousSettings.GetSelectedInstance()
         ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
-        invidiousHost = `${Invidious.API_URL}`.Replace("https://", "http://")
+        invidiousHost = instance.Replace("https://", "http://")
 
         localIp = GetLocalIpAddress()
         webServerPort = 8888
         expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 30 'A month from now
 
-        callbackUrl = WebUtils.UrlEncode(`http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}`)
+        callbackUrl = WebUtils.UrlEncode(`http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}?referer=${instance}`)
         return `${invidiousHost}/authorize_token?scopes=${Invidious.AUTH_SCOPE}&callback_url=${callbackUrl}&expire=${expire}`
     end function
 
-    function GetAuthenticationHeaders() as object
-        token = RegistryUtils.Read("invidious_token")
-        if token = invalid
-            return invalid
-        end if
+    function GetAuthenticationHeaders(token as string) as object
         return {
             "Authorization": `Bearer ${token}`
         }
     end function
 
     function GetUserFeed() as object
-        headers = Invidious.GetAuthenticationHeaders()
-        if headers = invalid
-            return invalid
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
+            return false
         end if
+        headers = Invidious.GetAuthenticationHeaders(authToken.token)
 
-        url = `${Invidious.API_URL}${Invidious.AUTH_FEED}`
+        url = `${authToken.instance}${Invidious.AUTH_FEED}`
 
         args = {
             headers: headers,
@@ -170,7 +169,7 @@ namespace Invidious
         response = Requests().get(url, args)
 
         if response.statuscode = 403
-            RegistryUtils.Delete("invidious_token")
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         end if
         if response.statuscode = 200
             return response.json.videos
@@ -179,12 +178,13 @@ namespace Invidious
     end function
 
     function GetUserPlaylists() as object
-        headers = Invidious.GetAuthenticationHeaders()
-        if headers = invalid
-            return invalid
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
+            return false
         end if
+        headers = Invidious.GetAuthenticationHeaders(authToken.token)
 
-        url = `${Invidious.API_URL}${Invidious.AUTH_PLAYLISTS}`
+        url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}`
 
         args = {
             headers: headers,
@@ -194,7 +194,7 @@ namespace Invidious
         response = Requests().get(url, args)
 
         if response.statuscode = 403
-            RegistryUtils.Delete("invidious_token")
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         end if
         if response.statuscode = 200
             return response.json
@@ -203,24 +203,24 @@ namespace Invidious
     end function
 
     function Logout() as boolean
-        headers = Invidious.GetAuthenticationHeaders()
-        if headers = invalid
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
             return false
         end if
+        headers = Invidious.GetAuthenticationHeaders(authToken.token)
 
-        url = `${Invidious.API_URL}${Invidious.AUTH_TOKENS_UNREGISTER}`
+        url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
 
-        ' token is already valid json that contains the "session" key needed by the unregister endpoint
-        token = RegistryUtils.Read("invidious_token")
+        ' authToken.token is already valid json that contains the "session" key needed by the unregister endpoint
         headers["Content-Type"] = "application/json"
         args = {
             headers: headers,
-            data: token
+            data: authToken.token
         }
 
         Requests().post(url, args)
 
-        RegistryUtils.Delete("invidious_token")
+        RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         return true
     end function
 end namespace

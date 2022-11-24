@@ -1,10 +1,9 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/General.bs"
+import "pkg:/source/services/InvidiousSettings.bs"
 
 class InvidiousService
-    API_URL = "https://vid.puffyan.us"
-
     private endpoints
     private responseHanlders
 
@@ -29,16 +28,19 @@ class InvidiousService
             return invalid
         end if
 
-        url = m.API_URL + endpoint.url
+        instance = InvidiousSettings.GetSelectedInstance()
+
+        url = instance + endpoint.url
 
         args = { params: {} }
 
         if endpoint.authenticated = true
-            auth_headers = m.GetAuthenticationHeaders()
-            if auth_headers = invalid
+            authToken = InvidiousSettings.GetAuthToken()
+            if authToken = invalid
                 return invalid
             end if
-            args.headers = auth_headers
+            url = authToken.instance + endpoint.url
+            args.headers = m.GetAuthenticationHeaders(authToken.token)
         end if
 
         if endpoint.queryParams <> invalid
@@ -73,11 +75,7 @@ class InvidiousService
         return responseHandler(m, requestData, response)
     end function
 
-    function GetAuthenticationHeaders() as object
-        token = RegistryUtils.Read("invidious_token")
-        if token = invalid
-            return invalid
-        end if
+    function GetAuthenticationHeaders(token as string) as object
         return {
             "Authorization": `Bearer ${token}`
         }
@@ -118,7 +116,7 @@ class InvidiousService
         if response.statuscode = 403
             print(`Server responded with 403: ${response.text}`)
             print("deleting token...")
-            RegistryUtils.Delete("invidious_token")
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         end if
     end function
 
