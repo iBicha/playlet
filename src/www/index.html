@@ -5,13 +5,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Playlet</title>
+  <style>
+    table,
+    th,
+    td {
+      border: 1px solid;
+    }
+  </style>
 </head>
 
 <body ondrop="OnDrop(event);" ondragover="OnDragover(event);">
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
-  <h4>Invidious Instance: <a id="host" target="_blank">None</a></h4>
-
+  <h4>Invidious Instance: <a id="instance" target="_blank">None</a></h4>
+  <table id="instances">
+    <thead>
+      <tr>
+        <th>Instances</th>
+      </tr>
+    </thead>
+    <tbody>
+    </tbody>
+  </table>
+  </br>
   <button onclick="PlayVideo()">Play Video</button>
   <label for="video-id">Video ID:</label>
   <input type="text" id="video-id" name="video-id" style="min-width:300px;">
@@ -134,17 +150,27 @@ ${JSON.stringify(window.appState.device, null, 2)}
           console.log(appState)
 
           document.getElementById("app-version").innerText = `Version: ${appState.app.version}`
-          
-          if(appState.invidious.logged_in){
+
+          if (appState.invidious.logged_in) {
             document.getElementById("logged-in").innerHTML = `Logged In: true (<a href="${appState.invidious.logged_in_instance}" target="_blank">${appState.invidious.logged_in_instance}</a>)`
           } else {
             document.getElementById("logged-in").innerHTML = "Logged In: false"
           }
 
-          hostEl = document.getElementById("host")
-          hostEl.innerText = hostEl.href = appState.invidious.selected_instance
+          instanceEl = document.getElementById("instance")
+          instanceEl.innerText = instanceEl.href = appState.invidious.selected_instance
 
-          document.getElementById("login-button").style.display = appState.invidious.logged_in ? "none" : "block";
+          instances = document.getElementById("instances").getElementsByTagName('tbody')[0];
+          for (var i in appState.invidious.instances) {
+            var row = instances.insertRow();
+            var cell = row.insertCell();
+            cell.innerHTML = `<a href="${appState.invidious.instances[i]}" target="_blank">${appState.invidious.instances[i]}</a>`
+          }
+
+          loginButton = document.getElementById("login-button")
+          loginButton.innerText = `Login (${appState.invidious.selected_instance})`
+          loginButton.style.display = appState.invidious.logged_in ? "none" : "block";
+          
           document.getElementById("logout-button").style.display = !appState.invidious.logged_in ? "none" : "block";
 
           document.getElementById("feedback-url").href = CreateGithubIssueUrl()
