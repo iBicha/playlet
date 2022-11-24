@@ -10,11 +10,18 @@
     th,
     td {
       border: 1px solid;
+      cursor: all-scroll;
+    }
+
+    table {
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
     }
   </style>
 </head>
 
-<body ondrop="OnDrop(event);" ondragover="OnDragover(event);">
+<body ondrop="OnBodyDrop(event);" ondragover="OnBodyDragover(event);">
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
   <h4>Invidious Instance: <a id="instance" target="_blank">None</a></h4>
@@ -28,6 +35,9 @@
     </tbody>
   </table>
   </br>
+  <button style="display: none" id="update-instances" onclick="UpdateInstances()">Update Instances</button>
+  </br>
+
   <button onclick="PlayVideo()">Play Video</button>
   <label for="video-id">Video ID:</label>
   <input type="text" id="video-id" name="video-id" style="min-width:300px;">
@@ -140,6 +150,24 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return urlSearchParams.get('v')
     }
 
+    function UpdateInstances() {
+      instances = Array.from(document.getElementById("instances")
+        .getElementsByTagName('tbody')[0]
+        .getElementsByTagName('td'))
+        .map(el => el.getElementsByTagName('a')[0])
+        .map(a => a.innerText);
+
+      args = instances.map(instance => `instances=${instance}`).join("&")
+
+      fetch(`/invidious/set-instances?${args}`)
+        .then(function (response) {
+          window.location.reload();
+        })
+        .catch(function (err) {
+          alert(err)
+        });
+    }
+
     function Initialize() {
       fetch("/api/state")
         .then(function (response) {
@@ -163,6 +191,11 @@ ${JSON.stringify(window.appState.device, null, 2)}
           instances = document.getElementById("instances").getElementsByTagName('tbody')[0];
           for (var i in appState.invidious.instances) {
             var row = instances.insertRow();
+            row.draggable = true
+            row.addEventListener('dragstart', OnTableRowDragStart);
+            row.addEventListener('dragover', OnTableRowDragover);
+            row.addEventListener('drop', OnTableRowDrop);
+
             var cell = row.insertCell();
             cell.innerHTML = `<a href="${appState.invidious.instances[i]}" target="_blank">${appState.invidious.instances[i]}</a>`
           }
@@ -170,7 +203,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
           loginButton = document.getElementById("login-button")
           loginButton.innerText = `Login (${appState.invidious.selected_instance})`
           loginButton.style.display = appState.invidious.logged_in ? "none" : "block";
-          
+
           document.getElementById("logout-button").style.display = !appState.invidious.logged_in ? "none" : "block";
 
           document.getElementById("feedback-url").href = CreateGithubIssueUrl()
@@ -180,12 +213,49 @@ ${JSON.stringify(window.appState.device, null, 2)}
         });
     }
 
-    function OnDrop(event) {
+    var tableRow;
+    function OnTableRowDragStart(event) {
+      target = event.target;
+      while (target && target.tagName !== 'TR') {
+        target = target.parentNode
+      }
+      tableRow = target
+    }
+
+    function OnTableRowDragover(event) {
+      event.preventDefault();
+
+      if (!tableRow) {
+        return
+      }
+
+      target = event.target;
+      while (target && target.tagName !== 'TR') {
+        target = target.parentNode
+      }
+      if (!target) {
+        return
+      }
+
+      let children = Array.from(target.parentNode.children);
+
+      if (children.indexOf(target) > children.indexOf(tableRow))
+        target.after(tableRow);
+      else
+        target.before(tableRow);
+    }
+
+    function OnTableRowDrop(event) {
+      event.preventDefault();
+      document.getElementById("update-instances").style.display = "block";
+    }
+
+    function OnBodyDrop(event) {
       for (var i in event.dataTransfer.items) {
         let item = event.dataTransfer.items[i]
         if (item.kind = 'string' && item.getAsString) {
           item.getAsString((dataString) => {
-            if (IsValidHttpUrl(dataString)) {
+            if (IsValidHttpUrl(dataString) && GetVideoId(dataString)) {
               document.getElementById('video-id').value = dataString
             }
           });
@@ -194,7 +264,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
       event.preventDefault();
     }
 
-    function OnDragover(event) {
+    function OnBodyDragover(event) {
       event.preventDefault();
     }
 

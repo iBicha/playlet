@@ -8,22 +8,52 @@ namespace Http
             m.Get("*", function(context as object) as boolean
                 request = context.request
                 response = context.response
-                server = context.server
 
-                uri = request.uri
-                if uri.StartsWith(Invidious.TOKEN_CALLBACK)
-                    components = WebUtils.UrlQueryComponents(uri)
-                    if components["token"] <> invalid
-                        ' Token is encoded twice for some reason
-                        token = WebUtils.UrlUnescape(components["token"]).DecodeUriComponent()
-                        referer = WebUtils.UrlUnescape(components["referer"])
-                        InvidiousSettings.SetAuthToken(token, referer)
-                        server.task.top.login = true
+                route = request.uri
+                if not route.StartsWith("/invidious/set-instances")
+                    return false
+                end if
+
+                components = WebUtils.UrlQueryComponents(route)
+
+                instances = []
+                if components.DoesExist("instances")
+                    instances = components["instances"]
+                    if GetInterface(instances, "ifArray") = invalid
+                        instances = [instances]
                     end if
-                    response.Redirect("/", 302)
+                end if
+
+                if instances.Count() = 0
+                    response.Default(400, "missing query param 'instances'")
                     return true
                 end if
-                return false
+
+                InvidiousSettings.SetRegistryInstances(instances)
+                response.Default(200, "OK")
+                return true
+            end function)
+
+            m.Get("*", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                server = context.server
+
+                route = request.uri
+                if not route.StartsWith(Invidious.TOKEN_CALLBACK)
+                    return false
+                end if
+
+                components = WebUtils.UrlQueryComponents(route)
+                if components["token"] <> invalid
+                    ' Token is encoded twice for some reason
+                    token = WebUtils.UrlUnescape(components["token"]).DecodeUriComponent()
+                    referer = WebUtils.UrlUnescape(components["referer"])
+                    InvidiousSettings.SetAuthToken(token, referer)
+                    server.task.top.login = true
+                end if
+                response.Redirect("/", 302)
+                return true
             end function)
         end function
 
