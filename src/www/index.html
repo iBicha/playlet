@@ -25,6 +25,16 @@
   <h2>Playlet - Youtube Player for Roku</h2>
   <h4 id="app-version">Version: </h4>
   <h4>Invidious Instance: <a id="instance" target="_blank">None</a></h4>
+  <button onclick="PlayVideo()">Play Video</button>
+  <label for="video-id">Video ID:</label>
+  <input type="text" id="video-id" name="video-id" style="min-width:300px;">
+
+  <h4 id="logged-in">Logged In: </h4>
+  <button style="display: none" id="login-button" onclick="Login()">Login</button>
+  <button style="display: none" id="logout-button" onclick="Logout()">Logout</button>
+
+  <br />
+
   <table id="instances">
     <thead>
       <tr>
@@ -33,18 +43,20 @@
     </thead>
     <tbody>
     </tbody>
+    <tbody>
+      <tr id="instance-input-row">
+        <td>
+          <input type="text" id="instance-input" name="new-instance" oninput="OnNewInstanceTextChanged()"
+            style="min-width:300px;">
+        </td>
+        <td>
+          <button id="instance-add" disabled="true" onclick="AddInstance()">Add</button>
+        </td>
+      </tr>
+    </tbody>
   </table>
   </br>
   <button style="display: none" id="update-instances" onclick="UpdateInstances()">Update Instances</button>
-  </br>
-
-  <button onclick="PlayVideo()">Play Video</button>
-  <label for="video-id">Video ID:</label>
-  <input type="text" id="video-id" name="video-id" style="min-width:300px;">
-
-  <h4 id="logged-in">Logged In: </h4>
-  <button style="display: none" id="login-button" onclick="Login()">Login</button>
-  <button style="display: none" id="logout-button" onclick="Logout()">Logout</button>
 
   <h5>Instructions</h5>
   <ul>
@@ -150,17 +162,59 @@ ${JSON.stringify(window.appState.device, null, 2)}
       return urlSearchParams.get('v')
     }
 
+    function OnNewInstanceTextChanged() {
+      document.getElementById("instance-add").disabled = !IsValidHttpUrl(document.getElementById("instance-input").value)
+    }
+
+    function AddInstance() {
+      instance = document.getElementById("instance-input").value
+      AddInstanceRow(instance)
+      document.getElementById("instance-input").value = ""
+      document.getElementById("update-instances").style.display = "block";
+    }
+
+    function AddInstanceRow(instance) {
+      instances = document.getElementById("instances").getElementsByTagName('tbody')[0];
+      var row = instances.insertRow();
+      row.draggable = true
+      row.addEventListener('dragstart', OnTableRowDragStart);
+      row.addEventListener('dragover', OnTableRowDragover);
+      row.addEventListener('drop', OnTableRowDrop);
+      var cell = row.insertCell();
+      style = instance === window.appState.invidious.selected_instance ? `style="font-weight:bold"` : ""
+      cell.innerHTML = `<a href="${instance}" ${style} target="_blank">${instance}</a>`
+      cell = row.insertCell();
+      cell.innerHTML = `<button onclick="RemoveInstance('${instance}')">Remove</button>`
+    }
+
+    function RemoveInstance(instance) {
+      instanceRows = Array.from(document.getElementById("instances")
+        .getElementsByTagName('tbody')[0]
+        .getElementsByTagName('tr'));
+
+      for (const i in instanceRows) {
+        currentInstance = instanceRows[i].getElementsByTagName('a')[0].innerText
+        if (currentInstance === instance) {
+          instanceRows[i].remove()
+          document.getElementById("update-instances").style.display = "block";
+          return;
+        }
+      }
+    }
+
     function UpdateInstances() {
       instances = Array.from(document.getElementById("instances")
         .getElementsByTagName('tbody')[0]
         .getElementsByTagName('td'))
         .map(el => el.getElementsByTagName('a')[0])
+        .filter(a => !!a)
         .map(a => a.innerText);
 
       args = instances.map(instance => `instances=${instance}`).join("&")
 
       fetch(`/invidious/set-instances?${args}`)
         .then(function (response) {
+          alert("Instances updated. Restart Playlet to reflect changes.")
           window.location.reload();
         })
         .catch(function (err) {
@@ -188,16 +242,8 @@ ${JSON.stringify(window.appState.device, null, 2)}
           instanceEl = document.getElementById("instance")
           instanceEl.innerText = instanceEl.href = appState.invidious.selected_instance
 
-          instances = document.getElementById("instances").getElementsByTagName('tbody')[0];
           for (var i in appState.invidious.instances) {
-            var row = instances.insertRow();
-            row.draggable = true
-            row.addEventListener('dragstart', OnTableRowDragStart);
-            row.addEventListener('dragover', OnTableRowDragover);
-            row.addEventListener('drop', OnTableRowDrop);
-
-            var cell = row.insertCell();
-            cell.innerHTML = `<a href="${appState.invidious.instances[i]}" target="_blank">${appState.invidious.instances[i]}</a>`
+            AddInstanceRow(appState.invidious.instances[i])
           }
 
           loginButton = document.getElementById("login-button")
@@ -219,6 +265,9 @@ ${JSON.stringify(window.appState.device, null, 2)}
       while (target && target.tagName !== 'TR') {
         target = target.parentNode
       }
+      if (target.id === "instance-input-row") {
+        return
+      }
       tableRow = target
     }
 
@@ -233,7 +282,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
       while (target && target.tagName !== 'TR') {
         target = target.parentNode
       }
-      if (!target) {
+      if (!target || target.id === "instance-input-row") {
         return
       }
 
@@ -247,6 +296,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
 
     function OnTableRowDrop(event) {
       event.preventDefault();
+      tableRow = undefined
       document.getElementById("update-instances").style.display = "block";
     }
 
