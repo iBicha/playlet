@@ -1,12 +1,17 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/WebUtils.bs"
 
 namespace SponsorBlock
     const API_URL = "https://sponsor.ajay.app"
     const SKIP_SEGMENT_ENDPOINT = "/api/skipSegments"
-    const CATEGORIES = "&category=sponsor&category=selfpromo&category=interaction&category=intro&category=outro&category=preview&category=music_offtopic"
 
     function GetSkipSegmentsForVideo(videoId as string) as object
-        url = `${SponsorBlock.API_URL}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}?videoID=${videoId}${SponsorBlock.CATEGORIES}`
+        categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "chapter", "filler", "exclusive_access"]
+        actionTypes = ["skip", "mute", "chapter", "full", "poi"]
+
+        categoriesJson = WebUtils.UrlEscape(FormatJson(categories))
+        actionTypesJson = WebUtils.UrlEscape(FormatJson(actionTypes))
+        url = `${SponsorBlock.API_URL}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}?videoID=${videoId}&categories=${categoriesJson}&actionTypes=${actionTypesJson}`
         response = Requests().get(url)
 
         if response.statuscode = 200
