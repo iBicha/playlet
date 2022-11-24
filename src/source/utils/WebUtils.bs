@@ -34,12 +34,26 @@ namespace WebUtils
         url = Mid(url, index + 1)
         components = url.split("&")
         for each component in components
+            key = component
+            value = ""
+            hasValue = false
             if Instr(0, component, "=")
                 keyValue = component.split("=")
-                query[keyValue[0]] = keyValue[1]
-            else
-                query[component] = ""
+                key = keyValue[0]
+                value = keyValue[1]
+                hasValue = true
             end if
+
+            if query.DoesExist(key) and hasValue
+                oldValue = query[key]
+                if GetInterface(oldValue, "ifArray") = invalid
+                    oldValue = [oldValue]
+                end if
+                oldValue.push(value)
+                value = oldValue
+            end if
+
+            query[key] = value
         end for
         return query
     end function

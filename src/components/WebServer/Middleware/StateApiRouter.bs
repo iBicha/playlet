@@ -8,18 +8,47 @@ namespace Http
         function new()
             super()
 
-            m.Get("/api/state", function(context as object) as boolean
+            m.Get("*", function(context as object) as boolean
+                request = context.request
                 response = context.response
 
-                state = {
-                    app: GetAppInfo(),
-                    device: GetDeviceInfo(),
-                    invidious: {
-                        host: Invidious.GetCurrentHost(),
+                route = request.uri
+                ' TODO: this is not the right filtering. /api/state/something will go through, which is not correct
+                if not route.StartsWith("/api/state")
+                    return false
+                end if
+
+                keys = ["app", "device", "invidious"]
+
+                components = WebUtils.UrlQueryComponents(route)
+                if components.DoesExist("key")
+                    keys = components["key"]
+                    if GetInterface(keys, "ifArray") = invalid
+                        keys = [keys]
+                    end if
+                end if
+
+                state = {}
+
+                if ArrayIndexOf(keys, "app") <> -1
+                    state["app"] = GetAppInfo()
+                end if
+
+                if ArrayIndexOf(keys, "device") <> -1
+                    state["device"] = GetDeviceInfo()
+                end if
+
+                if ArrayIndexOf(keys, "invidious") <> -1
+                    authToken = InvidiousSettings.GetAuthToken()
+                    state["invidious"] = {
+                        instances: InvidiousSettings.GetCurrentInstances(),
+                        selected_instance: InvidiousSettings.GetSelectedInstance(),
                         auth_url: Invidious.GetAuthorizeTokenLink(),
-                        logged_in: Invidious.GetAuthenticationHeaders() <> invalid
+                        logged_in: authToken <> invalid,
+                        logged_in_instance: authToken <> invalid ? authToken.instance : invalid
                     }
-                }
+                end if
+
                 response.Json(state)
                 return true
             end function)

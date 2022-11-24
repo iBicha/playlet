@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for DASH and Live videos
 - Log out button to web app
 - Search Screen
+- Very basic UI to customize/change invidious instance
 
 ### Fixed
 - Bug where Settings page and home page are both visible, if settings page is selected, and user logs in.

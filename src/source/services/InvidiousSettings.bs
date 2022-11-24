@@ -1,0 +1,95 @@
+namespace InvidiousSettings
+
+    const DEFAULT_INSTANCE = "https://vid.puffyan.us"
+
+    const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,health,users,api"
+
+    function GetCurrentInstances() as object
+        ' TODO: cache this call to avoid json parsing every time
+        instances = InvidiousSettings.GetRegistryInstances()
+        if instances.Count() > 0
+            return instances
+        end if
+
+        publicInstances = InvidiousSettings.GetPublicInstances()
+        if publicInstances <> invalid
+            for i = 0 to 4
+                if i < publicInstances.Count()
+                    instances.push(publicInstances[i].uri)
+                end if
+            end for
+        end if
+
+        if instances.Count() > 0
+            InvidiousSettings.SetRegistryInstances(instances)
+            return instances
+        end if
+
+        return [InvidiousSettings.DEFAULT_INSTANCE]
+    end function
+
+    function GetSelectedInstance() as string
+        instances = InvidiousSettings.GetCurrentInstances()
+        return instances[0]
+    end function
+
+    function SetAuthToken(token as string, instance as string)
+        json = FormatJson({
+            token: token,
+            instance: instance
+        })
+        RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
+
+        instances = InvidiousSettings.GetCurrentInstances()
+        index = ArrayIndexOf(instances, instance)
+        if index = -1
+            instances.push(instance)
+            InvidiousSettings.SetRegistryInstances(instances)
+        end if
+    end function
+
+    function GetAuthToken() as dynamic
+        tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
+        if tokenPayload = invalid
+            return invalid
+        end if
+        return ParseJson(tokenPayload)
+    end function
+
+    function GetRegistryInstances() as object
+        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+        if instances = invalid
+            return []
+        end if
+        return ParseJson(instances)
+    end function
+
+    function SetRegistryInstances(instances as object)
+        RegistryUtils.Write(RegistryUtils.INVIDIOUS_INSTANCES, FormatJson(instances))
+    end function
+
+    function GetPublicInstances() as object
+        if m.invidiousPublicInstances <> invalid
+            return m.invidiousPublicInstances
+        end if
+        response = Requests().get(InvidiousSettings.INSTANCES_API)
+        if response.statuscode = 200
+            json = response.json
+            instances = []
+
+            for each instance in json
+                data = instance[1]
+                if data.monitor <> invalid and data.monitor.dailyRatios <> invalid
+                    data.monitor.dailyRatios = invalid
+                end if
+                data["name"] = instance[0]
+                instances.push(data)
+            end for
+
+            m.invidiousPublicInstances = instances
+        end if
+
+        return m.invidiousPublicInstances
+    end function
+
+end namespace
