@@ -1,0 +1,25 @@
+import "pkg:/source/utils/General.bs"
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+
+function Init()
+    m.top.functionName = "TaskMain"
+end function
+
+function TaskMain()
+    latest = "N/A"
+    response = Requests().request("HEAD", "https://github.com/iBicha/playlet/releases/latest", invalid)
+
+    if response.statusCode = 200
+        if response.headers.location <> invalid
+            regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
+            match = regex.match(response.headers.location)
+            if match.Count() = 2
+                latest = match[1]
+            end if
+        end if
+    end if
+
+    m.top.setField("output", {
+        latest: latest
+    })
+end function

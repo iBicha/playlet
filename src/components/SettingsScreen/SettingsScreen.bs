@@ -1,7 +1,13 @@
 import "pkg:/source/utils/General.bs"
+import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 
 function Init()
+    m.versionLabel = m.top.findNode("VersionLabel")
     m.top.url = `http:/${GetLocalIpAddress()}:8888`
+    appInfo = GetAppInfo()
+    m.currentVersion = appInfo.version
+    SetVersionLabel(m.currentVersion, "N/A")
+    GetLatestVersion()
 end function
 
 function OnUrlSet()
@@ -12,4 +18,18 @@ function OnUrlSet()
 
     urlLabel = m.top.findNode("urlLabel")
     urlLabel.text = url
+end function
+
+function GetLatestVersion()
+    createTaskPromise("AppVersionTask", {
+        input: {}
+    }).then(function(task as object) as void
+        if task.output.latest <> invalid
+            SetVersionLabel(m.currentVersion, task.output.latest)
+        end if
+    end function)
+end function
+
+function SetVersionLabel(current as string, latest as string)
+    m.versionLabel.text = `Version: ${current} | Latest: ${latest}`
 end function
