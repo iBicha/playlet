@@ -196,6 +196,8 @@ function SetCaptions(metadata as object, videoPlayer as object, contentNode as o
 end function
 
 function OnPositionChangeSkipSponsorBlockSections() as void
+    shouldMute = false
+    muteCategory = ""
     segments = m.videoPlayer.skipSegments
     for each segment in segments
         ' TODO: handle other action types
@@ -211,5 +213,20 @@ function OnPositionChangeSkipSponsorBlockSections() as void
                 return
             end if
         end if
+        if segment["actionType"] = "mute"
+            segmentRange = segment["segment"]
+            segmentStart = segmentRange[0]
+            segmentEnd = segmentRange[1]
+            currentPosition = m.videoPlayer.position
+            if (segmentStart < currentPosition) and (segmentEnd > currentPosition)
+                shouldMute = true
+                muteCategory = segment["category"]
+                exit for
+            end if
+        end if
     end for
+    if m.videoPlayer.mute <> shouldMute
+        print(`Muting section: ${muteCategory} - ${shouldMute}`)
+        m.videoPlayer.mute = shouldMute
+    end if
 end function
