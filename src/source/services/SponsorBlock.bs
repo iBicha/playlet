@@ -1,5 +1,6 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/WebUtils.bs"
+import "pkg:/source/utils/Crypto.bs"
 
 namespace SponsorBlock
     const API_URL = "https://sponsor.ajay.app"
@@ -11,11 +12,19 @@ namespace SponsorBlock
 
         categoriesJson = WebUtils.UrlEscape(FormatJson(categories))
         actionTypesJson = WebUtils.UrlEscape(FormatJson(actionTypes))
-        url = `${SponsorBlock.API_URL}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}?videoID=${videoId}&categories=${categoriesJson}&actionTypes=${actionTypesJson}`
+
+        ' From SponsorBlock docs: It should be the first 4 - 32 characters (4 is recommended).
+        hashPrefix = GetSha256(videoId).Left(4)
+        url = `${SponsorBlock.API_URL}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}/${hashPrefix}?categories=${categoriesJson}&actionTypes=${actionTypesJson}`
         response = Requests().get(url)
 
         if response.statuscode = 200
-            return response.json
+            results = response.json
+            for each item in results
+                if item.videoId = videoId
+                    return item.segments
+                end if
+            end for
         end if
         return invalid
     end function
