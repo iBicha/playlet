@@ -1,4 +1,9 @@
+<p align="center">
+  <img src="banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
+</p>
+
 # Playlet
+
 Unofficial Youtube client for Roku 📺
 
 <img src="screenshot.jpg" alt="Screenshot of Playlet" width="350"/>
