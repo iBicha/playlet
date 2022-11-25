@@ -29,7 +29,7 @@ For full instructions, see [Set up your Roku device to enable Developer Settings
 Make sure to remember the password you set during this step, you will need it later.
 
 ### Gather your info
-By now, you show have the following
+By now, you should have the following
 - Your Roku Dev password (setup in the previous step)
 - Your Roku TV local IP address
   - You can find this information in your TV network settings. It should look like 192.168.X.X or so
