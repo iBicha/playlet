@@ -5,8 +5,8 @@ const zip_name = 'playlet.zip'
 rokuDeploy.zipPackage({
     outDir: 'release',
     outFile: zip_name,
-    //BUG: rokuDeploy does not read stagingFolderPath properly fron config
-    stagingFolderPath: 'dist/build'
+    //BUG: rokuDeploy does not read stagingDir properly fron config
+    stagingDir: 'dist/build'
 }).then(function(){
     console.log(`${zip_name} created`)
 }, function(error) {
