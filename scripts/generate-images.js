@@ -2,33 +2,46 @@ const fs = require('fs')
 const path = require('path')
 const { convertFile } = require('convert-svg-to-png');
 
-const logoInput = './src/images/vector/logo.svg';
+const logoPoster = './src/images/vector/logo-light.svg';
+const logoSplash = './src/images/vector/logo-dark.svg';
 
 logoOutput = {
     // Logo
     "splash-screen_fhd.jpg": {
         width: 1920,
-        height: 1080
+        height: 1080,
+        background: "#242424",
+        from: logoSplash
     },
     "splash-screen_hd.jpg": {
         width: 1280,
-        height: 720
+        height: 720,
+        background: "#242424",
+        from: logoSplash
     },
     "splash-screen_sd.jpg": {
         width: 720,
-        height: 480
+        height: 480,
+        background: "#242424",
+        from: logoSplash
     },
     "channel-poster_fhd.png": {
         width: 540,
-        height: 405
+        height: 405,
+        background: "#FFFFFF",
+        from: logoPoster
     },
     "channel-poster_hd.png": {
         width: 290,
-        height: 218
+        height: 218,
+        background: "#FFFFFF",
+        from: logoPoster
     },
     "channel-poster_sd.png": {
         width: 214,
-        height: 144
+        height: 144,
+        background: "#FFFFFF",
+        from: logoPoster
     },
 };
 
@@ -38,9 +51,9 @@ const iconsOutput = './src/images/icons';
 (async () => {
 
     for (var logo in logoOutput) {
-        await convertFile(logoInput, {
+        await convertFile(logoOutput[logo].from, {
             outputFilePath: './src/images/' + logo,
-            background: "#242424",
+            background: logoOutput[logo].background,
             height: logoOutput[logo].height,
             width: logoOutput[logo].width,
         });
