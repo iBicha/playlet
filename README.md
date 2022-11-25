@@ -6,14 +6,16 @@
 
 Unofficial Youtube client for Roku 📺
 
-<img src="screenshot.jpg" alt="Screenshot of Playlet" width="350"/>
-
-
 ## Features
 - 🔥 No Ads (Not now, not ever)
 - 🕵️ No Tracking
 - 🛡️ Privacy driven (uses Invidious backend)
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
+
+## Screenshots
+<img src="screenshot1.jpg" alt="Screenshot of Playlet" width="350"/>
+<img src="screenshot2.jpg" alt="Screenshot of Playlet" width="350"/>
+<img src="screenshot3.jpg" alt="Screenshot of Playlet" width="350"/>
 
 ## Installation
 
