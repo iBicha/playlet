@@ -1,3 +1,5 @@
+import "pkg:/components/WebServer/HttpRequestState.bs"
+
 namespace Http
 
     function GetHttpRequestId() as integer
@@ -8,22 +10,22 @@ namespace Http
     class HttpRequest
         private log as log.Logger
 
-        Unix2NewLine = UnixNL() + UnixNL()
-        Windows2NewLine = WinNL() + WinNL()
-
         ' members
         private method = invalid
         private uri = invalid
         private protocol = invalid
-        private buf = invalid
+        private buffer = invalid
+        private buffer_index = 0
         private headers = invalid
+        private body = invalid
+        private state = Http.HttpRequestState.INIT
         private id = 0
         ' copied members
         private range_begin = 0
         private range_end = 0
         private range_begin_given = false
         private range_end_given = false
-        private ok = true
+        private ready_for_response = false
 
         function new()
             m.log = new log.Logger("HttpRequest")
@@ -32,54 +34,132 @@ namespace Http
         end function
 
         function Add(incoming as string)
-            if isstr(m.buf)
-                m.buf = m.buf + incoming
+            if isstr(m.buffer)
+                m.buffer = m.buffer + incoming
             else
-                m.buf = incoming
+                m.buffer = incoming
             end if
         end function
 
-        function IsComplete() as boolean
-            ' TODO: this function is correct only if request does not have a body
-            ' Need read and process line by line
-            ' Once there's an empty line, we've read all headers
-            ' Check for Content-Length header, and read that amount of data
-            ' If header is missing, error out
-            buf = m.buf
-            complete = isstr(buf) and (right(buf, 2) = m.Unix2NewLine) or (right(buf, 4) = m.Windows2NewLine)
-            'if complete then info(m,"header:"+UnixNL()+buf)
-            return complete
+        function ProcessNext(connection as HttpConnection) as boolean
+            if m.state = Http.HttpRequestState.DONE
+                return m.ready_for_response
+            end if
 
+            if m.state = Http.HttpRequestState.INIT
+                m.state = Http.HttpRequestState.READING_OPERATION
+            end if
+
+            if m.state = Http.HttpRequestState.READING_OPERATION
+                if m.ParseOperation()
+                    m.state = Http.HttpRequestState.READING_HEADERS
+                end if
+            end if
+
+            if m.state = Http.HttpRequestState.READING_HEADERS
+                if m.ParseHeaders()
+                    m.ProcessHeaders(connection)
+                    m.state = Http.HttpRequestState.READING_BODY
+                end if
+            end if
+
+            if m.state = Http.HttpRequestState.READING_BODY
+                if m.ParseBody()
+                    m.state = Http.HttpRequestState.DONE
+                end if
+            end if
+
+            return m.ready_for_response
         end function
 
-        function Parse(connection as HttpConnection) as boolean
-            lines = m.buf.tokenize(WinNL())
-            operation = lines.RemoveHead()
-            if operation <> invalid
-                parts = operation.tokenize(" ")
-                if parts.count() = 3
-                    m.method = Ucase(parts.RemoveHead())
-                    m.uri = parts.RemoveHead()
-                    m.protocol = Ucase(parts.RemoveHead())
-                    m.log.info(m.method + " '" + m.uri + "'")
-                    for each line in lines
-                        av = line.tokenize(": ")
-                        if av.count() = 2
-                            m.headers[av.GetHead()] = av.GetTail()
-                        end if
-                    end for
-                    ' interpret some headers if present
-                    m.ParseRange()
-                    m.ParseConnection(connection)
+        function ParseOperation() as boolean
+            if m.buffer_index <> 0
+                m.log.error(`invalid state: reading operation, but request is at index ${m.buffer_index}`)
+                m.ready_for_response = true
+                return false
+            end if
+
+            if m.buffer.len() = 0
+                return false
+            end if
+
+            operation = m.ReadHeaderLine()
+
+            if operation = invalid or operation = ""
+                m.log.error("empty request")
+                m.ready_for_response = true
+                return false
+            end if
+
+            parts = operation.tokenize(" ")
+            if parts.count() = 3
+                m.method = Ucase(parts[0])
+                m.uri = parts[1]
+                m.protocol = Ucase(parts[2])
+                m.log.info(m.method + " '" + m.uri + "'")
+            else
+                m.log.error("invalid request: " + operation)
+                m.ready_for_response = true
+            end if
+
+            return not m.ready_for_response
+        end function
+
+        function ParseHeaders() as boolean
+            line = m.ReadHeaderLine()
+            while line <> invalid and line <> ""
+                splitIndex = line.InStr(": ")
+                if splitIndex > 0
+                    key = line.Left(splitIndex)
+                    value = line.Mid(splitIndex + 2)
+                    m.headers[key] = value
+                end if
+                line = m.ReadHeaderLine()
+            end while
+
+            ' Unfinished line, we wait for the rest
+            if line = invalid
+                return false
+            end if
+
+            ' Empty line, we're done with headers
+            if line = ""
+                return true
+            end if
+
+            return not m.ready_for_response
+        end function
+
+        function ParseBody() as boolean
+            data = m.ReadBufferToEnd()
+            if isstr(m.body)
+                m.body = m.body + data
+            else
+                m.body = data
+            end if
+
+            if m.headers["Content-Length"] = invalid
+                m.ready_for_response = true
+                if m.body.len() > 0
+                    m.log.error("invalid request: request body found, but no Content-Length header")
+                    return false
                 else
-                    m.log.error("invalid request: " + operation)
-                    m.ok = false
+                    return true
                 end if
             else
-                m.log.error("empty request")
-                m.ok = false
+                contentLength = m.headers["Content-Length"].toInt()
+                if not isstr(m.body)
+                    return false
+                end if
+
+                m.ready_for_response = m.body.len() = contentLength
+                return m.ready_for_response
             end if
-            return m.ok
+        end function
+
+        function ProcessHeaders(connection as HttpConnection)
+            m.ParseRange()
+            m.ParseConnection(connection)
         end function
 
         function ParseRange()
@@ -110,8 +190,26 @@ namespace Http
             end if
         end function
 
-        function Process(connection as HttpConnection) as boolean
-            return m.Parse(connection)
+        function ReadHeaderLine() as dynamic
+            index = m.buffer.Instr(m.buffer_index, WinNL())
+            if index = -1
+                return invalid
+            end if
+
+            length = index - m.buffer_index
+            line = m.buffer.Mid(m.buffer_index, length)
+            m.buffer_index += length + 2 'WinNL().len() = 2
+            return line
+        end function
+
+        function ReadBufferToEnd() as dynamic
+            if m.buffer_index = m.buffer.len()
+                return ""
+            end if
+
+            data = m.buffer.Mid(m.buffer_index)
+            m.buffer_index += data.len()
+            return data
         end function
     end class
 
