@@ -13,6 +13,7 @@ namespace Http
         ' members
         private method = invalid
         private uri = invalid
+        private query = invalid
         private protocol = invalid
         private buffer = invalid
         private buffer_index = 0
@@ -52,6 +53,7 @@ namespace Http
 
             if m.state = Http.HttpRequestState.READING_OPERATION
                 if m.ParseOperation()
+                    m.ProcessOperation()
                     m.state = Http.HttpRequestState.READING_HEADERS
                 end if
             end if
@@ -160,6 +162,10 @@ namespace Http
         function ProcessHeaders(connection as HttpConnection)
             m.ParseRange()
             m.ParseConnection(connection)
+        end function
+
+        function ProcessOperation()
+            m.query = WebUtils.UrlQueryComponents(m.uri)
         end function
 
         function ParseRange()

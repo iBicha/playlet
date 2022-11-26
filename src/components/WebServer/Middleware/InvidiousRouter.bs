@@ -15,11 +15,9 @@ namespace Http
                     return false
                 end if
 
-                components = WebUtils.UrlQueryComponents(route)
-
                 instances = []
-                if components.DoesExist("instances")
-                    instances = components["instances"]
+                if request.query.DoesExist("instances")
+                    instances = request.query["instances"]
                     if GetInterface(instances, "ifArray") = invalid
                         instances = [instances]
                     end if
@@ -46,11 +44,10 @@ namespace Http
                     return false
                 end if
 
-                components = WebUtils.UrlQueryComponents(route)
-                if components["token"] <> invalid and components["referer"] <> invalid
+                if request.query["token"] <> invalid and request.query["referer"] <> invalid
                     ' Token is encoded twice for some reason
-                    token = WebUtils.UrlUnescape(components["token"]).DecodeUriComponent()
-                    referer = WebUtils.UrlUnescape(components["referer"])
+                    token = WebUtils.UrlUnescape(request.query["token"]).DecodeUriComponent()
+                    referer = WebUtils.UrlUnescape(request.query["referer"])
                     InvidiousSettings.SetAuthToken(token, referer)
                     server.task.top.login = true
                 end if
