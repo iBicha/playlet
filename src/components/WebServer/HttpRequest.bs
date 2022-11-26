@@ -16,7 +16,7 @@ namespace Http
         private uri = invalid
         private protocol = invalid
         private buf = invalid
-        private fields = invalid
+        private headers = invalid
         private id = 0
         ' copied members
         private range_begin = 0
@@ -28,7 +28,7 @@ namespace Http
         function new()
             m.log = new log.Logger("HttpRequest")
             m.id = Http.GetHttpRequestId()
-            m.fields = CreateObject("roAssociativeArray")
+            m.headers = CreateObject("roAssociativeArray")
         end function
 
         function Add(incoming as string)
@@ -65,10 +65,10 @@ namespace Http
                     for each line in lines
                         av = line.tokenize(": ")
                         if av.count() = 2
-                            m.fields[av.GetHead()] = av.GetTail()
+                            m.headers[av.GetHead()] = av.GetTail()
                         end if
                     end for
-                    ' interpret some fields if present
+                    ' interpret some headers if present
                     m.ParseRange()
                     m.ParseConnection(connection)
                 else
@@ -83,7 +83,7 @@ namespace Http
         end function
 
         function ParseRange()
-            range = m.fields.range
+            range = m.headers.range
             if range <> invalid
                 endpoints = lcase(range).tokenize("=")
                 if endpoints.count() = 2 and endpoints.GetHead() = "bytes"
@@ -104,7 +104,7 @@ namespace Http
         end function
 
         function ParseConnection(connection as HttpConnection)
-            connectionStr = m.fields.connection
+            connectionStr = m.headers.connection
             if connectionStr <> invalid
                 connection.close = (lcase(connectionStr.trim()) = "close")
             end if
