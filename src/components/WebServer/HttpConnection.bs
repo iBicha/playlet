@@ -79,9 +79,9 @@ namespace Http
             ' append to connection request
             m.request.Add(rcvStr)
 
-            if m.request.IsComplete()
-                server.num_requests = validint(server.num_requests) + 1
-                if m.request.Process(m)
+            if m.request.ProcessNext(m)
+                if m.request.state = Http.HttpRequestState.DONE
+                    server.num_requests = validint(server.num_requests) + 1
                     m.response = new HttpResponse(m.request, m.server, m.settings)
                     m.response.Process()
                     m.SetState(Http.HttpConnectionState.SEND_HEADER)
@@ -90,7 +90,7 @@ namespace Http
                     m.close = true
                     m.log.error("couldn't process request or response, closing @" + m.client)
                 end if
-            else if m.request.buf.len() > m.settings.MaxRequestLength ' die if it's too long
+            else if m.request.buffer.len() > m.settings.MaxRequestLength ' die if it's too long
                 m.response = new HttpResponse(m.request, m.server, m.settings)
                 m.response.Default(413, "Your request was dropped because it was too long.")
                 m.SetState(Http.HttpConnectionState.SEND_HEADER)

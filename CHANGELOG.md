@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Version check in settings page
+- Support for web request body parsing
 
 ## [0.4.0] - 2022-11-24
 ### Added
