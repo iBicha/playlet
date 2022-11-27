@@ -1,66 +1,28 @@
 import "pkg:/source/services/Invidious.bs"
 
-function ShowVideoScreenEmbedded(videoId as string, thumbnailNode as object)
+function ShowVideoScreen(videoId as string, sender as object)
     m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
-    m.videoPlayer.id = "VideoPlayer"
-    AddVideoFields()
-    m.videoPlayer.embedded = true
-
-    m.videoPlayer.enableUI = false
-    m.videoPlayer.width = thumbnailNode.width
-    m.videoPlayer.height = thumbnailNode.height
-    thumbnailNode.AppendChild(m.videoPlayer)
-    ShowVideoScreen(videoId)
-end function
-
-function ShowVideoScreenFull(videoId as string, sender as object)
-    m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
-    m.videoPlayer.id = "VideoPlayer"
     m.videoPlayer.sender = sender
-    AddVideoFields()
-    m.videoPlayer.embedded = false
-    m.videoPlayer.getScene().AppendChild(m.videoPlayer)
-    ShowVideoScreen(videoId)
-end function
-
-function AddVideoFields()
     m.videoPlayer.addFields({
-        embedded: false,
         sponsorBlockTask: false,
         videoPlayingSuccess: false,
-        ignoreNextFinishedState: false
+        ignoreNextFinishedState: false,
+        videoId: videoId
     })
-end function
 
-function ExpandVideoScreenFull()
-    m.videoPlayer.embedded = true
-    m.videoPlayer.reparent(m.top, false)
-    m.videoPlayer.enableUI = true
-    m.videoPlayer.width = 1280
-    m.videoPlayer.height = 720
-    m.videoPlayer.SetFocus(true)
-    StartSponsorBlockTask(m.videoPlayer.videoId)
-end function
+    m.videoPlayer.getScene().AppendChild(m.videoPlayer)
 
-function ShowVideoScreen(videoId as string)
-    m.videoPlayer.addFields({ videoId: videoId })
     m.videoPlayer.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
     m.videoPlayer.bufferingBar.filledBarBlendColor = "0xFF0000FF"
     m.videoPlayer.retrievingBar.filledBarBlendColor = "0xFF0000FF"
 
-    if not m.videoPlayer.embedded
-        m.videoPlayer.visible = true
-        m.videoPlayer.SetFocus(true)
-    else
-        m.videoPlayer.visible = false
-    end if
+    m.videoPlayer.visible = true
+    m.videoPlayer.SetFocus(true)
 
     m.videoPlayer.ObserveField("state", "OnVideoPlayerStateChange")
 
     StartVideoDetailsTask(videoId)
-    if not m.videoPlayer.embedded
-        StartSponsorBlockTask(videoId)
-    end if
+    StartSponsorBlockTask(videoId)
 end function
 
 function OnVideoPlayerStateChange() as void
@@ -112,11 +74,12 @@ function OnVideoPlayerStateChange() as void
 end function
 
 function CloseVideoPlayer()
+    sender = m.videoPlayer.sender
     m.videoPlayer.control = "stop"
     m.videoPlayer.visible = false
     m.videoPlayer.getParent().RemoveChild(m.videoPlayer)
     m.videoPlayer = invalid
-    m.top.focus = true
+    sender.focus = true
 end function
 
 function StartVideoDetailsTask(videoId as string)
