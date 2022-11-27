@@ -46,8 +46,6 @@ function StartFetchTask() as void
         if m.sortedContent.Count() = m.defaultLayout.Count()
             ' All tasks are done
             m.Delete("sortedContent")
-            ' TODO: uncommment if auto-play
-            ' m.top.ObserveField("rowItemFocused", "OnHomeGridScreenVideoFocused")
         end if
         return
     end if
@@ -108,19 +106,8 @@ function OnHomeGridScreenVideoSelected(event as object) as void
 
     videoId = itemContent.videoId
 
-    if m.videoPlayer <> invalid
-        if m.videoPlayer.videoId = videoId
-            ExpandVideoScreenFull()
-            return
-        else
-            m.videoPlayer.control = "stop"
-            m.videoPlayer.visible = false
-            m.videoPlayer.getParent().removeChild(m.videoPlayer)
-            m.videoPlayer = invalid
-        end if
-    end if
-
-    ShowVideoScreenFull(videoId, m.top)
+    CloseVideo()
+    ShowVideoScreen(videoId, m.top)
 end function
 
 function CloseVideo()
@@ -135,39 +122,7 @@ end function
 function OnPlayVideoCommand()
     videoId = m.top.playvideo
     CloseVideo()
-    ShowVideoScreenFull(videoId, m.top)
-end function
-
-function OnHomeGridScreenVideoFocused(event as object) as void
-    if m.videoPlayer <> invalid
-        m.videoPlayer.control = "stop"
-        m.videoPlayer.visible = false
-        m.videoPlayer.getParent().removeChild(m.videoPlayer)
-        m.videoPlayer = invalid
-    end if
-    grid = event.GetRoSGNode()
-
-    selectedPair = event.GetData()
-    selectedRow = selectedPair[0]
-    selectedRowItem = selectedPair[1]
-
-    rowContent = grid.content.GetChild(selectedRow)
-    itemContent = rowContent.GetChild(selectedRowItem)
-
-    videoId = itemContent.videoId
-    thumbnail = GetThumbnailPoster(videoId)
-    ShowVideoScreenEmbedded(videoId, thumbnail)
-end function
-
-function GetThumbnailPoster(videoId as string) as object
-    ' TODO: make this faster
-    all = m.top.getAll()
-    for each item in all
-        if item.id = `thumbnail-${videoId}`
-            return item
-        end if
-    end for
-    return invalid
+    ShowVideoScreen(videoId, m.top)
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
