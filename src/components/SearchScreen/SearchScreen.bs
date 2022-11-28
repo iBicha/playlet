@@ -12,6 +12,7 @@ function Init()
 
     m.keyboard.ObserveField("text", "OnTextChange")
     m.suggestions.ObserveField("buttonSelected", "OnSearchButtonSelected")
+    m.suggestions.ObserveField("buttonFocused", "OnSearchButtonFocused")
     m.rowList.ObserveField("rowItemSelected", "OnSearchVideoSelected")
     m.top.ObserveField("focus", "OnFocusChange")
     m.top.ObserveField("visible", "OnVisibilityChange")
@@ -36,6 +37,9 @@ function OnFocusChange() as void
 end function
 
 function OnTextChange() as void
+    if IsNodeFocused("suggestions")
+        return
+    end if
     text = m.keyboard.text
 
     createTaskPromise("SearchSuggestionsTask", {
@@ -47,8 +51,12 @@ function OnTextChange() as void
         if task.output.q <> m.keyboard.text
             return
         end if
+        q = task.output.q
         suggestions = task.output.response
         if suggestions <> invalid
+            if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
+                suggestions.Unshift(q)
+            end if
             ' TODO: fix race condition where button group gains focus before suggestions are set
             m.suggestions.buttons = suggestions
         end if
@@ -59,6 +67,12 @@ function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
     Search(text)
+end function
+
+function OnSearchButtonFocused()
+    selected = m.suggestions.buttonFocused
+    text = m.suggestions.buttons[selected]
+    m.keyboard.text = text
 end function
 
 function Search(text as string)
@@ -93,7 +107,7 @@ function ClearSearch()
 end function
 
 function IsNodeFocused(id as string) as boolean
-    return m.top.focusedChild.id = id or m.container.focusedChild.id = id
+    return m.top.focusedChild?.id = id or m.container.focusedChild?.id = id
 end function
 
 function ScrollUp() as void
