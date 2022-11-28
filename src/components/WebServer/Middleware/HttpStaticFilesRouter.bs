@@ -18,12 +18,8 @@ namespace Http
                 request = context.request
                 response = context.response
 
-                uri = request.uri
-                decoded_uri = WebUtils.UrlUnescape(uri)
-                if decoded_uri.instr("?")
-                    decoded_uri = decoded_uri.Tokenize("?")[0]
-                end if
-                path = CreateObject("roPath", router.root + decoded_uri)
+                decoded_path = WebUtils.UrlUnescape(request.route)
+                path = CreateObject("roPath", router.root + decoded_path)
                 fs = CreateObject("roFilesystem")
 
                 if not path.isValid()
@@ -49,9 +45,9 @@ namespace Http
                     router.GenerateDirectoryListing(path, router, request, response)
                     return true
                 else if stat.type = "file"
-                    response.mimetype = WebUtils.MimeType(decoded_uri)
+                    response.mimetype = WebUtils.MimeType(decoded_path)
                     response.fileLength = stat.size
-                    router.log.info("uri=" + uri + ", target=" + path + ", content-type=" + response.mimetype + ", content-length=" + Stri(response.fileLength).trim())
+                    router.log.info("uri=" + request.uri + ", target=" + path + ", content-type=" + response.mimetype + ", content-length=" + Stri(response.fileLength).trim())
                     router.GenerateFile(path, router, request, response)
                     return true
                 else
