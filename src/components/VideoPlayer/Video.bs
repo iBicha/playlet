@@ -1,5 +1,7 @@
 import "pkg:/source/services/Invidious.bs"
 
+#const DASH_THUMBNAILS = false
+
 function ShowVideoScreen(videoId as string, sender as object)
     m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
     m.videoPlayer.sender = sender
@@ -100,9 +102,14 @@ function StartVideoDetailsTask(videoId as string)
             if metadata.hlsUrl <> invalid
                 contentNode.url = metadata.hlsUrl
             else if metadata.dashUrl <> invalid
-                ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
-                ' TODO: make this optional, in case it breaks the DASH manifest
-                contentNode.url = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
+                #if DASH_THUMBNAILS
+                    ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
+                    ' TODO: make this optional, in case it breaks the DASH manifest
+                    contentNode.url = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
+                #else
+                    contentNode.url = metadata.dashUrl
+                #end if
+
             else
                 stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
                 itag = stream.itag
