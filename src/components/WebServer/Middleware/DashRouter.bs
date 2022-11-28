@@ -97,14 +97,22 @@ namespace Http
             result = ""
             storyboards = metadata.storyboards
             for each storyboard in storyboards
-                ' Broken storyboards have interval = 0
+                ' BUG: Broken storyboards have interval = 0 https://github.com/iv-org/invidious/issues/3441
                 ' TODO: implement proper segments when storyboard.storyboardCount > 1
                 if storyboard.interval > 0 and storyboard.storyboardCount = 1
-                    tilesPerPage = storyboard.storyboardWidth * storyboard.storyboardHeight
+
+                    ' BUG: storyboardHeight can be wrong https://github.com/iv-org/invidious/issues/3440
+                    ' TODO: this fix/assumption is only if we have storyboard.storyboardCount = 1
+                    storyboardHeight = storyboard.count \ storyboard.storyboardWidth
+                    if storyboard.count mod storyboard.storyboardWidth > 0
+                        storyboardHeight += 1
+                    end if
+
+                    tilesPerPage = storyboard.storyboardWidth * storyboardHeight
                     intervalSeconds = (storyboard.interval / 1000)
                     for i = 0 to storyboard.storyboardCount - 1
                         width = storyboard.width * storyboard.storyboardWidth
-                        height = storyboard.height * storyboard.storyboardHeight
+                        height = storyboard.height * storyboardHeight
 
                         tileCount = tilesPerPage
                         if i = storyboard.storyboardCount - 1
@@ -134,7 +142,7 @@ namespace Http
                         end for
 
                         result += `<BaseURL>${url}</BaseURL>`
-                        result += `<EssentialProperty schemeIdUri="http://dashif.org/guidelines/thumbnail_tile" value="${storyboard.storyboardWidth}x${storyboard.storyboardHeight}"/>`
+                        result += `<EssentialProperty schemeIdUri="http://dashif.org/guidelines/thumbnail_tile" value="${storyboard.storyboardWidth}x${storyboardHeight}"/>`
                         result += `</Representation>`
                         exit for
                     end for
