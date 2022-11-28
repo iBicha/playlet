@@ -46,7 +46,7 @@ namespace Http
 
                 response.http_code = resp.statuscode
                 response.buf.fromasciistring(text)
-                response.length = response.buf.count() 
+                response.length = response.buf.count()
                 response.mimetype = "application/xml"
                 response.GenerateHeader(true)
                 response.source = Http.HttpResponseSource.GENERATED
@@ -84,7 +84,7 @@ namespace Http
                 end if
             end for
 
-            thumbnails = router.GenerateThumbnailAdaptationSet(metadata, thumb_id)
+            thumbnails = router.GenerateThumbnailAdaptationSet(router, metadata, thumb_id)
 
             injectPoint = StringLastIndexOf(dash, "</AdaptationSet>") + "</AdaptationSet>".Len()
 
@@ -93,65 +93,70 @@ namespace Http
             return newDash
         end function
 
-        function GenerateThumbnailAdaptationSet(metadata as object, id as integer) as string
+        function GenerateThumbnailAdaptationSet(router as object, metadata as object, id as integer) as string
             result = ""
             storyboards = metadata.storyboards
             for each storyboard in storyboards
                 ' BUG: Broken storyboards have interval = 0 https://github.com/iv-org/invidious/issues/3441
                 ' TODO: implement proper segments when storyboard.storyboardCount > 1
-                if storyboard.interval > 0 and storyboard.storyboardCount = 1
-
+                if storyboard.interval > 0
                     ' BUG: storyboardHeight can be wrong https://github.com/iv-org/invidious/issues/3440
                     ' TODO: this fix/assumption is only if we have storyboard.storyboardCount = 1
-                    storyboardHeight = storyboard.count \ storyboard.storyboardWidth
-                    if storyboard.count mod storyboard.storyboardWidth > 0
-                        storyboardHeight += 1
+                    storyboardHeight = storyboard.storyboardHeight
+                    if storyboard.storyboardCount = 1
+                        storyboardHeight = storyboard.count \ storyboard.storyboardWidth
+                        if storyboard.count mod storyboard.storyboardWidth > 0
+                            storyboardHeight += 1
+                        end if
                     end if
 
                     tilesPerPage = storyboard.storyboardWidth * storyboardHeight
                     intervalSeconds = (storyboard.interval / 1000)
-                    for i = 0 to storyboard.storyboardCount - 1
-                        width = storyboard.width * storyboard.storyboardWidth
-                        height = storyboard.height * storyboardHeight
 
-                        tileCount = tilesPerPage
-                        if i = storyboard.storyboardCount - 1
-                            tileCount = storyboard.count mod tilesPerPage
-                        end if
+                    url = router.EscapeUrlForXml(storyboard.templateUrl.Replace("$M", "$Number$"))
 
-                        presentationTimeOffset = i * tilesPerPage * intervalSeconds
+                    tileCount = tilesPerPage
+                    duration = tileCount * intervalSeconds
 
-                        duration = tileCount * intervalSeconds
+                    width = storyboard.width * storyboard.storyboardWidth
+                    height = storyboard.height * storyboardHeight
 
-                        result += `<AdaptationSet id="${id}" mimeType="image/jpeg" contentType="image">`
-                        result += `<SegmentTemplate duration="${duration}" startNumber="0"/>`
-    
-                        ' TODO: estimate bandwidth?
-                        result += `<Representation id="thumbnails_${i}" bandwidth="12000" width="${width}" height="${height}" presentationTimeOffset="${presentationTimeOffset}">`
-                        url = storyboard.templateUrl.Replace("$M", `${i}`)
+                    ' Bandwidth is kind of a guess...
+                    bandwidth = Int((width * height * 0.5) / duration)
 
-                        urlEscapeChars = {}
-                        urlEscapeChars["&"] = "&amp;"
-                        urlEscapeChars["'"] = "&apos;"
-                        urlEscapeChars[`"`] = "&quot;"
-                        urlEscapeChars["<"] = "&lt;"
-                        urlEscapeChars[">"] = "&gt;"
+                    result += `<AdaptationSet id="${id}" mimeType="image/jpeg" contentType="image">`
+                    result += `<SegmentTemplate media="${url}" duration="${duration}" startNumber="0" />`
+                    result += `<Representation id="thumbnails_${id}" bandwidth="${bandwidth}" width="${width}" height="${height}">`
 
-                        for each escapeChar in urlEscapeChars
-                            url = url.Replace(escapeChar, urlEscapeChars[escapeChar])
-                        end for
-
-                        result += `<BaseURL>${url}</BaseURL>`
-                        result += `<EssentialProperty schemeIdUri="http://dashif.org/guidelines/thumbnail_tile" value="${storyboard.storyboardWidth}x${storyboardHeight}"/>`
-                        result += `</Representation>`
-                        exit for
-                    end for
+                    ' TODO: the last image in the list is usually smaller than the others. For example:
+                    ' Consider a video with 85 thumbnails, in tiles of 5x5
+                    ' 1st tile is 5x5 (25)
+                    ' 2nd tile is 5x5 (50)
+                    ' 3rd tile is 5x5 (75)
+                    ' 4th tile is 5x2 (85)
+                    ' This makes the display always misinterpret the the last tile if it is smaller
+                    result += `<EssentialProperty schemeIdUri="http://dashif.org/guidelines/thumbnail_tile" value="${storyboard.storyboardWidth}x${storyboardHeight}"/>`
+                    result += `</Representation>`
                     result += `</AdaptationSet>`
+
                     id += 1
-                    exit for
                 end if
             end for
             return result
+        end function
+
+        function EscapeUrlForXml(url as string) as string
+            urlEscapeChars = {}
+            urlEscapeChars["&"] = "&amp;"
+            urlEscapeChars["'"] = "&apos;"
+            urlEscapeChars[`"`] = "&quot;"
+            urlEscapeChars["<"] = "&lt;"
+            urlEscapeChars[">"] = "&gt;"
+
+            for each escapeChar in urlEscapeChars
+                url = url.Replace(escapeChar, urlEscapeChars[escapeChar])
+            end for
+            return url
         end function
 
     end class
