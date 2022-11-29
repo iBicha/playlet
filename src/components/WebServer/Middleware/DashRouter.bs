@@ -8,15 +8,10 @@ namespace Http
         function new()
             super()
 
-            m.Get("*", function(context as object) as boolean
+            m.Get("/dash", function(context as object) as boolean
                 request = context.request
                 response = context.response
                 router = context.router
-
-                route = request.uri
-                if not route.StartsWith("/dash")
-                    return false
-                end if
 
                 v = request.query.v
                 local = request.query.local
@@ -45,9 +40,8 @@ namespace Http
                 end if
 
                 response.http_code = resp.statuscode
-                response.buf.fromasciistring(text)
-                response.length = response.buf.count()
-                response.mimetype = "application/dash+xml"
+                response.SetBodyDataString(text)
+                response.ContentType("application/dash+xml")
                 response.GenerateHeader(true)
                 response.source = Http.HttpResponseSource.GENERATED
 
