@@ -17,31 +17,25 @@ namespace Http
                 return true
             end function)
 
-            m.Get("*", function(context as object) as boolean
+            m.Get("/api/command/play", function(context as object) as boolean
                 request = context.request
                 response = context.response
                 server = context.server
 
-                route = request.uri
-
-                if route.StartsWith("/api/command/play")
-                    if request.query["v"] = invalid
-                        response.Default(400, "Missing arg 'v'")
-                        return true
-                    end if
-
-                    server.task.top.command = `play:${request.query["v"]}`
-                    if request.query["redirect"] = "true"
-                        ' 302 to prevent redirection to current host permanently
-                        response.Redirect(`${InvidiousSettings.GetSelectedInstance()}/watch?v=${request.query["v"]}`, 302)
-                    else
-                        response.Default(204, "OK")
-                    end if
+                if request.query["v"] = invalid
+                    response.Default(400, "Missing arg 'v'")
                     return true
                 end if
 
-                return false
-            end function)
+                server.task.top.command = `play:${request.query["v"]}`
+                if request.query["redirect"] = "true"
+                    ' 302 to prevent redirection to current host permanently
+                    response.Redirect(`${InvidiousSettings.GetSelectedInstance()}/watch?v=${request.query["v"]}`, 302)
+                else
+                    response.Default(204, "OK")
+                end if
+                return true
+        end function)
         end function
 
     end class

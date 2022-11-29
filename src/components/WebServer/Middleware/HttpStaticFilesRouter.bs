@@ -18,12 +18,8 @@ namespace Http
                 request = context.request
                 response = context.response
 
-                uri = request.uri
-                decoded_uri = WebUtils.UrlUnescape(uri)
-                if decoded_uri.instr("?")
-                    decoded_uri = decoded_uri.Tokenize("?")[0]
-                end if
-                path = CreateObject("roPath", router.root + decoded_uri)
+                decoded_path = WebUtils.UrlUnescape(request.route)
+                path = CreateObject("roPath", router.root + decoded_path)
                 fs = CreateObject("roFilesystem")
 
                 if not path.isValid()
@@ -45,13 +41,14 @@ namespace Http
                         response.Default(403, "Forbidden")
                         return false
                     end if
-                    response.mimetype = "text/html"
+                    response.ContentType("text/html")
                     router.GenerateDirectoryListing(path, router, request, response)
                     return true
                 else if stat.type = "file"
-                    response.mimetype = WebUtils.MimeType(decoded_uri)
+                    mimetype = WebUtils.MimeType(decoded_path)
+                    response.ContentType(mimetype)
                     response.fileLength = stat.size
-                    router.log.info("uri=" + uri + ", target=" + path + ", content-type=" + response.mimetype + ", content-length=" + Stri(response.fileLength).trim())
+                    router.log.info("uri=" + request.uri + ", target=" + path + ", content-type=" + mimetype + ", content-length=" + Stri(response.fileLength).trim())
                     router.GenerateFile(path, router, request, response)
                     return true
                 else
@@ -94,15 +91,19 @@ namespace Http
                 end if
 
                 response.start = start
-                response.length = finish - start + 1
+                response.body_buffer_length = finish - start + 1
+                response.ContentLength(response.body_buffer_length)
+                response.headers["Content-Range"] = "bytes " + response.MakeRange(response.start, response.body_buffer_length, response.filelength)
                 response.http_code = 206
 
-                router.log.info("sending range " + response.MakeRange(start, response.length, response.fileLength))
+                router.log.info("sending range " + response.MakeRange(start, response.body_buffer_length, response.fileLength))
             else ' no range stuff
-                response.length = response.fileLength
+                response.body_buffer_length = response.fileLength
+                response.ContentLength(response.body_buffer_length)
                 response.http_code = 200
             end if
 
+            response.headers["Accept-Ranges"] = "bytes"
             response.GenerateHeader()
             return true
         end function
@@ -170,9 +171,7 @@ namespace Http
             listing = listing + "</body>" + UnixNL()
             listing = listing + "</html>" + UnixNL()
 
-            response.buf.FromAsciiString(listing)
-            response.length = response.buf.count()
-
+            response.SetBodyDataString(listing)
             response.http_code = 200
             response.GenerateHeader()
             response.source = Http.HttpResponseSource.GENERATED

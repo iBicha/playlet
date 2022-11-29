@@ -13,6 +13,7 @@ namespace Http
         ' members
         private method = invalid
         private uri = invalid
+        private route = invalid
         private query = invalid
         private protocol = invalid
         private buffer = invalid
@@ -171,9 +172,17 @@ namespace Http
         end function
 
         function ProcessOperation()
-            m.query = WebUtils.UrlQueryComponents(m.uri)
+            m.route = m.uri
+            split = m.route.Instr("?")
+            if split <> -1
+                m.route = m.route.Left(split)
+                m.query = WebUtils.UrlQueryComponents(m.uri)
+            else
+                m.query = {}
+            end if
         end function
 
+        ' TODO: this function does not take into account multiple ranges.
         function ParseRange()
             range = m.headers.range
             if range <> invalid
