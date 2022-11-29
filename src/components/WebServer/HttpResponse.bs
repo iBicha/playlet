@@ -30,7 +30,6 @@ namespace Http
         private header_only = false
         private buf_start = 0
         private http_code = 0
-        private mimetype = "text/html" ' for errors
         private allow_origin
 
         private server
@@ -43,6 +42,7 @@ namespace Http
             m.server = server
             m.settings = settings
             m.body_buffer = CreateObject("roByteArray")
+            m.headers = {}
         end function
 
         function Process() as boolean
@@ -70,7 +70,7 @@ namespace Http
             m.body_buffer.fromasciistring(buffer)
             m.body_buffer_length = m.body_buffer.count()
 
-            m.mimetype = "text/html"
+            m.ContentType("text/html")
 
             m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
@@ -90,10 +90,14 @@ namespace Http
             m.body_buffer.fromasciistring(buffer)
             m.body_buffer_length = m.body_buffer.count()
 
-            m.mimetype = "application/json"
+            m.ContentType("application/json")
 
             m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
+        end function
+
+        function ContentType(mimeType as string)
+            m.headers["Content-Type"] = mimeType
         end function
 
         function Send(sock as object, bufsize as integer) as integer
@@ -139,6 +143,11 @@ namespace Http
             code = m.http_code
             title = WebUtils.HttpTitle(code)
             m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
+
+            for each header in m.headers
+                m.header = m.header + header + ": " + m.headers[header] + WinNL()
+            end for
+
             m.header = m.header + "Date: " + m.Now() + WinNL()
             m.header = m.header + "Server: " + m.settings.PackageName + WinNL()
             if isstr(m.location)
@@ -152,7 +161,7 @@ namespace Http
             if code = 206
                 m.header = m.header + "Content-Range: bytes" + m.MakeRange(m.start, m.body_buffer_length, m.filelength) + WinNL()
             end if
-            m.header = m.header + "Content-Type: " + m.mimetype + WinNL()
+
             m.header = m.header + "Accept-Ranges: bytes" + WinNL()
             m.header = m.header + WinNL()
             m.header_length = m.header.len()

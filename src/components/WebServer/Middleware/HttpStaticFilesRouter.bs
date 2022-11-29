@@ -41,13 +41,14 @@ namespace Http
                         response.Default(403, "Forbidden")
                         return false
                     end if
-                    response.mimetype = "text/html"
+                    response.ContentType("text/html")
                     router.GenerateDirectoryListing(path, router, request, response)
                     return true
                 else if stat.type = "file"
-                    response.mimetype = WebUtils.MimeType(decoded_path)
+                    mimetype = WebUtils.MimeType(decoded_path)
+                    response.ContentType(mimetype)
                     response.fileLength = stat.size
-                    router.log.info("uri=" + request.uri + ", target=" + path + ", content-type=" + response.mimetype + ", content-length=" + Stri(response.fileLength).trim())
+                    router.log.info("uri=" + request.uri + ", target=" + path + ", content-type=" + mimetype + ", content-length=" + Stri(response.fileLength).trim())
                     router.GenerateFile(path, router, request, response)
                     return true
                 else
