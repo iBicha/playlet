@@ -17,14 +17,14 @@ namespace Http
         private source = Http.HttpResponseSource.NONE
 
         ' members
-        private buf = invalid
-        private header = invalid
+        private body_buffer = invalid
+        private header_buffer = invalid
         private path = invalid
         private request = invalid
         private id = 0
         ' copy-initializable members
         private start = 0
-        private length = 0
+        private body_buffer_length = 0
         private sent = 0
         private header_sent = 0
         private header_only = false
@@ -39,14 +39,10 @@ namespace Http
         function new(request as HttpRequest, server as HttpServer, settings as HttpSettings)
             m.log = new log.Logger("HttpResponse")
             m.id = Http.GetHttpResponseId()
+            m.request = request
             m.server = server
             m.settings = settings
-            m.Init(request)
-        end function
-
-        function Init(request as HttpRequest)
-            m.buf = CreateObject("roByteArray")
-            m.request = request
+            m.body_buffer = CreateObject("roByteArray")
         end function
 
         function Process() as boolean
@@ -64,15 +60,17 @@ namespace Http
             errname = WebUtils.HttpTitle(errcode)
             m.http_code = errcode
 
-            buf = "<html><head><title>" + Stri(errcode).trim() + " " + errname + "</title></head><body>" + UnixNL()
-            buf = buf + "<h1>" + errname + "</h1>" + UnixNL()
-            buf = buf + reason + UnixNL()
-            buf = buf + "<hr>" + UnixNL()
-            buf = buf + m.GeneratedBy() + UnixNL()
-            buf = buf + "</body></html>" + UnixNL()
+            buffer = "<html><head><title>" + Stri(errcode).trim() + " " + errname + "</title></head><body>" + UnixNL()
+            buffer = buffer + "<h1>" + errname + "</h1>" + UnixNL()
+            buffer = buffer + reason + UnixNL()
+            buffer = buffer + "<hr>" + UnixNL()
+            buffer = buffer + m.GeneratedBy() + UnixNL()
+            buffer = buffer + "</body></html>" + UnixNL()
 
-            m.buf.fromasciistring(buf)
-            m.length = m.buf.count()
+            m.body_buffer.fromasciistring(buffer)
+            m.body_buffer_length = m.body_buffer.count()
+
+            m.mimetype = "text/html"
 
             m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
@@ -87,10 +85,10 @@ namespace Http
         function Json(data as object)
             m.http_code = 200
 
-            buf = FormatJson(data)
+            buffer = FormatJson(data)
 
-            m.buf.fromasciistring(buf)
-            m.length = m.buf.count()
+            m.body_buffer.fromasciistring(buffer)
+            m.body_buffer_length = m.body_buffer.count()
 
             m.mimetype = "application/json"
 
@@ -101,23 +99,23 @@ namespace Http
         function Send(sock as object, bufsize as integer) as integer
             sent = -1
             if m.source = Http.HttpResponseSource.FROMFILE
-                if m.start + m.sent >= m.buf_start + m.buf.count()
+                if m.start + m.sent >= m.buf_start + m.body_buffer.count()
                     m.buf_start = m.start + m.sent
-                    m.buf.ReadFile(m.path, m.buf_start, bufsize)
-                    m.log.info("Read" + Stri(m.buf.count()) + " bytes from source file @" + itostr(m.buf_start))
+                    m.body_buffer.ReadFile(m.path, m.buf_start, bufsize)
+                    m.log.info("Read" + Stri(m.body_buffer.count()) + " bytes from source file @" + itostr(m.buf_start))
                 end if
             end if
             buf_pos = m.start + m.sent - m.buf_start
-            buf_remaining = m.buf.count() - buf_pos
+            buf_remaining = m.body_buffer.count() - buf_pos
             if buf_remaining = 0
-                m.log.info("source buf is empty")
+                m.log.info("source buffer is empty")
             end if
-            req_remaining = m.length - m.sent
+            req_remaining = m.body_buffer_length - m.sent
             if buf_remaining > req_remaining
                 buf_remaining = req_remaining
             end if
-            sent = sock.send(m.buf, buf_pos, buf_remaining)
-            m.LogInfo(sent, m.buf_start + buf_pos, m.length)
+            sent = sock.send(m.body_buffer, buf_pos, buf_remaining)
+            m.LogInfo(sent, m.buf_start + buf_pos, m.body_buffer_length)
             if sent > 0
                 m.sent = m.sent + sent
             end if
@@ -150,9 +148,9 @@ namespace Http
                 m.header = m.header + "Access-Control-Allow-Origin: " + m.allow_origin + WinNL()
             end if
             m.header = m.header + m.KeepAlive(close) + WinNL()
-            m.header = m.header + "Content-Length:" + Stri(m.length) + WinNL()
+            m.header = m.header + "Content-Length:" + Stri(m.body_buffer_length) + WinNL()
             if code = 206
-                m.header = m.header + "Content-Range: bytes" + m.MakeRange(m.start, m.length, m.filelength) + WinNL()
+                m.header = m.header + "Content-Range: bytes" + m.MakeRange(m.start, m.body_buffer_length, m.filelength) + WinNL()
             end if
             m.header = m.header + "Content-Type: " + m.mimetype + WinNL()
             m.header = m.header + "Accept-Ranges: bytes" + WinNL()
@@ -161,7 +159,7 @@ namespace Http
         end function
 
         function Done() as boolean
-            return m.sent = m.length
+            return m.sent = m.body_buffer_length
         end function
 
         function DoneHeader() as boolean
