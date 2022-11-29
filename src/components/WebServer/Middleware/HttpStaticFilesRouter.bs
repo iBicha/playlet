@@ -92,14 +92,18 @@ namespace Http
 
                 response.start = start
                 response.body_buffer_length = finish - start + 1
+                response.ContentLength(response.body_buffer_length)
+                response.headers["Content-Range"] = "bytes " + response.MakeRange(response.start, response.body_buffer_length, response.filelength)
                 response.http_code = 206
 
                 router.log.info("sending range " + response.MakeRange(start, response.body_buffer_length, response.fileLength))
             else ' no range stuff
                 response.body_buffer_length = response.fileLength
+                response.ContentLength(response.body_buffer_length)
                 response.http_code = 200
             end if
 
+            response.headers["Accept-Ranges"] = "bytes"
             response.GenerateHeader()
             return true
         end function
@@ -167,9 +171,7 @@ namespace Http
             listing = listing + "</body>" + UnixNL()
             listing = listing + "</html>" + UnixNL()
 
-            response.body_buffer.FromAsciiString(listing)
-            response.body_buffer_length = response.body_buffer.count()
-
+            response.SetBodyDataString(listing)
             response.http_code = 200
             response.GenerateHeader()
             response.source = Http.HttpResponseSource.GENERATED

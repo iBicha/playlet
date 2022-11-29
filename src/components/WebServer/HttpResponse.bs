@@ -30,7 +30,6 @@ namespace Http
         private header_only = false
         private buf_start = 0
         private http_code = 0
-        private allow_origin
 
         private server
         private settings
@@ -67,9 +66,7 @@ namespace Http
             buffer = buffer + m.GeneratedBy() + UnixNL()
             buffer = buffer + "</body></html>" + UnixNL()
 
-            m.body_buffer.fromasciistring(buffer)
-            m.body_buffer_length = m.body_buffer.count()
-
+            m.SetBodyDataString(buffer)
             m.ContentType("text/html")
 
             m.GenerateHeader(true)
@@ -77,7 +74,7 @@ namespace Http
         end function
 
         function Redirect(where as string, code = 301 as integer)
-            m.location = where
+            m.headers["Location"] = where
             message = "Moved to: <a href=" + Quote() + where + Quote() + ">" + where + "</a>"
             m.Default(code, message)
         end function
@@ -86,14 +83,21 @@ namespace Http
             m.http_code = 200
 
             buffer = FormatJson(data)
-
-            m.body_buffer.fromasciistring(buffer)
-            m.body_buffer_length = m.body_buffer.count()
-
+            m.SetBodyDataString(buffer)
             m.ContentType("application/json")
 
             m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
+        end function
+
+        function SetBodyDataString(data as string)
+            m.body_buffer.fromasciistring(data)
+            m.body_buffer_length = m.body_buffer.count()
+            m.ContentLength(m.body_buffer_length)
+        end function
+
+        function ContentLength(length as integer)
+            m.headers["Content-Length"] = Stri(length).trim()
         end function
 
         function ContentType(mimeType as string)
@@ -142,27 +146,16 @@ namespace Http
         function GenerateHeader(close = false as boolean)
             code = m.http_code
             title = WebUtils.HttpTitle(code)
-            m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
 
+            m.headers["Date"] = m.Now()
+            m.headers["Server"] = m.settings.PackageName
+            m.KeepAlive(close)
+
+            m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
             for each header in m.headers
                 m.header = m.header + header + ": " + m.headers[header] + WinNL()
             end for
 
-            m.header = m.header + "Date: " + m.Now() + WinNL()
-            m.header = m.header + "Server: " + m.settings.PackageName + WinNL()
-            if isstr(m.location)
-                m.header = m.header + "Location: " + m.location + WinNL()
-            end if
-            if m.allow_origin <> invalid
-                m.header = m.header + "Access-Control-Allow-Origin: " + m.allow_origin + WinNL()
-            end if
-            m.header = m.header + m.KeepAlive(close) + WinNL()
-            m.header = m.header + "Content-Length:" + Stri(m.body_buffer_length) + WinNL()
-            if code = 206
-                m.header = m.header + "Content-Range: bytes" + m.MakeRange(m.start, m.body_buffer_length, m.filelength) + WinNL()
-            end if
-
-            m.header = m.header + "Accept-Ranges: bytes" + WinNL()
             m.header = m.header + WinNL()
             m.header_length = m.header.len()
         end function
@@ -179,8 +172,14 @@ namespace Http
             m.log.info("Sent" + Stri(recent) + " [" + m.MakeRange(from, recent, total) + "]")
         end function
 
-        function KeepAlive(close as boolean) as string
-            return close ? "Connection: close" : "Keep-Alive: timeout=" + Stri(m.settings.Idletime).trim()
+        function KeepAlive(close as boolean)
+            if close
+                m.headers["Connection"] = "close"
+                m.headers.Delete("Keep-Alive")
+            else
+                m.headers["Keep-Alive"] = "timeout=" + Stri(m.settings.Idletime).trim()
+                m.headers.Delete("Connection")
+            end if
         end function
 
         function Now() as string
