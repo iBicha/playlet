@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Version check in settings page
 - Support for web request body parsing
 - Error dialog for video load fail
+- SponsorBlock sections and category info
 
 ## [0.4.0] - 2022-11-24
 ### Added
