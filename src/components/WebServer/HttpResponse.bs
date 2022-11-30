@@ -69,7 +69,6 @@ namespace Http
             m.SetBodyDataString(buffer)
             m.ContentType("text/html")
 
-            m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
         end function
 
@@ -86,7 +85,6 @@ namespace Http
             m.SetBodyDataString(buffer)
             m.ContentType("application/json")
 
-            m.GenerateHeader(true)
             m.source = Http.HttpResponseSource.GENERATED
         end function
 
@@ -131,6 +129,10 @@ namespace Http
         end function
 
         function SendHeader(sock as object, bufsize as integer) as integer
+            if m.header = invalid
+                m.GenerateHeader()
+            end if
+
             if m.header_sent = 0
                 sent = sock.sendStr(m.header)
             else
@@ -143,13 +145,16 @@ namespace Http
             return sent
         end function
 
-        function GenerateHeader(close = false as boolean)
+        function GenerateHeader()
             code = m.http_code
             title = WebUtils.HttpTitle(code)
 
             m.headers["Date"] = m.Now()
             m.headers["Server"] = m.settings.PackageName
-            m.KeepAlive(close)
+
+            if not m.headers.DoesExist("Connection")
+                m.KeepAlive(false)
+            end if
 
             m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
             for each header in m.headers
@@ -172,13 +177,13 @@ namespace Http
             m.log.info("Sent" + Stri(recent) + " [" + m.MakeRange(from, recent, total) + "]")
         end function
 
-        function KeepAlive(close as boolean)
-            if close
+        function KeepAlive(keepAlive as boolean)
+            if keepAlive
+                m.headers["Connection"] = "keep-alive"
+                m.headers["Keep-Alive"] = "timeout=" + Stri(m.settings.Idletime).trim()
+            else
                 m.headers["Connection"] = "close"
                 m.headers.Delete("Keep-Alive")
-            else
-                m.headers["Keep-Alive"] = "timeout=" + Stri(m.settings.Idletime).trim()
-                m.headers.Delete("Connection")
             end if
         end function
 
