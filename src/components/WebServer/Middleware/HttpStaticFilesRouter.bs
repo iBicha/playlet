@@ -4,22 +4,34 @@ namespace Http
         private log as log.Logger
 
         private root
-        private filesOnly
+        private route
+        private showDirectories
+        private showHidden
 
-        function new(root as string, filesOnly = false as boolean)
+        function new(route as string, root as string, showDirectories = false as boolean, showHidden = false as boolean)
             super()
             m.log = new log.Logger("HttpStaticFilesRouter")
 
             m.root = root
-            m.filesOnly = filesOnly
+            m.route = route
+            m.showDirectories = showDirectories
+            m.showHidden = showHidden
 
             m.Get("*", function(context as object) as boolean
                 router = context.router
                 request = context.request
                 response = context.response
 
-                decoded_path = WebUtils.UrlUnescape(request.route)
-                path = CreateObject("roPath", router.root + decoded_path)
+                if not request.route.StartsWith(router.route)
+                    return false
+                end if
+
+                path_in_route = request.route.Mid(router.route.Len())
+
+                decoded_path = WebUtils.UrlUnescape(path_in_route)
+                full_path = PathJoin(router.root, decoded_path)
+
+                path = CreateObject("roPath", full_path)
                 fs = CreateObject("roFilesystem")
 
                 if not path.isValid()
@@ -37,9 +49,9 @@ namespace Http
                 end if
 
                 if stat.type = "directory"
-                    if router.filesOnly
+                    if not router.showDirectories
                         response.Default(403, "Forbidden")
-                        return false
+                        return true
                     end if
                     response.ContentType("text/html")
                     router.GenerateDirectoryListing(path, router, request, response)
@@ -141,8 +153,19 @@ namespace Http
             if uriDir.len() > 0 and uriDir.right(1) <> "/"
                 uriDir = uriDir + "/"
             end if
+
+            routeDir = router.route
+            if routeDir.len() > 0 and routeDir.right(1) <> "/"
+                routeDir = routeDir + "/"
+            end if
+
+            if not uriDir = routeDir
+                uri = uriDir + ".."
+                listing = listing + "<a href=" + Quote() + uri + Quote() + ">" + ".." + "</a>" + UnixNL()
+            end if
+
             for each item in dirList
-                if item.left(1) <> "."
+                if router.showHidden or item.left(1) <> "."
                     indicator = invalid
                     stat = fs.stat(dir + item)
                     if stat <> invalid

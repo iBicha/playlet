@@ -11,6 +11,7 @@ import "pkg:/components/WebServer/Middleware/BasicAuthMiddleware.bs"
 import "pkg:/components/WebServer/Middleware/DashRouter.bs"
 
 #const WEB_SERVER_BASIC_AUTH = false
+#const WEB_SERVER_PACKAGE_DEBUG = false
 
 function Init()
     m.top.functionName = "WebServerLoop"
@@ -38,7 +39,10 @@ function WebServerLoop()
     m.server.UseRouter(new Http.CommandsApiRouter())
     m.server.UseRouter(new Http.StateApiRouter())
     m.server.UseRouter(new Http.InvidiousRouter())
-    m.server.UseRouter(new Http.HttpStaticFilesRouter(m.settings.WwwRoot))
+    m.server.UseRouter(new Http.HttpStaticFilesRouter("/", m.settings.WwwRoot))
+    #if WEB_SERVER_PACKAGE_DEBUG
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug", "pkg:/", true, true))
+    #end if
     #if WEB_SERVER_BASIC_AUTH
         m.server.UseRouter(new Http.BasicAuthMiddleware())
     #end if
