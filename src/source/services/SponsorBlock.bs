@@ -29,6 +29,29 @@ namespace SponsorBlock
         return 0
     end function
 
+    function SegmentTitle(category as string) as string
+        map = m.SponsorBlockTitles
+        if map = invalid
+            map = {
+                sponsor: "Sponsor",
+                selfpromo: "Unpaid/Self Promotion",
+                exclusive_access: "Exclusive Access",
+                interaction: "Interaction Reminder (Subscribe)",
+                poi_highlight: "Highlight",
+                intro: "Intermission/Intro Animation",
+                outro: "Endcards/Credits",
+                preview: "Preview/Recap",
+                filler: "Filler Tangent/Jokes",
+                music_offtopic: "Non-Music Section"
+            }
+            m.SponsorBlockTitles = map
+        end if
+        if map.doesexist(category)
+            return map[category]
+        end if
+        return ""
+    end function
+
     function GetSkipSegmentsForVideo(videoId as string) as object
         categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "chapter", "filler", "exclusive_access"]
         actionTypes = ["skip", "mute", "chapter", "full", "poi"]
@@ -54,7 +77,7 @@ namespace SponsorBlock
 
     function GenerateProgressBarBackground(segments as object, path as string)
         bar = CreateObject("roBitmap", { width: 1000, height: 20, AlphaEnable: true })
-        bar.Clear(0)
+        bar.Clear(&hFFFFFF80)
         width = bar.GetWidth()
         height = bar.GetHeight()
         for each segment in segments
