@@ -1,0 +1,151 @@
+import "pkg:/source/utils/WebUtils.bs"
+import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+
+namespace Http
+
+    class DashRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/dash", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                router = context.router
+
+                v = request.query.v
+                local = request.query.local
+
+                instance = InvidiousSettings.GetSelectedInstance()
+                metadata = router.GetVideoMetadata(context, v)
+                dashUrl = `${instance}/api/manifest/dash/id/${v}`
+
+                if metadata = invalid and local = invalid
+                    m.Redirect(dashUrl, 302)
+                    return true
+                end if
+
+                if local <> invalid
+                    dashUrl = `${dashUrl}?local=${local}`
+                end if
+
+                resp = Requests().get(dashUrl)
+                text = resp.text ?? ""
+                if resp.statuscode = 200 and local = "true"
+                    text = text.Replace("<BaseURL>/videoplayback", `<BaseURL>${instance}/videoplayback`)
+                end if
+
+                if resp.statuscode = 200 and metadata <> invalid
+                    text = router.InjectStoryBoard(router, text, metadata)
+                end if
+
+                response.http_code = resp.statuscode
+                response.SetBodyDataString(text)
+                response.ContentType("application/dash+xml")
+                response.GenerateHeader(true)
+                response.source = Http.HttpResponseSource.GENERATED
+
+                return true
+            end function)
+        end function
+
+        function GetVideoMetadata(context as object, videoId as string) as object
+            scene = context.server.task.top.getScene()
+            videoPlayer = scene.findNode("VideoPlayer")
+            metadata = videoPlayer?.content?.metadata
+            if metadata <> invalid and metadata.videoId = videoId
+                return metadata
+            end if
+            metadata = Invidious.GetVideoMetadata(videoId)
+            return metadata
+        end function
+
+        function InjectStoryBoard(router as object, dash as string, metadata as object) as string
+            xml = CreateObject ("roXMLElement")
+            if not xml.Parse(dash)
+                return dash
+            end if
+
+            thumb_id = 0
+            period = xml.GetChildNodes()[0]
+            sets = period.GetChildNodes()
+            for each set in sets
+                attributes = set.GetAttributes()
+                id = attributes.id
+                idInt = id.toInt()
+                if idInt >= thumb_id
+                    thumb_id = idInt + 1
+                end if
+            end for
+
+            thumbnails = router.GenerateThumbnailAdaptationSet(router, metadata, thumb_id)
+
+            injectPoint = StringLastIndexOf(dash, "</AdaptationSet>") + "</AdaptationSet>".Len()
+
+            newDash = dash.Left(injectPoint) + thumbnails + dash.Mid(injectPoint)
+
+            return newDash
+        end function
+
+        function GenerateThumbnailAdaptationSet(router as object, metadata as object, id as integer) as string
+            result = ""
+            storyboards = metadata.storyboards
+            for each storyboard in storyboards
+                ' BUG: Broken storyboards have interval = 0 https://github.com/iv-org/invidious/issues/3441
+                if storyboard.interval > 0
+                    ' BUG: storyboardHeight can be wrong https://github.com/iv-org/invidious/issues/3440
+                    ' TODO: this fix/assumption is only if we have storyboard.storyboardCount = 1
+                    storyboardHeight = storyboard.storyboardHeight
+                    if storyboard.storyboardCount = 1
+                        storyboardHeight = storyboard.count \ storyboard.storyboardWidth
+                        if storyboard.count mod storyboard.storyboardWidth > 0
+                            storyboardHeight += 1
+                        end if
+                    end if
+
+                    tilesPerPage = storyboard.storyboardWidth * storyboardHeight
+                    intervalSeconds = (storyboard.interval / 1000)
+
+                    ' If the template changed from known format, abort.
+                    if storyboard.templateUrl.Instr("$M") = -1
+                        return ""
+                    end if
+                    ' Youtube template uses the var $M for tile pages
+                    ' DASH-IF uses $Number$ in the SegmentTemplate
+                    url = WebUtils.EscapeUrlForXml(storyboard.templateUrl.Replace("$M", "$Number$"))
+
+                    tileCount = tilesPerPage
+                    duration = tileCount * intervalSeconds
+
+                    width = storyboard.width * storyboard.storyboardWidth
+                    height = storyboard.height * storyboardHeight
+
+                    ' Bandwidth is kind of a guess...
+                    bandwidth = Int((width * height * 0.5) / duration)
+
+                    result += `<AdaptationSet id="${id}" mimeType="image/jpeg" contentType="image">`
+                    result += `<SegmentTemplate media="${url}" duration="${duration}" startNumber="0" />`
+                    result += `<Representation id="thumbnails_${id}" bandwidth="${bandwidth}" `
+                    result += ` width="${width}" height="${height}">`
+
+                    ' TODO: the last image in the list is usually smaller than the others. For example:
+                    ' Consider a video with 85 thumbnails, in tiles of 5x5
+                    ' 1st tile is 5x5 (25)
+                    ' 2nd tile is 5x5 (50)
+                    ' 3rd tile is 5x5 (75)
+                    ' 4th tile is 5x2 (85)
+                    ' This makes the display always misinterpret the the last tile if it is smaller
+                    result += `<EssentialProperty schemeIdUri="http://dashif.org/guidelines/thumbnail_tile" value="${storyboard.storyboardWidth}x${storyboardHeight}"/>`
+                    result += `</Representation>`
+                    result += `</AdaptationSet>`
+
+                    id += 1
+                end if
+            end for
+            return result
+        end function
+
+    end class
+
+end namespace

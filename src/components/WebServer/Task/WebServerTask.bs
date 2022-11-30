@@ -8,6 +8,7 @@ import "pkg:/components/WebServer/Middleware/StateApiRouter.bs"
 import "pkg:/components/WebServer/Middleware/CommandsApiRouter.bs"
 import "pkg:/components/WebServer/Middleware/CorsMiddleware.bs"
 import "pkg:/components/WebServer/Middleware/BasicAuthMiddleware.bs"
+import "pkg:/components/WebServer/Middleware/DashRouter.bs"
 
 #const WEB_SERVER_BASIC_AUTH = false
 
@@ -21,7 +22,7 @@ function WebServerLoop()
     m.settings = new Http.HttpSettings(m.webServerPort)
     ' Root at www to get http://IP_ADDRESS:PORT/index.html
     m.settings.WwwRoot = "pkg:/www"
-    m.settings.Timeout = 5000
+    m.settings.Timeout = 2000
     m.server = new Http.HttpServer(m.settings, m)
 
     homeRouter = new Http.HttpRouter()
@@ -33,6 +34,7 @@ function WebServerLoop()
 
     m.server.UseRouter(new Http.CorsMiddleware(`http://${GetLocalIpAddress()}:8888`))
     m.server.UseRouter(homeRouter)
+    m.server.UseRouter(new Http.DashRouter())
     m.server.UseRouter(new Http.CommandsApiRouter())
     m.server.UseRouter(new Http.StateApiRouter())
     m.server.UseRouter(new Http.InvidiousRouter())
