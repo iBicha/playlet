@@ -1,3 +1,4 @@
+import "pkg:/source/utils/WebUtils.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 
@@ -30,7 +31,7 @@ namespace Http
                 end if
 
                 resp = Requests().get(dashUrl)
-                text = resp.text
+                text = resp.text ?? ""
                 if resp.statuscode = 200 and local = "true"
                     text = text.Replace("<BaseURL>/videoplayback", `<BaseURL>${instance}/videoplayback`)
                 end if
@@ -112,7 +113,7 @@ namespace Http
                     end if
                     ' Youtube template uses the var $M for tile pages
                     ' DASH-IF uses $Number$ in the SegmentTemplate
-                    url = router.EscapeUrlForXml(storyboard.templateUrl.Replace("$M", "$Number$"))
+                    url = WebUtils.EscapeUrlForXml(storyboard.templateUrl.Replace("$M", "$Number$"))
 
                     tileCount = tilesPerPage
                     duration = tileCount * intervalSeconds
@@ -143,20 +144,6 @@ namespace Http
                 end if
             end for
             return result
-        end function
-
-        function EscapeUrlForXml(url as string) as string
-            urlEscapeChars = {}
-            urlEscapeChars["&"] = "&amp;"
-            urlEscapeChars["'"] = "&apos;"
-            urlEscapeChars[`"`] = "&quot;"
-            urlEscapeChars["<"] = "&lt;"
-            urlEscapeChars[">"] = "&gt;"
-
-            for each escapeChar in urlEscapeChars
-                url = url.Replace(escapeChar, urlEscapeChars[escapeChar])
-            end for
-            return url
         end function
 
     end class
