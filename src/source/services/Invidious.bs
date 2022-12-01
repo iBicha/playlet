@@ -31,36 +31,6 @@ namespace Invidious
         }
     end function
 
-    function GetPopular() as object
-        instance = InvidiousSettings.GetSelectedInstance()
-        url = `${instance}${Invidious.POPULAR_ENDPOINT}`
-
-        args = Invidious.DefaultArgs()
-        response = Requests().get(url, args)
-
-        if response.statuscode = 200
-            return response.json
-        end if
-        return invalid
-    end function
-
-    function GetTrending(trendingType = "" as string) as object
-        instance = InvidiousSettings.GetSelectedInstance()
-        url = `${instance}${Invidious.TRENDING_ENDPOINT}`
-
-        args = Invidious.DefaultArgs()
-        if trendingType <> ""
-            args.params.type = trendingType
-        end if
-
-        response = Requests().get(url, args)
-
-        if response.statuscode = 200
-            return response.json
-        end if
-        return invalid
-    end function
-
     function GetVideoUrl(videoId as string, itag as string, local as boolean) as string
         instance = InvidiousSettings.GetSelectedInstance()
         url = `${instance}/latest_version?id=${videoId}&itag=${itag}`
@@ -150,56 +120,6 @@ namespace Invidious
         return {
             "Authorization": `Bearer ${token}`
         }
-    end function
-
-    function GetUserFeed() as object
-        authToken = InvidiousSettings.GetAuthToken()
-        if authToken = invalid
-            return false
-        end if
-        headers = Invidious.GetAuthenticationHeaders(authToken.token)
-
-        url = `${authToken.instance}${Invidious.AUTH_FEED}`
-
-        args = {
-            headers: headers,
-            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
-        }
-
-        response = Requests().get(url, args)
-
-        if response.statuscode = 403
-            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
-        end if
-        if response.statuscode = 200
-            return response.json.videos
-        end if
-        return invalid
-    end function
-
-    function GetUserPlaylists() as object
-        authToken = InvidiousSettings.GetAuthToken()
-        if authToken = invalid
-            return false
-        end if
-        headers = Invidious.GetAuthenticationHeaders(authToken.token)
-
-        url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}`
-
-        args = {
-            headers: headers,
-            retryCount: 3 'Sometimes authentication fails randomly with a valid token...
-        }
-
-        response = Requests().get(url, args)
-
-        if response.statuscode = 403
-            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
-        end if
-        if response.statuscode = 200
-            return response.json
-        end if
-        return invalid
     end function
 
     function Logout() as boolean
