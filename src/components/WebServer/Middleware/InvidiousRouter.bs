@@ -5,17 +5,15 @@ namespace Http
         function new()
             super()
 
-            ' TODO: use POST once supported
-            m.Get("/invidious/set-instances", function(context as object) as boolean
+            m.Post("/invidious/instances", function(context as object) as boolean
                 request = context.request
                 response = context.response
 
-                instances = []
-                if request.query.DoesExist("instances")
-                    instances = request.query["instances"]
-                    if GetInterface(instances, "ifArray") = invalid
-                        instances = [instances]
-                    end if
+                instances = request.Json()
+
+                if GetInterface(instances, "ifArray") = invalid
+                    response.Default(400, "Expected json array")
+                    return true
                 end if
 
                 for i = 0 to instances.Count() - 1
