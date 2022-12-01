@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for web request body parsing
 - Error dialog for video load fail
 - SponsorBlock sections and category info
+- Loading spinner
 
 ### Fixed
 - Bug where playing and exiting a video too quickly would cause the video to play in the background.
