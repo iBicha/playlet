@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error dialog for video load fail
 - SponsorBlock sections and category info
 
+### Fixed
+- Bug where playing and exiting a video too quickly would cause the video to play in the background.
+
 ## [0.4.0] - 2022-11-24
 ### Added
 - Play video API
