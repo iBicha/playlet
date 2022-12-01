@@ -82,7 +82,7 @@
     }
 
     function Logout() {
-      fetch('/api/command/logout')
+      PostJson('/api/command', { command: "logout" })
         .then(function (response) {
           window.location.reload();
         })
@@ -100,7 +100,7 @@
         alert("Please set video id")
         return
       }
-      fetch(`/api/command/play?v=${v}`)
+      PostJson('/api/command', { command: "play", videoId: v })
         .catch(function (err) {
           alert(err)
         });
@@ -210,14 +210,7 @@ ${JSON.stringify(window.appState.device, null, 2)}
         .filter(a => !!a)
         .map(a => a.innerText);
 
-      fetch('/invidious/instances',
-        {
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          method: "POST",
-          body: JSON.stringify(instances)
-        })
+      PostJson('/invidious/instances', instances)
         .then(function (response) {
           alert("Instances updated. Restart Playlet to reflect changes.")
           window.location.reload();
@@ -225,6 +218,17 @@ ${JSON.stringify(window.appState.device, null, 2)}
         .catch(function (err) {
           alert(err)
         });
+    }
+
+    function PostJson(url, payload) {
+      return fetch(url,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: "POST",
+          body: JSON.stringify(payload)
+        })
     }
 
     function Initialize() {

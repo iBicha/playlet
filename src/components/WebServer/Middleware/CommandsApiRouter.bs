@@ -5,35 +5,31 @@ namespace Http
         function new()
             super()
 
-            m.Get("/api/command/logout", function(context as object) as boolean
-                response = context.response
-                server = context.server
-
-                if Invidious.Logout()
-                    server.task.top.login = false
-                end if
-
-                response.Default(204, "OK")
-                return true
-            end function)
-
-            m.Get("/api/command/play", function(context as object) as boolean
+            m.Post("/api/command", function(context as object) as boolean
                 request = context.request
                 response = context.response
                 server = context.server
 
-                if request.query["v"] = invalid
-                    response.Default(400, "Missing arg 'v'")
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, "Invalid payload")
                     return true
                 end if
 
-                server.task.top.command = `play:${request.query["v"]}`
-                if request.query["redirect"] = "true"
-                    ' 302 to prevent redirection to current host permanently
-                    response.Redirect(`${InvidiousSettings.GetSelectedInstance()}/watch?v=${request.query["v"]}`, 302)
-                else
+                if payload.command = "logout"
+                    if Invidious.Logout()
+                        server.task.top.login = false
+                    end if
                     response.Default(204, "OK")
+                    return true
+                else if payload.command = "play"
+                    videoId = payload.videoId
+                    server.task.top.command = `play:${videoId}`
+                    response.Default(204, "OK")
+                    return true
                 end if
+
+                response.Default(400, `Invalid command: ${payload.command}`)
                 return true
             end function)
         end function
