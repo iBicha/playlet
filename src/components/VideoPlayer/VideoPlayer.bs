@@ -1,4 +1,82 @@
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/services/SponsorBlock.bs"
+
 function Init()
+    SetChapterLabel()
+    m.timeLabel = FindTimeLabel()
+    m.top.trickPlayBar.observeField("visible", "OnTrickPlayBarVisible")
+    m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
+    m.chapterLabelTimer.observeField("fire", "OnChapterLabelTimer")
+end function
+
+' This is a hack to access the position of the trickplay
+function FindTimeLabel() as object
+    children = m.top.trickPlayBar.getChildren(m.top.trickPlayBar.getChildCount(), 0)
+    label = invalid
+    for each child in children
+        ' It's very unfortunate to have to find a label with 0:00 text, 
+        ' and that's on the left side of the screen. This might need completely custom trickPlayBar
+        if child.isSubtype("Label") and child.text = "0:00"
+            if label = invalid
+                label = child
+            else
+                if child.translation[0] < label.translation[0]
+                    label = child
+                end if
+            end if
+        end if
+    end for
+    return label
+end function
+
+function OnTrickPlayBarVisible()
+    if m.top.trickPlayBar.visible
+        m.top.chapter = ""
+        m.chapterLabelTimer.control = "start"
+    else
+        m.chapterLabelTimer.control = "stop"
+    end if
+end function
+
+function OnChapterLabelTimer() as void
+    if m.timeLabel = invalid or m.top.skipSegments = invalid
+        return
+    end if
+
+    if m.sponsorBlockLastTime = m.timeLabel.text
+        return
+    end if
+    m.sponsorBlockLastTime = m.timeLabel.text
+
+    time = TimeUtils.ParseTime(m.timeLabel.text)
+    UpdateSponsorBlockChapter(time)
+end function
+
+function UpdateSponsorBlockChapter(time as integer) as void
+    segments = m.top.skipSegments
+    for each segment in segments
+        segmentRange = segment["segment"]
+        segmentStart = segmentRange[0]
+        segmentEnd = segmentRange[1]
+
+        if (segmentStart <= time) and (segmentEnd >= time)
+            m.top.chapter = SponsorBlock.SegmentTitle(segment["category"])
+            return
+        end if
+    end for
+    m.top.chapter = ""
+end function
+
+function SetChapterLabel()
+    m.chapterLabel = m.top.findNode("chapterLabel")
+    m.chapterLabel.reparent(m.top.trickPlayBar, false)
+    trickPlayBarWidth = m.top.trickPlayBar.boundingRect().width
+    #if DASH_THUMBNAILS
+        yPos = 25
+    #else
+        yPos = 55
+    #end if
+    m.chapterLabel.translation = [trickPlayBarWidth / 2 - m.chapterLabel.width / 2, yPos]
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean

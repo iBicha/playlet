@@ -6,6 +6,52 @@ namespace SponsorBlock
     const API_URL = "https://sponsor.ajay.app"
     const SKIP_SEGMENT_ENDPOINT = "/api/skipSegments"
 
+    function SegmentColor(category as string) as integer
+        map = m.SponsorBlockColors
+        if map = invalid
+            map = {
+                sponsor: &h00D400FF,
+                selfpromo: &hFFFF00FF,
+                exclusive_access: &h008A5CFF,
+                interaction: &hCC00FFFF,
+                poi_highlight: &hFF1684FF,
+                intro: &h00FFFFFF,
+                outro: &h0202EDFF,
+                preview: &h008FD6FF,
+                filler: &h7300FFFF,
+                music_offtopic: &hFF9900FF
+            }
+            m.SponsorBlockColors = map
+        end if
+        if map.doesexist(category)
+            return map[category]
+        end if
+        return 0
+    end function
+
+    function SegmentTitle(category as string) as string
+        map = m.SponsorBlockTitles
+        if map = invalid
+            map = {
+                sponsor: "Sponsor",
+                selfpromo: "Unpaid/Self Promotion",
+                exclusive_access: "Exclusive Access",
+                interaction: "Interaction Reminder (Subscribe)",
+                poi_highlight: "Highlight",
+                intro: "Intermission/Intro Animation",
+                outro: "Endcards/Credits",
+                preview: "Preview/Recap",
+                filler: "Filler Tangent/Jokes",
+                music_offtopic: "Non-Music Section"
+            }
+            m.SponsorBlockTitles = map
+        end if
+        if map.doesexist(category)
+            return map[category]
+        end if
+        return ""
+    end function
+
     function GetSkipSegmentsForVideo(videoId as string) as object
         categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "chapter", "filler", "exclusive_access"]
         actionTypes = ["skip", "mute", "chapter", "full", "poi"]
@@ -27,6 +73,27 @@ namespace SponsorBlock
             end for
         end if
         return invalid
+    end function
+
+    function GenerateProgressBarBackground(segments as object, path as string)
+        bar = CreateObject("roBitmap", { width: 1000, height: 20, AlphaEnable: true })
+        bar.Clear(&hFFFFFF80)
+        width = bar.GetWidth()
+        height = bar.GetHeight()
+        for each segment in segments
+            pixelStart = (segment.segment[0] / segment.videoDuration) * width
+            pixelEnd = (segment.segment[1] / segment.videoDuration) * width
+            color = SponsorBlock.SegmentColor(segment.category)
+            ' highlight's duration is zero, so it is not visble on the bar.
+            ' Add a couple of pixels to see it
+            if pixelStart = pixelEnd
+                pixelEnd += 2
+            end if
+            bar.DrawRect(pixelStart, 0, pixelEnd - pixelStart, height, color)
+        end for
+        bar.Finish()
+        buffer = bar.GetPng(0, 0, width, height)
+        buffer.WriteFile(path)
     end function
 
 end namespace
