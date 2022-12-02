@@ -5,8 +5,11 @@ import "pkg:/components/VideoPlayer/Video.bs"
 function Init()
     SetupSponsorBlock()
     m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
+    ' busySpinner is our spinner, shown when loading the video details (like links, title, etc)
     m.busySpinner = m.top.findNode("BusySpinner")
+    ' Once the Content is ready, the rokuBusySpinner shows up, which is loading the video feed
     m.rokuBusySpinner = FindChildNodeOfType(m.top, "BusySpinner")
+    ' The label that shows the buffering percentage
     m.rokuBusySpinnerLabel = FindChildNodeOfType(m.rokuBusySpinner, "Label")
     SetupBusySpinner()
     m.busySpinner.visible = true
@@ -33,6 +36,9 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
     end if
+    ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
+    ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
+    ' Because of that, the button "down" is used to shrink the video for picture in picture mode
     if key = "down"
         if ToggleVideoPictureInPicture()
             return true

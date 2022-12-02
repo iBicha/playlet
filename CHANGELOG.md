@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SponsorBlock sections and category info
 - Loading spinner
 - Picture in picture support
-- Deep linking support
+- [Deep linking support](https://developer.roku.com/en-ca/docs/developer-program/discovery/implementing-deep-linking.md)
+  - Both Launch arguments and Input arguments are supported, using the "contentId" key as the Youtube video id
 - Error and Exit dialogs
 
 ### Fixed
