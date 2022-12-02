@@ -29,6 +29,9 @@ function OnFocusChange() as void
             return
         end if
         if m.suggestions.buttons.Count() > 0
+            if m.suggestions.buttonFocused >= m.suggestions.buttons.Count()
+                m.suggestions.focusButton = 0
+            end if
             m.suggestions.SetFocus(true)
             return
         end if
@@ -57,8 +60,19 @@ function OnTextChange() as void
             if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
                 suggestions.Unshift(q)
             end if
-            ' TODO: fix race condition where button group gains focus before suggestions are set
+
+            ' Capture current focused button and restore it after resetting the buttons
+            buttonFocused = -1
+            if IsNodeFocused("suggestions")
+                buttonFocused = m.suggestions.buttonFocused
+            end if
+            if buttonFocused >= m.suggestions.buttons.Count()
+                buttonFocused = m.suggestions.buttons.Count() -1
+            end if
             m.suggestions.buttons = suggestions
+            if buttonFocused <> -1
+                m.suggestions.focusButton = buttonFocused
+            end if
         end if
     end function)
 end function
@@ -69,7 +83,11 @@ function OnSearchButtonSelected()
     Search(text)
 end function
 
-function OnSearchButtonFocused()
+function OnSearchButtonFocused() as void
+    if not IsNodeFocused("suggestions")
+        return
+    end if
+
     selected = m.suggestions.buttonFocused
     text = m.suggestions.buttons[selected]
     m.keyboard.text = text

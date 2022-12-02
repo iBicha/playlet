@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where logging in causes issues if a video is already playing
 - Bug where casting from web app while playing a video from the search
 - Spinner for the video
+- Bug where search sugggestions selected index is higher than total count
+- Race condition where button group gains focus before suggestions are set in Search Page
 
 ## [0.4.0] - 2022-11-24
 ### Added
