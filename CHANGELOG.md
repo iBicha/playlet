@@ -11,9 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Error dialog for video load fail
 - SponsorBlock sections and category info
 - Loading spinner
+- Picture in picture support
+- Deep linking support
+- Error and Exit dialogs
 
 ### Fixed
 - Bug where playing and exiting a video too quickly would cause the video to play in the background.
+- Bug where logging in causes issues if a video is already playing
+- Bug where casting from web app while playing a video from the search
+- Spinner for the video
 
 ## [0.4.0] - 2022-11-24
 ### Added
