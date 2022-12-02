@@ -11,6 +11,18 @@ Unofficial Youtube client for Roku 📺
 - 🕵️ No Tracking
 - 🛡️ Privacy driven (uses Invidious backend)
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
+- 📱 Cast from phone
+- 🔮 Picture-in-picture mode
+
+### Cast from phone
+1. Open settings in Playlet
+1. Scan QR Code with Phone
+1. Enter video ID or video url, and press Play button
+
+### Picture-in-picture
+- When viewing a video in full screen, press ⬇️ (down) button on your remote to shrink the video
+- You can browser or search for videos while you watch 
+- To restore currently playing video to full screen, press the ✳️ (options) button
 
 ## Screenshots
 <img src="screenshot1.jpg" alt="Screenshot of Playlet" width="350"/>
