@@ -9,6 +9,7 @@ function Init()
     m.busySpinnerLabel = FindChildNodeOfType(m.busySpinner, "Label")
     ' TODO: show spinner while fetching video details
     SetupBusySpinner()
+    m.global.loadingIndicator.visible = true
 
     m.videoPlayingSuccess = false
     m.ignoreNextFinishedState = false
@@ -28,7 +29,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return false
     end if
     if key = "back"
-        UtilsCloseVideo()
+        CloseVideo()
         return true
     end if
     return false
@@ -55,8 +56,9 @@ function OnVideoDetailsTaskResults() as void
         return
     end if
     if metadata = invalid
+        m.global.loadingIndicator.visible = false
         ErrorMessage(`Failed to load video information for ${videoId}`, "Video load fail")
-        UtilsCloseVideo()
+        CloseVideo()
     end if
 
     contentNode = CreateObject("roSGNode", "ContentNode")
@@ -82,6 +84,7 @@ function OnVideoDetailsTaskResults() as void
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
     SetCaptions(metadata, m.top, contentNode)
+    m.global.loadingIndicator.visible = false
     m.top.content = contentNode
     m.top.control = "play"
 end function
@@ -172,6 +175,6 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "error" or state = "finished"
-        UtilsCloseVideo()
+        CloseVideo()
     end if
 end function
