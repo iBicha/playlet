@@ -1,212 +1,35 @@
 import "pkg:/source/services/Invidious.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 
-function ShowVideoScreen(videoId as string, sender as object)
-    m.videoPlayer = CreateObject("roSGNode", "VideoPlayer")
-    m.videoPlayer.sender = sender
-    m.videoPlayer.addFields({
-        videoPlayingSuccess: false,
-        ignoreNextFinishedState: false,
-        videoId: videoId
-    })
-
-    m.videoPlayer.getScene().AppendChild(m.videoPlayer)
-
-    m.videoPlayer.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
-    m.videoPlayer.bufferingBar.filledBarBlendColor = "0xFF0000FF"
-    m.videoPlayer.retrievingBar.filledBarBlendColor = "0xFF0000FF"
-
-    m.videoPlayer.visible = true
-    m.videoPlayer.SetFocus(true)
-
-    m.videoPlayer.ObserveField("state", "OnVideoPlayerStateChange")
-
-    StartVideoDetailsTask(videoId)
-    StartSponsorBlockTask(videoId)
+function PlayVideo(videoId as string, sender = invalid as object)
+    CloseVideo(false)
+    videoContainer = GetVideoContainer()
+    if sender <> invalid
+        videoContainer.sender = sender
+    end if
+    videoContainer.videoPlayer = videoContainer.createChild("VideoPlayer")
+    videoContainer.videoPlayer.videoId = videoId
+    videoContainer.videoPlayer.SetFocus(true)
 end function
 
-function OnVideoPlayerStateChange() as void
-    state = m.videoPlayer.state
-
-    ' If we successfully played the video, then any error that comes later is not due to rate limiting.
-    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
-    if state = "playing"
-        m.videoPlayer.videoPlayingSuccess = true
-
-        if m.videoPlayer.visible = false and m.videoPlayer.embedded = true
-            m.videoPlayer.visible = true
-        end if
+function CloseVideo(setFocus = true as boolean)
+    videoContainer = GetVideoContainer()
+    if videoContainer.videoPlayer <> invalid
+        videoContainer.videoPlayer.control = "stop"
+        videoContainer.RemoveChild(videoContainer.videoPlayer)
+        videoContainer.videoPlayer = invalid
     end if
-
-    if state = "error"
-        ' A hack to see if we could use the proxy here
-        if m.videoPlayingSuccess <> true
-            errorInfo = m.videoPlayer.errorInfo
-            ' http for stream format, mediaerror for DASH
-            if errorInfo.category = "http" or errorInfo.category = "mediaerror"
-                url = m.videoPlayer.content.url
-                if url.InStr("local=true") = -1
-                    print(`Video ${url} failed to play. Trying a proxy (local=true)`)
-                    if url.InStr("?") = -1
-                        url += "?local=true"
-                    else
-                        url += "&local=true"
-                    end if
-                    m.videoPlayer.content.url = url
-                    ' This video errored, and is about to finish, so don't close the video yet
-                    ' TODO: perhaps creating a second player is better?
-                    m.videoPlayer.ignoreNextFinishedState = true
-                    m.videoPlayer.control = "play"
-                    return
-                end if
-            end if
-        end if
-    end if
-
-    if state = "finished" and m.videoPlayer.ignoreNextFinishedState = true
-        m.videoPlayer.ignoreNextFinishedState = false
-        return
-    end if
-
-    if state = "error" or state = "finished"
-        CloseVideoPlayer()
-    end if
-end function
-
-function CloseVideoPlayer()
-    sender = m.videoPlayer.sender
-    m.videoPlayer.control = "stop"
-    m.videoPlayer.visible = false
-    m.videoPlayer.getParent().RemoveChild(m.videoPlayer)
-    m.videoPlayer = invalid
-    sender.focus = true
-end function
-
-function StartVideoDetailsTask(videoId as string)
-    createTaskPromise("VideoDetailsTask", {
-        input: {
-            videoId: videoId
-        }
-    }).then(function(task as object) as void
-        if m.videoPlayer.control = "stop"
-            return
-        end if
-        videoId = task.output.videoId
-        metadata = task.output.metadata
-        if metadata <> invalid
-            contentNode = CreateObject("roSGNode", "ContentNode")
-            contentNode.addFields({
-                videoId: videoId,
-                metadata: metadata
-            })
-
-            if metadata.hlsUrl <> invalid
-                contentNode.url = metadata.hlsUrl
-            else if metadata.dashUrl <> invalid
-                #if DASH_THUMBNAILS
-                    ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
-                    contentNode.url = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
-                #else
-                    contentNode.url = metadata.dashUrl
-                #end if
-
-            else
-                stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
-                itag = stream.itag
-                ' Use an url relative to the host, so we can proxy(local=true) in case it fails
-                contentNode.url = Invidious.GetVideoUrl(videoId, itag, false)
-            end if
-
-            contentNode.title = metadata.title
-            contentNode.secondaryTitle = metadata.author
-            SetCaptions(metadata, m.videoPlayer, contentNode)
-            m.videoPlayer.content = contentNode
-            m.videoPlayer.control = "play"
+    if setFocus and videoContainer.sender <> invalid
+        if videoContainer.sender.hasField("focus")
+            videoContainer.sender.focus = true
         else
-            ErrorMessage(`Failed to load video ${videoId}`, "Video load fail")
-            CloseVideoPlayer()
+            videoContainer.sender.SetFocus(true)
         end if
-    end function)
-end function
-
-function StartSponsorBlockTask(videoId as string)
-    createTaskPromise("SponsorBlockTask", {
-        input: {
-            videoId: videoId
-        }
-    }).then(function(task as object)
-        skipSegments = task.output.skipSegments
-        barPath = task.output.barPath
-        if skipSegments <> invalid
-            m.videoPlayer.addFields({ skipSegments: skipSegments })
-            m.videoPlayer.seekMode = "accurate"
-            if barPath <> invalid
-                m.videoPlayer.trickPlayBar.trackImageUri = barPath
-                m.videoPlayer.trickPlayBar.filledBarBlendColor = "0xFF000080"
-            end if
-
-            m.videoPlayer.ObserveField("position", "OnPositionChangeSkipSponsorBlockSections")
-        end if
-    end function)
-end function
-
-function SetCaptions(metadata as object, videoPlayer as object, contentNode as object) as void
-    ' TODO: check if we have caption settings ON
-    ' TODO: read favorate language from system settings
-    ' TODO: populate list of caption tracks
-    if metadata.captions.Count() = 0
-        return
     end if
-    videoPlayer.globalCaptionMode = "ON"
-    contentNode.ClosedCaptions = True
-    selectedCaption = metadata.captions[0]
-
-    ' Use favorite caption langauage, or the first one
-    for each caption in metadata.captions
-        if caption.language_code = "en"
-            selectedCaption = caption
-            exit for
-        end if
-    end for
-
-    contentNode.SubtitleConfig = {
-        ShowSubtitle: 1,
-        TrackName: InvidiousSettings.GetSelectedInstance() + selectedCaption.url
-    }
+    m.global.loadingIndicator.visible = false
 end function
 
-function OnPositionChangeSkipSponsorBlockSections() as void
-    shouldMute = false
-    muteCategory = ""
-    segments = m.videoPlayer.skipSegments
-    for each segment in segments
-        ' TODO: handle other action types
-        if segment["actionType"] = "skip"
-            segmentRange = segment["segment"]
-            segmentStart = segmentRange[0]
-            segmentEnd = segmentRange[1]
-            currentPosition = m.videoPlayer.position
-            if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
-                ' TODO: if segmentEnd is at the end of the video, close video
-                m.videoPlayer.seek = segmentEnd
-                print("Skiping section:" + segment["category"])
-                return
-            end if
-        end if
-        if segment["actionType"] = "mute"
-            segmentRange = segment["segment"]
-            segmentStart = segmentRange[0]
-            segmentEnd = segmentRange[1]
-            currentPosition = m.videoPlayer.position
-            if (segmentStart < currentPosition) and (segmentEnd > currentPosition)
-                shouldMute = true
-                muteCategory = segment["category"]
-                exit for
-            end if
-        end if
-    end for
-    if m.videoPlayer.mute <> shouldMute
-        print(`Muting section: ${muteCategory} - ${shouldMute}`)
-        m.videoPlayer.mute = shouldMute
-    end if
+function GetVideoContainer() as object
+    return m.global.videoContainer
 end function
