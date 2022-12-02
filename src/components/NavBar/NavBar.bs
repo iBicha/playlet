@@ -1,3 +1,5 @@
+import "pkg:/components/VideoPlayer/Video.bs"
+
 function Init()
     m.buttonGroup = m.top.findNode("NavBarButtonGroup")
     m.top.observeField("focusIndex", "OnFocusIndexChange")
@@ -6,6 +8,11 @@ end function
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press
         return false
+    end if
+    if key = "options"
+        if ToggleVideoPictureInPicture(m.top)
+            return true
+        end if
     end if
     if key = "down"
         i = m.top.focusIndex
@@ -31,9 +38,21 @@ function onKeyEvent(key as string, press as boolean) as boolean
             m.top.focusIndex = -1
             return true
         end if
+    else if key = "back"
+        dialog = ShowDialogButtons("Do you want to exit Playlet?", "Exit", ["Exit", "Cancel"])
+        dialog.observeField("buttonSelected", "OnExitDialog", ["buttonSelected"])
+        return true
     end if
 
     return false
+end function
+
+function OnExitDialog(event as object)
+    buttonIndex = event.GetData()
+    if buttonIndex = 0 ' Exit
+        ? "EXITING APP"
+        m.top.GetScene().exitChannel = true
+    end if
 end function
 
 function OnFocusIndexChange()

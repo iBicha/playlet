@@ -5,11 +5,12 @@ import "pkg:/components/VideoPlayer/Video.bs"
 function Init()
     SetupSponsorBlock()
     m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
-    m.busySpinner = FindChildNodeOfType(m.top, "BusySpinner")
-    m.busySpinnerLabel = FindChildNodeOfType(m.busySpinner, "Label")
-    ' TODO: show spinner while fetching video details
+    m.busySpinner = m.top.findNode("BusySpinner")
+    m.rokuBusySpinner = FindChildNodeOfType(m.top, "BusySpinner")
+    m.rokuBusySpinnerLabel = FindChildNodeOfType(m.rokuBusySpinner, "Label")
     SetupBusySpinner()
-    m.global.loadingIndicator.visible = true
+    m.busySpinner.visible = true
+    m.busySpinner.control = "start"
 
     m.videoPlayingSuccess = false
     m.ignoreNextFinishedState = false
@@ -21,12 +22,21 @@ function Init()
     m.top.observeField("control", "OnControlChange")
     m.top.observeField("videoId", "StartVideoDetailsTask")
 
+    m.videoContainer = GetVideoContainer()
+    m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
+    OnFullScreenChange()
+
     m.top.ObserveField("state", "OnVideoPlayerStateChange")
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
+    end if
+    if key = "down"
+        if ToggleVideoPictureInPicture()
+            return true
+        end if
     end if
     if key = "back"
         CloseVideo()
@@ -56,8 +66,9 @@ function OnVideoDetailsTaskResults() as void
         return
     end if
     if metadata = invalid
-        m.global.loadingIndicator.visible = false
-        ErrorMessage(`Failed to load video information for ${videoId}`, "Video load fail")
+        m.busySpinner.visible = false
+        m.busySpinner.control = "stop"
+        ShowDialog(`Failed to load video information for ${videoId}`, "Video load fail")
         CloseVideo()
     end if
 
@@ -84,7 +95,8 @@ function OnVideoDetailsTaskResults() as void
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
     SetCaptions(metadata, m.top, contentNode)
-    m.global.loadingIndicator.visible = false
+    m.busySpinner.visible = false
+    m.busySpinner.control = "stop"
     m.top.content = contentNode
     m.top.control = "play"
 end function
@@ -107,31 +119,36 @@ function FindChildNodeOfType(node as object, nodeType as string) as object
 end function
 
 function SetupBusySpinner()
+    m.rokuBusySpinner.poster.width = 150
+    m.rokuBusySpinner.poster.height = 150
+    m.rokuBusySpinner.poster.uri = "pkg:/images/spinner.png"
+    m.rokuBusySpinner.observeField("translation", "OnRokuSpinnerMoved")
+
+    m.rokuBusySpinnerLabel.width = 150
+    m.rokuBusySpinnerLabel.height = 150
+    m.rokuBusySpinnerLabel.translation = [0, 0]
+    m.rokuBusySpinnerLabel.observeField("translation", "OnRokuSpinnerLabelMoved")
+
     m.busySpinner.poster.width = 150
     m.busySpinner.poster.height = 150
     m.busySpinner.poster.uri = "pkg:/images/spinner.png"
-    m.busySpinner.observeField("translation", "OnSpinnerMoved")
-    m.busySpinnerLabel.width = 150
-    m.busySpinnerLabel.height = 150
-    m.busySpinnerLabel.translation = [0, 0]
-    m.busySpinnerLabel.observeField("translation", "OnSpinnerLabelMoved")
 end function
 
-function OnSpinnerMoved()
-    currentTranslation = m.busySpinner.translation
+function OnRokuSpinnerMoved()
+    currentTranslation = m.rokuBusySpinner.translation
     parentRect = m.top.boundingRect()
-    centerx = (parentRect.width - m.busySpinner.poster.width) / 2
-    centery = (parentRect.height - m.busySpinner.poster.height) / 2
+    centerx = (parentRect.width - m.rokuBusySpinner.poster.width) / 2
+    centery = (parentRect.height - m.rokuBusySpinner.poster.height) / 2
 
     if currentTranslation[0] <> centerx or currentTranslation[1] <> centery
-        m.busySpinner.translation = [centerx, centery]
+        m.rokuBusySpinner.translation = [centerx, centery]
     end if
 end function
 
-function OnSpinnerLabelMoved()
-    currentTranslation = m.busySpinnerLabel.translation
+function OnRokuSpinnerLabelMoved()
+    currentTranslation = m.rokuBusySpinnerLabel.translation
     if currentTranslation[0] <> 0 or currentTranslation[1] <> 0
-        m.busySpinnerLabel.translation = [0, 0]
+        m.rokuBusySpinnerLabel.translation = [0, 0]
     end if
 end function
 
@@ -174,7 +191,46 @@ function OnVideoPlayerStateChange() as void
         return
     end if
 
-    if state = "error" or state = "finished"
+    if state = "finished"
         CloseVideo()
     end if
+
+    if state = "error"
+        errorInfo = m.top.errorInfo
+        messageLines = [`VideoId: ${m.top.videoId}`]
+        for each info in errorInfo
+            messageLines.push(`${info}: ${errorInfo[info]}`)
+        end for
+        ShowDialog(messageLines, "Error playing video")
+        CloseVideo()
+    end if
+end function
+
+function OnFullScreenChange()
+    margin = 20
+    width = 1280
+    height = 720
+    if m.videoContainer.fullscreen
+        m.top.translation = [0, 0]
+        m.top.width = width
+        m.top.height = height
+    else
+        small_width = width / 3
+        small_height = height / 3
+        x = width - small_width - margin
+        y = height - small_height - margin
+
+        m.top.translation = [x, y]
+        m.top.width = small_width
+        m.top.height = small_height
+    end if
+
+    m.top.enableUI = m.videoContainer.fullscreen
+    PositionSpinner()
+end function
+
+function PositionSpinner()
+    centerx = (m.top.width - m.busySpinner.poster.width) / 2
+    centery = (m.top.height - m.busySpinner.poster.height) / 2
+    m.busySpinner.translation = [centerx, centery]
 end function

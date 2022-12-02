@@ -10,7 +10,9 @@ function PlayVideo(videoId as string, sender = invalid as object)
     end if
     videoContainer.videoPlayer = videoContainer.createChild("VideoPlayer")
     videoContainer.videoPlayer.videoId = videoId
-    videoContainer.videoPlayer.SetFocus(true)
+    if videoContainer.fullscreen
+        videoContainer.videoPlayer.SetFocus(true)
+    end if
 end function
 
 function CloseVideo(setFocus = true as boolean)
@@ -28,6 +30,30 @@ function CloseVideo(setFocus = true as boolean)
         end if
     end if
     m.global.loadingIndicator.visible = false
+end function
+
+function ToggleVideoPictureInPicture(sender = invalid as object) as boolean
+    videoContainer = GetVideoContainer()
+    if videoContainer.videoPlayer = invalid
+        return false
+    end if
+    videoContainer.fullscreen = not videoContainer.fullscreen
+    if sender <> invalid
+        videoContainer.sender = sender
+    end if
+    if videoContainer.fullscreen
+        videoContainer.videoPlayer.SetFocus(true)
+    else
+        if videoContainer.sender <> invalid
+            if videoContainer.sender.hasField("focus")
+                videoContainer.sender.focus = true
+            else
+                videoContainer.sender.SetFocus(true)
+            end if
+        end if
+        videoContainer.sender = invalid
+    end if
+    return true
 end function
 
 function GetVideoContainer() as object

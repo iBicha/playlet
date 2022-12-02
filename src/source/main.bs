@@ -4,8 +4,9 @@ function main() as void
     screen.setMessagePort(m.port)
     m.global = screen.getGlobalNode()
 
-    screen.CreateScene("MainScene")
+    scene = screen.CreateScene("MainScene")
     screen.show()
+    scene.ObserveField("exitChannel", m.port)
 
     ' The following comment is to enable the SceneGraph inspector
     ' on the VSCode BrightScript plugin.
@@ -19,6 +20,12 @@ function main() as void
         if msgType = "roSGScreenEvent"
             if msg.isScreenClosed()
                 return
+            end if
+        else if msgType = "roSGNodeEvent"
+            field = msg.getField()
+            data = msg.getData()
+            if field = "exitChannel" and data = true
+                END
             end if
         end if
     end while
