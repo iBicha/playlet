@@ -1,4 +1,4 @@
-function main() as void
+function main(args as object) as void
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")
     screen.setMessagePort(m.port)
@@ -7,6 +7,7 @@ function main() as void
     scene = screen.CreateScene("MainScene")
     screen.show()
     scene.ObserveField("exitChannel", m.port)
+    scene.launchArgs = args
 
     ' The following comment is to enable the SceneGraph inspector
     ' on the VSCode BrightScript plugin.
@@ -27,6 +28,8 @@ function main() as void
             if field = "exitChannel" and data = true
                 END
             end if
+        else if msgType = "roInputEvent"
+            scene.inputArgs = msg.getInfo()
         end if
     end while
 end function
