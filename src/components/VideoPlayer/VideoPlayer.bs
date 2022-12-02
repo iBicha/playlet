@@ -1,82 +1,26 @@
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/services/SponsorBlock.bs"
+import "pkg:/components/VideoPlayer/Video.bs"
 
 function Init()
-    SetChapterLabel()
-    m.timeLabel = FindTimeLabel()
-    m.top.trickPlayBar.observeField("visible", "OnTrickPlayBarVisible")
-    m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
-    m.chapterLabelTimer.observeField("fire", "OnChapterLabelTimer")
-end function
+    SetupSponsorBlock()
+    m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
+    m.busySpinner = FindChildNodeOfType(m.top, "BusySpinner")
+    m.busySpinnerLabel = FindChildNodeOfType(m.busySpinner, "Label")
+    ' TODO: show spinner while fetching video details
+    SetupBusySpinner()
 
-' This is a hack to access the position of the trickplay
-function FindTimeLabel() as object
-    children = m.top.trickPlayBar.getChildren(m.top.trickPlayBar.getChildCount(), 0)
-    label = invalid
-    for each child in children
-        ' It's very unfortunate to have to find a label with 0:00 text,
-        ' and that's on the left side of the screen. This might need completely custom trickPlayBar
-        if child.isSubtype("Label") and child.text = "0:00"
-            if label = invalid
-                label = child
-            else
-                if child.translation[0] < label.translation[0]
-                    label = child
-                end if
-            end if
-        end if
-    end for
-    return label
-end function
+    m.videoPlayingSuccess = false
+    m.ignoreNextFinishedState = false
 
-function OnTrickPlayBarVisible()
-    if m.top.trickPlayBar.visible
-        m.top.chapter = ""
-        m.chapterLabelTimer.control = "start"
-    else
-        m.chapterLabelTimer.control = "stop"
-    end if
-end function
+    m.top.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
+    m.top.bufferingBar.filledBarBlendColor = "0xFF0000FF"
+    m.top.retrievingBar.filledBarBlendColor = "0xFF0000FF"
 
-function OnChapterLabelTimer() as void
-    if m.timeLabel = invalid or m.top.skipSegments = invalid
-        return
-    end if
+    m.top.observeField("control", "OnControlChange")
+    m.top.observeField("videoId", "StartVideoDetailsTask")
 
-    if m.sponsorBlockLastTime = m.timeLabel.text
-        return
-    end if
-    m.sponsorBlockLastTime = m.timeLabel.text
-
-    time = TimeUtils.ParseTime(m.timeLabel.text)
-    UpdateSponsorBlockChapter(time)
-end function
-
-function UpdateSponsorBlockChapter(time as integer) as void
-    segments = m.top.skipSegments
-    for each segment in segments
-        segmentRange = segment["segment"]
-        segmentStart = segmentRange[0]
-        segmentEnd = segmentRange[1]
-
-        if (segmentStart <= time) and (segmentEnd >= time)
-            m.top.chapter = SponsorBlock.SegmentTitle(segment["category"])
-            return
-        end if
-    end for
-    m.top.chapter = ""
-end function
-
-function SetChapterLabel()
-    m.chapterLabel = m.top.findNode("chapterLabel")
-    m.chapterLabel.reparent(m.top.trickPlayBar, false)
-    trickPlayBarWidth = m.top.trickPlayBar.boundingRect().width
-    #if DASH_THUMBNAILS
-        yPos = 25
-    #else
-        yPos = 55
-    #end if
-    m.chapterLabel.translation = [trickPlayBarWidth / 2 - m.chapterLabel.width / 2, yPos]
+    m.top.ObserveField("state", "OnVideoPlayerStateChange")
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -84,16 +28,150 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return false
     end if
     if key = "back"
-        CloseVideo()
+        UtilsCloseVideo()
         return true
     end if
     return false
 end function
 
-function CloseVideo()
-    sender = m.top.sender
-    m.top.control = "stop"
-    m.top.visible = false
-    m.top.getParent().removeChild(m.videoPlayer)
-    sender.focus = true
+function OnControlChange()
+    if m.top.control = "stop"
+        m.sponsorBlockTask.control = "stop"
+        m.videoDetailsTask.control = "stop"
+    end if
+end function
+
+function StartVideoDetailsTask()
+    m.videoDetailsTask.input = { videoId: m.top.videoId }
+    m.videoDetailsTask.observeField("output", "OnVideoDetailsTaskResults")
+    m.videoDetailsTask.control = "run"
+end function
+
+function OnVideoDetailsTaskResults() as void
+    task = m.videoDetailsTask
+    videoId = task.output.videoId
+    metadata = task.output.metadata
+    if videoId <> m.top.videoId
+        return
+    end if
+    if metadata = invalid
+        ErrorMessage(`Failed to load video information for ${videoId}`, "Video load fail")
+        UtilsCloseVideo()
+    end if
+
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.addFields({ metadata: metadata })
+
+    if metadata.hlsUrl <> invalid
+        contentNode.url = metadata.hlsUrl
+    else if metadata.dashUrl <> invalid
+        #if DASH_THUMBNAILS
+            ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
+            contentNode.url = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
+        #else
+            contentNode.url = metadata.dashUrl
+        #end if
+
+    else
+        stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
+        itag = stream.itag
+        ' Use an url relative to the host, so we can proxy(local=true) in case it fails
+        contentNode.url = Invidious.GetVideoUrl(videoId, itag, false)
+    end if
+
+    contentNode.title = metadata.title
+    contentNode.secondaryTitle = metadata.author
+    SetCaptions(metadata, m.top, contentNode)
+    m.top.content = contentNode
+    m.top.control = "play"
+end function
+
+function FindChildNodeOfType(node as object, nodeType as string) as object
+    if node.subtype() = nodeType
+        return node
+    end if
+
+    childCount = node.getChildCount()
+    children = node.getChildren(childCount, 0)
+    for i = 0 to childCount - 1
+        child = FindChildNodeOfType(children[i], nodeType)
+        if child <> invalid
+            return child
+        end if
+    end for
+
+    return invalid
+end function
+
+function SetupBusySpinner()
+    m.busySpinner.poster.width = 150
+    m.busySpinner.poster.height = 150
+    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+    m.busySpinner.observeField("translation", "OnSpinnerMoved")
+    m.busySpinnerLabel.width = 150
+    m.busySpinnerLabel.height = 150
+    m.busySpinnerLabel.translation = [0, 0]
+    m.busySpinnerLabel.observeField("translation", "OnSpinnerLabelMoved")
+end function
+
+function OnSpinnerMoved()
+    currentTranslation = m.busySpinner.translation
+    parentRect = m.top.boundingRect()
+    centerx = (parentRect.width - m.busySpinner.poster.width) / 2
+    centery = (parentRect.height - m.busySpinner.poster.height) / 2
+
+    if currentTranslation[0] <> centerx or currentTranslation[1] <> centery
+        m.busySpinner.translation = [centerx, centery]
+    end if
+end function
+
+function OnSpinnerLabelMoved()
+    currentTranslation = m.busySpinnerLabel.translation
+    if currentTranslation[0] <> 0 or currentTranslation[1] <> 0
+        m.busySpinnerLabel.translation = [0, 0]
+    end if
+end function
+
+function OnVideoPlayerStateChange() as void
+    state = m.top.state
+
+    ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
+    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
+    if state = "playing"
+        m.videoPlayingSuccess = true
+    end if
+
+    if state = "error"
+        ' A hack to see if we could use the proxy here
+        if m.videoPlayingSuccess <> true
+            errorInfo = m.top.errorInfo
+            ' http for stream format, mediaerror for DASH
+            if errorInfo.category = "http" or errorInfo.category = "mediaerror"
+                url = m.top.content.url
+                if url.InStr("local=true") = -1
+                    print(`Video ${url} failed to play. Trying a proxy (local=true)`)
+                    if url.InStr("?") = -1
+                        url += "?local=true"
+                    else
+                        url += "&local=true"
+                    end if
+                    m.top.content.url = url
+                    ' This video errored, and is about to finish, so don't close the video yet
+                    ' TODO: perhaps creating a second player is better?
+                    m.ignoreNextFinishedState = true
+                    m.top.control = "play"
+                    return
+                end if
+            end if
+        end if
+    end if
+
+    if state = "finished" and m.ignoreNextFinishedState = true
+        m.ignoreNextFinishedState = false
+        return
+    end if
+
+    if state = "error" or state = "finished"
+        UtilsCloseVideo()
+    end if
 end function

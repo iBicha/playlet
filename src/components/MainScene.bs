@@ -1,4 +1,5 @@
 import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/components/VideoPlayer/Video.bs"
 
 function Init()
     log.initializeLogManager(["log_PrintTransport"], 2)
@@ -6,9 +7,13 @@ function Init()
     m.top.backgroundColor = "0x242424FF"
     m.top.backgroundURI = ""
 
-    loadingIndicator = m.top.findNode("LoadingIndicator")
-    m.global.addFields({ loadingIndicator: loadingIndicator })
-    m.global.loadingIndicator.visible = true
+    m.loadingIndicator = m.top.findNode("LoadingIndicator")
+    m.videoContainer = m.top.findNode("VideoContainer")
+    m.global.addFields({
+        loadingIndicator: m.loadingIndicator,
+        videoContainer: m.videoContainer
+    })
+    m.loadingIndicator.visible = true
 
     m.homeGridScreen = m.top.findNode("HomeGridScreen")
     m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
@@ -76,38 +81,12 @@ function OnNavIndexChange() as void
 end function
 
 function OnWebServerLogin()
-    ' TODO: refresh same component instead of creating a new one
-    m.global.loadingIndicator.visible = true
-    homeIndex = GetIndexOfChild(m.top, m.homeGridScreen.id)
-    newHomeGridScreen = CreateObject("roSGNode", "HomeGridScreen")
-    m.top.replaceChild(newHomeGridScreen, homeIndex)
-    m.homeGridScreen = newHomeGridScreen
-    m.homeGridScreen.id = "HomeGridScreen"
-    m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
-
-    ' Selecting home
-    m.navBar.focusIndex = -1
-    m.homeGridScreen.focus = true
-
-    m.searchScreen.visible = false
-    m.homeGridScreen.visible = true
-    m.settingsScreen.visible = false
+    m.homeGridScreen.refresh = true
 end function
 
 function OnWebServerCommand()
     if m.serverTask.command.StartsWith("play:")
-        ' Selecting home
-        m.navBar.focusIndex = -1
-        m.homeGridScreen.focus = true
-
-        m.searchScreen.visible = false
-        m.homeGridScreen.visible = true
-        m.settingsScreen.visible = false
-        ' Trigger play video from home
-        ' TODO: allow returning to current screen, instead of home
-        ' BUG: if current video is playing in search screen, new video does not play
-        ' TODO: Owner of video player needs to be independant
-        m.homeGridScreen.playvideo = m.serverTask.command.Mid(5)
+        UtilsPlayVideo(m.serverTask.command.Mid(5))
     end if
 end function
 
