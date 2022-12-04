@@ -65,13 +65,22 @@ function OnVideoDetailsTaskResults() as void
     if videoId <> m.top.videoId
         return
     end if
-    if metadata = invalid
+    if not metadata.success
         m.busySpinner.visible = false
         m.busySpinner.control = "stop"
-        ShowDialog(`Failed to load video information for ${videoId}`, "Video load fail")
+        message = `Failed to load video information for ${videoId}`
+        message += `\nStatus Code: ${metadata.statusCode}`
+        if isstr(metadata.data)
+            message += `\nError: ${metadata.data}`
+        else if isAssocArray(metadata.data)
+            message += `\nError: ${FormatJson(metadata.data)}`
+        end if
+        ShowDialog(message, "Video load fail")
         CloseVideo()
         return
     end if
+
+    metadata = metadata.data
 
     contentNode = CreateObject("roSGNode", "ContentNode")
     contentNode.addFields({ metadata: metadata })
@@ -85,7 +94,6 @@ function OnVideoDetailsTaskResults() as void
         #else
             contentNode.url = metadata.dashUrl
         #end if
-
     else
         stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
         itag = stream.itag
