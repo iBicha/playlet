@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - Bug where app freezes if metadata fails to fetch
-- A bug where SponsorBlock returning videoDuration of zero causes the app to hang
+- Bug where SponsorBlock returning videoDuration of zero causes the app to hang
+- Bug where app would lose focus when casting from web app
 
 ## [0.5.0] - 2022-12-02
 ### Added

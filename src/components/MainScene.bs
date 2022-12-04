@@ -28,6 +28,8 @@ function Init()
     m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
     m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
 
+    m.currentFocued = m.homeGridScreen
+
     InitWebServer()
 end function
 
@@ -42,19 +44,23 @@ end function
 function OnSearchScreenEscape()
     m.navBar.SetFocus(true)
     m.navBar.focusIndex = 0
+    m.currentFocued = m.navBar
 end function
 
 function OnHomeGridScreenEscape()
     m.navBar.SetFocus(true)
     m.navBar.focusIndex = 1
+    m.currentFocued = m.navBar
 end function
 
 function OnNavBarEscape()
     index = m.navBar.escapeIndex
     if index = 0
         m.searchScreen.focus = true
+        m.currentFocued = m.searchScreen
     else if index = 1
         m.homeGridScreen.focus = true
+        m.currentFocued = m.homeGridScreen
     else if index = 2
         m.settingsScreen.focus = true
     end if
@@ -86,7 +92,8 @@ end function
 
 function OnWebServerCommand()
     if m.serverTask.command.StartsWith("play:")
-        PlayVideo(m.serverTask.command.Mid(5))
+        sender = m.videoContainer.sender ?? m.currentFocued
+        PlayVideo(m.serverTask.command.Mid(5), sender)
     end if
 end function
 
@@ -104,13 +111,15 @@ end function
 function LaunchArgumentsReceived()
     ? "LaunchArgumentsReceived" m.top.launchArgs
     if m.top.launchArgs <> invalid and m.top.launchArgs.contentId <> invalid
-        PlayVideo(m.top.launchArgs.contentId, m.homeGridScreen)
+        sender = m.videoContainer.sender ?? m.currentFocued
+        PlayVideo(m.top.launchArgs.contentId, sender)
     end if
 end function
 
 function InputArgumentsReceived()
     ? "InputArgumentsReceived" m.top.inputArgs
     if m.top.inputArgs <> invalid and m.top.inputArgs.contentId <> invalid
-        PlayVideo(m.top.inputArgs.contentId)
+        sender = m.videoContainer.sender ?? m.currentFocued
+        PlayVideo(m.top.inputArgs.contentId, sender)
     end if
 end function
