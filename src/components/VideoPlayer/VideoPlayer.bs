@@ -4,30 +4,24 @@ import "pkg:/components/VideoPlayer/Video.bs"
 
 function Init()
     SetupSponsorBlock()
-    m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
-    ' busySpinner is our spinner, shown when loading the video details (like links, title, etc)
-    m.busySpinner = m.top.findNode("BusySpinner")
-    ' Once the Content is ready, the rokuBusySpinner shows up, which is loading the video feed
-    m.rokuBusySpinner = FindChildNodeOfType(m.top, "BusySpinner")
-    ' The label that shows the buffering percentage
-    m.rokuBusySpinnerLabel = FindChildNodeOfType(m.rokuBusySpinner, "Label")
+    SetupAnimation()
     SetupBusySpinner()
-    m.busySpinner.visible = true
-    m.busySpinner.control = "start"
-
-    m.videoPlayingSuccess = false
-    m.ignoreNextFinishedState = false
 
     m.top.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
     m.top.bufferingBar.filledBarBlendColor = "0xFF0000FF"
     m.top.retrievingBar.filledBarBlendColor = "0xFF0000FF"
 
+    m.videoContainer = GetVideoContainer()
+    m.top.enableUI = m.videoContainer.fullscreen
+    m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
+
+    m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
+
+    m.videoPlayingSuccess = false
+    m.ignoreNextFinishedState = false
+
     m.top.observeField("control", "OnControlChange")
     m.top.observeField("videoId", "StartVideoDetailsTask")
-
-    m.videoContainer = GetVideoContainer()
-    m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
-    OnFullScreenChange()
 
     m.top.ObserveField("state", "OnVideoPlayerStateChange")
 end function
@@ -126,19 +120,40 @@ function FindChildNodeOfType(node as object, nodeType as string) as object
 end function
 
 function SetupBusySpinner()
+    ' busySpinner is our spinner, shown when loading the video details (like links, title, etc)
+    m.busySpinner = m.top.findNode("BusySpinner")
+    ' Once the Content is ready, the rokuBusySpinner shows up, which is loading the video feed
+    m.rokuBusySpinner = FindChildNodeOfType(m.top, "BusySpinner")
+    ' The label that shows the buffering percentage
+    m.rokuBusySpinnerLabel = FindChildNodeOfType(m.rokuBusySpinner, "Label")
+
     m.rokuBusySpinner.poster.width = 150
     m.rokuBusySpinner.poster.height = 150
     m.rokuBusySpinner.poster.uri = "pkg:/images/spinner.png"
     m.rokuBusySpinner.observeField("translation", "OnRokuSpinnerMoved")
+    m.top.observeField("width", "OnRokuSpinnerMoved")
+    m.top.observeField("height", "OnRokuSpinnerMoved")
+    m.top.observeField("translation", "OnRokuSpinnerMoved")
 
     m.rokuBusySpinnerLabel.width = 150
     m.rokuBusySpinnerLabel.height = 150
     m.rokuBusySpinnerLabel.translation = [0, 0]
     m.rokuBusySpinnerLabel.observeField("translation", "OnRokuSpinnerLabelMoved")
+    m.top.observeField("width", "OnRokuSpinnerLabelMoved")
+    m.top.observeField("height", "OnRokuSpinnerLabelMoved")
+    m.top.observeField("translation", "OnRokuSpinnerLabelMoved")
 
     m.busySpinner.poster.width = 150
     m.busySpinner.poster.height = 150
     m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+    m.top.observeField("width", "PositionSpinner")
+    m.top.observeField("height", "PositionSpinner")
+    m.top.observeField("translation", "PositionSpinner")
+
+    PositionSpinner()
+
+    m.busySpinner.visible = true
+    m.busySpinner.control = "start"
 end function
 
 function OnRokuSpinnerMoved()
@@ -157,6 +172,12 @@ function OnRokuSpinnerLabelMoved()
     if currentTranslation[0] <> 0 or currentTranslation[1] <> 0
         m.rokuBusySpinnerLabel.translation = [0, 0]
     end if
+end function
+
+function PositionSpinner()
+    centerx = (m.top.width - m.busySpinner.poster.width) / 2
+    centery = (m.top.height - m.busySpinner.poster.height) / 2
+    m.busySpinner.translation = [centerx, centery]
 end function
 
 function OnVideoPlayerStateChange() as void
@@ -213,31 +234,23 @@ function OnVideoPlayerStateChange() as void
     end if
 end function
 
-function OnFullScreenChange()
-    margin = 20
-    width = 1280
-    height = 720
-    if m.videoContainer.fullscreen
-        m.top.translation = [0, 0]
-        m.top.width = width
-        m.top.height = height
-    else
-        small_width = width / 3
-        small_height = height / 3
-        x = width - small_width - margin
-        y = height - small_height - margin
-
-        m.top.translation = [x, y]
-        m.top.width = small_width
-        m.top.height = small_height
-    end if
-
-    m.top.enableUI = m.videoContainer.fullscreen
-    PositionSpinner()
+function SetupAnimation()
+    m.widthAnimation = m.top.findNode("widthAnimation")
+    m.widthAnimationInterpolator = m.top.findNode("widthAnimationInterpolator")
+    m.heightAnimation = m.top.findNode("heightAnimation")
+    m.heightAnimationInterpolator = m.top.findNode("heightAnimationInterpolator")
+    m.translationAnimation = m.top.findNode("translationAnimation")
+    m.translationAnimationInterpolator = m.top.findNode("translationAnimationInterpolator")
 end function
 
-function PositionSpinner()
-    centerx = (m.top.width - m.busySpinner.poster.width) / 2
-    centery = (m.top.height - m.busySpinner.poster.height) / 2
-    m.busySpinner.translation = [centerx, centery]
+function OnFullScreenChange()
+    m.widthAnimationInterpolator.reverse = m.videoContainer.fullscreen
+    m.heightAnimationInterpolator.reverse = m.videoContainer.fullscreen
+    m.translationAnimationInterpolator.reverse = m.videoContainer.fullscreen
+
+    m.widthAnimation.control = "start"
+    m.heightAnimation.control = "start"
+    m.translationAnimation.control = "start"
+
+    m.top.enableUI = m.videoContainer.fullscreen
 end function

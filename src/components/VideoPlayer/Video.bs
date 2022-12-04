@@ -3,13 +3,26 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 
 function PlayVideo(videoId as string, sender = invalid as object)
-    CloseVideo(false)
+    width = 1280
+    height = 720
+    translation = [0.0, 0.0]
     videoContainer = GetVideoContainer()
+    if videoContainer.videoPlayer <> invalid
+        width = videoContainer.videoPlayer.width
+        height = videoContainer.videoPlayer.height
+        translation = videoContainer.videoPlayer.translation
+    end if
+    CloseVideo(false)
     if sender <> invalid
         videoContainer.sender = sender
     end if
     videoContainer.videoPlayer = videoContainer.createChild("VideoPlayer")
+    videoContainer.videoPlayer.id = "VideoPlayer"
     videoContainer.videoPlayer.videoId = videoId
+    videoContainer.videoPlayer.width = width
+    videoContainer.videoPlayer.height = height
+    videoContainer.videoPlayer.translation = translation
+
     if videoContainer.fullscreen
         videoContainer.videoPlayer.SetFocus(true)
     end if
