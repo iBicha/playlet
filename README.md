@@ -24,6 +24,11 @@ Unofficial Youtube client for Roku 📺
 - You can browser or search for videos while you watch 
 - To restore currently playing video to full screen, press the ✳️ (options) button
 
+### Customize Invidious instance
+1. Open settings in Playlet
+1. Scan QR Code with Phone
+1. Change the Invidious instance
+
 ## Screenshots
 <img src="screenshot1.jpg" alt="Screenshot of Playlet" width="350"/>
 <img src="screenshot2.jpg" alt="Screenshot of Playlet" width="350"/>
