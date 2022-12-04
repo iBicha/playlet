@@ -4,8 +4,19 @@ function TaskMain()
     input = m.top.getField("input")
     videoId = input.videoId
 
-    skipSegments = SponsorBlock.GetSkipSegmentsForVideo(videoId)
+    sponsorBlockResponse = SponsorBlock.GetSkipSegmentsForVideo(videoId)
     barPath = invalid
+
+    skipSegments = []
+    for each segment in sponsorBlockResponse
+        if segment.videoDuration > 0
+            skipSegments.push(segment)
+        end if
+    end for
+
+    if skipSegments.Count() = 0
+        skipSegments = invalid
+    end if
 
     if skipSegments <> invalid
         barPath = `tmp:/sponsorblock_bar_${videoId}.png`
