@@ -13,6 +13,7 @@ namespace Http
         private total_sent = 0
         private id = "<uninit>"
         private close = true
+        private ws_upgrade = false
         private state = Http.HttpConnectionState.INIT
 
         private server
@@ -41,6 +42,7 @@ namespace Http
             m.header_only = false
             m.http_code = 0
             m.close = true
+            m.ws_upgrade = false
             m.SetState(Http.HttpConnectionState.INIT)
         end function
 
@@ -83,7 +85,7 @@ namespace Http
                 if m.request.state = Http.HttpRequestState.DONE
                     server.num_requests = validint(server.num_requests) + 1
                     m.response = new HttpResponse(m.request, m.server, m.settings)
-                    m.response.Process()
+                    m.response.Process(m)
                     m.SetState(Http.HttpConnectionState.SEND_HEADER)
                 else
                     m.setState(Http.HttpConnectionState.DONE)

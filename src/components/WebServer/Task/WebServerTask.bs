@@ -10,6 +10,7 @@ import "pkg:/components/WebServer/Middleware/CorsMiddleware.bs"
 import "pkg:/components/WebServer/Middleware/BasicAuthMiddleware.bs"
 import "pkg:/components/WebServer/Middleware/DashRouter.bs"
 import "pkg:/components/WebServer/Middleware/WebSocketMiddleware.bs"
+import "pkg:/components/WebServer/WebSocketServer.bs"
 
 function Init()
     m.top.functionName = "WebServerLoop"
@@ -23,6 +24,9 @@ function WebServerLoop()
     m.settings.WwwRoot = "pkg:/www"
     m.settings.Timeout = 2000
     m.server = new Http.HttpServer(m.settings, m)
+
+    m.websocket = new Web.WebSocketServer()
+    m.server.websocket = m.websocket
 
     homeRouter = new Http.HttpRouter()
     homeRouter.Get("/", function(context as object) as boolean
@@ -55,10 +59,12 @@ function WebServerLoop()
 
     while true
         m.server.PreWait()
+        m.websocket.PreWait()
         msg = wait(timeout, msgPort)
         tm = type(msg)
         if tm = "roSocketEvent" or msg = invalid
             m.server.PostWait()
+            m.websocket.PostWait()
         end if
     end while
 end function

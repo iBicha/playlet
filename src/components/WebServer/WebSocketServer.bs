@@ -1,0 +1,98 @@
+namespace Web
+
+    class WebSocketServer
+        private connections = invalid
+        private buffer = invalid
+
+        function new()
+            m.connections = CreateObject("roAssociativeArray")
+            m.buffer = CreateObject("roByteArray")
+            ' BUG: https://community.roku.com/t5/Roku-Developer-Program/Help-with-roStreamSocket-data/m-p/249287/highlight/true#M10021
+            m.buffer.FromHexString("000000000000000000000000000000000000000000000000")
+        end function
+
+        function AddConnection(socket as object)
+            socket.notifyReadable(true)
+            socket.notifyWritable(true)
+            socket.SetKeepAlive(true)
+            socket.SetNoDelay(true)
+            id = Stri(socket.getID()).trim()
+            m.connections[id] = socket
+        end function
+
+        function PreWait()
+            connections = m.connections
+            for each id in connections
+                socket = connections[id]
+                if socket.isReadable() and socket.GetCountRcvBuf() > 0
+                    firstByte = m.ReadByte(socket)
+                    fin = (firstByte and &h80) <> 0
+                    opcode = firstByte and &hf
+
+                    if not fin
+                        ?"We don't support continuations"
+                    end if
+
+                    if opcode <> 1
+                        ?"We only support opcode 1"
+                    end if
+
+                    secondByte = m.ReadByte(socket)
+                    isMasked = (secondByte and &h80) <> 0
+                    payloadSize = secondByte and &h7F
+
+                    if not isMasked
+                        ?"All incoming frames should be masked according to the websocket spec"
+                    end if
+
+                    if payloadSize >= 126
+                        ?"We only support payloads < 126 bytes in length"
+                    end if
+
+                    ?"Payload size" payloadSize
+
+                    mask = [m.ReadByte(socket), m.ReadByte(socket), m.ReadByte(socket), m.ReadByte(socket)]
+
+                    masked = []
+                    unmasked = CreateObject("roByteArray")
+                    for i = 0 to payloadSize - 1
+                        masked.push(m.ReadByte(socket))
+                        unmasked.push(m.xor(masked[i], mask[i mod 4]))
+                    end for
+
+                    ?"Message:" unmasked.ToAsciiString()
+
+                    send_buffer = CreateObject("roByteArray")
+                    send_buffer.push(&h81) 'fin + opcode
+
+                    message_buffer = CreateObject("roByteArray")
+                    message_buffer.FromAsciiString("Yes, we're here!")
+
+                    message_buffer_len = message_buffer.Count()
+                    send_buffer.push(message_buffer_len)
+
+                    for i = 0 to message_buffer_len - 1
+                        send_buffer.push(message_buffer[i])
+                    end for
+
+                    send_buffer_len = send_buffer.Count()
+                    socket.Send(send_buffer, 0, send_buffer_len)
+                end if
+            end for
+        end function
+
+        function xor(a as integer, b as integer) as integer
+            return (a or b) and not (a and b)
+        end function
+
+        function PostWait()
+        end function
+
+        function ReadByte(socket as object) as dynamic
+            read = socket.receive(m.buffer, 0, 1)
+            return read = 1 ? m.buffer[0] : -1
+        end function
+
+    end class
+
+end namespace
