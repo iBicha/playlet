@@ -1,0 +1,49 @@
+import "pkg:/source/utils/Crypto.bs"
+
+namespace Http
+
+    class WebSocketMiddleware extends HttpRouter
+
+        MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+        function new()
+            super()
+
+            m.Get("*", function(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                router = context.router
+
+                if LCase(validStr(request.headers["Connection"])) <> "upgrade"
+                    return false
+                end if
+
+                if LCase(validStr(request.headers["Upgrade"])) <> "websocket"
+                    return false
+                end if
+
+                webSocketKey = request.headers["Sec-WebSocket-Key"]
+                if webSocketKey = invalid
+                    return false
+                end if
+
+                sha1Hash = GetSha1(webSocketKey + router.MAGIC_STRING)
+                buffer = CreateObject("roByteArray")
+                buffer.FromHexString(sha1Hash)
+                webSocketAccept = ToBase64(buffer.ToAsciiString())
+
+                response.http_code = 101
+                response.headers["Connection"] = "Upgrade"
+                response.headers["Upgrade"] = "websocket"
+                response.headers["Sec-WebSocket-Accept"] = webSocketAccept
+                response.header_only = true
+                response.source = Http.HttpResponseSource.GENERATED
+
+                return true
+            end function)
+        end function
+
+    end class
+
+end namespace

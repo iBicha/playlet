@@ -266,6 +266,8 @@ ${JSON.stringify(window.appState.device, null, 2)}
         .catch(function (err) {
           alert(err)
         });
+
+      SetupWebSocket();
     }
 
     var tableRow;
@@ -325,6 +327,23 @@ ${JSON.stringify(window.appState.device, null, 2)}
 
     function OnBodyDragover(event) {
       event.preventDefault();
+    }
+
+    function SetupWebSocket() {
+      var socket = new WebSocket(`ws://${window.location.host}`);
+      socket.onopen = function (event) {
+        console.log("WebSocket connected!")
+        socket.send("Hello?");
+      };
+      socket.onclose = function (event) {
+        console.log("WebSocket closed!")
+      };
+      socket.onerror = function (event) {
+        console.log('WebSocket error: ', event);
+      };
+      socket.onmessage = function (event) {
+        console.log(event.data);
+      }
     }
 
     Initialize();
