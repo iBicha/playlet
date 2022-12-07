@@ -1,21 +1,28 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import playletLogo from "./assets/logo-dark.svg";
   import Counter from "./lib/Counter.svelte";
   import CurrentInstance from "./lib/CurrentInstance.svelte";
-  import { GetHost } from "./lib/Host";
+  import { getHost } from "./lib/Host";
+  import { PlayletApi } from "./lib/PlayletApi";
+  import { playletStateStore } from "./lib/Stores";
+
+  onMount(async () => {
+    const playletState = await PlayletApi.getState();
+    playletStateStore.set(playletState);
+  });
 </script>
 
 <main>
   <div>
     <img src={playletLogo} class="logo" alt="Playlet Logo" />
   </div>
-  <h1>Playlet</h1>
 
   <div class="card">
     <Counter />
   </div>
   <div class="card">
-    Host: {GetHost()}
+    Host: {getHost()}
   </div>
   <div class="card">
     <CurrentInstance />

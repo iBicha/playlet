@@ -1,15 +1,11 @@
 <script lang="ts">
-    import { onMount } from "svelte";
-    import { GetHost } from "./Host";
+    import { playletStateStore } from "./Stores";
 
-    let currentInstance = "N/A";
+    let currentInstance;
 
-    onMount(async () => {
-        const response = await fetch(`http://${GetHost()}/api/state`);
-        const state = await response.json();
-        currentInstance = state.invidious.selected_instance;
-    })
-
+	playletStateStore.subscribe(value => {
+        currentInstance = value?.invidious?.selected_instance ?? "N/A";
+	});
 </script>
 <div>
     Current Instance: {currentInstance}
