@@ -1,14 +1,16 @@
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require("child_process");
+
 const semverParse = require('semver/functions/parse')
 
-const packageJsonContent = fs.readFileSync("./package.json", {encoding:'utf8', flag:'r'})
+const packageJsonContent = fs.readFileSync("./package.json", { encoding: 'utf8', flag: 'r' })
 const packageJson = JSON.parse(packageJsonContent)
 
 const version = packageJson.version
 const parsedVersion = semverParse(version)
 
-let appManifestContent = fs.readFileSync("./src/manifest", {encoding:'utf8', flag:'r'})
+let appManifestContent = fs.readFileSync("./src/manifest", { encoding: 'utf8', flag: 'r' })
 
 const majorPattern = /major_version=(\d+)/
 const minorPattern = /minor_version=(\d+)/
@@ -19,3 +21,5 @@ appManifestContent = appManifestContent.replace(minorPattern, `minor_version=${p
 appManifestContent = appManifestContent.replace(buildPattern, `build_version=${String(parsedVersion.patch).padStart(5, '0')}`)
 
 fs.writeFileSync("./src/manifest", appManifestContent)
+
+execSync(`npm version ${version}`, { cwd: 'playlet-web' })
