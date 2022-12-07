@@ -26,11 +26,16 @@ function WebServerLoop()
     homeRouter = new Http.HttpRouter()
     homeRouter.Get("/", function(context as object) as boolean
         response = context.response
-        response.Redirect("/index.html?tab=settings", 302)
+        response.Redirect("/index.v1.html", 302)
         return true
     end function)
 
-    m.server.UseRouter(new Http.CorsMiddleware(`http://${GetLocalIpAddress()}:8888`))
+    #if DEBUG
+        allowedOrigin = "*"
+    #else
+        allowedOrigin = `http://${GetLocalIpAddress()}:8888`
+    #end if
+    m.server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
     m.server.UseRouter(homeRouter)
     m.server.UseRouter(new Http.DashRouter())
     m.server.UseRouter(new Http.CommandsApiRouter())
