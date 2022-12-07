@@ -1,6 +1,8 @@
 <script lang="ts">
   import playletLogo from "./assets/logo-dark.svg";
   import Counter from "./lib/Counter.svelte";
+  import CurrentInstance from "./lib/CurrentInstance.svelte";
+  import { GetHost } from "./lib/Host";
 </script>
 
 <main>
@@ -12,11 +14,17 @@
   <div class="card">
     <Counter />
   </div>
+  <div class="card">
+    Host: {GetHost()}
+  </div>
+  <div class="card">
+    <CurrentInstance />
+  </div>
 </main>
 
 <style>
   .logo {
-    height: 16em;
+    height: 6em;
     padding: 1.5em;
     will-change: filter;
   }

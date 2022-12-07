@@ -30,7 +30,12 @@ function WebServerLoop()
         return true
     end function)
 
-    m.server.UseRouter(new Http.CorsMiddleware(`http://${GetLocalIpAddress()}:8888`))
+    #if DEBUG
+        allowedOrigin = "*"
+    #else
+        allowedOrigin = `http://${GetLocalIpAddress()}:8888`
+    #end if
+    m.server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
     m.server.UseRouter(homeRouter)
     m.server.UseRouter(new Http.DashRouter())
     m.server.UseRouter(new Http.CommandsApiRouter())
