@@ -2,9 +2,9 @@ import "pkg:/source/utils/Crypto.bs"
 
 namespace Http
 
-    class WebSocketMiddleware extends HttpRouter
+    const WEB_SOCKET_MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
-        MAGIC_STRING = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+    class WebSocketMiddleware extends HttpRouter
 
         function new()
             super()
@@ -13,8 +13,6 @@ namespace Http
                 request = context.request
                 response = context.response
                 connection = context.connection
-
-                router = context.router
 
                 if LCase(validStr(request.headers["Connection"])) <> "upgrade"
                     return false
@@ -29,7 +27,7 @@ namespace Http
                     return false
                 end if
 
-                sha1Hash = GetSha1(webSocketKey + router.MAGIC_STRING)
+                sha1Hash = GetSha1(webSocketKey + Http.WEB_SOCKET_MAGIC_STRING)
                 buffer = CreateObject("roByteArray")
                 buffer.FromHexString(sha1Hash)
                 webSocketAccept = ToBase64(buffer.ToAsciiString())

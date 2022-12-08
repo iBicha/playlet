@@ -22,11 +22,19 @@ function WebServerLoop()
     m.settings = new Http.HttpSettings(m.webServerPort)
     ' Root at www to get http://IP_ADDRESS:PORT/index.html
     m.settings.WwwRoot = "pkg:/www"
-    m.settings.Timeout = 2000
+    ' Short interval to keep polling on web socket messages
+    m.settings.Timeout = 500
     m.server = new Http.HttpServer(m.settings, m)
 
-    m.websocket = new Web.WebSocketServer()
-    m.server.websocket = m.websocket
+    #if WEB_SOCKETS
+        m.websocket = new Web.WebSocketServer()
+        m.websocket.OnMessage(function(context as object)
+            connection = context.connection
+            message = context.message
+            connection.Send("Echo: " + message)
+        end function)
+        m.server.websocket = m.websocket
+    #end if
 
     homeRouter = new Http.HttpRouter()
     homeRouter.Get("/", function(context as object) as boolean
@@ -41,7 +49,9 @@ function WebServerLoop()
         allowedOrigin = `http://${GetLocalIpAddress()}:8888`
     #end if
     m.server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
-    m.server.UseRouter(new Http.WebSocketMiddleware())
+    #if WEB_SOCKETS
+        m.server.UseRouter(new Http.WebSocketMiddleware())
+    #end if
     m.server.UseRouter(homeRouter)
     m.server.UseRouter(new Http.DashRouter())
     m.server.UseRouter(new Http.CommandsApiRouter())
@@ -66,8 +76,9 @@ function WebServerLoop()
         m.server.PreWait()
         m.websocket.Poll()
         msg = wait(timeout, msgPort)
-        tm = type(msg)
-        if tm = "roSocketEvent" or msg = invalid
+        msg = wait(0, m.port)
+        msgType = type(msg)
+        if msgType = "roSocketEvent" or msg = invalid
             m.server.PostWait()
         end if
     end while

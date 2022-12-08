@@ -9,13 +9,15 @@ namespace Web
     class WebSocketConnection
         private log as log.Logger
 
+        private server
         private socket
         private frame
         public id = invalid
         public state = invalid
 
-        function new(socket as object)
+        function new(server as WebSocketServer, socket as object)
             m.log = new log.Logger("WebSocketConnection")
+            m.server = server
             m.socket = socket
             m.socket.SetKeepAlive(true)
             m.socket.SetNoDelay(true)
@@ -29,23 +31,46 @@ namespace Web
             m.state = Web.WebSocketConnectionState.OPEN
         end function
 
-        function Poll()
-            if m.socket.isReadable() and m.socket.GetCountRcvBuf() > 0
-                received = m.socket.receive(m.buffer, 0, Web.BUFSIZE)
-                if received > 0
-                    if m.frame.ReadFromBuffer(m.buffer, 0, received)
-                        message = m.frame.GetPayloadText()
-                        m.log.info("received message:", message)
+        function Poll() as void
+            if not m.socket.eOK()
+                m.Close()
+                return
+            end if
+            received = m.socket.receive(m.buffer, 0, Web.BUFSIZE)
+            if received = 0
+                m.Close()
+                return
+            else if received > 0
+                if m.frame.ReadFromBuffer(m.buffer, 0, received)
+                    message = m.frame.GetPayloadText()
+                    m.log.info("received message:", message)
 
-                        response = "Yes, we're here!"
-                        m.frame.SetPayloadText(response)
-
-                        written_bytes = m.frame.WriteToBuffer(m.buffer, 0, Web.BUFSIZE)
-                        if written_bytes > 0
-                            m.socket.Send(m.buffer, 0, written_bytes)
-                        end if
-                    end if
+                    m.server.TriggerOnMessage(m, message)
                 end if
+            end if
+        end function
+
+        function IsClosed() as boolean
+            return m.state = Web.WebSocketConnectionState.CLOSED
+        end function
+
+        function Close() as void
+            if m.IsClosed()
+                return
+            end if
+            m.socket.Close()
+            m.state = Web.WebSocketConnectionState.CLOSED
+            m.server.TriggerOnDisconnect(m)
+        end function
+
+        function Send(text as string) as void
+            if m.IsClosed()
+                return
+            end if
+            m.frame.SetPayloadText(text)
+            written_bytes = m.frame.WriteToBuffer(m.buffer, 0, Web.BUFSIZE)
+            if written_bytes > 0
+                m.socket.Send(m.buffer, 0, written_bytes)
             end if
         end function
 
