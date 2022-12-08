@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The License has changed from MIT to AGPL
+- Now videos play the next related/recommended video once finished
+  - This does not take into account the videos in playlists
 
 ### Fixed
 - Bug where app freezes if metadata fails to fetch
