@@ -3,6 +3,7 @@ import "pkg:/components/WebServer/HttpSettings.bs"
 import "pkg:/components/WebServer/HttpRouter.bs"
 import "pkg:/components/WebServer/HttpConnectionState.bs"
 import "pkg:/components/WebServer/HttpConnection.bs"
+import "pkg:/components/WebServer/WebSocket/WebSocketServer.bs"
 
 namespace Http
 
@@ -28,6 +29,7 @@ namespace Http
 
         public settings as Http.HttpSettings
         public task
+        public websocket as Web.WebSocketServer
 
         function new(settings as HttpSettings, task as object)
             m.log = new log.Logger("HttpResponse")
@@ -130,6 +132,10 @@ namespace Http
                     if conn.close
                         conn.socket.close()
                         connections.delete(id)
+                    else if conn.ws_upgrade and m.websocket <> invalid
+                        m.log.info("upgrading connection to web socket")
+                        m.websocket.AddConnection(conn.socket)
+                        connections.delete(id)
                     else
                         conn.Recycle()
                         conn.PollRequest(m)
@@ -160,6 +166,9 @@ namespace Http
                 conn = connections[id]
                 conn.socket.close()
             end for
+            if m.websocket <> invalid
+                m.websocket.Close()
+            end if
             ' final stats
             m.log.info(UnixNL() + m.stats())
         end function
