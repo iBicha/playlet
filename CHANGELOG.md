@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Ability to clear search history from web app
+- WebSocket server for realtime events
 
 ### Changed
 - The License has changed from MIT to AGPL
