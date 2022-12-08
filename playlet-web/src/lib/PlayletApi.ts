@@ -13,7 +13,7 @@ export class PlayletApi {
     }
 
     static async playVideo(videoId) {
-        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "play", v: videoId });
+        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "play", videoId: videoId });
     }
 
     static async clearSearchHistory() {
