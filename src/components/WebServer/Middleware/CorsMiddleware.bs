@@ -3,15 +3,24 @@ namespace Http
     class CorsMiddleware extends HttpRouter
         private origin
 
-        function new(origin = "*" as string)
+        function new(origin = "*" as string, headers = "*" as string)
             super()
 
             m.origin = origin
+            m.headers = headers
 
             m.All("*", function(context as object) as boolean
                 router = context.router
+                request = context.request
                 response = context.response
                 response.headers["Access-Control-Allow-Origin"] = router.origin
+                response.headers["Access-Control-Allow-Headers"] = router.headers
+
+                if request.method = "OPTIONS"
+                    response.header_only = true
+                    response.http_code = 200
+                    return true
+                end if
                 return false
             end function)
         end function
