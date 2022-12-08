@@ -1,34 +1,21 @@
 <script lang="ts">
-  import playletLogo from "./assets/logo-dark.svg";
-  import Counter from "./lib/Counter.svelte";
-  import CurrentInstance from "./lib/CurrentInstance.svelte";
-  import { GetHost } from "./lib/Host";
+  import { onMount } from "svelte";
+  import InstanceInfo from "./lib/InstanceInfo.svelte";
+  import NavBar from "./lib/NavBar.svelte";
+  import PlayVideo from "./lib/PlayVideo.svelte";
+  import ClearSearchHistory from "./lib/ClearSearchHistory.svelte";
+  import { PlayletApi } from "./lib/PlayletApi";
+  import { playletStateStore } from "./lib/Stores";
+
+  onMount(async () => {
+    const playletState = await PlayletApi.getState();
+    playletStateStore.set(playletState);
+  });
 </script>
 
 <main>
-  <div>
-    <img src={playletLogo} class="logo" alt="Playlet Logo" />
-  </div>
-  <h1>Playlet</h1>
-
-  <div class="card">
-    <Counter />
-  </div>
-  <div class="card">
-    Host: {GetHost()}
-  </div>
-  <div class="card">
-    <CurrentInstance />
-  </div>
+  <NavBar />
+  <InstanceInfo />
+  <PlayVideo />
+  <ClearSearchHistory />
 </main>
-
-<style>
-  .logo {
-    height: 6em;
-    padding: 1.5em;
-    will-change: filter;
-  }
-  .logo:hover {
-    filter: drop-shadow(0 0 2em #646cffaa);
-  }
-</style>
