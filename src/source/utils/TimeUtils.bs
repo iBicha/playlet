@@ -14,6 +14,54 @@ namespace TimeUtils
         return minutes + ":" + seconds
     end function
 
+    function GetFormattedTimeLeft(unixTimestamp as integer) as string
+        if unixTimestamp = invalid
+            return "N/A"
+        end if
+
+        currentTime = TimeUtils.Now().AsSeconds()
+        timeLeft = unixTimestamp - currentTime
+        if timeLeft <= 0
+            return "now"
+        end if
+
+        if timeLeft < 60
+            result = `${timeLeft} second`
+            if timeLeft > 1
+                result += "s"
+            end if
+            return result    
+        end if
+
+        timeLeft = timeLeft / 60.0
+        if timeLeft < 60
+            timeLeft = Cint(timeLeft)
+            result = `${timeLeft} minute`
+            if timeLeft > 1
+                result += "s"
+            end if
+            return result    
+        end if
+
+        timeLeft = timeLeft / 60.0
+        if timeLeft < 24
+            timeLeft = Cint(timeLeft)
+            result = `${timeLeft} hour`
+            if timeLeft > 1
+                result += "s"
+            end if
+            return result    
+        else
+            timeLeft = timeLeft / 24.0
+            timeLeft = Cint(timeLeft)
+            result = `${timeLeft} day`
+            if timeLeft > 1
+                result += "s"
+            end if
+            return result    
+        end if
+    end function
+
     function Now() as object
         this = m.now
         if this = invalid

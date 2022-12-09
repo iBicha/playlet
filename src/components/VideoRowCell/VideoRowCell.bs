@@ -7,12 +7,16 @@ function OnContentSet()
         m.top.FindNode("titleLabel").text = content.title
         m.top.FindNode("authorLabel").text = content.author
 
-        publishedText = validstr(content.publishedText)
-        viewCount = FormatViewCount(content.viewCount)
-        if publishedText = "" and viewCount = ""
-            m.top.FindNode("viewCountDateLabel").text = ""
+        if IsVideoUpcoming(content)
+            m.top.FindNode("viewCountDateLabel").text = `Premeres in ${TimeUtils.GetFormattedTimeLeft(content.premiereTimestamp)}`
         else
-            m.top.FindNode("viewCountDateLabel").text = `${publishedText} • ${viewCount}`
+            publishedText = validstr(content.publishedText)
+            viewCount = FormatViewCount(content.viewCount)
+            if publishedText = "" and viewCount = ""
+                m.top.FindNode("viewCountDateLabel").text = ""
+            else
+                m.top.FindNode("viewCountDateLabel").text = `${publishedText} • ${viewCount}`
+            end if
         end if
 
         thumbnail = m.top.FindNode("thumbnail")
@@ -44,6 +48,10 @@ function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string
         end if
     end for
     return videoThumbnails[0].url
+end function
+
+function IsVideoUpcoming(metadata as object) as boolean
+    return metadata.isUpcoming = true
 end function
 
 function IsVideoLive(metadata as object) as boolean
