@@ -18,7 +18,8 @@ class InvidiousService
         m.responseHanlders = {
             DefaultHandler: m.DefaultHandler,
             AuthFeedHandler: m.AuthFeedHandler,
-            AuthPlaylistsHandler: m.AuthPlaylistsHandler
+            AuthPlaylistsHandler: m.AuthPlaylistsHandler,
+            PlaylistHandler: m.PlaylistHandler
         }
     end function
 
@@ -64,6 +65,12 @@ class InvidiousService
             args.params.append(requestData.queryParams)
         end if
 
+        if requestData.pathParams <> invalid
+            for each param in requestData.pathParams
+                url = url.Replace(`:${param}`, requestData.pathParams[param])
+            end for
+        end if
+
         if endpoint.requestArgs <> invalid
             args.append(endpoint.requestArgs)
         end if
@@ -106,21 +113,27 @@ class InvidiousService
             playlists = response.json
             result = {}
             for each playlist in playlists
-                title = requestData.title
-                title = m.ProcessTemplate(title, playlist)
-                result[title] = playlist.videos
+                result.append(m.ProcessPlaylist(requestData, playlist))
             end for
             return result
         end if
         return invalid
     end function
 
-    function DeleteExpiredToken(response as object)
-        if response.statuscode = 403
-            print(`Server responded with 403: ${response.text}`)
-            print("deleting token...")
-            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+    function PlaylistHandler(m as object, requestData as object, response as object) as object
+        if response.statuscode = 200
+            playlist = response.json
+            return m.ProcessPlaylist(requestData, playlist)
         end if
+        return invalid
+    end function
+
+    function ProcessPlaylist(requestData as object, playlist as object) as object
+        title = requestData.title
+        title = m.ProcessTemplate(title, playlist)
+        return {
+            title: playlist.videos
+        }
     end function
 
     function ProcessTemplate(template as string, data as object) as string
@@ -130,4 +143,11 @@ class InvidiousService
         return template
     end function
 
+    function DeleteExpiredToken(response as object)
+        if response.statuscode = 403
+            print(`Server responded with 403: ${response.text}`)
+            print("deleting token...")
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+        end if
+    end function
 end class
