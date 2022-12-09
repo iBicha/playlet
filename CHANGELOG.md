@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where app freezes if metadata fails to fetch
 - Bug where SponsorBlock returning videoDuration of zero causes the app to hang
 - Bug where app would lose focus when casting from web app
+- Bug where DASH stream is not compatible. Play format stream as a fallback
 
 ## [0.5.0] - 2022-12-02
 ### Added

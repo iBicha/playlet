@@ -82,28 +82,53 @@ function OnVideoDetailsTaskResults() as void
 
     metadata = metadata.data
 
-    contentNode = CreateObject("roSGNode", "ContentNode")
-    contentNode.addFields({ metadata: metadata })
+    playletStreamUrls = []
 
     if metadata.hlsUrl <> invalid
-        contentNode.url = metadata.hlsUrl
-    else if metadata.dashUrl <> invalid
-        #if DASH_THUMBNAILS
-            ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
-            contentNode.url = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
-        #else
-            contentNode.url = metadata.dashUrl
-        #end if
+        playletStreamUrls.push(metadata.hlsUrl)
     else
-        stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
-        itag = stream.itag
-        ' Use an url relative to the host, so we can proxy(local=true) in case it fails
-        contentNode.url = Invidious.GetVideoUrl(videoId, itag, false)
+        if metadata.dashUrl <> invalid
+
+            #if DASH_THUMBNAILS
+                ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
+                dashUrl = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
+            #else
+                dashUrl = metadata.dashUrl
+            #end if
+            playletStreamUrls.push(dashUrl)
+
+            if dashUrl.InStr("?") = -1
+                dashUrlLocal = dashUrl + "?local=true"
+            else
+                dashUrlLocal = dashUrl + "&local=true"
+            end if
+            playletStreamUrls.push(dashUrlLocal)
+        end if
+
+        if metadata.formatStreams.Count() > 0
+            stream = metadata.formatStreams[metadata.formatStreams.Count() - 1]
+            itag = stream.itag
+            streamUrl = Invidious.GetVideoUrl(videoId, itag, false)
+            playletStreamUrls.push(streamUrl)
+            if streamUrl.InStr("?") = -1
+                streamUrlLocal = streamUrl + "?local=true"
+            else
+                streamUrlLocal = streamUrl + "&local=true"
+            end if
+            playletStreamUrls.push(streamUrlLocal)
+        end if
     end if
+
+    metadata.playletStreamUrls = playletStreamUrls
+    metadata.playletStreamUrlIndex = 0
+
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.addFields({ metadata: metadata })
 
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
     SetCaptions(metadata, m.top, contentNode)
+    contentNode.url = metadata.playletStreamUrls[metadata.playletStreamUrlIndex]
     m.busySpinner.visible = false
     m.busySpinner.control = "stop"
     m.top.content = contentNode
@@ -203,15 +228,15 @@ function OnVideoPlayerStateChange() as void
             errorInfo = m.top.errorInfo
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
-                url = m.top.content.url
-                if url.InStr("local=true") = -1
-                    print(`Video ${url} failed to play. Trying a proxy (local=true)`)
-                    if url.InStr("?") = -1
-                        url += "?local=true"
-                    else
-                        url += "&local=true"
-                    end if
-                    m.top.content.url = url
+                currentUrl = m.top.content.metadata.playletStreamUrls[m.top.content.metadata.playletStreamUrlIndex]
+                metadata = m.top.content.metadata
+                metadata.playletStreamUrlIndex++
+                m.top.content.metadata = metadata
+                if m.top.content.metadata.playletStreamUrlIndex < m.top.content.metadata.playletStreamUrls.Count()
+                    nextUrl = m.top.content.metadata.playletStreamUrls[m.top.content.metadata.playletStreamUrlIndex]
+                    print(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+
+                    m.top.content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' TODO: perhaps creating a second player is better?
                     m.ignoreNextFinishedState = true
@@ -229,8 +254,8 @@ function OnVideoPlayerStateChange() as void
 
     if state = "finished"
         metadata = m.top.content?.metadata
-        videoId = metadata?.recommendedVideos?[0]?.videoId
-        if videoId <> invalid 
+        videoId = metadata?.recommendedVideos?.GetEntry(0)?.videoId
+        if videoId <> invalid
             PlayVideo(videoId, invalid)
         else
             CloseVideo()
