@@ -1,0 +1,41 @@
+name: Linter
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Configure repo
+        run: |
+          git config --local user.email "githubaction@githubaction.com"
+          git config --local user.name "github-action linter"
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint:fix
+
+      - name: Run formatter
+        run: npm run format:fix
+
+      - name: Commit & Push Changes
+        run: |
+          git add "." && git commit -m "Lint fix" --no-verify && git push || true
