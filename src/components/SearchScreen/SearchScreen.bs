@@ -1,4 +1,3 @@
-import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 import "pkg:/components/VideoPlayer/Video.bs"
 import "pkg:/components/SearchScreen/SearchHistory.bs"
 
@@ -45,41 +44,45 @@ function OnTextChange() as void
     end if
     text = m.keyboard.text
 
-    createTaskPromise("SearchSuggestionsTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
-        ' In case this is an old request, discard suggestions
-        if task.output.q <> m.keyboard.text
-            return
-        end if
-        q = task.output.q
-        suggestions = task.output.response
-        if suggestions <> invalid
-            if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
-                suggestions.Unshift(q)
-            end if
+    m.searchSuggestionsTask = CreateObject("roSGNode", "SearchSuggestionsTask")
+    m.searchSuggestionsTask.id = "SearchSuggestionsTask"
+    m.searchSuggestionsTask.input = { q: text }
+    m.searchSuggestionsTask.ObserveField("output", "OnSearchSuggestionsTaskResults")
+    m.searchSuggestionsTask.control = "RUN"
+end function
 
-            ' Capture current focused button and restore it after resetting the buttons
-            buttonFocused = -1
-            if IsNodeFocused("suggestions")
-                buttonFocused = m.suggestions.buttonFocused
-            end if
-            if buttonFocused >= m.suggestions.buttons.Count()
-                buttonFocused = m.suggestions.buttons.Count() - 1
-            end if
-            m.suggestions.buttons = suggestions
-            if buttonFocused <> -1
-                m.suggestions.focusButton = buttonFocused
-            end if
+function OnSearchSuggestionsTaskResults() as void
+    task = m.searchSuggestionsTask
+    ' In case this is an old request, discard suggestions
+    if task.output.q <> m.keyboard.text
+        return
+    end if
+    q = task.output.q
+    suggestions = task.output.response
+    if suggestions <> invalid
+        if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
+            suggestions.Unshift(q)
         end if
-    end function)
+
+        ' Capture current focused button and restore it after resetting the buttons
+        buttonFocused = -1
+        if IsNodeFocused("suggestions")
+            buttonFocused = m.suggestions.buttonFocused
+        end if
+        if buttonFocused >= m.suggestions.buttons.Count()
+            buttonFocused = m.suggestions.buttons.Count() - 1
+        end if
+        m.suggestions.buttons = suggestions
+        if buttonFocused <> -1
+            m.suggestions.focusButton = buttonFocused
+        end if
+    end if
 end function
 
 function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
+    SaveSearchHistory(text)
     Search(text)
 end function
 
@@ -94,22 +97,24 @@ function OnSearchButtonFocused() as void
 end function
 
 function Search(text as string)
-    SaveSearchHistory(text)
-    createTaskPromise("SearchTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
-        rootChildren = task.output.rootChildren
-        contentNode = CreateObject("roSGNode", "ContentNode")
-        contentNode.Update({
-            children: rootChildren
-        }, true)
-        m.rowList.content = contentNode
-        m.rowList.SetFocus(true)
-        m.rowList.jumpToRowItem = [0, 0]
-        ScrollDown()
-    end function)
+    m.searchTask = CreateObject("roSGNode", "SearchTask")
+    m.searchTask.id = "SearchTask"
+    m.searchTask.input = { q: text }
+    m.searchTask.ObserveField("output", "OnSearchTaskResults")
+    m.searchTask.control = "RUN"
+end function
+
+function OnSearchTaskResults()
+    task = m.searchTask
+    rootChildren = task.output.rootChildren
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.Update({
+        children: rootChildren
+    }, true)
+    m.rowList.content = contentNode
+    m.rowList.SetFocus(true)
+    m.rowList.jumpToRowItem = [0, 0]
+    ScrollDown()
 end function
 
 function OnVisibilityChange()
