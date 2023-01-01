@@ -5,6 +5,7 @@ import "pkg:/source/utils/Crypto.bs"
 namespace SponsorBlock
     const API_URL = "https://sponsor.ajay.app"
     const SKIP_SEGMENT_ENDPOINT = "/api/skipSegments"
+    const VIEWED_SEGMENT_ENDPOINT = "/api/viewedVideoSponsorTime"
 
     function SegmentColor(category as string) as integer
         map = m.SponsorBlockColors
@@ -73,6 +74,12 @@ namespace SponsorBlock
             end for
         end if
         return invalid
+    end function
+
+    function PostSegmentViewed(segmentId as string) as boolean
+        url = `${SponsorBlock.API_URL}${SponsorBlock.VIEWED_SEGMENT_ENDPOINT}?UUID=${segmentId}`
+        response = Requests().post(url)
+        return response.statuscode = 200
     end function
 
     function GenerateProgressBarBackground(segments as object, path as string)
