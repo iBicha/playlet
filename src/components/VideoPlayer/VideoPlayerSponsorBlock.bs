@@ -1,10 +1,13 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockTask.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockTrackingTask.bs"
+
 function SetupSponsorBlock()
     PositionChapterLabel()
     m.timeLabel = FindTimeLabel()
     m.top.trickPlayBar.observeField("visible", "OnTrickPlayBarVisible")
     m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
     m.chapterLabelTimer.observeField("fire", "OnChapterLabelTimer")
-    m.sponsorBlockTask = m.top.findNode("SponsorBlockTask")
     m.top.observeField("videoId", "StartSponsorBlockTask")
 end function
 
@@ -79,15 +82,16 @@ function UpdateSponsorBlockChapter(time as integer) as void
 end function
 
 function StartSponsorBlockTask()
-    m.sponsorBlockTask.input = { videoId: m.top.videoId }
-    m.sponsorBlockTask.observeField("output", "OnSponsorBlockTaskResults")
-    m.sponsorBlockTask.control = "run"
+    if m.sponsorBlockTask <> invalid
+        m.sponsorBlockTask.control = "stop"
+    end if
+
+    m.sponsorBlockTask = StartAsyncTask(SponsorBlockTask, { videoId: m.top.videoId }, OnSponsorBlockTaskResults)
 end function
 
-function OnSponsorBlockTaskResults()
-    task = m.sponsorBlockTask
-    skipSegments = task.output.skipSegments
-    barPath = task.output.barPath
+function OnSponsorBlockTaskResults(output as object)
+    skipSegments = output.result.skipSegments
+    barPath = output.result.barPath
     if skipSegments <> invalid
         m.skipSegments = skipSegments
         m.top.seekMode = "accurate"
@@ -144,7 +148,5 @@ function OnPositionChangeSkipSponsorBlockSections() as void
 end function
 
 function SendSkippedSectionEvent(segmentId as string)
-    task = createObject("roSGNode", "SponsorBlockTrackingTask")
-    task.input = { segmentId: segmentId }
-    task.control = "RUN"
+    StartAsyncTask(SponsorBlockTrackingTask, { segmentId: segmentId })
 end function

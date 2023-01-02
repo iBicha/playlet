@@ -1,12 +1,8 @@
 import "pkg:/source/services/Invidious.bs"
 import "pkg:/components/SearchScreen/SearchHistory.bs"
 
-function Init()
-    m.top.functionName = "TaskMain"
-end function
-
-function TaskMain()
-    input = m.top.getField("input")
+@asynctask
+function SearchSuggestionsTask(input as object) as object
     q = input.q
 
     searchSuggestsions = q <> "" ? Invidious.SearchSuggestions(q) : invalid
@@ -17,10 +13,10 @@ function TaskMain()
         history = MergeSearchSuggestions(history, searchSuggestsions.suggestions)
     end if
 
-    m.top.setField("output", {
+    return {
         q: q,
         response: history
-    })
+    }
 end function
 
 function MergeSearchSuggestions(history as object, queryResults as object, maxItems = 10 as integer) as object

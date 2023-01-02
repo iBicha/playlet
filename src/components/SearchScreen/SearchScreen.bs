@@ -1,6 +1,8 @@
-import "pkg:/source/roku_modules/rokupromise/Promise.brs"
+import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/VideoPlayer/Video.bs"
 import "pkg:/components/SearchScreen/SearchHistory.bs"
+import "pkg:/components/SearchScreen/SearchSuggestionsTask.bs"
+import "pkg:/components/SearchScreen/SearchTask.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
@@ -22,64 +24,72 @@ function Init()
 end function
 
 function OnFocusChange() as void
-    if m.top.focus = true
-        if m.rowlist.content <> invalid
-            m.rowlist.SetFocus(true)
-            ScrollDown()
-            return
-        end if
-        if m.suggestions.buttons.Count() > 0
-            if m.suggestions.buttonFocused >= m.suggestions.buttons.Count()
-                m.suggestions.focusButton = 0
-            end if
-            m.suggestions.SetFocus(true)
-            return
-        end if
-        m.keyboard.SetFocus(true)
+    if m.top.focus <> true
+        return
     end if
+
+    if m.rowlist.content <> invalid
+        m.rowlist.SetFocus(true)
+        ScrollDown()
+        return
+    end if
+    if m.suggestions.buttons.Count() > 0
+        if m.suggestions.buttonFocused >= m.suggestions.buttons.Count()
+            m.suggestions.focusButton = 0
+        end if
+        m.suggestions.SetFocus(true)
+        return
+    end if
+    m.keyboard.SetFocus(true)
 end function
 
 function OnTextChange() as void
     if IsNodeFocused("suggestions")
         return
     end if
-    text = m.keyboard.text
 
-    createTaskPromise("SearchSuggestionsTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
-        ' In case this is an old request, discard suggestions
-        if task.output.q <> m.keyboard.text
-            return
-        end if
-        q = task.output.q
-        suggestions = task.output.response
-        if suggestions <> invalid
-            if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
-                suggestions.Unshift(q)
-            end if
+    if m.searchSuggestionsTask <> invalid
+        m.searchSuggestionsTask.control = "stop"
+    end if
 
-            ' Capture current focused button and restore it after resetting the buttons
-            buttonFocused = -1
-            if IsNodeFocused("suggestions")
-                buttonFocused = m.suggestions.buttonFocused
-            end if
-            if buttonFocused >= m.suggestions.buttons.Count()
-                buttonFocused = m.suggestions.buttons.Count() - 1
-            end if
-            m.suggestions.buttons = suggestions
-            if buttonFocused <> -1
-                m.suggestions.focusButton = buttonFocused
-            end if
-        end if
-    end function)
+    m.searchSuggestionsTask = StartAsyncTask(SearchSuggestionsTask, {
+        q: m.keyboard.text
+    }, OnSearchSuggestionsTaskResults)
+end function
+
+function OnSearchSuggestionsTaskResults(output as object) as void
+    ' In case this is an old request, discard suggestions
+    q = output.result.q
+    if q <> m.keyboard.text
+        return
+    end if
+    suggestions = output.result.response
+    if suggestions = invalid
+        return
+    end if
+
+    if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
+        suggestions.Unshift(q)
+    end if
+
+    ' Capture current focused button and restore it after resetting the buttons
+    buttonFocused = -1
+    if IsNodeFocused("suggestions")
+        buttonFocused = m.suggestions.buttonFocused
+    end if
+    if buttonFocused >= m.suggestions.buttons.Count()
+        buttonFocused = m.suggestions.buttons.Count() - 1
+    end if
+    m.suggestions.buttons = suggestions
+    if buttonFocused <> -1
+        m.suggestions.focusButton = buttonFocused
+    end if
 end function
 
 function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
+    SaveSearchHistory(text)
     Search(text)
 end function
 
@@ -94,22 +104,25 @@ function OnSearchButtonFocused() as void
 end function
 
 function Search(text as string)
-    SaveSearchHistory(text)
-    createTaskPromise("SearchTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
-        rootChildren = task.output.rootChildren
-        contentNode = CreateObject("roSGNode", "ContentNode")
-        contentNode.Update({
-            children: rootChildren
-        }, true)
-        m.rowList.content = contentNode
-        m.rowList.SetFocus(true)
-        m.rowList.jumpToRowItem = [0, 0]
-        ScrollDown()
-    end function)
+    if m.searchTask <> invalid
+        m.searchTask.control = "stop"
+    end if
+
+    m.searchTask = StartAsyncTask(SearchTask, {
+        q: text
+    }, OnSearchTaskResults)
+end function
+
+function OnSearchTaskResults(output as object)
+    rootChildren = output.result.rootChildren
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.Update({
+        children: rootChildren
+    }, true)
+    m.rowList.content = contentNode
+    m.rowList.SetFocus(true)
+    m.rowList.jumpToRowItem = [0, 0]
+    ScrollDown()
 end function
 
 function OnVisibilityChange()

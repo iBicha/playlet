@@ -1,0 +1,48 @@
+import "pkg:/source/utils/Types.bs"
+
+function StartAsyncTask(taskFunc as object, input as object, callback = invalid as object) as object
+    task = CreateAsyncTask(taskFunc, input, callback)
+    task.control = "RUN"
+    return task
+end function
+
+function CreateAsyncTask(taskFunc as object, input as object, callback = invalid as object) as object
+    id = StrI(rnd(2147483647), 36)
+    task = createObject("roSGNode", GetFunctionName(taskFunc))
+    task.id = id
+    task.input = input
+
+    m[`asynctask_${id}`] = task
+    m[`asynctask_${id}_callback`] = callback
+    task.ObserveField("state", "OnTaskState")
+
+    return task
+end function
+
+function GetFunctionName(taskFunc as object) as string
+    if IsStr(taskFunc)
+        return LCase(`${taskFunc}_asynctask`)
+    end if
+    return (LCase(`${taskFunc}_asynctask`)).replace("function:", "").trim()
+end function
+
+function OnTaskState(e as object) as void
+    task = e.getRoSGNode()
+    if task.state = "init" or task.state = "run"
+        return
+    end if
+
+    id = task.id
+    output = task.output
+    ' if output is invalid, it means the task was interrupted before the result is ready
+    if output <> invalid
+        callback = m[`asynctask_${id}_callback`]
+        if callback <> invalid
+            output = task.output
+            callback(output)
+        end if
+    end if
+
+    m.delete(`asynctask_${id}`)
+    m.delete(`asynctask_${id}_callback`)
+end function

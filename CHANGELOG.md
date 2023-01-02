@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ability to clear search history from web app
 - WebSocket server for realtime events
 - SponsorBlock tracking
+- Auto-generated tasks and the @asynctask annotation
 
 ### Changed
 - The License has changed from MIT to AGPL
@@ -21,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where app would lose focus when casting from web app
 - Bug where DASH stream is not compatible. Play format stream as a fallback
 - Showing upcoming videos correctly
+
+# Removed
+- Dependency on [roku-promise](https://github.com/rokucommunity/roku-promise)
 
 ## [0.5.0] - 2022-12-02
 ### Added
