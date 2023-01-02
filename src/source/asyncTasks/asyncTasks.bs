@@ -1,0 +1,33 @@
+function StartAsyncTask(taskFunc as object, input as object, callback as object) as object
+    task = CreateAsyncTask(taskFunc, input, callback)
+    task.control = "RUN"
+    return task
+end function
+
+function CreateAsyncTask(taskFunc as object, input as object, callback as object) as object
+    id = StrI(rnd(2147483647), 36)
+    task = createObject("roSGNode", GetFunctionName(taskFunc))
+    task.id = id
+    task.input = input
+    task.ObserveField("output", "TaskCallback")
+    m[`asynctask_${id}`] = task
+    m[`asynctask_${id}_callback`] = callback
+    return task
+end function
+
+function GetFunctionName(taskFunc as object) as string
+    return (LCase(`${taskFunc}_asynctask`)).replace("function:", "").trim()
+end function
+
+function TaskCallback(e as object)
+    task = e.getRoSGNode()
+    id = task.id
+    callback = m[`asynctask_${id}_callback`]
+
+    output = task.output
+
+    callback(output)
+
+    m.delete(`asynctask_${id}`)
+    m.delete(`asynctask_${id}_callback`)
+end function

@@ -1,18 +1,14 @@
 import "pkg:/source/services/InvidiousService.bs"
 
-function Init()
-    m.top.functionName = "TaskMain"
-end function
-
-function TaskMain()
+@asynctask
+function GetHomeScreenContent(input as object) as object
     rootChildren = []
 
-    invidious = new InvidiousService()
+    service = new InvidiousService()
 
-    input = m.top.getField("input")
     requestData = input.requestData
 
-    response = invidious.MakeRequest(requestData)
+    response = service.MakeRequest(requestData)
     if response <> invalid
         if type(response) = "roAssociativeArray"
             for each key in response
@@ -29,10 +25,10 @@ function TaskMain()
         end if
     end if
 
-    m.top.setField("output", {
+    return {
         index: input.index,
         rootChildren: rootChildren
-    })
+    }
 end function
 
 function GetCategoryContent(category as string, json as object) as object

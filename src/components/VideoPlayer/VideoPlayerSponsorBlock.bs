@@ -119,6 +119,7 @@ function OnPositionChangeSkipSponsorBlockSections() as void
                 ' TODO: if segmentEnd is at the end of the video, close video
                 m.top.seek = segmentEnd
                 print("Skiping section:" + segment["category"])
+                SendSkippedSectionEvent(segment.UUID)
                 return
             end if
         end if
@@ -140,4 +141,10 @@ function OnPositionChangeSkipSponsorBlockSections() as void
         print(`Muting section: ${muteCategory} - ${shouldMute}`)
         m.top.mute = shouldMute
     end if
+end function
+
+function SendSkippedSectionEvent(segmentId as string)
+    task = createObject("roSGNode", "SponsorBlockTrackingTask")
+    task.input = { segmentId: segmentId }
+    task.control = "RUN"
 end function
