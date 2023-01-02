@@ -1,5 +1,8 @@
+import "pkg:/source/asyncTasks/asyncTasks.bs"
 import "pkg:/components/VideoPlayer/Video.bs"
 import "pkg:/components/SearchScreen/SearchHistory.bs"
+import "pkg:/components/SearchScreen/SearchSuggestionsTask.bs"
+import "pkg:/components/SearchScreen/SearchTask.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
@@ -42,23 +45,19 @@ function OnTextChange() as void
     if IsNodeFocused("suggestions")
         return
     end if
-    text = m.keyboard.text
 
-    m.searchSuggestionsTask = CreateObject("roSGNode", "SearchSuggestionsTask")
-    m.searchSuggestionsTask.id = "SearchSuggestionsTask"
-    m.searchSuggestionsTask.input = { q: text }
-    m.searchSuggestionsTask.ObserveField("output", "OnSearchSuggestionsTaskResults")
-    m.searchSuggestionsTask.control = "RUN"
+    StartAsyncTask(SearchSuggestionsTask, {
+        q: m.keyboard.text
+    }, OnSearchSuggestionsTaskResults)
 end function
 
-function OnSearchSuggestionsTaskResults() as void
-    task = m.searchSuggestionsTask
+function OnSearchSuggestionsTaskResults(output as object) as void
     ' In case this is an old request, discard suggestions
-    if task.output.q <> m.keyboard.text
+    q = output.result.q
+    if q <> m.keyboard.text
         return
     end if
-    q = task.output.q
-    suggestions = task.output.response
+    suggestions = output.result.response
     if suggestions <> invalid
         if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
             suggestions.Unshift(q)
@@ -97,16 +96,13 @@ function OnSearchButtonFocused() as void
 end function
 
 function Search(text as string)
-    m.searchTask = CreateObject("roSGNode", "SearchTask")
-    m.searchTask.id = "SearchTask"
-    m.searchTask.input = { q: text }
-    m.searchTask.ObserveField("output", "OnSearchTaskResults")
-    m.searchTask.control = "RUN"
+    StartAsyncTask(SearchTask, {
+        q: text
+    }, OnSearchTaskResults)
 end function
 
-function OnSearchTaskResults()
-    task = m.searchTask
-    rootChildren = task.output.rootChildren
+function OnSearchTaskResults(output as object)
+    rootChildren = output.result.rootChildren
     contentNode = CreateObject("roSGNode", "ContentNode")
     contentNode.Update({
         children: rootChildren
