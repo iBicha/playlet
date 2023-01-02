@@ -9,11 +9,11 @@ function CreateAsyncTask(taskFunc as object, input as object, callback = invalid
     task = createObject("roSGNode", GetFunctionName(taskFunc))
     task.id = id
     task.input = input
-    if callback <> invalid
-        m[`asynctask_${id}`] = task
-        m[`asynctask_${id}_callback`] = callback
-        task.ObserveField("output", "TaskCallback")
-    end if
+
+    m[`asynctask_${id}`] = task
+    m[`asynctask_${id}_callback`] = callback
+    task.ObserveField("state", "OnTaskState")
+
     return task
 end function
 
@@ -21,13 +21,22 @@ function GetFunctionName(taskFunc as object) as string
     return (LCase(`${taskFunc}_asynctask`)).replace("function:", "").trim()
 end function
 
-function TaskCallback(e as object)
+function OnTaskState(e as object) as void
     task = e.getRoSGNode()
-    id = task.id
-    callback = m[`asynctask_${id}_callback`]
+    if task.state = "init" or task.state = "run"
+        return
+    end if
 
+    id = task.id
     output = task.output
-    callback(output)
+    ' if output is invalid, it means the task was interrupted before the result is ready
+    if output <> invalid
+        callback = m[`asynctask_${id}_callback`]
+        if callback <> invalid
+            output = task.output
+            callback(output)
+        end if
+    end if
 
     m.delete(`asynctask_${id}`)
     m.delete(`asynctask_${id}_callback`)
