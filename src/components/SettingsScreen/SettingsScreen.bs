@@ -1,5 +1,4 @@
 import "pkg:/source/utils/General.bs"
-import "pkg:/source/roku_modules/rokupromise/Promise.brs"
 
 function Init()
     m.versionLabel = m.top.findNode("VersionLabel")
@@ -21,13 +20,17 @@ function OnUrlSet()
 end function
 
 function GetLatestVersion()
-    createTaskPromise("AppVersionTask", {
-        input: {}
-    }).then(function(task as object) as void
-        if task.output.latest <> invalid
-            SetVersionLabel(m.currentVersion, task.output.latest)
-        end if
-    end function)
+    m.appVersionTask = CreateObject("roSGNode", "AppVersionTask")
+    m.appVersionTask.id = "AppVersionTask"
+    m.appVersionTask.ObserveField("output", "OnAppVersionTaskResults")
+    m.appVersionTask.control = "RUN"
+end function
+
+function OnAppVersionTaskResults()
+    task = m.appVersionTask
+    if task.output.latest <> invalid
+        SetVersionLabel(m.currentVersion, task.output.latest)
+    end if
 end function
 
 function SetVersionLabel(current as string, latest as string)
