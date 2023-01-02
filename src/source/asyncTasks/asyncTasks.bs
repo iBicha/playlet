@@ -1,17 +1,19 @@
-function StartAsyncTask(taskFunc as object, input as object, callback as object) as object
+function StartAsyncTask(taskFunc as object, input as object, callback = invalid as object) as object
     task = CreateAsyncTask(taskFunc, input, callback)
     task.control = "RUN"
     return task
 end function
 
-function CreateAsyncTask(taskFunc as object, input as object, callback as object) as object
+function CreateAsyncTask(taskFunc as object, input as object, callback = invalid as object) as object
     id = StrI(rnd(2147483647), 36)
     task = createObject("roSGNode", GetFunctionName(taskFunc))
     task.id = id
     task.input = input
-    task.ObserveField("output", "TaskCallback")
-    m[`asynctask_${id}`] = task
-    m[`asynctask_${id}_callback`] = callback
+    if callback <> invalid
+        m[`asynctask_${id}`] = task
+        m[`asynctask_${id}_callback`] = callback
+        task.ObserveField("output", "TaskCallback")
+    end if
     return task
 end function
 
@@ -25,7 +27,6 @@ function TaskCallback(e as object)
     callback = m[`asynctask_${id}_callback`]
 
     output = task.output
-
     callback(output)
 
     m.delete(`asynctask_${id}`)
