@@ -1,6 +1,7 @@
-import "pkg:/source/roku_modules/rokupromise/Promise.brs"
+import "pkg:/source/asyncTasks/asyncTasks.bs"
 import "pkg:/components/VideoPlayer/Video.bs"
-import "pkg:/components/SearchScreen/SearchHistory.bs"
+import "pkg:/components/SearchScreen/SearchSuggestionsTask.bs"
+import "pkg:/components/SearchScreen/SearchTask.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
@@ -45,17 +46,15 @@ function OnTextChange() as void
     end if
     text = m.keyboard.text
 
-    createTaskPromise("SearchSuggestionsTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
+    StartAsyncTask(SearchSuggestionsTask, {
+        q: text
+    }, function(output as object) as void
         ' In case this is an old request, discard suggestions
-        if task.output.q <> m.keyboard.text
+        if output.result.q <> m.keyboard.text
             return
         end if
-        q = task.output.q
-        suggestions = task.output.response
+        q = output.result.q
+        suggestions = output.result.response
         if suggestions <> invalid
             if q.len() > 0 and ArrayIndexOf(suggestions, q) = -1
                 suggestions.Unshift(q)
@@ -95,12 +94,11 @@ end function
 
 function Search(text as string)
     SaveSearchHistory(text)
-    createTaskPromise("SearchTask", {
-        input: {
-            q: text
-        }
-    }).then(function(task as object) as void
-        rootChildren = task.output.rootChildren
+
+    StartAsyncTask(SearchTask, {
+        q: text
+    }, function(output as object) as void
+        rootChildren = output.result.rootChildren
         contentNode = CreateObject("roSGNode", "ContentNode")
         contentNode.Update({
             children: rootChildren
