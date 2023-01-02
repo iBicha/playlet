@@ -1,6 +1,7 @@
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/services/SponsorBlock.bs"
 import "pkg:/components/VideoPlayer/Video.bs"
+import "pkg:/components/VideoPlayer/VideoDetailsTask.bs"
 
 function Init()
     SetupSponsorBlock()
@@ -14,8 +15,6 @@ function Init()
     m.videoContainer = GetVideoContainer()
     m.top.enableUI = m.videoContainer.fullscreen
     m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
-
-    m.videoDetailsTask = m.top.findNode("VideoDetailsTask")
 
     m.videoPlayingSuccess = false
     m.ignoreNextFinishedState = false
@@ -47,21 +46,26 @@ end function
 
 function OnControlChange()
     if m.top.control = "stop"
-        m.sponsorBlockTask.control = "stop"
-        m.videoDetailsTask.control = "stop"
+        if m.videoDetailsTask <> invalid
+            m.videoDetailsTask.control = "stop"
+        end if
+        if m.sponsorBlockTask <> invalid
+            m.sponsorBlockTask.control = "stop"
+        end if
     end if
 end function
 
 function StartVideoDetailsTask()
-    m.videoDetailsTask.input = { videoId: m.top.videoId }
-    m.videoDetailsTask.observeField("output", "OnVideoDetailsTaskResults")
-    m.videoDetailsTask.control = "run"
+    if m.videoDetailsTask <> invalid
+        m.videoDetailsTask.control = "stop"
+    end if
+
+    m.videoDetailsTask = StartAsyncTask(VideoDetailsTask, { videoId: m.top.videoId }, OnVideoDetailsTaskResults)
 end function
 
-function OnVideoDetailsTaskResults() as void
-    task = m.videoDetailsTask
-    videoId = task.output.videoId
-    metadata = task.output.metadata
+function OnVideoDetailsTaskResults(output as object) as void
+    videoId = output.result.videoId
+    metadata = output.result.metadata
     if videoId <> m.top.videoId
         return
     end if
