@@ -55,11 +55,27 @@ function OnControlChange()
     end if
 end function
 
+function SetMetadata() as void
+    if m.top.metadata = invalid
+        return
+    end if
+    
+    metadata = m.top.metadata
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.addFields({ metadata: metadata })
+
+    contentNode.title = metadata.title
+    contentNode.secondaryTitle = metadata.author
+
+    m.top.content = contentNode
+end function
+
 function StartVideoDetailsTask()
     if m.videoDetailsTask <> invalid
         m.videoDetailsTask.control = "stop"
     end if
 
+    SetMetadata()
     m.videoDetailsTask = StartAsyncTask(VideoDetailsTask, { videoId: m.top.videoId }, OnVideoDetailsTaskResults)
 end function
 
@@ -253,9 +269,10 @@ function OnVideoPlayerStateChange() as void
 
     if state = "finished"
         metadata = m.top.content?.metadata
-        videoId = metadata?.recommendedVideos?.GetEntry(0)?.videoId
+        metadata = metadata?.recommendedVideos?.GetEntry(0)
+        videoId = metadata?.videoId
         if videoId <> invalid
-            PlayVideo(videoId, invalid)
+            PlayVideo(videoId, { metadata: metadata })
         else
             CloseVideo()
         end if

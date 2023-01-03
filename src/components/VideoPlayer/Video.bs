@@ -1,7 +1,14 @@
 import "pkg:/source/services/Invidious.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 
-function PlayVideo(videoId as string, sender as object)
+function PlayVideo(videoId as string, args = invalid as object)
+    sender = args?.sender
+    metadata = args?.metadata 
+
+    if metadata <> invalid and GetInterface(metadata, "ifSGNodeField") <> invalid
+        metadata = args.metadata.getFields()
+    end if
+
     width = 1280
     height = 720
     translation = [0.0, 0.0]
@@ -17,6 +24,7 @@ function PlayVideo(videoId as string, sender as object)
     end if
     videoContainer.videoPlayer = videoContainer.createChild("VideoPlayer")
     videoContainer.videoPlayer.id = "VideoPlayer"
+    videoContainer.videoPlayer.metadata = metadata
     videoContainer.videoPlayer.videoId = videoId
     videoContainer.videoPlayer.width = width
     videoContainer.videoPlayer.height = height

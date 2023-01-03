@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WebSocket server for realtime events
 - SponsorBlock tracking
 - Auto-generated tasks and the @asynctask annotation
+- Show known video metadata while loading video details
+- Caching for video details
 
 ### Changed
 - The License has changed from MIT to AGPL
