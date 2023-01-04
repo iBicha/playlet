@@ -7,8 +7,10 @@ import "pkg:/source/utils/WebUtils.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
 
 namespace Invidious
-    ' TODO: query server status, check if it supports APIs and/or signups
     const TOKEN_CALLBACK = "/invidious/token_callback"
+
+    ' TODO: query server status, check if it supports APIs and/or signups
+    const STATS_ENDPOINT = "/api/v1/stats"
 
     const VIDEOS_ENDPOINT = "/api/v1/videos"
 
@@ -26,6 +28,17 @@ namespace Invidious
                 region: GetUserCountryCode()
             }
         }
+    end function
+
+    function GetServerStats() as object
+        instance = InvidiousSettings.GetSelectedInstance()
+        url = `${instance}${Invidious.STATS_ENDPOINT}`
+
+        response = Requests().get(url)
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
     end function
 
     function GetVideoUrl(videoId as string, itag as string, local as boolean) as string
