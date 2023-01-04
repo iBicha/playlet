@@ -19,9 +19,10 @@ function OnContentSet()
             end if
         end if
 
-        thumbnail = m.top.FindNode("thumbnail")
-        thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
-        thumbnail.id = `thumbnail-${content.videoId}`
+        m.thumbnail = m.top.FindNode("thumbnail")
+        m.thumbnail.observeField("loadStatus", "OnThumbnailLoadFailed")
+        m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
+        m.thumbnail.id = `thumbnail-${content.videoId}`
 
         if IsVideoLive(content)
             m.top.FindNode("liveRect").visible = true
@@ -36,6 +37,13 @@ function OnContentSet()
             end if
         end if
     end if
+end function
+
+function OnThumbnailLoadFailed() as void
+    if m.thumbnail.loadStatus <> "failed"
+        return
+    end if
+    m.thumbnail.uri = "pkg:/images/thumbnail-missing.jpg"
 end function
 
 function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string) as string
