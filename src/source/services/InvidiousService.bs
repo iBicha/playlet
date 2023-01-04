@@ -1,4 +1,5 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/General.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
@@ -146,8 +147,29 @@ class InvidiousService
     function DeleteExpiredToken(response as object)
         if response.statuscode = 403
             print(`Server responded with 403: ${response.text}`)
-            print("deleting token...")
-            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+            if m.IsTokenMaybeExpired() = true
+                print("deleting token...")
+                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+            end if
         end if
+    end function
+
+    ' Public Invidious instances fail a lot randomly, even with valid tokens
+    ' For that reason, it's better to make sure the token actually expired by date
+    function IsTokenMaybeExpired() as dynamic
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
+            return invalid
+        end if
+        token = ParseJson(authToken.token)
+        if token = invalid
+            return invalid
+        end if
+        if not token.DoesExist("expire")
+            return invalid
+        end if
+        expire = token["expire"]
+        currentTime = TimeUtils.Now().AsSeconds()
+        return expire < currentTime
     end function
 end class
