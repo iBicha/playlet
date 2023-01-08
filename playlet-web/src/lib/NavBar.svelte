@@ -33,8 +33,8 @@
 
 <div class="navbar bg-base-100">
     <div class="flex-1">
-        <img src={playletLogo} class="btn" alt="Playlet Logo" />
-        <h4 class="label">{version}</h4>
+        <img src={playletLogo} class="h-12" alt="Playlet Logo" />
+        <h4 class="label brightness-75">{version}</h4>
     </div>
     <div class="flex-none">
         {#if loggedIn}
