@@ -6,6 +6,7 @@
   import ClearSearchHistory from "./lib/ClearSearchHistory.svelte";
   import { PlayletApi } from "./lib/PlayletApi";
   import { playletStateStore } from "./lib/Stores";
+  import LegacyUI from "./lib/LegacyUI.svelte";
 
   onMount(async () => {
     const playletState = await PlayletApi.getState();
@@ -15,7 +16,10 @@
 
 <main>
   <NavBar />
-  <InstanceInfo />
-  <PlayVideo />
-  <ClearSearchHistory />
+  <div class="p-6 space-y-2 form-control">
+    <InstanceInfo />
+    <PlayVideo />
+    <ClearSearchHistory />
+    <LegacyUI />
+  </div>
 </main>

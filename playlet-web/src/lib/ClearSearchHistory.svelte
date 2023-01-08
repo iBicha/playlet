@@ -6,5 +6,6 @@
     };
 </script>
 
-<button class="btn" on:click={clearSearchHistory}>Clear search history</button>
-
+<div>
+    <button class="btn" on:click={clearSearchHistory}>Clear search history</button>
+</div>
