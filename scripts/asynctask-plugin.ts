@@ -57,7 +57,7 @@ export class AsyncTaskPlugin implements CompilerPlugin {
         for (let index = 0; index < functionsWithDuplicates.length; index++) {
             const fn = functionsWithDuplicates[index];
             if (this.duplicatesReporeted.indexOf(fn) !== -1) {
-                return
+                continue
             }
             file.addDiagnostics([{
                 code: 6661,
