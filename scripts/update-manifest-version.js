@@ -22,4 +22,4 @@ appManifestContent = appManifestContent.replace(buildPattern, `build_version=${S
 
 fs.writeFileSync("./src/manifest", appManifestContent)
 
-execSync(`npm version ${version}`, { cwd: 'playlet-web' })
+execSync(`npm version ${version} --allow-same-version`, { cwd: 'playlet-web' })
