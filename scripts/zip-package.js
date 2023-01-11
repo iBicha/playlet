@@ -1,15 +1,19 @@
 const rokuDeploy = require('roku-deploy');
 
-const zip_name = 'playlet.zip'
-
-rokuDeploy.zipPackage({
+const options = {
     outDir: 'release',
-    outFile: zip_name,
+    outFile: 'playlet.zip',
     //BUG: rokuDeploy does not read stagingDir properly fron config
     stagingDir: 'dist/build',
     retainStagingDir: true
-}).then(function(){
-    console.log(`${zip_name} created`)
-}, function(error) {
-    console.error(error);
-});
+};
+
+(async () => {
+    try {
+        await rokuDeploy.zipPackage(options);
+        console.log(`${options.outFile} created`);
+    }
+    catch (error) {
+        console.error(error);
+    }
+})();
