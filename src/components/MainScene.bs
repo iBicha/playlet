@@ -108,18 +108,28 @@ function GetIndexOfChild(parent as object, childId as string) as integer
     return -1
 end function
 
-function LaunchArgumentsReceived()
+function LaunchArgumentsReceived() as void
     ? "LaunchArgumentsReceived" m.top.launchArgs
-    if m.top.launchArgs <> invalid and m.top.launchArgs.contentId <> invalid
-        sender = m.videoContainer.sender ?? m.currentFocued
-        PlayVideo(m.top.launchArgs.contentId, { sender: sender })
-    end if
+    PlayVideoFromArgs(m.top.launchArgs)
 end function
 
-function InputArgumentsReceived()
+function InputArgumentsReceived() as void
     ? "InputArgumentsReceived" m.top.inputArgs
-    if m.top.inputArgs <> invalid and m.top.inputArgs.contentId <> invalid
+    PlayVideoFromArgs(m.top.inputArgs)
+end function
+
+function PlayVideoFromArgs(args as object) as void
+    if args = invalid
+        return
+    end if
+
+    contentId = args.contentId
+    ' mediaType is not unused, not putting it here fails validation
+    ' bs:disable-next-line
+    mediaType = args.mediaType
+
+    if contentId <> invalid
         sender = m.videoContainer.sender ?? m.currentFocued
-        PlayVideo(m.top.inputArgs.contentId, { sender: sender })
+        PlayVideo(contentId, { sender: sender })
     end if
 end function

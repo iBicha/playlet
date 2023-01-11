@@ -2,7 +2,7 @@ namespace InvidiousSettings
 
     const DEFAULT_INSTANCE = "https://vid.puffyan.us"
 
-    const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,health,users,api"
+    const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
 
     function GetCurrentInstances() as object
         ' TODO: cache this call to avoid json parsing every time
@@ -13,9 +13,12 @@ namespace InvidiousSettings
 
         publicInstances = InvidiousSettings.GetPublicInstances()
         if publicInstances <> invalid
-            for i = 0 to 4
-                if i < publicInstances.Count()
+            for i = 0 to publicInstances.Count() - 1
+                if InvidiousSettings.IsValidPublicInstance(publicInstances[i])
                     instances.push(publicInstances[i].uri)
+                end if
+                if instances.Count() >= 5
+                    exit for
                 end if
             end for
         end if
@@ -72,10 +75,8 @@ namespace InvidiousSettings
         if m.invidiousPublicInstances <> invalid
             return m.invidiousPublicInstances
         end if
-        args = {
-            cacheSeconds: 60 * 60 * 6 ' 6 hours
-        }
-        response = Requests().get(InvidiousSettings.INSTANCES_API, args)
+
+        response = Requests().get(InvidiousSettings.INSTANCES_API)
         if response.statuscode = 200
             json = response.json
             instances = []
@@ -93,6 +94,14 @@ namespace InvidiousSettings
         end if
 
         return m.invidiousPublicInstances
+    end function
+
+    function IsValidPublicInstance(instance as object) as boolean
+        if instance = invalid
+            return false
+        end if
+
+        return instance.type = "https" and instance.api = true
     end function
 
 end namespace

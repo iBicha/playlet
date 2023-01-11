@@ -1,11 +1,11 @@
-const fs = require('fs')
-const path = require('path')
+const fs = require('fs');
+const path = require('path');
 const { convertFile } = require('convert-svg-to-png');
 
 const logoPoster = './src/images/vector/logo-light.svg';
 const logoSplash = './src/images/vector/logo-dark.svg';
 
-logoOutput = {
+const logoOutput = {
     // Logo
     "splash-screen_fhd.jpg": {
         width: 1920,
@@ -38,8 +38,8 @@ logoOutput = {
         from: logoPoster
     },
     "channel-poster_sd.png": {
-        width: 214,
-        height: 144,
+        width: 246,
+        height: 140,
         background: "#FFFFFF",
         from: logoPoster
     },
@@ -49,7 +49,6 @@ const iconsInput = './src/images/vector/icons';
 const iconsOutput = './src/images/icons';
 
 (async () => {
-
     for (var logo in logoOutput) {
         await convertFile(logoOutput[logo].from, {
             outputFilePath: './src/images/' + logo,
@@ -58,13 +57,13 @@ const iconsOutput = './src/images/icons';
             width: logoOutput[logo].width,
         });
 
-        console.log(`Generated ${logo}`)
+        console.log(`Generated ${logo}`);
     }
 
-    const iconFiles = fs.readdirSync(iconsInput)
+    const iconFiles = fs.readdirSync(iconsInput);
     for (var i in iconFiles) {
-        const input = path.join(iconsInput, iconFiles[i])
-        const output = path.join(iconsOutput, iconFiles[i].replace('.svg', '.png'))
+        const input = path.join(iconsInput, iconFiles[i]);
+        const output = path.join(iconsOutput, iconFiles[i].replace('.svg', '.png'));
 
         await convertFile(input, {
             outputFilePath: output,
@@ -72,6 +71,6 @@ const iconsOutput = './src/images/icons';
             height: 64,
         });
 
-        console.log(`Generated ${output}`)
+        console.log(`Generated ${output}`);
     }
 })();
