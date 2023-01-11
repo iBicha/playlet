@@ -38,8 +38,8 @@ logoOutput = {
         from: logoPoster
     },
     "channel-poster_sd.png": {
-        width: 214,
-        height: 144,
+        width: 246,
+        height: 140,
         background: "#FFFFFF",
         from: logoPoster
     },
