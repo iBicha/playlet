@@ -1,0 +1,40 @@
+import "pkg:/source/utils/StringUtils.bs"
+
+function init()
+    m.richLabelImage = m.top.findNode("RichLabelImage")
+    m.richLabelImage.observeField("loadStatus", "OnRichLabelImageLoadStatus")
+end function
+
+function OnRichTextSet()
+    richText = m.top.richText
+    m.top.text = richText
+
+    args = {
+        text: richText,
+        width: m.top.width,
+        height: m.top.height,
+        font: m.top.richFont,
+        color: "#FFFFFF"
+    }
+    uri = GetTextToImageUrl(args)
+    ?uri
+    m.richLabelImage.uri = uri
+end function
+
+function GetTextToImageUrl(args as object) as string
+    ' TODO: remove this. Adding a random value to disable caching 
+    args._rnd = `${Rnd(1000000)}`
+    args = ToBase64(FormatJson(args))
+    return "http://192.168.1.182:8080/v1/render?args=" + args
+end function
+
+function OnRichLabelImageLoadStatus() as void
+    if not m.richLabelImage.loadStatus = "ready"
+        return
+    end if
+
+    m.richLabelImage.width = m.top.width
+    m.richLabelImage.height = m.richLabelImage.width * (m.richLabelImage.bitmapHeight / m.richLabelImage.bitmapWidth)
+
+    m.top.text = ""
+end function
