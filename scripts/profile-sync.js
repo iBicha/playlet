@@ -86,9 +86,10 @@ async function extractVideos(sourceUrl, limit = 100) {
         let ytDlpErrors = ""
         const videos = []
 
-        const ytDlpProcess = spawn('yt-dlp', [sourceUrl, '--cookies-from-browser', browserName, '--flat-playlist', '--print', '%(id)s']);
+        const ytDlpProcess = spawn('yt-dlp', [sourceUrl, '--cookies-from-browser', browserName, '--flat-playlist', '--lazy-playlist', '--print', '%(id)s']);
 
         ytDlpProcess.stdout.on('data', function (data) {
+            process.stdout.write('.')
             if (videos.length > limit) {
                 return;
             }
@@ -99,10 +100,12 @@ async function extractVideos(sourceUrl, limit = 100) {
         });
 
         ytDlpProcess.stderr.on('data', function (data) {
+            process.stdout.write('.')
             ytDlpErrors += data.toString() + '\n'
         });
 
         ytDlpProcess.on('close', function (code) {
+            process.stdout.write('\n')
             if (code === 0 || videos.length === limit) {
                 resolve(videos)
             } else {
