@@ -1,6 +1,7 @@
 // This script reads recommendations, subscriptions, watch later, liked, and history from Youtube
 // and imports them into invidious.
 
+const { ArgumentParser } = require('argparse')
 const fs = require('fs');
 const dotenv = require('dotenv');
 const spawn = require('child_process').spawn;
@@ -10,17 +11,10 @@ const ip = require('ip');
 const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
-if (process.argv.length !== 3) {
-    console.error("Invalid usage! usage: npm run profile-sync -- chrome");
-    exit(-1);
-}
-
-const browserName = process.argv[2];
-
-async function updateFeed(sourceUrl, invidiousInstance, token, destinationPlaylist, limit = 50) {
+async function updateFeed(sourceUrl, destinationPlaylist, invidiousInstance, token, browser = undefined, limit = 50) {
     console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`)
 
-    const videos = await extractVideos(sourceUrl, limit);
+    const videos = await extractVideos(sourceUrl, browser, limit);
 
     let playlist = await getPlaylist(invidiousInstance, token, destinationPlaylist)
     if (playlist) {
@@ -80,13 +74,17 @@ async function deletePlaylist(invidiousInstance, token, playlist) {
     })
 }
 
-async function extractVideos(sourceUrl, limit = 100) {
+async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
     console.log(`Extracting videos from feed "${sourceUrl}" with limit "${limit}"`)
     return await new Promise(function (resolve, reject) {
         let ytDlpErrors = ""
         const videos = []
 
-        const ytDlpProcess = spawn('yt-dlp', [sourceUrl, '--cookies-from-browser', browserName, '--flat-playlist', '--lazy-playlist', '--print', '%(id)s']);
+        args = [sourceUrl, '--flat-playlist', '--lazy-playlist', '--print', '%(id)s']
+        if (browser) {
+            args.push('--cookies-from-browser', browser)
+        }
+        const ytDlpProcess = spawn('yt-dlp', args);
 
         ytDlpProcess.stdout.on('data', function (data) {
             process.stdout.write('.')
@@ -171,14 +169,34 @@ async function deleteAccessToken(invidiousInstance, token) {
     let invidiousInstance = undefined
     let token = undefined;
     try {
-        invidiousInstance = await getInvidiousInstance()
+        const parser = new ArgumentParser({
+            description: 'Sync Youtube profile with Invidious'
+        });
+
+        parser.add_argument('--browser', { help: 'Use cookies from browser' });
+        parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
+
+        let args = parser.parse_args()
+        invidiousInstance = args.invidious
+        browser = args.browser
+
+        if (!invidiousInstance) {
+            try {
+                invidiousInstance = await getInvidiousInstance()
+            } catch (error) {
+                throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
+            }
+        }
+
         token = await getAccessToken(invidiousInstance)
 
-        await updateFeed("https://www.youtube.com/", invidiousInstance, token, "Youtube - Recommended")
-        await updateFeed("https://www.youtube.com/feed/subscriptions", invidiousInstance, token, "Youtube - Subscriptions")
-        await updateFeed("https://www.youtube.com/playlist?list=WL", invidiousInstance, token, "Youtube - Watch later")
-        await updateFeed("https://www.youtube.com/playlist?list=LL", invidiousInstance, token, "Youtube - Liked Videos")
-        await updateFeed("https://www.youtube.com/feed/history", invidiousInstance, token, "Youtube - History")
+        await updateFeed("https://www.youtube.com/", "Youtube - Recommended", invidiousInstance, token, browser)
+        if (browser) {
+            await updateFeed("https://www.youtube.com/feed/subscriptions", "Youtube - Subscriptions", invidiousInstance, token, browser)
+            await updateFeed("https://www.youtube.com/playlist?list=WL", "Youtube - Watch later", invidiousInstance, token, browser)
+            await updateFeed("https://www.youtube.com/playlist?list=LL", "Youtube - Liked Videos", invidiousInstance, token, browser)
+            await updateFeed("https://www.youtube.com/feed/history", "Youtube - History", invidiousInstance, token, browser)
+        }
     }
     catch (error) {
         console.error(error);
