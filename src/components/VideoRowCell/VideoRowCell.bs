@@ -1,42 +1,45 @@
 import "pkg:/source/utils/TimeUtils.bs"
 
-function OnContentSet()
+function OnContentSet() as void
     content = m.top.itemContent
 
-    if content <> invalid
-        m.top.FindNode("titleLabel").richText = content.title
-        m.top.FindNode("authorLabel").richText = content.author
+    if content = invalid
+        return
+    end if
 
-        if IsVideoUpcoming(content)
-            m.top.FindNode("viewCountDateLabel").text = `Premeres in ${TimeUtils.GetFormattedTimeLeft(content.premiereTimestamp)}`
+    m.top.FindNode("titleLabel").richText = content.title
+    m.top.FindNode("authorLabel").richText = content.author
+
+    if IsVideoUpcoming(content)
+        m.top.FindNode("viewCountDateLabel").text = `Premeres in ${TimeUtils.GetFormattedTimeLeft(content.premiereTimestamp)}`
+    else
+        publishedText = validstr(content.publishedText)
+        viewCount = FormatViewCount(content.viewCount)
+        if publishedText = "" and viewCount = ""
+            m.top.FindNode("viewCountDateLabel").text = ""
         else
-            publishedText = validstr(content.publishedText)
-            viewCount = FormatViewCount(content.viewCount)
-            if publishedText = "" and viewCount = ""
-                m.top.FindNode("viewCountDateLabel").text = ""
-            else
-                m.top.FindNode("viewCountDateLabel").text = `${publishedText} • ${viewCount}`
-            end if
-        end if
-
-        m.thumbnail = m.top.FindNode("thumbnail")
-        m.thumbnail.observeField("loadStatus", "OnThumbnailLoadFailed")
-        m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
-        m.thumbnail.id = `thumbnail-${content.videoId}`
-
-        if IsVideoLive(content)
-            m.top.FindNode("liveRect").visible = true
-            m.top.FindNode("durationRect").visible = false
-        else
-            m.top.FindNode("liveRect").visible = false
-            if content.lengthSeconds <> invalid and content.lengthSeconds <> 0
-                m.top.FindNode("durationLabel").text = TimeUtils.GetFormattedTime(content.lengthSeconds)
-                m.top.FindNode("durationRect").visible = true
-            else
-                m.top.FindNode("durationRect").visible = false
-            end if
+            m.top.FindNode("viewCountDateLabel").text = `${publishedText} • ${viewCount}`
         end if
     end if
+
+    m.thumbnail = m.top.FindNode("thumbnail")
+    m.thumbnail.observeField("loadStatus", "OnThumbnailLoadFailed")
+    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
+    m.thumbnail.id = `thumbnail-${content.videoId}`
+
+    if IsVideoLive(content)
+        m.top.FindNode("liveRect").visible = true
+        m.top.FindNode("durationRect").visible = false
+    else
+        m.top.FindNode("liveRect").visible = false
+        if content.lengthSeconds <> invalid and content.lengthSeconds <> 0
+            m.top.FindNode("durationLabel").text = TimeUtils.GetFormattedTime(content.lengthSeconds)
+            m.top.FindNode("durationRect").visible = true
+        else
+            m.top.FindNode("durationRect").visible = false
+        end if
+    end if
+
 end function
 
 function OnThumbnailLoadFailed() as void
