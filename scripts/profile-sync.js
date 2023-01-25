@@ -91,7 +91,15 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
             if (videos.length > limit) {
                 return;
             }
-            videos.push(data.toString().trim())
+            newVideos = data.toString()
+                .split('\n')
+                .map(video => video.trim())
+                .filter(i => i);
+
+            newVideos.forEach(video => {
+                videos.push(video)
+            });
+            
             if (videos.length >= limit) {
                 ytDlpProcess.kill()
             }
