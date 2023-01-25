@@ -57,8 +57,8 @@ namespace SponsorBlock
         categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "chapter", "filler", "exclusive_access"]
         actionTypes = ["skip", "mute", "chapter", "full", "poi"]
 
-        categoriesJson = WebUtils.UrlEscape(FormatJson(categories))
-        actionTypesJson = WebUtils.UrlEscape(FormatJson(actionTypes))
+        categoriesJson = FormatJson(categories).EncodeUriComponent()
+        actionTypesJson = FormatJson(actionTypes).EncodeUriComponent()
 
         ' From SponsorBlock docs: It should be the first 4 - 32 characters (4 is recommended).
         hashPrefix = GetSha256(videoId).Left(4)
@@ -78,7 +78,7 @@ namespace SponsorBlock
 
     function PostSegmentViewed(segmentId as string) as boolean
         url = `${SponsorBlock.API_URL}${SponsorBlock.VIEWED_SEGMENT_ENDPOINT}?UUID=${segmentId}`
-        response = Requests().post(url)
+        response = Requests().post(url, { parseJson: false })
         return response.statuscode = 200
     end function
 
