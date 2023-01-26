@@ -10,7 +10,7 @@ const options = {
     outDir: 'release',
     outFile: 'playlet.zip',
     failOnCompileError: true,
-    stagingDir: 'dist/build',
+    stagingDir: 'dist/build/playlet',
     retainStagingDir: true,
     signingPassword: config.ROKU_SIGN_PASSWORD,
 };

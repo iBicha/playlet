@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { convertFile } = require('convert-svg-to-png');
 
-const logoPoster = './src/images/vector/logo-light.svg';
-const logoSplash = './src/images/vector/logo-dark.svg';
+const logoPoster = './playlet/src/images/vector/logo-light.svg';
+const logoSplash = './playlet/src/images/vector/logo-dark.svg';
 
 const logoOutput = {
     // Logo
@@ -45,13 +45,13 @@ const logoOutput = {
     },
 };
 
-const iconsInput = './src/images/vector/icons';
-const iconsOutput = './src/images/icons';
+const iconsInput = './playlet/src/images/vector/icons';
+const iconsOutput = './playlet-lib/src/images/icons';
 
 (async () => {
     for (var logo in logoOutput) {
         await convertFile(logoOutput[logo].from, {
-            outputFilePath: './src/images/' + logo,
+            outputFilePath: './playlet/src/images/' + logo,
             background: logoOutput[logo].background,
             height: logoOutput[logo].height,
             width: logoOutput[logo].width,

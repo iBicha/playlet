@@ -4,7 +4,7 @@ const options = {
     outDir: 'release',
     outFile: 'playlet.zip',
     //BUG: rokuDeploy does not read stagingDir properly fron config
-    stagingDir: 'dist/build',
+    stagingDir: 'dist/build/playlet',
     retainStagingDir: true
 };
 
