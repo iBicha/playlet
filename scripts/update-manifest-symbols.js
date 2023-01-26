@@ -14,20 +14,23 @@ function argsToSymbolsObject(arr) {
 }
 
 const newSymbols = argsToSymbolsObject(process.argv.slice(2));
-let currentSymbols = {}
 
-const appManifestLines = fs.readFileSync("./src/manifest", { encoding: 'utf8', flag: 'r' }).split('\n');
-const bsConstIndex = appManifestLines.findIndex(line => line.startsWith("bs_const="));
-if (bsConstIndex !== -1) {
-    let bsConst = appManifestLines[bsConstIndex];
-    bsConst = bsConst.substring("bs_const=".length);
-    currentSymbols = argsToSymbolsObject(bsConst.split(";"))
-}
+["playlet/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
+    let currentSymbols = {}
 
-mergedSymbols = { ...currentSymbols, ...newSymbols };
+    const appManifestLines = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' }).split('\n');
+    const bsConstIndex = appManifestLines.findIndex(line => line.startsWith("bs_const="));
+    if (bsConstIndex !== -1) {
+        let bsConst = appManifestLines[bsConstIndex];
+        bsConst = bsConst.substring("bs_const=".length);
+        currentSymbols = argsToSymbolsObject(bsConst.split(";"))
+    }
 
-bsConst = "bs_const=" + Object.keys(mergedSymbols).map(key => `${key}=${mergedSymbols[key]}`).join(";");
+    mergedSymbols = { ...currentSymbols, ...newSymbols };
 
-appManifestLines[bsConstIndex] = bsConst;
+    bsConst = "bs_const=" + Object.keys(mergedSymbols).map(key => `${key}=${mergedSymbols[key]}`).join(";");
 
-fs.writeFileSync("./src/manifest", appManifestLines.join("\n"));
+    appManifestLines[bsConstIndex] = bsConst;
+
+    fs.writeFileSync(manifestPath, appManifestLines.join("\n"));
+})
