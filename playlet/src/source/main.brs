@@ -19,8 +19,8 @@ function main(args as object) as void
     m.port = CreateObject("roMessagePort")
     screen.setMessagePort(m.port)
     m.global = screen.getGlobalNode()
-    m.global.addFields({screen: screen})
-    
+    m.global.addFields({ screen: screen })
+
     scene = screen.CreateScene("BootstrapScene")
     screen.show()
     scene.signalBeacon("AppLaunchComplete")
