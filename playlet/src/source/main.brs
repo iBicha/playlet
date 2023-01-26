@@ -31,10 +31,13 @@ function main(args as object) as void
     input = CreateObject("roInput")
     input.setMessagePort(m.port)
 
-    ' The following comment is to enable the SceneGraph inspector
-    ' on the VSCode BrightScript plugin.
     #if DEBUG
+        ' The following comment is to enable the SceneGraph inspector
+        ' on the VSCode BrightScript plugin.
         ' vscode_rdb_on_device_component_entry
+
+        ' The following comment is to enable RALE tracking
+        ' vscode_rale_tracker_entry
     #end if
 
     while true

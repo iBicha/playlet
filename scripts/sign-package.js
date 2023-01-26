@@ -7,7 +7,6 @@ const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
 const options = {
     host: config.ROKU_DEV_TARGET,
     password: config.ROKU_DEVPASSWORD,
-    outDir: 'release',
     outFile: 'playlet.zip',
     failOnCompileError: true,
     stagingDir: 'dist/build/playlet',

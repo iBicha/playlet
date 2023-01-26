@@ -1,7 +1,8 @@
+// Can safely get rid of this script after this is fixed https://github.com/rokucommunity/vscode-brightscript-language/issues/461
 const fs = require('fs');
 
-if (process.argv.length < 3) {
-    console.error("Invalid usage! usage: npm run manifest-symbols -- SYMBOL1=true [SYMBOL2=false]");
+if (process.argv.length < 4) {
+    console.error("Invalid usage! usage: npm run manifest-symbols -- MANIFEST_PATH SYMBOL1=true [SYMBOL2=false]");
     exit(-1);
 }
 
@@ -13,24 +14,25 @@ function argsToSymbolsObject(arr) {
     }, {});
 }
 
-const newSymbols = argsToSymbolsObject(process.argv.slice(2));
 
-["playlet/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
-    let currentSymbols = {}
+console.log(process.cwd())
+const manifestPath = process.argv[2];
+const newSymbols = argsToSymbolsObject(process.argv.slice(3));
 
-    const appManifestLines = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' }).split('\n');
-    const bsConstIndex = appManifestLines.findIndex(line => line.startsWith("bs_const="));
-    if (bsConstIndex !== -1) {
-        let bsConst = appManifestLines[bsConstIndex];
-        bsConst = bsConst.substring("bs_const=".length);
-        currentSymbols = argsToSymbolsObject(bsConst.split(";"))
-    }
+let currentSymbols = {}
 
-    mergedSymbols = { ...currentSymbols, ...newSymbols };
+const appManifestLines = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' }).split('\n');
+const bsConstIndex = appManifestLines.findIndex(line => line.startsWith("bs_const="));
+if (bsConstIndex !== -1) {
+    let bsConst = appManifestLines[bsConstIndex];
+    bsConst = bsConst.substring("bs_const=".length);
+    currentSymbols = argsToSymbolsObject(bsConst.split(";"))
+}
 
-    bsConst = "bs_const=" + Object.keys(mergedSymbols).map(key => `${key}=${mergedSymbols[key]}`).join(";");
+mergedSymbols = { ...currentSymbols, ...newSymbols };
 
-    appManifestLines[bsConstIndex] = bsConst;
+bsConst = "bs_const=" + Object.keys(mergedSymbols).map(key => `${key}=${mergedSymbols[key]}`).join(";");
 
-    fs.writeFileSync(manifestPath, appManifestLines.join("\n"));
-})
+appManifestLines[bsConstIndex] = bsConst;
+
+fs.writeFileSync(manifestPath, appManifestLines.join("\n"));
