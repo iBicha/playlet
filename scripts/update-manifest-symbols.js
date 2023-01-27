@@ -14,8 +14,6 @@ function argsToSymbolsObject(arr) {
     }, {});
 }
 
-
-console.log(process.cwd())
 const manifestPath = process.argv[2];
 const newSymbols = argsToSymbolsObject(process.argv.slice(3));
 
