@@ -21,7 +21,7 @@ function WebServerLoop()
 
     m.settings = new Http.HttpSettings(m.webServerPort)
     ' Root at www to get http://IP_ADDRESS:PORT/index.html
-    m.settings.WwwRoot = "pkg:/www"
+    m.settings.WwwRoot = "libpkg:/www"
     ' Short interval to keep polling on web socket messages
     m.settings.Timeout = 500
     m.server = new Http.HttpServer(m.settings, m)
@@ -43,11 +43,11 @@ function WebServerLoop()
         return true
     end function)
 
-    #if DEBUG
+    if IsDebugMode()
         allowedOrigin = "*"
-    #else
+    else
         allowedOrigin = `http://${GetLocalIpAddress()}:8888`
-    #end if
+    end if
     m.server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
     #if WEB_SOCKETS
         m.server.UseRouter(new Http.WebSocketMiddleware())
@@ -57,13 +57,14 @@ function WebServerLoop()
     m.server.UseRouter(new Http.CommandsApiRouter())
     m.server.UseRouter(new Http.StateApiRouter())
     m.server.UseRouter(new Http.InvidiousRouter())
-    m.server.UseRouter(new Http.HttpStaticFilesRouter("/", m.settings.WwwRoot))
-    #if DEBUG
+    m.server.UseRouter(new Http.HttpStaticFilesRouter("/", m.settings.WwwRoot, false, false, false))
+    if IsDebugMode()
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", true, true, false))
         m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/pkg", "pkg:/", true, true))
         m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/tmp", "tmp:/", true, true))
         m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/cachefs", "cachefs:/", true, true))
         m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/common", "common:/", true, true))
-    #end if
+    end if
     #if WEB_SERVER_BASIC_AUTH
         m.server.UseRouter(new Http.BasicAuthMiddleware())
     #end if

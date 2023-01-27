@@ -7,8 +7,9 @@ namespace Http
         private route
         private showDirectories
         private showHidden
+        private fsCheck
 
-        function new(route as string, root as string, showDirectories = false as boolean, showHidden = false as boolean)
+        function new(route as string, root as string, showDirectories = false as boolean, showHidden = false as boolean, fsCheck = true as boolean)
             super()
             m.log = new log.Logger("HttpStaticFilesRouter")
 
@@ -16,6 +17,7 @@ namespace Http
             m.route = route
             m.showDirectories = showDirectories
             m.showHidden = showHidden
+            m.fsCheck = fsCheck
 
             m.Get("*", function(context as object) as boolean
                 router = context.router
@@ -30,6 +32,19 @@ namespace Http
 
                 decoded_path = path_in_route.DecodeUri()
                 full_path = PathJoin(router.root, decoded_path)
+
+                if not router.fsCheck
+                    ' libpkg:/ does not work with roFilesystem...
+                    buffer = createObject("roByteArray")
+                    if buffer.ReadFile(full_path) and buffer.count() > 0
+                        mimetype = WebUtils.MimeType(decoded_path)
+                        response.SetBodyDataBuffer(buffer)
+                        response.ContentType(mimetype)
+                        response.http_code = 200
+                        response.source = Http.HttpResponseSource.GENERATED
+                        return true
+                    end if
+                end if
 
                 path = CreateObject("roPath", full_path)
                 fs = CreateObject("roFilesystem")

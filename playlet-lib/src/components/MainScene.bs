@@ -4,6 +4,9 @@ import "pkg:/components/VideoPlayer/Video.bs"
 function Init()
     log.initializeLogManager(["log_PrintTransport"], 2)
 
+    scene = m.top.getScene()
+    scene.ObserveField("playletLibMsg", "OnPlayletLibMsg")
+
     m.loadingIndicator = m.top.findNode("LoadingIndicator")
     m.videoContainer = m.top.findNode("VideoContainer")
     m.global.addFields({
@@ -14,7 +17,8 @@ function Init()
 
     m.homeGridScreen = m.top.findNode("HomeGridScreen")
     m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
-    m.homeGridScreen.SetFocus(true)
+    m.homeGridScreen.focus = true
+    m.currentFocued = m.homeGridScreen
 
     m.settingsScreen = m.top.findNode("SettingsScreen")
 
@@ -25,9 +29,9 @@ function Init()
     m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
     m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
 
-    m.currentFocued = m.homeGridScreen
-
     InitWebServer()
+
+    RequestLaunchArgs()
 end function
 
 function InitWebServer()
@@ -105,14 +109,38 @@ function GetIndexOfChild(parent as object, childId as string) as integer
     return -1
 end function
 
-function LaunchArgumentsReceived() as void
-    ? "LaunchArgumentsReceived" m.top.launchArgs
-    PlayVideoFromArgs(m.top.launchArgs)
+function RequestLaunchArgs()
+    scene = m.top.getScene()
+
+    scene.playletLibMsg = {
+        source: "playlet-lib",
+        command: "launchArgs"
+    }
 end function
 
-function InputArgumentsReceived() as void
-    ? "InputArgumentsReceived" m.top.inputArgs
-    PlayVideoFromArgs(m.top.inputArgs)
+function OnPlayletLibMsg() as void
+    data = m.top.getScene().playletLibMsg
+    if data["source"] = "playlet-lib"
+        return
+    end if
+
+    if data["command"] = "launchArgs"
+        LaunchArgumentsReceived(data["data"])
+    end if
+    if data["command"] = "inputArgs"
+        InputArgumentsReceived(data["data"])
+    end if
+
+end function
+
+function LaunchArgumentsReceived(launchArgs as object) as void
+    ? "LaunchArgumentsReceived" launchArgs
+    PlayVideoFromArgs(launchArgs)
+end function
+
+function InputArgumentsReceived(inputArgs as object) as void
+    ? "InputArgumentsReceived" inputArgs
+    PlayVideoFromArgs(inputArgs)
 end function
 
 function PlayVideoFromArgs(args as object) as void
