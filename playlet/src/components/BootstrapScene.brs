@@ -25,7 +25,7 @@ function IsDebugMode() as boolean
     appInfo = CreateObject("roAppInfo")
     bsConst = appInfo.GetValue("bs_const")
     symbols = bsConst.Tokenize(";")
-   
+
     for each symbol in symbols
         keyValuePair = symbol.Tokenize("=")
         if keyValuePair.Count() <> 2
