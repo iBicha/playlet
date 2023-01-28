@@ -14,12 +14,11 @@
 ' You should have received a copy of the GNU Affero General Public License
 ' along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-function main(args as object) as void
+function Main(args as object) as void
     screen = CreateObject("roSGScreen")
     m.port = CreateObject("roMessagePort")
     screen.setMessagePort(m.port)
     m.global = screen.getGlobalNode()
-    m.global.addFields({ screen: screen })
 
     scene = screen.CreateScene("BootstrapScene")
     screen.show()

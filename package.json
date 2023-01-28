@@ -16,7 +16,6 @@
         "convert-svg-to-png": "^0.6.4",
         "dotenv": "^16.0.3",
         "express": "^4.18.2",
-        "ip": "^1.1.8",
         "roku-log-bsc-plugin": "^0.7.0",
         "ropm": "^0.10.11",
         "semver": "^7.3.8",
@@ -35,11 +34,15 @@
     "scripts": {
         "dev:web": "cd playlet-web && npm run dev",
         "prebuild": "rm -rf dist",
-        "build": "npm run build:web && npm run build:lib && npm run build:app",
-        "build:prod": "npm run build -- --sourceMap=false",
+        "build:dev": "npm run build:web && npm run build:lib:dev && npm run build:app:dev",
+        "build:prod": "npm run build:web && npm run build:lib:prod && npm run build:app:prod",
         "build:release": "npm run format:fix && npm run lint:fix && npm run manifest-version && npm run generate-images && npm run build:prod && npm run sign-package",
         "build:app": "cd playlet && bsc --create-package --lintConfig ../config/bslint.jsonc",
+        "build:app:dev": "npm run build:app -- --debug=true",
+        "build:app:prod": "npm run build:app -- --debug=false --sourceMap=false",
         "build:lib": "cd playlet-lib && bsc --create-package --lintConfig ../config/bslint.jsonc",
+        "build:lib:dev": "npm run build:lib -- --debug=true",
+        "build:lib:prod": "npm run build:lib -- --debug=false --sourceMap=false",
         "build:web": "cd playlet-web && npm run build",
         "lint": "bslint --project playlet-lib/bsconfig.lint.json --lintConfig config/bslint.jsonc && bslint --project playlet/bsconfig.lint.json --lintConfig config/bslint.jsonc",
         "lint:fix": "npm run lint -- --fix",
@@ -50,9 +53,7 @@
         "manifest-version": "node tools/update-manifest-version.js",
         "sign-package": "node tools/sign-package.js",
         "screenshot": "node tools/screenshot.js",
-        "manifest-symbols": "node tools/update-manifest-symbols.js",
         "profile-sync": "node tools/profile-sync.js",
-        "postinstall": "npx ropm copy && cd playlet-web && npm install",
-        "set-lib-manifest-debug": "npm run manifest-symbols -- dist/build/playlet-lib/manifest DEBUG=true"
+        "postinstall": "npx ropm copy && cd playlet-web && npm install"
     }
 }
