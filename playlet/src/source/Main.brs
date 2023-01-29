@@ -24,7 +24,8 @@ function Main(args as object) as void
     screen.show()
     scene.signalBeacon("AppLaunchComplete")
 
-    scene.ObserveField("playletLibMsg", m.port)
+    scene.ObserveField("exitChannel", m.port)
+    scene.launchArgs = args
 
     input = CreateObject("roInput")
     input.setMessagePort(m.port)
@@ -43,35 +44,17 @@ function Main(args as object) as void
         msgType = type(msg)
         if msgType = "roSGScreenEvent"
             if msg.isScreenClosed()
-                END
+                return
             end if
         else if msgType = "roSGNodeEvent"
             field = msg.getField()
             data = msg.getData()
-
-            if field = "playletLibMsg"
-                if data["source"] = "playlet-app"
-                    continue while
-                end if
-
-                if data["command"] = "launchArgs"
-                    scene.playletLibMsg = {
-                        source: "playlet-app",
-                        command: "launchArgs",
-                        data: args
-                    }
-                end if
-
-                if data["command"] = "exitChannel"
-                    END
-                end if
+            if field = "exitChannel" and data = true
+                END
             end if
         else if msgType = "roInputEvent"
-            scene.playletLibMsg = {
-                source: "playlet-app",
-                command: "inputArgs",
-                data: msg.getInfo()
-            }
+            scene.inputArgs = msg.getInfo()
         end if
     end while
+
 end function

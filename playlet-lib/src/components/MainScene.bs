@@ -4,9 +4,6 @@ import "pkg:/components/VideoPlayer/Video.bs"
 function Init()
     log.initializeLogManager(["log_PrintTransport"], 2)
 
-    scene = m.top.getScene()
-    scene.ObserveField("playletLibMsg", "OnPlayletLibMsg")
-
     m.loadingIndicator = m.top.findNode("LoadingIndicator")
     m.videoContainer = m.top.findNode("VideoContainer")
     m.global.addFields({
@@ -31,7 +28,10 @@ function Init()
 
     InitWebServer()
 
-    RequestLaunchArgs()
+    LaunchArgumentsReceived()
+
+    scene = m.top.getScene()
+    scene.ObserveField("inputArgs", "InputArgumentsReceived")
 end function
 
 function InitWebServer()
@@ -98,36 +98,17 @@ function OnWebServerCommand()
     end if
 end function
 
-function RequestLaunchArgs()
+function LaunchArgumentsReceived() as void
     scene = m.top.getScene()
-
-    scene.playletLibMsg = {
-        source: "playlet-lib",
-        command: "launchArgs"
-    }
-end function
-
-function OnPlayletLibMsg() as void
-    data = m.top.getScene().playletLibMsg
-    if data["source"] = "playlet-lib"
-        return
-    end if
-
-    if data["command"] = "launchArgs"
-        LaunchArgumentsReceived(data["data"])
-    end if
-    if data["command"] = "inputArgs"
-        InputArgumentsReceived(data["data"])
-    end if
-end function
-
-function LaunchArgumentsReceived(launchArgs as object) as void
-    ? "LaunchArgumentsReceived" launchArgs
+    launchArgs = scene.launchArgs
+    ? "LaunchArgumentsReceived " launchArgs
     PlayVideoFromArgs(launchArgs)
 end function
 
-function InputArgumentsReceived(inputArgs as object) as void
-    ? "InputArgumentsReceived" inputArgs
+function InputArgumentsReceived() as void
+    scene = m.top.getScene()
+    inputArgs = scene.inputArgs
+     ? "InputArgumentsReceived " inputArgs
     PlayVideoFromArgs(inputArgs)
 end function
 

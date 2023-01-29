@@ -17,9 +17,5 @@ function OnButtonSelected()
 end function
 
 function OnDialogClosed()
-    scene = m.top.getScene()
-    scene.playletLibMsg = {
-        source: "playlet-lib",
-        command: "exitChannel"
-    }
+    m.top.getScene().exitChannel = true
 end function
