@@ -22,10 +22,39 @@ function GetAppInfo() as object
         appInfo = CreateObject("roAppInfo")
         m.appInfo = {
             id: appInfo.GetID(),
-            version: appInfo.GetVersion()
+            version: appInfo.GetVersion(),
+            lib_version: GetLibVersion()
         }
     end if
     return m.appInfo
+end function
+
+function GetLibVersion() as string
+    values = GetLibManifestValues()
+
+    Major = values["major_version"].toInt()
+    Minor = values["minor_version"].toInt()
+    Build = values["build_version"].toInt()
+
+    return `${Major}.${Minor}.${Build}`
+end function
+
+function GetLibManifestValues() as object
+    libManifest = ReadAsciiFile("libpkg:/manifest")
+    lines = libManifest.Tokenize(UnixNL())
+    values = {}
+    for each line in lines
+        if line.left(1) = "#"
+            continue for
+        end if
+        keyValuePair = line.Tokenize("=")
+        if keyValuePair.Count() <> 2
+            continue for
+        end if
+
+        values[keyValuePair[0]] = keyValuePair[1]
+    end for
+    return values
 end function
 
 function GetDeviceInfo() as object
