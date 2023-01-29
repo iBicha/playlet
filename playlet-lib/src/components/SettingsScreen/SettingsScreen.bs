@@ -1,0 +1,36 @@
+import "pkg:/source/utils/General.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/SettingsScreen/AppVersionTask.bs"
+
+function Init()
+    m.versionLabel = m.top.findNode("VersionLabel")
+    m.top.url = `http://${GetLocalIpAddress()}:8888`
+
+    m.appInfo = GetAppInfo()
+
+    SetVersionLabel(m.appInfo.version, m.appInfo.lib_version, "N/A")
+    GetLatestVersion()
+end function
+
+function OnUrlSet()
+    url = m.top.url
+
+    qrCode = m.top.findNode("SettingsQRPoster")
+    qrCode.text = url
+
+    urlLabel = m.top.findNode("urlLabel")
+    urlLabel.text = url
+end function
+
+function GetLatestVersion()
+    StartAsyncTask(AppVersionTask, {}, function(output as object) as void
+        if output.result.latest <> invalid
+            SetVersionLabel(m.appInfo.version, m.appInfo.lib_version, output.result.latest)
+        end if
+    end function)
+end function
+
+function SetVersionLabel(appVersion as string, libVersion as string, latest as string)
+    m.versionLabel.text = `Playlet: ${appVersion} | Playlet-Lib: ${libVersion} | Latest: ${latest}`
+end function

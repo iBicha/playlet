@@ -13,7 +13,7 @@ const PORT = 5173
 export default defineConfig({
   plugins: [svelte()],
   build: {
-    outDir: "../src/www",
+    outDir: "../playlet-lib/src/www",
     emptyOutDir: true
   },
   server: {

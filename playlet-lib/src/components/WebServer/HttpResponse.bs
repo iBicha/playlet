@@ -1,0 +1,212 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/WebUtils.bs"
+import "pkg:/source/services/Invidious.bs"
+import "pkg:/components/WebServer/HttpResponseSource.bs"
+
+namespace Http
+    function GetHttpResponseId() as integer
+        m.http_response_id = validint(m.http_response_id) + 1
+        return m.http_response_id
+    end function
+
+    class HttpResponse
+        private log as log.Logger
+
+        private source = Http.HttpResponseSource.NONE
+
+        ' members
+        private body_buffer = invalid
+        private header_buffer = invalid
+        private path = invalid
+        private request = invalid
+        private id = 0
+        ' copy-initializable members
+        private start = 0
+        private body_buffer_length = 0
+        private sent = 0
+        private header_sent = 0
+        private header_only = false
+        private buf_start = 0
+        private http_code = 0
+
+        private server
+        private settings
+
+        function new(request as HttpRequest, server as HttpServer, settings as HttpSettings)
+            m.log = new log.Logger("HttpResponse")
+            m.id = Http.GetHttpResponseId()
+            m.request = request
+            m.server = server
+            m.settings = settings
+            m.body_buffer = CreateObject("roByteArray")
+            m.headers = {}
+        end function
+
+        function Process(connection as HttpConnection) as boolean
+            routers = m.server.routers
+            for each router in routers
+                if router.OnRequest(m.request, m, connection)
+                    return true
+                end if
+            end for
+
+            return true
+        end function
+
+        function Default(errcode as integer, reason as string)
+            errname = WebUtils.HttpTitle(errcode)
+            m.http_code = errcode
+
+            buffer = "<html><head><title>" + Stri(errcode).trim() + " " + errname + "</title></head><body>" + UnixNL()
+            buffer = buffer + "<h1>" + errname + "</h1>" + UnixNL()
+            buffer = buffer + reason + UnixNL()
+            buffer = buffer + "<hr>" + UnixNL()
+            buffer = buffer + m.GeneratedBy() + UnixNL()
+            buffer = buffer + "</body></html>" + UnixNL()
+
+            m.SetBodyDataString(buffer)
+            m.ContentType("text/html")
+
+            m.source = Http.HttpResponseSource.GENERATED
+        end function
+
+        function Redirect(where as string, code = 302 as integer)
+            m.headers["Location"] = where
+            message = "Moved to: <a href=" + Quote() + where + Quote() + ">" + where + "</a>"
+            m.Default(code, message)
+        end function
+
+        function Json(data as object)
+            m.http_code = 200
+
+            buffer = FormatJson(data)
+            m.SetBodyDataString(buffer)
+            m.ContentType("application/json")
+
+            m.source = Http.HttpResponseSource.GENERATED
+        end function
+
+        function SetBodyDataBuffer(buffer as object)
+            m.body_buffer = buffer
+            m.body_buffer_length = m.body_buffer.count()
+            m.ContentLength(m.body_buffer_length)
+        end function
+
+        function SetBodyDataString(data as string)
+            m.body_buffer.fromasciistring(data)
+            m.body_buffer_length = m.body_buffer.count()
+            m.ContentLength(m.body_buffer_length)
+        end function
+
+        function ContentLength(length as integer)
+            m.headers["Content-Length"] = Stri(length).trim()
+        end function
+
+        function ContentType(mimeType as string)
+            m.headers["Content-Type"] = mimeType
+        end function
+
+        function Send(sock as object, bufsize as integer) as integer
+            sent = -1
+            if m.source = Http.HttpResponseSource.FROMFILE
+                if m.start + m.sent >= m.buf_start + m.body_buffer.count()
+                    m.buf_start = m.start + m.sent
+                    m.body_buffer.ReadFile(m.path, m.buf_start, bufsize)
+                    m.log.info("Read" + Stri(m.body_buffer.count()) + " bytes from source file @" + itostr(m.buf_start))
+                end if
+            end if
+            buf_pos = m.start + m.sent - m.buf_start
+            buf_remaining = m.body_buffer.count() - buf_pos
+            if buf_remaining = 0
+                m.log.info("source buffer is empty")
+            end if
+            req_remaining = m.body_buffer_length - m.sent
+            if buf_remaining > req_remaining
+                buf_remaining = req_remaining
+            end if
+            sent = sock.send(m.body_buffer, buf_pos, buf_remaining)
+            m.LogInfo(sent, m.buf_start + buf_pos, m.body_buffer_length)
+            if sent > 0
+                m.sent = m.sent + sent
+            end if
+            return sent
+        end function
+
+        function SendHeader(sock as object, bufsize as integer) as integer
+            if m.header = invalid
+                m.GenerateHeader()
+            end if
+
+            if m.header_sent = 0
+                sent = sock.sendStr(m.header)
+            else
+                sent = sock.sendStr(m.header.mid(m.header_sent))
+            end if
+            m.LogInfo(sent, m.header_sent, m.header_length)
+            if sent > 0
+                m.header_sent = m.header_sent + sent
+            end if
+            return sent
+        end function
+
+        function GenerateHeader()
+            code = m.http_code
+            title = WebUtils.HttpTitle(code)
+
+            m.headers["Date"] = m.Now()
+            m.headers["Server"] = m.settings.PackageName
+
+            if not m.headers.DoesExist("Connection")
+                m.KeepAlive(false)
+            end if
+
+            m.header = "HTTP/1.1" + Stri(code) + " " + title + WinNL()
+            for each header in m.headers
+                m.header = m.header + header + ": " + m.headers[header] + WinNL()
+            end for
+
+            m.header = m.header + WinNL()
+            m.header_length = m.header.len()
+        end function
+
+        function Done() as boolean
+            return m.sent = m.body_buffer_length
+        end function
+
+        function DoneHeader() as boolean
+            return m.header_sent = m.header_length
+        end function
+
+        function LogInfo(recent as integer, from as integer, total as integer)
+            m.log.info("Sent" + Stri(recent) + " [" + m.MakeRange(from, recent, total) + "]")
+        end function
+
+        function KeepAlive(keepAlive as boolean)
+            if keepAlive
+                m.headers["Connection"] = "keep-alive"
+                m.headers["Keep-Alive"] = "timeout=" + Stri(m.settings.Idletime).trim()
+            else
+                m.headers["Connection"] = "close"
+                m.headers.Delete("Keep-Alive")
+            end if
+        end function
+
+        function Now() as string
+            if m._now = invalid
+                m._now = TimeUtils.RFC1123_Date(TimeUtils.Now())
+            end if
+            return m._now
+        end function
+
+        function GeneratedBy() as string
+            return "generated by " + m.settings.PackageName + " on " + m.Now()
+        end function
+
+        function MakeRange(start as integer, length as integer, total as integer) as string
+            return itostr(start) + "-" + itostr(start + length - 1) + "/" + itostr(total)
+        end function
+
+    end class
+end namespace
