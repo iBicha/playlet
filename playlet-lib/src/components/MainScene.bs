@@ -29,6 +29,7 @@ function Init()
 
     scene = m.top.getScene()
     scene.ObserveField("inputArgs", "InputArgumentsReceived")
+    scene.signalBeacon("AppLaunchComplete")
 end function
 
 function InitWebServer()
@@ -110,19 +111,10 @@ function InputArgumentsReceived() as void
 end function
 
 function PlayVideoFromArgs(args as object) as void
-    if args = invalid
-        return
-    end if
-
-    contentId = args.contentId
-    ' mediaType is not unused, not putting it here fails validation
-    ' bs:disable-next-line
-    mediaType = args.mediaType
-
-    if contentId = invalid
+    if args = invalid or args.contentId = invalid
         return
     end if
 
     sender = m.videoContainer.sender ?? m.currentFocued
-    PlayVideo(contentId, { sender: sender })
+    PlayVideo(args.contentId, { sender: sender })
 end function
