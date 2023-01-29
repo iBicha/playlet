@@ -2,6 +2,12 @@ function Init() as void
     m.top.backgroundColor = "0x242424FF"
     m.top.backgroundURI = ""
 
+    m.loadingIndicator = m.top.findNode("LoadingIndicator")
+    m.loadingIndicator.visible = true
+    m.global.addFields({
+        loadingIndicator: m.loadingIndicator
+    })
+
     m.playletLibUrls = GetPlayletLibUrls()
     m.playletLibUrlIndex = 0
 
@@ -31,10 +37,12 @@ end function
 
 function LoadPlayletLib() as void
     if m.playletLibUrlIndex >= m.playletLibUrls.Count()
+        m.loadingIndicator.visible = false
         ShowPlayletLibLoadErrorDialog()
         return
     end if
 
+    RemoveComponentLibrary()
     m.lib = m.top.getScene().createChild("ComponentLibrary")
     m.lib.observeField("loadStatus", "OnLoadStatusChanged")
 
@@ -46,8 +54,11 @@ end function
 function OnLoadStatusChanged() as void
     uri = m.playletLibUrls[m.playletLibUrlIndex].link
     if m.lib.loadStatus = "ready"
+        RemoveComponentLibrary()
         ?"Playlet lib loaded from " uri
-        m.top.getScene().createChild("PlayletLib:MainScene")
+        scene = m.top.getScene()
+        container = scene.findNode("MainSceneContainer")
+        container.createChild("PlayletLib:MainScene")
         return
     end if
 
@@ -61,6 +72,16 @@ function OnLoadStatusChanged() as void
         m.playletLibUrlIndex += 1
         LoadPlayletLib()
     end if
+end function
+
+function RemoveComponentLibrary() as void
+    if m.lib = invalid
+        return
+    end if
+
+    scene = m.top.getScene()
+    scene.removeChild(m.lib)
+    m.lib = invalid
 end function
 
 function ShowPlayletLibLoadErrorDialog()
