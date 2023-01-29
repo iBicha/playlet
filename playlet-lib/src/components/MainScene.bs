@@ -1,0 +1,120 @@
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/components/VideoPlayer/Video.bs"
+
+function Init()
+    log.initializeLogManager(["log_PrintTransport"], 2)
+
+    m.videoContainer = m.top.findNode("VideoContainer")
+    m.global.addFields({
+        videoContainer: m.videoContainer
+    })
+
+    m.homeGridScreen = m.top.findNode("HomeGridScreen")
+    m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
+    m.homeGridScreen.SetFocus(true)
+    m.currentFocued = m.homeGridScreen
+
+    m.settingsScreen = m.top.findNode("SettingsScreen")
+
+    m.searchScreen = m.top.findNode("SearchScreen")
+    m.searchScreen.ObserveField("escape", "OnSearchScreenEscape")
+
+    m.navBar = m.top.findNode("NavBar")
+    m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
+    m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
+
+    InitWebServer()
+
+    LaunchArgumentsReceived()
+
+    scene = m.top.getScene()
+    scene.ObserveField("inputArgs", "InputArgumentsReceived")
+    scene.signalBeacon("AppLaunchComplete")
+end function
+
+function InitWebServer()
+    m.serverTask = createObject("roSGNode", "WebServerTask")
+    m.serverTask.id = "WebServerTask"
+    m.serverTask.ObserveField("login", "OnWebServerLogin")
+    m.serverTask.ObserveField("command", "OnWebServerCommand")
+    m.serverTask.control = "RUN"
+end function
+
+function OnSearchScreenEscape()
+    m.navBar.SetFocus(true)
+    m.navBar.focusIndex = 0
+    m.currentFocued = m.navBar
+end function
+
+function OnHomeGridScreenEscape()
+    m.navBar.SetFocus(true)
+    m.navBar.focusIndex = 1
+    m.currentFocued = m.navBar
+end function
+
+function OnNavBarEscape()
+    index = m.navBar.escapeIndex
+    if index = 0
+        m.searchScreen.focus = true
+        m.currentFocued = m.searchScreen
+    else if index = 1
+        m.homeGridScreen.focus = true
+        m.currentFocued = m.homeGridScreen
+    else if index = 2
+        m.settingsScreen.focus = true
+    end if
+end function
+
+function OnNavIndexChange() as void
+    index = m.navBar.focusIndex
+    if index = -1
+        return
+    end if
+    if index = 0
+        m.searchScreen.visible = true
+        m.homeGridScreen.visible = false
+        m.settingsScreen.visible = false
+    else if index = 1
+        m.searchScreen.visible = false
+        m.homeGridScreen.visible = true
+        m.settingsScreen.visible = false
+    else if index = 2
+        m.searchScreen.visible = false
+        m.homeGridScreen.visible = false
+        m.settingsScreen.visible = true
+    end if
+end function
+
+function OnWebServerLogin()
+    m.homeGridScreen.refresh = true
+end function
+
+function OnWebServerCommand()
+    if m.serverTask.command.StartsWith("play:")
+        sender = m.videoContainer.sender ?? m.currentFocued
+        PlayVideo(m.serverTask.command.Mid(5), { sender: sender })
+    end if
+end function
+
+function LaunchArgumentsReceived() as void
+    scene = m.top.getScene()
+    launchArgs = scene.launchArgs
+    ? "LaunchArgumentsReceived " launchArgs
+    PlayVideoFromArgs(launchArgs)
+end function
+
+function InputArgumentsReceived() as void
+    scene = m.top.getScene()
+    inputArgs = scene.inputArgs
+    ? "InputArgumentsReceived " inputArgs
+    PlayVideoFromArgs(inputArgs)
+end function
+
+function PlayVideoFromArgs(args as object) as void
+    if args = invalid or args.contentId = invalid
+        return
+    end if
+
+    sender = m.videoContainer.sender ?? m.currentFocued
+    PlayVideo(args.contentId, { sender: sender })
+end function

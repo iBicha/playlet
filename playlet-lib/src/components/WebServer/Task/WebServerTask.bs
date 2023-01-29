@@ -1,0 +1,87 @@
+import "pkg:/components/WebServer/HttpSettings.bs"
+import "pkg:/components/WebServer/HttpServer.bs"
+import "pkg:/components/WebServer/Middleware/HttpStaticFilesRouter.bs"
+import "pkg:/components/WebServer/Middleware/HttpDefaultRouter.bs"
+import "pkg:/components/WebServer/Middleware/InvidiousRouter.bs"
+import "pkg:/components/WebServer/Middleware/RegistryApiRouter.bs"
+import "pkg:/components/WebServer/Middleware/StateApiRouter.bs"
+import "pkg:/components/WebServer/Middleware/CommandsApiRouter.bs"
+import "pkg:/components/WebServer/Middleware/CorsMiddleware.bs"
+import "pkg:/components/WebServer/Middleware/BasicAuthMiddleware.bs"
+import "pkg:/components/WebServer/Middleware/DashRouter.bs"
+import "pkg:/components/WebServer/WebSocket/Middleware/WebSocketMiddleware.bs"
+import "pkg:/components/WebServer/WebSocket/WebSocketServer.bs"
+
+function Init()
+    m.top.functionName = "WebServerLoop"
+end function
+
+function WebServerLoop()
+    m.webServerPort = CreateObject("roMessagePort")
+
+    m.settings = new Http.HttpSettings(m.webServerPort)
+    ' Root at www to get http://IP_ADDRESS:PORT/index.html
+    m.settings.WwwRoot = "libpkg:/www"
+    ' Short interval to keep polling on web socket messages
+    m.settings.Timeout = 500
+    m.server = new Http.HttpServer(m.settings, m)
+
+    #if WEB_SOCKETS
+        m.websocket = new Web.WebSocketServer()
+        m.websocket.OnMessage(function(context as object)
+            connection = context.connection
+            message = context.message
+            connection.Send("Echo: " + message)
+        end function)
+        m.server.websocket = m.websocket
+    #end if
+
+    homeRouter = new Http.HttpRouter()
+    homeRouter.Get("/", function(context as object) as boolean
+        response = context.response
+        response.Redirect("/index.v1.html")
+        return true
+    end function)
+
+    if IsDebugMode()
+        allowedOrigin = "*"
+    else
+        allowedOrigin = `http://${GetLocalIpAddress()}:8888`
+    end if
+    m.server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
+    #if WEB_SOCKETS
+        m.server.UseRouter(new Http.WebSocketMiddleware())
+    #end if
+    m.server.UseRouter(homeRouter)
+    m.server.UseRouter(new Http.DashRouter())
+    m.server.UseRouter(new Http.CommandsApiRouter())
+    m.server.UseRouter(new Http.StateApiRouter())
+    m.server.UseRouter(new Http.InvidiousRouter())
+    m.server.UseRouter(new Http.HttpStaticFilesRouter("/", m.settings.WwwRoot, false, false, false))
+    if IsDebugMode()
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", true, true, false))
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/pkg", "pkg:/", true, true))
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/tmp", "tmp:/", true, true))
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/cachefs", "cachefs:/", true, true))
+        m.server.UseRouter(new Http.HttpStaticFilesRouter("/debug/common", "common:/", true, true))
+    end if
+    #if WEB_SERVER_BASIC_AUTH
+        m.server.UseRouter(new Http.BasicAuthMiddleware())
+    #end if
+    m.server.UseRouter(new Http.RegistryApiRouter())
+    m.server.UseRouter(new Http.HttpDefaultRouter())
+
+    timeout = m.settings.Timeout
+    msgPort = m.settings.MessagePort
+
+    while true
+        m.server.PreWait()
+        m.websocket.Poll()
+        msg = wait(timeout, msgPort)
+        msg = wait(0, m.port)
+        msgType = type(msg)
+        if msgType = "roSocketEvent" or msg = invalid
+            m.server.PostWait()
+        end if
+    end while
+end function
