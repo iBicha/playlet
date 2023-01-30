@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - A script to sync between Youtube profile and and Invidious profile
 - Moved most of Playlet logic to Playlet Lib
+- Support for multiple caption languages
 
 ## [0.6.0] - 2023-01-10
 ### Added

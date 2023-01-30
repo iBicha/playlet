@@ -1,24 +1,19 @@
 function SetCaptions(metadata as object, videoPlayer as object, contentNode as object) as void
-    ' TODO: check if we have caption settings ON
-    ' TODO: read favorate language from system settings
-    ' TODO: populate list of caption tracks
     if metadata.captions.Count() = 0
         return
     end if
-    videoPlayer.globalCaptionMode = "ON"
-    contentNode.ClosedCaptions = True
-    selectedCaption = metadata.captions[0]
+    isoLanguageList = ParseJson(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json"))
+    instance = InvidiousSettings.GetSelectedInstance()
 
-    ' Use favorite caption langauage, or the first one
+    subtitleTracks = []
+
     for each caption in metadata.captions
-        if caption.language_code = "en"
-            selectedCaption = caption
-            exit for
-        end if
+        subtitleTracks.Push({
+            Description: caption.label,
+            Language: isoLanguageList[caption.language_code] ?? caption.language_code,
+            TrackName: instance + caption.url
+        })
     end for
-
-    contentNode.SubtitleConfig = {
-        ShowSubtitle: 1,
-        TrackName: InvidiousSettings.GetSelectedInstance() + selectedCaption.url
-    }
+    contentNode.ClosedCaptions = True
+    contentNode.SubtitleTracks = subtitleTracks
 end function
