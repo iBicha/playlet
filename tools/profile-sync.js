@@ -11,70 +11,47 @@ const ip = require('ip');
 const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
-async function updateFeed(sourceUrl, destinationPlaylist, invidiousInstance, token, browser = undefined, limit = 50) {
-    console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`)
-
-    const videos = await extractVideos(sourceUrl, browser, limit);
-
-    let playlist = await getPlaylist(invidiousInstance, token, destinationPlaylist)
-    if (playlist) {
-        await deletePlaylist(invidiousInstance, token, playlist)
-    }
-
-    playlist = await createPlaylist(invidiousInstance, token, destinationPlaylist)
-    for (let i = 0; i < videos.length; i++) {
-        const videoId = videos[i];
-        console.log(`Adding video "${videoId}" (${i + 1}/${videos.length}) to playlist "${playlist.title}"`)
-        await addPlaylistVideo(invidiousInstance, token, playlist, videoId)
-    }
-}
-
-async function getPlaylist(invidiousInstance, token, playlistName) {
-    console.log(`Finding playlist ${playlistName}`)
-    const response = await fetch(`${invidiousInstance}/api/v1/auth/playlists`, {
+async function exportInvidiousProfile(invidiousInstance, token) {
+    console.log(`Exporting Invidious profile`)
+    const response = await fetch(`${invidiousInstance}/api/v1/auth/export/invidious`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
     })
-    const playlists = await response.json()
-    return playlists.find(p => p.title === playlistName);
-}
-
-async function createPlaylist(invidiousInstance, token, playlistName) {
-    console.log(`Creating playlist "${playlistName}"`)
-    const response = await fetch(`${invidiousInstance}/api/v1/auth/playlists`, {
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        method: "POST",
-        body: JSON.stringify({ title: playlistName, privacy: "private" })
-    })
     return await response.json()
 }
 
-async function addPlaylistVideo(invidiousInstance, token, playlist, videoId) {
-    await fetch(`${invidiousInstance}/api/v1/auth/playlists/${playlist.playlistId}/videos`, {
+async function importInvidiousProfile(invidiousInstance, token, profile) {
+    console.log(`Importing Invidious profile`)
+    await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
         headers: {
             "Authorization": `Bearer ${token}`,
             'Content-Type': 'application/json'
         },
         method: "POST",
-        body: JSON.stringify({ videoId: videoId })
+        body: JSON.stringify(profile)
     })
 }
 
-async function deletePlaylist(invidiousInstance, token, playlist) {
-    console.log(`Playlist "${playlist.title}" exists. Deleting.`)
-    await fetch(`${invidiousInstance}/api/v1/auth/playlists/${playlist.playlistId}`, {
-        headers: {
-            "Authorization": `Bearer ${token}`,
-        },
-        method: "DELETE"
-    })
+async function updatePlaylist(sourceUrl, destinationPlaylist, profile, browser = undefined, limit = 50) {
+    console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`);
+
+    const videos = await extractVideos(sourceUrl, browser, limit);
+
+    let playlistIndex = profile.playlists.findIndex((playlist) => playlist.title === destinationPlaylist);
+    if (playlistIndex === -1) {
+        profile.playlists.push({
+            title: destinationPlaylist,
+            privacy: "private"
+        });
+        playlistIndex = profile.playlists.length - 1
+    }
+
+    profile.playlists[playlistIndex].description = "Imported from Youtube";
+    profile.playlists[playlistIndex].videos = videos
 }
 
-async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
+async function extractVideos(sourceUrl, browser = undefined, limit = 50) {
     console.log(`Extracting videos from feed "${sourceUrl}" with limit "${limit}"`)
     return await new Promise(function (resolve, reject) {
         let ytDlpErrors = ""
@@ -99,7 +76,7 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
             newVideos.forEach(video => {
                 videos.push(video)
             });
-            
+
             if (videos.length >= limit) {
                 ytDlpProcess.kill()
             }
@@ -114,6 +91,46 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
             process.stdout.write('\n')
             if (code === 0 || videos.length === limit) {
                 resolve(videos)
+            } else {
+                reject({ code: code, error: ytDlpErrors })
+            }
+        });
+    })
+}
+
+async function extractSubscriptionChannels(browser) {
+    console.log(`Extracting channels from feed/subscriptions`)
+    return await new Promise(function (resolve, reject) {
+        let ytDlpErrors = ""
+        const channels = new Set()
+
+        args = ['https://www.youtube.com/feed/subscriptions', '--flat-playlist', '--lazy-playlist', '--print', '%(channel_id)s']
+        if (browser) {
+            args.push('--cookies-from-browser', browser)
+        }
+        const ytDlpProcess = spawn('yt-dlp', args);
+
+        ytDlpProcess.stdout.on('data', function (data) {
+            process.stdout.write('.')
+            newChannels = data.toString()
+                .split('\n')
+                .map(id => id.trim())
+                .filter(i => i);
+
+            newChannels.forEach(channel => {
+                channels.add(channel)
+            });
+        });
+
+        ytDlpProcess.stderr.on('data', function (data) {
+            process.stdout.write('.')
+            ytDlpErrors += data.toString() + '\n'
+        });
+
+        ytDlpProcess.on('close', function (code) {
+            process.stdout.write('\n')
+            if (code === 0) {
+                resolve(Array.from(channels))
             } else {
                 reject({ code: code, error: ytDlpErrors })
             }
@@ -170,7 +187,6 @@ async function deleteAccessToken(invidiousInstance, token) {
         method: "POST",
         body: token
     })
-
 }
 
 (async () => {
@@ -198,13 +214,21 @@ async function deleteAccessToken(invidiousInstance, token) {
 
         token = await getAccessToken(invidiousInstance)
 
-        await updateFeed("https://www.youtube.com/", "Youtube - Recommended", invidiousInstance, token, browser)
+        const profile = await exportInvidiousProfile(invidiousInstance, token);
+
+        await updatePlaylist("https://www.youtube.com", "Recommended", profile, browser)
+
         if (browser) {
-            await updateFeed("https://www.youtube.com/feed/subscriptions", "Youtube - Subscriptions", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/playlist?list=WL", "Youtube - Watch later", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/playlist?list=LL", "Youtube - Liked Videos", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/feed/history", "Youtube - History", invidiousInstance, token, browser)
+            console.log("Updating subscriptions")
+            profile.subscriptions = await extractSubscriptionChannels(browser)
+            console.log("Updating watch history")
+            profile.watch_history = await extractVideos("https://www.youtube.com/feed/history", browser)
+
+            await updatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", profile, browser)
+            await updatePlaylist("https://www.youtube.com/playlist?list=LL", "Liked Videos", profile, browser)
         }
+
+        await importInvidiousProfile(invidiousInstance, token, profile);
     }
     catch (error) {
         console.error(error);
