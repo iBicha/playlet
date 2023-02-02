@@ -15,29 +15,28 @@ function Init() as void
 end function
 
 function GetPlayletLibUrls() as object
+    savedUrls = GetPlayletLibUrlsFromRegistry()
+    if savedUrls <> invalid
+        m.shouldClearRegistryOnLoadFail = true
+        return savedUrls
+    end if
+
     github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
     embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
-    registry = { type: "registry", link: ReadRegistryKey("playlet_lib_url", "Playlet") }
 
     #if DEBUG
         return [embedded]
+    #else
+        return [github, embedded]
     #end if
-
-    urls = []
-
-    if registry.link <> invalid
-        urls.Push(registry)
-    end if
-
-    urls.push(github)
-    urls.push(embedded)
-
-    return urls
 end function
 
 function LoadPlayletLib() as void
     if m.playletLibUrlIndex >= m.playletLibUrls.Count()
         m.loadingIndicator.visible = false
+        if m.shouldClearRegistryOnLoadFail = true
+            DeleteRegistryKey("playlet_lib_urls", "Playlet")
+        end if
         ShowPlayletLibLoadErrorDialog()
         return
     end if
@@ -64,10 +63,6 @@ function OnLoadStatusChanged() as void
 
     if m.lib.loadStatus = "failed"
         ?"Playlet lib failed to load from " uri
-        if m.playletLibUrls[m.playletLibUrlIndex].type = "registry"
-            ' Delete library url from registry since it failed
-            DeleteRegistryKey("playlet_lib_url", "Playlet")
-        end if
         ' Try next url
         m.playletLibUrlIndex += 1
         LoadPlayletLib()
