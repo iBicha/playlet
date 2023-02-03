@@ -223,15 +223,17 @@ async function deleteAccessToken(invidiousInstance, token) {
         parser.add_argument('--browser', { help: 'Use cookies from browser' });
         parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
         parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
+        parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', default: 500 });
 
         let args = parser.parse_args()
         invidiousInstance = args.invidious
         browser = args.browser
         outputFile = args.output_file
+        playlistLimit = args.playlist_limit
 
         const profile = { playlists: [] }
 
-        profile.playlists.push(await generatePlaylist("https://www.youtube.com", "Recommended", browser))
+        profile.playlists.push(await generatePlaylist("https://www.youtube.com", "Recommended", browser, playlistLimit))
         const playlistsToDelete = ["Recommended"]
 
         if (browser) {
@@ -239,13 +241,13 @@ async function deleteAccessToken(invidiousInstance, token) {
             profile.subscriptions = await extractYtDlp("https://www.youtube.com/feed/channels", browser, -1)
 
             console.log("Updating watch history")
-            profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser)
+            profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser, playlistLimit)
 
             const playlists = await extractYtDlpPlaylists(browser);
             for (let i = 0; i < playlists.length; i++) {
                 const playlist = playlists[i];
                 try {
-                    profile.playlists.push(await generatePlaylist(playlist.url, playlist.title, browser))
+                    profile.playlists.push(await generatePlaylist(playlist.url, playlist.title, browser, playlistLimit))
                     playlistsToDelete.push(playlist.title)    
                 } catch (error) {
                     console.log(error)
