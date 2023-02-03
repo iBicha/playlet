@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved most of Playlet logic to Playlet Lib
 - Support for multiple caption languages
 
+#### Fixed
+- Issue where auto-play keeps playing the same videos in a loop
+
 ## [0.6.0] - 2023-01-10
 ### Added
 - Ability to clear search history from web app
