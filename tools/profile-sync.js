@@ -222,20 +222,12 @@ async function deleteAccessToken(invidiousInstance, token) {
 
         parser.add_argument('--browser', { help: 'Use cookies from browser' });
         parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
+        parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
 
         let args = parser.parse_args()
         invidiousInstance = args.invidious
         browser = args.browser
-
-        if (!invidiousInstance) {
-            try {
-                invidiousInstance = await getInvidiousInstance()
-            } catch (error) {
-                throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
-            }
-        }
-
-        token = await getAccessToken(invidiousInstance)
+        outputFile = args.output_file
 
         const profile = { playlists: [] }
 
@@ -261,8 +253,24 @@ async function deleteAccessToken(invidiousInstance, token) {
             }
         }
 
-        await deletePlaylists(invidiousInstance, token, playlistsToDelete)
-        await importInvidiousProfile(invidiousInstance, token, profile);
+        if (outputFile) {
+            console.log(`Writing profile to ${outputFile}`)
+            fs.writeFileSync(outputFile, JSON.stringify(profile, null, 2))
+        } else {
+            if (!invidiousInstance) {
+                try {
+                    invidiousInstance = await getInvidiousInstance()
+                } catch (error) {
+                    throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
+                }
+            }
+    
+            token = await getAccessToken(invidiousInstance)
+    
+            await deletePlaylists(invidiousInstance, token, playlistsToDelete)
+            await importInvidiousProfile(invidiousInstance, token, profile);    
+        }
+
     }
     catch (error) {
         console.error(error);
@@ -271,7 +279,7 @@ async function deleteAccessToken(invidiousInstance, token) {
         if (token) {
             console.log("Deleting token")
             await deleteAccessToken(invidiousInstance, token)
-            console.log("Done!")
         }
+        console.log("Done!")
     }
 })();
