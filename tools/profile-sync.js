@@ -39,7 +39,7 @@ async function updatePlaylist(sourceUrl, destinationPlaylist, profile, browser =
     profile.playlists = profile.playlists
         .filter(playlist => playlist.title !== destinationPlaylist);
 
-    const videos = await extractVideos(sourceUrl, browser, limit);
+    const videos = await extractYtDlp(sourceUrl, browser, limit);
 
     profile.playlists.push({
         title: destinationPlaylist,
@@ -79,11 +79,11 @@ async function deletePlaylist(invidiousInstance, token, playlist) {
     })
 }
 
-async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
-    console.log(`Extracting videos from feed "${sourceUrl}" with limit "${limit}"`)
+async function extractYtDlp(sourceUrl, browser = undefined, limit = 100) {
+    console.log(`Extracting from "${sourceUrl}" with limit "${limit}"`)
     return await new Promise(function (resolve, reject) {
         let ytDlpErrors = ""
-        const videos = []
+        const items = []
 
         args = [sourceUrl, '--flat-playlist', '--lazy-playlist', '--print', '%(id)s']
         if (browser) {
@@ -93,19 +93,19 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
 
         ytDlpProcess.stdout.on('data', function (data) {
             process.stdout.write('.')
-            if (videos.length > limit) {
+            if (limit > 0 && items.length > limit) {
                 return;
             }
-            newVideos = data.toString()
+            newItems = data.toString()
                 .split('\n')
-                .map(video => video.trim())
+                .map(item => item.trim())
                 .filter(i => i);
 
-            newVideos.forEach(video => {
-                videos.push(video)
+            newItems.forEach(item => {
+                items.push(item)
             });
 
-            if (videos.length >= limit) {
+            if (limit > 0 && items.length >= limit) {
                 ytDlpProcess.kill()
             }
         });
@@ -117,48 +117,8 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
 
         ytDlpProcess.on('close', function (code) {
             process.stdout.write('\n')
-            if (code === 0 || videos.length === limit) {
-                resolve(videos)
-            } else {
-                reject({ code: code, error: ytDlpErrors })
-            }
-        });
-    })
-}
-
-async function extractSubscriptionChannels(browser) {
-    console.log(`Extracting channels from feed/subscriptions`)
-    return await new Promise(function (resolve, reject) {
-        let ytDlpErrors = ""
-        const channels = new Set()
-
-        args = ['https://www.youtube.com/feed/subscriptions', '--flat-playlist', '--lazy-playlist', '--print', '%(channel_id)s']
-        if (browser) {
-            args.push('--cookies-from-browser', browser)
-        }
-        const ytDlpProcess = spawn('yt-dlp', args);
-
-        ytDlpProcess.stdout.on('data', function (data) {
-            process.stdout.write('.')
-            newChannels = data.toString()
-                .split('\n')
-                .map(id => id.trim())
-                .filter(i => i);
-
-            newChannels.forEach(channel => {
-                channels.add(channel)
-            });
-        });
-
-        ytDlpProcess.stderr.on('data', function (data) {
-            process.stdout.write('.')
-            ytDlpErrors += data.toString() + '\n'
-        });
-
-        ytDlpProcess.on('close', function (code) {
-            process.stdout.write('\n')
-            if (code === 0) {
-                resolve(Array.from(channels))
+            if (code === 0 || (limit > 0 && items.length === limit)) {
+                resolve(items)
             } else {
                 reject({ code: code, error: ytDlpErrors })
             }
@@ -243,17 +203,16 @@ async function deleteAccessToken(invidiousInstance, token) {
         token = await getAccessToken(invidiousInstance)
 
         const profile = await exportInvidiousProfile(invidiousInstance, token);
-        const currentPlaylists = await getPlaylists(invidiousInstance, token);
 
         await updatePlaylist("https://www.youtube.com", "Recommended", profile, browser);
         const playlistsToDelete = ["Recommended"]
 
         if (browser) {
             console.log("Updating subscriptions")
-            profile.subscriptions = await extractSubscriptionChannels(browser)
+            profile.subscriptions = await extractYtDlp("https://www.youtube.com/feed/channels", browser, -1)
 
             console.log("Updating watch history")
-            profile.watch_history = await extractVideos("https://www.youtube.com/feed/history", browser)
+            profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser)
 
             await updatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", profile, browser)
             playlistsToDelete.push("Watch later")
