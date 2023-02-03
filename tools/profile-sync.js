@@ -66,6 +66,54 @@ async function deletePlaylist(invidiousInstance, token, playlist) {
     })
 }
 
+async function extractYtDlpPlaylists(browser) {
+    console.log(`Extracting playlists`)
+    return await new Promise(function (resolve, reject) {
+        let ytDlpErrors = ""
+        const items = []
+
+        args = ["https://www.youtube.com/feed/library", '--flat-playlist', '--lazy-playlist', '--dump-json', '--cookies-from-browser', browser]
+        const ytDlpProcess = spawn('yt-dlp', args);
+
+        ytDlpProcess.stdout.on('data', function (data) {
+            process.stdout.write('.')
+            newItems = data.toString()
+                .split('\n')
+                .map(item => item.trim())
+                .filter(i => i);
+
+            newItems.forEach(item => {
+                try {
+                    const json = JSON.parse(item);
+                    if (json.url?.startsWith("https://www.youtube.com/playlist?list")) {
+                        items.push({
+                            url: json.url,
+                            title: json.title
+                        })
+                    }
+                } catch (error) {
+                    console.error(error)
+                    ytDlpErrors += error
+                }
+            });
+        });
+
+        ytDlpProcess.stderr.on('data', function (data) {
+            process.stdout.write('.')
+            ytDlpErrors += data.toString() + '\n'
+        });
+
+        ytDlpProcess.on('close', function (code) {
+            process.stdout.write('\n')
+            if (code === 0) {
+                resolve(items)
+            } else {
+                reject({ code: code, error: ytDlpErrors })
+            }
+        });
+    })
+}
+
 async function extractYtDlp(sourceUrl, browser = undefined, limit = 100) {
     console.log(`Extracting from "${sourceUrl}" with limit "${limit}"`)
     return await new Promise(function (resolve, reject) {
@@ -201,11 +249,16 @@ async function deleteAccessToken(invidiousInstance, token) {
             console.log("Updating watch history")
             profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser)
 
-            profile.playlists.push(await generatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", browser))
-            playlistsToDelete.push("Watch later")
-
-            profile.playlists.push(await generatePlaylist("https://www.youtube.com/playlist?list=LL", "Liked Videos", browser))
-            playlistsToDelete.push("Liked Videos")
+            const playlists = await extractYtDlpPlaylists(browser);
+            for (let i = 0; i < playlists.length; i++) {
+                const playlist = playlists[i];
+                try {
+                    profile.playlists.push(await generatePlaylist(playlist.url, playlist.title, browser))
+                    playlistsToDelete.push(playlist.title)    
+                } catch (error) {
+                    console.log(error)
+                }
+            }
         }
 
         await deletePlaylists(invidiousInstance, token, playlistsToDelete)
