@@ -33,25 +33,53 @@ async function importInvidiousProfile(invidiousInstance, token, profile) {
     })
 }
 
-async function updatePlaylist(sourceUrl, destinationPlaylist, profile, browser = undefined, limit = 50) {
+async function updatePlaylist(sourceUrl, destinationPlaylist, profile, browser = undefined, limit = 100) {
     console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`);
+
+    profile.playlists = profile.playlists
+        .filter(playlist => playlist.title !== destinationPlaylist);
 
     const videos = await extractVideos(sourceUrl, browser, limit);
 
-    let playlistIndex = profile.playlists.findIndex((playlist) => playlist.title === destinationPlaylist);
-    if (playlistIndex === -1) {
-        profile.playlists.push({
-            title: destinationPlaylist,
-            privacy: "private"
-        });
-        playlistIndex = profile.playlists.length - 1
-    }
-
-    profile.playlists[playlistIndex].description = "Imported from Youtube";
-    profile.playlists[playlistIndex].videos = videos
+    profile.playlists.push({
+        title: destinationPlaylist,
+        description: "Imported from Youtube",
+        privacy: "private",
+        videos: videos
+    });
 }
 
-async function extractVideos(sourceUrl, browser = undefined, limit = 50) {
+async function deletePlaylists(invidiousInstance, token, playlistNames) {
+    const playlistsToDelete = (await getPlaylists(invidiousInstance, token))
+        .filter(playlist => playlistNames.indexOf(playlist.title) !== -1);
+
+    for (let i = 0; i < playlistsToDelete.length; i++) {
+        const playlist = playlistsToDelete[i];
+        await deletePlaylist(invidiousInstance, token, playlist);
+    }
+}
+
+async function getPlaylists(invidiousInstance, token) {
+    console.log(`Finding playlists`)
+    const response = await fetch(`${invidiousInstance}/api/v1/auth/playlists`, {
+        headers: {
+            "Authorization": `Bearer ${token}`
+        }
+    })
+    return await response.json()
+}
+
+async function deletePlaylist(invidiousInstance, token, playlist) {
+    console.log(`Playlist "${playlist.title}" exists. Deleting.`)
+    await fetch(`${invidiousInstance}/api/v1/auth/playlists/${playlist.playlistId}`, {
+        headers: {
+            "Authorization": `Bearer ${token}`,
+        },
+        method: "DELETE"
+    })
+}
+
+async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
     console.log(`Extracting videos from feed "${sourceUrl}" with limit "${limit}"`)
     return await new Promise(function (resolve, reject) {
         let ytDlpErrors = ""
@@ -215,19 +243,26 @@ async function deleteAccessToken(invidiousInstance, token) {
         token = await getAccessToken(invidiousInstance)
 
         const profile = await exportInvidiousProfile(invidiousInstance, token);
+        const currentPlaylists = await getPlaylists(invidiousInstance, token);
 
-        await updatePlaylist("https://www.youtube.com", "Recommended", profile, browser)
+        await updatePlaylist("https://www.youtube.com", "Recommended", profile, browser);
+        const playlistsToDelete = ["Recommended"]
 
         if (browser) {
             console.log("Updating subscriptions")
             profile.subscriptions = await extractSubscriptionChannels(browser)
+
             console.log("Updating watch history")
             profile.watch_history = await extractVideos("https://www.youtube.com/feed/history", browser)
 
             await updatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", profile, browser)
+            playlistsToDelete.push("Watch later")
+
             await updatePlaylist("https://www.youtube.com/playlist?list=LL", "Liked Videos", profile, browser)
+            playlistsToDelete.push("Liked Videos")
         }
 
+        await deletePlaylists(invidiousInstance, token, playlistsToDelete)
         await importInvidiousProfile(invidiousInstance, token, profile);
     }
     catch (error) {
