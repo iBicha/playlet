@@ -11,16 +11,6 @@ const ip = require('ip');
 const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
-async function exportInvidiousProfile(invidiousInstance, token) {
-    console.log(`Exporting Invidious profile`)
-    const response = await fetch(`${invidiousInstance}/api/v1/auth/export/invidious`, {
-        headers: {
-            "Authorization": `Bearer ${token}`
-        }
-    })
-    return await response.json()
-}
-
 async function importInvidiousProfile(invidiousInstance, token, profile) {
     console.log(`Importing Invidious profile`)
     await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
@@ -33,20 +23,17 @@ async function importInvidiousProfile(invidiousInstance, token, profile) {
     })
 }
 
-async function updatePlaylist(sourceUrl, destinationPlaylist, profile, browser = undefined, limit = 100) {
-    console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`);
-
-    profile.playlists = profile.playlists
-        .filter(playlist => playlist.title !== destinationPlaylist);
+async function generatePlaylist(sourceUrl, playlistName, browser = undefined, limit = 100) {
+    console.log(`Updating playlist "${playlistName}" from feed "${sourceUrl}"`);
 
     const videos = await extractYtDlp(sourceUrl, browser, limit);
 
-    profile.playlists.push({
-        title: destinationPlaylist,
+    return {
+        title: playlistName,
         description: "Imported from Youtube",
         privacy: "private",
         videos: videos
-    });
+    };
 }
 
 async function deletePlaylists(invidiousInstance, token, playlistNames) {
@@ -202,9 +189,9 @@ async function deleteAccessToken(invidiousInstance, token) {
 
         token = await getAccessToken(invidiousInstance)
 
-        const profile = await exportInvidiousProfile(invidiousInstance, token);
+        const profile = { playlists: [] }
 
-        await updatePlaylist("https://www.youtube.com", "Recommended", profile, browser);
+        profile.playlists.push(await generatePlaylist("https://www.youtube.com", "Recommended", browser))
         const playlistsToDelete = ["Recommended"]
 
         if (browser) {
@@ -214,10 +201,10 @@ async function deleteAccessToken(invidiousInstance, token) {
             console.log("Updating watch history")
             profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser)
 
-            await updatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", profile, browser)
+            profile.playlists.push(await generatePlaylist("https://www.youtube.com/playlist?list=WL", "Watch later", browser))
             playlistsToDelete.push("Watch later")
 
-            await updatePlaylist("https://www.youtube.com/playlist?list=LL", "Liked Videos", profile, browser)
+            profile.playlists.push(await generatePlaylist("https://www.youtube.com/playlist?list=LL", "Liked Videos", browser))
             playlistsToDelete.push("Liked Videos")
         }
 
