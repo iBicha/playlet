@@ -5,11 +5,18 @@ import "pkg:/components/SettingsScreen/AppVersionTask.bs"
 
 function Init()
     m.versionLabel = m.top.findNode("VersionLabel")
+    m.playletLibUrlLabel = m.top.findNode("PlayletLibUrlLabel")
+
     m.top.url = `http://${GetLocalIpAddress()}:8888`
 
-    m.appInfo = GetAppInfo()
+    appInfo = GetAppInfo()
+    m.top.appVersion = appInfo.version
+    m.top.libVersion = appInfo.lib_version
 
-    SetVersionLabel(m.appInfo.version, m.appInfo.lib_version, "N/A")
+    scene = m.top.getScene()
+    if scene.playletLibLoadedUrl <> invalid
+        m.top.libUrl = `[${scene.playletLibLoadedUrl.type}|${scene.playletLibLoadedUrl.link}]`
+    end if
     GetLatestVersion()
 end function
 
@@ -26,11 +33,15 @@ end function
 function GetLatestVersion()
     StartAsyncTask(AppVersionTask, {}, function(output as object) as void
         if output.result.latest <> invalid
-            SetVersionLabel(m.appInfo.version, m.appInfo.lib_version, output.result.latest)
+            m.top.latestVersion = output.result.latest
         end if
     end function)
 end function
 
-function SetVersionLabel(appVersion as string, libVersion as string, latest as string)
-    m.versionLabel.text = `Playlet: ${appVersion} | Playlet-Lib: ${libVersion} | Latest: ${latest}`
+function SetVersionLabel()
+    m.versionLabel.text = `Playlet: ${m.top.appVersion} | Playlet-Lib: ${m.top.libVersion} | Latest: ${m.top.latestVersion}`
+end function
+
+function SetPlayletLibUrlLabel()
+    m.playletLibUrlLabel.text = `Playlet-Lib: ${m.top.libUrl}`
 end function
