@@ -1,0 +1,48 @@
+import "pkg:/source/services/SponsorBlock.bs"
+
+function Init()
+    m.categoryLabel = m.top.findNode("categoryLabel")
+    m.translationAnimation = m.top.findNode("translationAnimation")
+    m.translationAnimationInterpolator = m.top.findNode("translationAnimationInterpolator")
+    m.animationTimer = m.top.findNode("animationTimer")
+
+    m.top.translation = [1280, 20]
+    ' m.categoryLabel.text = "Skipped" + chr(10) + "Sponsor"
+    m.translationAnimation.observeField("state", "OnAnimationState")
+    m.animationTimer.observeField("fire", "OnAnimationTimer")
+end function
+
+function OnSegmentSet()
+    category = m.top.segment.category
+    categoryTitle = SponsorBlock.SegmentShortTitle(category)
+    m.categoryLabel.text = "Skipped" + chr(10) + categoryTitle 
+    AnimateIn()
+end function
+
+function OnAnimationTimer()
+    AnimateOut()
+end function
+
+function AnimateIn()
+    m.translationAnimation.unobserveField("state")
+    m.animationTimer.control = "stop"
+    m.animationTimer.control = "start"
+    m.translationAnimation.observeField("state", "OnAnimationState")
+
+    Animate(false)
+end function
+
+function AnimateOut()
+    Animate(true)
+end function
+
+function Animate(reverse as boolean)
+    m.translationAnimationInterpolator.reverse = reverse
+    m.translationAnimation.control = "start"
+end function
+
+function OnAnimationState()
+    if m.translationAnimation.state = "stopped" and m.translationAnimationInterpolator.reverse = true
+        m.top.getParent().removeChild(m.top)
+    end if
+end function
