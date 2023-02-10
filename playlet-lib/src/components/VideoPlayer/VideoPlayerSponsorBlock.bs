@@ -1,9 +1,13 @@
 import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockTask.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockTrackingTask.bs"
+import "pkg:/components/SponsorBlockNotification/SponsorBlockNotificationManager.bs"
 
 function SetupSponsorBlock()
     PositionChapterLabel()
+
+    SponsorBlockNotifcationSetVisible(m.videoContainer.fullscreen)
+
     m.timeLabel = FindTimeLabel()
     m.top.trickPlayBar.observeField("visible", "OnTrickPlayBarVisible")
     m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
@@ -123,6 +127,7 @@ function OnPositionChangeSkipSponsorBlockSections() as void
                 ' TODO: if segmentEnd is at the end of the video, close video
                 m.top.seek = segmentEnd
                 print("Skipping section:" + segment["category"])
+                ShowSponsorBlockNotifcation(segment)
                 SendSkippedSectionEvent(segment.UUID)
                 return
             end if
