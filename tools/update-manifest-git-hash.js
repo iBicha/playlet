@@ -1,4 +1,5 @@
-var shell = require('shelljs');
+const fs = require('fs');
+const shell = require('shelljs');
 
 if (!shell.which('git')) {
   shell.echo('Sorry, this script requires git');
@@ -11,4 +12,14 @@ if (gitStatus.stdout !== '') {
     shell.exit(1);
 }
 
-shell.echo('All Good!');
+const gitCommitHash =  shell.exec('git rev-parse HEAD').stdout.trim();
+
+["playlet/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
+    let appManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' });
+
+    const gitHashPattern = /git_commit_sha=(\w+)/;
+
+    appManifestContent = appManifestContent.replace(gitHashPattern, `git_commit_sha=${gitCommitHash}`);
+
+    fs.writeFileSync(manifestPath, appManifestContent);
+})
