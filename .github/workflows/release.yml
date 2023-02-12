@@ -24,17 +24,12 @@ jobs:
       - name: Build Playlet
         run: npm run build:release:ci
 
-      - name: Create unstable release if needed
-        run: gh release view unstable || gh release create unstable --prerelease
+      - name: Delete unstable release
+        run: gh release delete unstable --cleanup-tag --yes || echo "unstable release was not deleted"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
-      - name: Update unstable release
-        run: gh release edit unstable --notes "This is an automated release." --prerelease --title unstable
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-
-      - name: Replace release assets
-        run: gh release upload unstable ./release/playlet.zip ./playlet/src/lib/playlet-lib.zip --clobber
+      - name: Create unstable release
+        run: gh release create unstable ./release/playlet.zip ./playlet/src/lib/playlet-lib.zip --notes "This is an automated release." --prerelease --title unstable
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
