@@ -13,6 +13,7 @@ Unofficial Youtube client for Roku 📺
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
 - 📱 Cast from phone
 - 🔮 Picture-in-picture mode
+- ⚡ Fast! [Check out how we compare with the official Youtube app](https://youtu.be/qmSvA-QQW20)
 
 ### Cast from phone
 1. Open settings in Playlet
