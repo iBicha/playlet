@@ -41,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where DASH stream is not compatible. Play format stream as a fallback
 - Showing upcoming videos correctly
 
-# Removed
+### Removed
 - Dependency on [roku-promise](https://github.com/rokucommunity/roku-promise)
 
 ## [0.5.0] - 2022-12-02
