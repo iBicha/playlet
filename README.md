@@ -1,10 +1,18 @@
+# Playlet
 <p align="center">
   <img src="banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
+  <br/><br/>
+  <a href="https://github.com/iBicha/playlet">
+    <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
+  </a>
+  <a href="https://github.com/iBicha/playlet/releases">
+    <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
+    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
+  </a>
 </p>
 
-# Playlet
 
-Unofficial Youtube client for Roku 📺
+Playlet is an unofficial Youtube client for Roku 📺
 
 ## Features
 - 🔥 No Ads (Not now, not ever)
