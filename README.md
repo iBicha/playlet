@@ -39,9 +39,8 @@ Playlet is an unofficial Youtube client for Roku 📺
 1. Change the Invidious instance
 
 ## Screenshots
-<img src="screenshot1.jpg" alt="Screenshot of Playlet" width="350"/>
-<img src="screenshot2.jpg" alt="Screenshot of Playlet" width="350"/>
-<img src="screenshot3.jpg" alt="Screenshot of Playlet" width="350"/>
+| ![](screenshot1.jpg) | ![](screenshot2.jpg) | ![](screenshot3.jpg) |
+|----------------------|----------------------|----------------------|
 
 ## Installation
 ### Roku Store (Published app)
