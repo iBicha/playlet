@@ -1,6 +1,6 @@
 import "pkg:/source/utils/StringUtils.bs"
 
-function GetLocalIpAddress() as string
+function GetLocalIpAddress() as dynamic
     if m.ipAddress = invalid or m.ipAddress = ""
         di = CreateObject("roDeviceInfo")
         ips = di.GetIPAddrs()
@@ -25,7 +25,9 @@ function GetAppInfo() as object
         m.appInfo = {
             id: appInfo.GetID(),
             version: appInfo.GetVersion(),
-            lib_version: GetLibVersion()
+            git_commit_hash: appInfo.GetValue("git_commit_sha"),
+            lib_version: GetLibVersion(),
+            lib_git_commit_hash: GetLibGitCommitHash()
         }
     end if
     return m.appInfo
@@ -41,22 +43,34 @@ function GetLibVersion() as string
     return `${Major}.${Minor}.${Build}`
 end function
 
-function GetLibManifestValues() as object
-    libManifest = ReadAsciiFile("libpkg:/manifest")
-    lines = libManifest.Tokenize(UnixNL())
-    values = {}
-    for each line in lines
-        if line.left(1) = "#"
-            continue for
-        end if
-        keyValuePair = line.Tokenize("=")
-        if keyValuePair.Count() <> 2
-            continue for
-        end if
+function GetLibGitCommitHash() as string
+    values = GetLibManifestValues()
 
-        values[keyValuePair[0]] = keyValuePair[1]
-    end for
-    return values
+    if values.doesexist("git_commit_sha")
+        return values["git_commit_sha"]
+    end if
+    return ""
+end function
+
+function GetLibManifestValues() as object
+    if m.linManifestValues = invalid
+        libManifest = ReadAsciiFile("libpkg:/manifest")
+        lines = libManifest.Tokenize(UnixNL())
+        values = {}
+        for each line in lines
+            if line.left(1) = "#"
+                continue for
+            end if
+            keyValuePair = line.Tokenize("=")
+            if keyValuePair.Count() <> 2
+                continue for
+            end if
+
+            values[keyValuePair[0]] = keyValuePair[1]
+        end for
+        m.linManifestValues = values
+    end if
+    return m.linManifestValues
 end function
 
 function GetDeviceInfo() as object

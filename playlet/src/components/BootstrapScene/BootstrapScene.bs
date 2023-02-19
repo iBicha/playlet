@@ -21,12 +21,12 @@ function GetPlayletLibUrls() as object
         return savedUrls
     end if
 
-    github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
-    embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
-
     #if DEBUG
-        return [embedded]
+        debug = { type: "debug", link: ReadManifestValue("playlet_lib_debug_url") }
+        return [debug]
     #else
+        github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
+        embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
         return [github, embedded]
     #end if
 end function
@@ -51,18 +51,19 @@ function LoadPlayletLib() as void
 end function
 
 function OnLoadStatusChanged() as void
-    uri = m.playletLibUrls[m.playletLibUrlIndex].link
+    libUrl = m.playletLibUrls[m.playletLibUrlIndex]
     if m.lib.loadStatus = "ready"
         RemoveComponentLibrary()
-        ?"Playlet lib loaded from " uri
+        ?"Playlet lib loaded from " libUrl.link
         scene = m.top.getScene()
+        scene.playletLibLoadedUrl = libUrl
         container = scene.findNode("MainSceneContainer")
         container.createChild("PlayletLib:MainScene")
         return
     end if
 
     if m.lib.loadStatus = "failed"
-        ?"Playlet lib failed to load from " uri
+        ?"Playlet lib failed to load from " libUrl.link
         ' Try next url
         m.playletLibUrlIndex += 1
         LoadPlayletLib()

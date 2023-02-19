@@ -1,10 +1,18 @@
+# Playlet
 <p align="center">
   <img src="banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
+  <br/><br/>
+  <a href="https://github.com/iBicha/playlet">
+    <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
+  </a>
+  <a href="https://github.com/iBicha/playlet/releases">
+    <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
+    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
+  </a>
 </p>
 
-# Playlet
 
-Unofficial Youtube client for Roku 📺
+Playlet is an unofficial Youtube client for Roku 📺
 
 ## Features
 - 🔥 No Ads (Not now, not ever)
@@ -13,6 +21,7 @@ Unofficial Youtube client for Roku 📺
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
 - 📱 Cast from phone
 - 🔮 Picture-in-picture mode
+- ⚡ Fast! [Check out how we compare with the official Youtube app](https://youtu.be/qmSvA-QQW20)
 
 ### Cast from phone
 1. Open settings in Playlet
@@ -30,9 +39,8 @@ Unofficial Youtube client for Roku 📺
 1. Change the Invidious instance
 
 ## Screenshots
-<img src="screenshot1.jpg" alt="Screenshot of Playlet" width="350"/>
-<img src="screenshot2.jpg" alt="Screenshot of Playlet" width="350"/>
-<img src="screenshot3.jpg" alt="Screenshot of Playlet" width="350"/>
+| ![](screenshot1.jpg) | ![](screenshot2.jpg) | ![](screenshot3.jpg) |
+|----------------------|----------------------|----------------------|
 
 ## Installation
 ### Roku Store (Published app)

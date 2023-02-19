@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- SponsorBlock notification
+
+### Fixed
+- Crash in case GetLocalIpAddress() returns invalid
+
+## [0.7.0] - 2023-02-04
+### Added
 - A script to sync between Youtube profile and and Invidious profile
 - Moved most of Playlet logic to Playlet Lib
 - Support for multiple caption languages
@@ -34,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bug where DASH stream is not compatible. Play format stream as a fallback
 - Showing upcoming videos correctly
 
-# Removed
+### Removed
 - Dependency on [roku-promise](https://github.com/rokucommunity/roku-promise)
 
 ## [0.5.0] - 2022-12-02

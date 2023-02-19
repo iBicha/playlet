@@ -4,6 +4,7 @@ import {
 } from 'brighterscript';
 import path from 'path';
 import fs from 'fs';
+const ip = require('ip');
 
 export class ManifestBsConstDebugPlugin implements CompilerPlugin {
     public name = 'manifestBsConstDebugPlugin';
@@ -20,6 +21,7 @@ export class ManifestBsConstDebugPlugin implements CompilerPlugin {
         const manifestPath = path.join(builder.options.rootDir!, "manifest")
         this.originalManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' })
         let manifestContent = this.originalManifestContent.replace(/DEBUG=(true|false)/i, `DEBUG=${value}`);
+        manifestContent = manifestContent.replace(/DEBUG_HOST_IP_ADDRESS/i, `${ip.address()}`)
         fs.writeFileSync(manifestPath, manifestContent)
     }
 
