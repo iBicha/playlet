@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - SponsorBlock notification
+- Invidious username to web app v1
 
 ### Fixed
 - Crash in case GetLocalIpAddress() returns invalid
