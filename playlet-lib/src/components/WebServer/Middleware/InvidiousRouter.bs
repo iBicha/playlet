@@ -36,7 +36,13 @@ namespace Http
                     ' Token is encoded twice for some reason
                     token = request.query["token"].DecodeUri().DecodeUriComponent()
                     referer = request.query["ref"].DecodeUri()
-                    InvidiousSettings.SetAuthToken(token, referer)
+                    username = request.query["username"]
+                    ' TODO: remove null check after 6 months of https://github.com/iv-org/invidious/pull/3603
+                    if username <> invalid
+                        username = username.DecodeUriComponent()
+                    end if
+
+                    InvidiousSettings.SetAuthToken(token, referer, username)
                     server.task.top.login = true
                 end if
                 response.Redirect("/")
