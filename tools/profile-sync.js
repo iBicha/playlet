@@ -11,57 +11,49 @@ const ip = require('ip');
 const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
-async function updateFeed(sourceUrl, destinationPlaylist, invidiousInstance, token, browser = undefined, limit = 50) {
-    console.log(`Updating playlist "${destinationPlaylist}" from feed "${sourceUrl}"`)
+async function importInvidiousProfile(invidiousInstance, token, profile) {
+    console.log(`Importing Invidious profile`)
+    await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        method: "POST",
+        body: JSON.stringify(profile)
+    })
+}
 
-    const videos = await extractVideos(sourceUrl, browser, limit);
+async function generatePlaylist(sourceUrl, playlistName, browser = undefined, limit = 100) {
+    console.log(`Updating playlist "${playlistName}" from feed "${sourceUrl}"`);
 
-    let playlist = await getPlaylist(invidiousInstance, token, destinationPlaylist)
-    if (playlist) {
-        await deletePlaylist(invidiousInstance, token, playlist)
-    }
+    const videos = await extractYtDlp(sourceUrl, browser, limit);
 
-    playlist = await createPlaylist(invidiousInstance, token, destinationPlaylist)
-    for (let i = 0; i < videos.length; i++) {
-        const videoId = videos[i];
-        console.log(`Adding video "${videoId}" (${i + 1}/${videos.length}) to playlist "${playlist.title}"`)
-        await addPlaylistVideo(invidiousInstance, token, playlist, videoId)
+    return {
+        title: playlistName,
+        description: "Imported from Youtube",
+        privacy: "private",
+        videos: videos
+    };
+}
+
+async function deletePlaylists(invidiousInstance, token, playlistNames) {
+    const playlistsToDelete = (await getPlaylists(invidiousInstance, token))
+        .filter(playlist => playlistNames.indexOf(playlist.title) !== -1);
+
+    for (let i = 0; i < playlistsToDelete.length; i++) {
+        const playlist = playlistsToDelete[i];
+        await deletePlaylist(invidiousInstance, token, playlist);
     }
 }
 
-async function getPlaylist(invidiousInstance, token, playlistName) {
-    console.log(`Finding playlist ${playlistName}`)
+async function getPlaylists(invidiousInstance, token) {
+    console.log(`Finding playlists`)
     const response = await fetch(`${invidiousInstance}/api/v1/auth/playlists`, {
         headers: {
             "Authorization": `Bearer ${token}`
         }
     })
-    const playlists = await response.json()
-    return playlists.find(p => p.title === playlistName);
-}
-
-async function createPlaylist(invidiousInstance, token, playlistName) {
-    console.log(`Creating playlist "${playlistName}"`)
-    const response = await fetch(`${invidiousInstance}/api/v1/auth/playlists`, {
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        method: "POST",
-        body: JSON.stringify({ title: playlistName, privacy: "private" })
-    })
     return await response.json()
-}
-
-async function addPlaylistVideo(invidiousInstance, token, playlist, videoId) {
-    await fetch(`${invidiousInstance}/api/v1/auth/playlists/${playlist.playlistId}/videos`, {
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        method: "POST",
-        body: JSON.stringify({ videoId: videoId })
-    })
 }
 
 async function deletePlaylist(invidiousInstance, token, playlist) {
@@ -74,11 +66,59 @@ async function deletePlaylist(invidiousInstance, token, playlist) {
     })
 }
 
-async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
-    console.log(`Extracting videos from feed "${sourceUrl}" with limit "${limit}"`)
+async function extractYtDlpPlaylists(browser) {
+    console.log(`Extracting playlists`)
     return await new Promise(function (resolve, reject) {
         let ytDlpErrors = ""
-        const videos = []
+        const items = []
+
+        args = ["https://www.youtube.com/feed/library", '--flat-playlist', '--lazy-playlist', '--dump-json', '--cookies-from-browser', browser]
+        const ytDlpProcess = spawn('yt-dlp', args);
+
+        ytDlpProcess.stdout.on('data', function (data) {
+            process.stdout.write('.')
+            newItems = data.toString()
+                .split('\n')
+                .map(item => item.trim())
+                .filter(i => i);
+
+            newItems.forEach(item => {
+                try {
+                    const json = JSON.parse(item);
+                    if (json.url?.startsWith("https://www.youtube.com/playlist?list")) {
+                        items.push({
+                            url: json.url,
+                            title: json.title
+                        })
+                    }
+                } catch (error) {
+                    console.error(error)
+                    ytDlpErrors += error
+                }
+            });
+        });
+
+        ytDlpProcess.stderr.on('data', function (data) {
+            process.stdout.write('.')
+            ytDlpErrors += data.toString() + '\n'
+        });
+
+        ytDlpProcess.on('close', function (code) {
+            process.stdout.write('\n')
+            if (code === 0) {
+                resolve(items)
+            } else {
+                reject({ code: code, error: ytDlpErrors })
+            }
+        });
+    })
+}
+
+async function extractYtDlp(sourceUrl, browser = undefined, limit = 100) {
+    console.log(`Extracting from "${sourceUrl}" with limit "${limit}"`)
+    return await new Promise(function (resolve, reject) {
+        let ytDlpErrors = ""
+        const items = []
 
         args = [sourceUrl, '--flat-playlist', '--lazy-playlist', '--print', '%(id)s']
         if (browser) {
@@ -88,19 +128,19 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
 
         ytDlpProcess.stdout.on('data', function (data) {
             process.stdout.write('.')
-            if (videos.length > limit) {
+            if (limit > 0 && items.length > limit) {
                 return;
             }
-            newVideos = data.toString()
+            newItems = data.toString()
                 .split('\n')
-                .map(video => video.trim())
+                .map(item => item.trim())
                 .filter(i => i);
 
-            newVideos.forEach(video => {
-                videos.push(video)
+            newItems.forEach(item => {
+                items.push(item)
             });
-            
-            if (videos.length >= limit) {
+
+            if (limit > 0 && items.length >= limit) {
                 ytDlpProcess.kill()
             }
         });
@@ -112,8 +152,8 @@ async function extractVideos(sourceUrl, browser = undefined, limit = 100) {
 
         ytDlpProcess.on('close', function (code) {
             process.stdout.write('\n')
-            if (code === 0 || videos.length === limit) {
-                resolve(videos)
+            if (code === 0 || (limit > 0 && items.length === limit)) {
+                resolve(items)
             } else {
                 reject({ code: code, error: ytDlpErrors })
             }
@@ -170,7 +210,6 @@ async function deleteAccessToken(invidiousInstance, token) {
         method: "POST",
         body: token
     })
-
 }
 
 (async () => {
@@ -183,28 +222,57 @@ async function deleteAccessToken(invidiousInstance, token) {
 
         parser.add_argument('--browser', { help: 'Use cookies from browser' });
         parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
+        parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
+        parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', default: 500 });
 
         let args = parser.parse_args()
         invidiousInstance = args.invidious
         browser = args.browser
+        outputFile = args.output_file
+        playlistLimit = args.playlist_limit
 
-        if (!invidiousInstance) {
-            try {
-                invidiousInstance = await getInvidiousInstance()
-            } catch (error) {
-                throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
+        const profile = { playlists: [] }
+
+        profile.playlists.push(await generatePlaylist("https://www.youtube.com", "Recommended", browser, playlistLimit))
+        const playlistsToDelete = ["Recommended"]
+
+        if (browser) {
+            console.log("Updating subscriptions")
+            profile.subscriptions = await extractYtDlp("https://www.youtube.com/feed/channels", browser, -1)
+
+            console.log("Updating watch history")
+            profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser, playlistLimit)
+
+            const playlists = await extractYtDlpPlaylists(browser);
+            for (let i = 0; i < playlists.length; i++) {
+                const playlist = playlists[i];
+                try {
+                    profile.playlists.push(await generatePlaylist(playlist.url, playlist.title, browser, playlistLimit))
+                    playlistsToDelete.push(playlist.title)    
+                } catch (error) {
+                    console.log(error)
+                }
             }
         }
 
-        token = await getAccessToken(invidiousInstance)
-
-        await updateFeed("https://www.youtube.com/", "Youtube - Recommended", invidiousInstance, token, browser)
-        if (browser) {
-            await updateFeed("https://www.youtube.com/feed/subscriptions", "Youtube - Subscriptions", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/playlist?list=WL", "Youtube - Watch later", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/playlist?list=LL", "Youtube - Liked Videos", invidiousInstance, token, browser)
-            await updateFeed("https://www.youtube.com/feed/history", "Youtube - History", invidiousInstance, token, browser)
+        if (outputFile) {
+            console.log(`Writing profile to ${outputFile}`)
+            fs.writeFileSync(outputFile, JSON.stringify(profile, null, 2))
+        } else {
+            if (!invidiousInstance) {
+                try {
+                    invidiousInstance = await getInvidiousInstance()
+                } catch (error) {
+                    throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
+                }
+            }
+    
+            token = await getAccessToken(invidiousInstance)
+    
+            await deletePlaylists(invidiousInstance, token, playlistsToDelete)
+            await importInvidiousProfile(invidiousInstance, token, profile);    
         }
+
     }
     catch (error) {
         console.error(error);
@@ -213,7 +281,7 @@ async function deleteAccessToken(invidiousInstance, token) {
         if (token) {
             console.log("Deleting token")
             await deleteAccessToken(invidiousInstance, token)
-            console.log("Done!")
         }
+        console.log("Done!")
     }
 })();

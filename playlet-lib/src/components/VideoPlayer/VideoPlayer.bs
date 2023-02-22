@@ -4,6 +4,8 @@ import "pkg:/components/VideoPlayer/Video.bs"
 import "pkg:/components/VideoPlayer/VideoDetailsTask.bs"
 
 function Init()
+    m.videoContainer = GetVideoContainer()
+
     SetupSponsorBlock()
     SetupAnimation()
     SetupBusySpinner()
@@ -12,7 +14,6 @@ function Init()
     m.top.bufferingBar.filledBarBlendColor = "0xFF0000FF"
     m.top.retrievingBar.filledBarBlendColor = "0xFF0000FF"
 
-    m.videoContainer = GetVideoContainer()
     m.top.enableUI = m.videoContainer.fullscreen
     m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
 
@@ -38,6 +39,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         end if
     end if
     if key = "back"
+        m.videoContainer@.watchedVideosClear()
         CloseVideo()
         return true
     end if
@@ -156,6 +158,8 @@ function OnVideoDetailsTaskResults(output as object) as void
     m.busySpinner.control = "stop"
     m.top.content = contentNode
     m.top.control = "play"
+
+    m.videoContainer@.watchedVideosAdd(videoId)
 end function
 
 function FindChildNodeOfType(node as object, nodeType as string) as object
@@ -277,11 +281,8 @@ function OnVideoPlayerStateChange() as void
 
     if state = "finished"
         metadata = m.top.content?.metadata
-        metadata = metadata?.recommendedVideos?.GetEntry(0)
-        videoId = metadata?.videoId
-        if videoId <> invalid
-            PlayVideo(videoId, { metadata: metadata })
-        else
+
+        if not PlayNextRecommendedVideo(metadata?.recommendedVideos)
             CloseVideo()
         end if
     end if
@@ -295,6 +296,25 @@ function OnVideoPlayerStateChange() as void
         ShowDialog(messageLines, "Error playing video")
         CloseVideo()
     end if
+end function
+
+function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
+    if recommendedVideos = invalid or recommendedVideos.Count() = 0
+        return false
+    end if
+
+    for each metadata in recommendedVideos
+        videoId = metadata?.videoId
+        if videoId = invalid
+            continue for
+        end if
+        if not m.videoContainer@.watchedVideosContain(videoId)
+            PlayVideo(videoId, { metadata: metadata })
+            return true
+        end if
+    end for
+
+    return false
 end function
 
 function SetupAnimation()
@@ -316,4 +336,5 @@ function OnFullScreenChange()
     m.translationAnimation.control = "start"
 
     m.top.enableUI = m.videoContainer.fullscreen
+    SponsorBlockNotifcationSetVisible(m.videoContainer.fullscreen)
 end function

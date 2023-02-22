@@ -1,6 +1,6 @@
 {
     "name": "playlet",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Unofficial Youtube client for Roku",
     "dependencies": {
         "bslib": "npm:@rokucommunity/bslib@^0.1.1",
@@ -16,11 +16,13 @@
         "convert-svg-to-png": "^0.6.4",
         "dotenv": "^16.0.3",
         "express": "^4.18.2",
+        "ip": "^1.1.8",
         "roku-log-bsc-plugin": "^0.7.0",
         "ropm": "^0.10.11",
         "semver": "^7.3.8",
+        "shelljs": "^0.8.5",
         "ts-node": "^10.9.1",
-        "typescript": "^4.9.4"
+        "typescript": "^4.9.5"
     },
     "engines": {
         "node": "<19.0.0"
@@ -36,7 +38,8 @@
         "prebuild": "rm -rf dist",
         "build:dev": "npm run build:web && npm run build:lib:dev && npm run build:app:dev",
         "build:prod": "npm run build:web && npm run build:lib:prod && npm run build:app:prod",
-        "build:release": "npm run format:fix && npm run lint:fix && npm run manifest-version && npm run generate-images && npm run build:prod && npm run sign-package",
+        "build:release": "npm run build:release:ci && npm run sign-package",
+        "build:release:ci": "npm run format:fix && npm run lint:fix && npm run manifest-version && npm run manifest-git-hash && npm run build:prod",
         "build:app": "cd playlet && bsc --create-package --lintConfig ../config/bslint.jsonc",
         "build:app:dev": "npm run build:app -- --debug=true",
         "build:app:prod": "npm run build:app -- --debug=false --sourceMap=false",
@@ -51,9 +54,11 @@
         "format:fix": "npm run format:base -- --write",
         "generate-images": "node tools/generate-images.js",
         "manifest-version": "node tools/update-manifest-version.js",
+        "manifest-git-hash": "node tools/update-manifest-git-hash.js",
         "sign-package": "node tools/sign-package.js",
         "screenshot": "node tools/screenshot.js",
         "profile-sync": "node tools/profile-sync.js",
+        "generate-sponsorblock-config": "node tools/generate-sponsorblock-config.js",
         "postinstall": "npx ropm copy && cd playlet-web && npm install"
     }
 }

@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:    
+  release: 
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Use Node.js 18.x
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build Playlet
+        run: npm run build:release:ci
+
+      - name: Delete unstable release
+        run: gh release delete unstable --cleanup-tag --yes || echo "unstable release was not deleted"
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Create unstable release
+        run: gh release create unstable ./release/playlet.zip ./playlet/src/lib/playlet-lib.zip --notes "This is an automated release." --prerelease --title unstable
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

@@ -1,54 +1,53 @@
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/WebUtils.bs"
 import "pkg:/source/utils/Crypto.bs"
+import "pkg:/source/utils/ColorUtils.bs"
 
 namespace SponsorBlock
     const API_URL = "https://sponsor.ajay.app"
     const SKIP_SEGMENT_ENDPOINT = "/api/skipSegments"
     const VIEWED_SEGMENT_ENDPOINT = "/api/viewedVideoSponsorTime"
 
-    function SegmentColor(category as string) as integer
-        map = m.SponsorBlockColors
-        if map = invalid
-            map = {
-                sponsor: &h00D400FF,
-                selfpromo: &hFFFF00FF,
-                exclusive_access: &h008A5CFF,
-                interaction: &hCC00FFFF,
-                poi_highlight: &hFF1684FF,
-                intro: &h00FFFFFF,
-                outro: &h0202EDFF,
-                preview: &h008FD6FF,
-                filler: &h7300FFFF,
-                music_offtopic: &hFF9900FF
-            }
-            m.SponsorBlockColors = map
+    function GetSponsorBlockConfig() as object
+        if m.sponsorBlockConfig = invalid
+            m.sponsorBlockConfig = ParseJson(ReadAsciiFile("libpkg:/config/sponsorblock_config.json"))
         end if
-        if map.doesexist(category)
-            return map[category]
+        return m.sponsorBlockConfig
+    end function
+
+    function SegmentColor(category as string) as integer
+        config = SponsorBlock.GetSponsorBlockConfig()
+        if config = invalid
+            return 0
+        end if
+
+        if config.categories.doesexist(category)
+            color = config.categories[category].color
+            return ColorUtils.HexToInt(color)
         end if
         return 0
     end function
 
     function SegmentTitle(category as string) as string
-        map = m.SponsorBlockTitles
-        if map = invalid
-            map = {
-                sponsor: "Sponsor",
-                selfpromo: "Unpaid/Self Promotion",
-                exclusive_access: "Exclusive Access",
-                interaction: "Interaction Reminder (Subscribe)",
-                poi_highlight: "Highlight",
-                intro: "Intermission/Intro Animation",
-                outro: "Endcards/Credits",
-                preview: "Preview/Recap",
-                filler: "Filler Tangent/Jokes",
-                music_offtopic: "Non-Music Section"
-            }
-            m.SponsorBlockTitles = map
+        config = SponsorBlock.GetSponsorBlockConfig()
+        if config = invalid
+            return ""
         end if
-        if map.doesexist(category)
-            return map[category]
+
+        if config.categories.doesexist(category)
+            return config.categories[category].title
+        end if
+        return ""
+    end function
+
+    function SegmentShortTitle(category as string) as string
+        config = SponsorBlock.GetSponsorBlockConfig()
+        if config = invalid
+            return ""
+        end if
+
+        if config.categories.doesexist(category)
+            return config.categories[category].short_title
         end if
         return ""
     end function

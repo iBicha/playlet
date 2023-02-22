@@ -15,29 +15,28 @@ function Init() as void
 end function
 
 function GetPlayletLibUrls() as object
-    github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
-    embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
-    registry = { type: "registry", link: ReadRegistryKey("playlet_lib_url", "Playlet") }
-
-    if IsDebugMode()
-        return [embedded]
+    savedUrls = GetPlayletLibUrlsFromRegistry()
+    if savedUrls <> invalid
+        m.shouldClearRegistryOnLoadFail = true
+        return savedUrls
     end if
 
-    urls = []
-
-    if registry.link <> invalid
-        urls.Push(registry)
-    end if
-
-    urls.push(github)
-    urls.push(embedded)
-
-    return urls
+    #if DEBUG
+        debug = { type: "debug", link: ReadManifestValue("playlet_lib_debug_url") }
+        return [debug]
+    #else
+        github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
+        embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
+        return [github, embedded]
+    #end if
 end function
 
 function LoadPlayletLib() as void
     if m.playletLibUrlIndex >= m.playletLibUrls.Count()
         m.loadingIndicator.visible = false
+        if m.shouldClearRegistryOnLoadFail = true
+            DeleteRegistryKey("playlet_lib_urls", "Playlet")
+        end if
         ShowPlayletLibLoadErrorDialog()
         return
     end if
@@ -52,22 +51,19 @@ function LoadPlayletLib() as void
 end function
 
 function OnLoadStatusChanged() as void
-    uri = m.playletLibUrls[m.playletLibUrlIndex].link
+    libUrl = m.playletLibUrls[m.playletLibUrlIndex]
     if m.lib.loadStatus = "ready"
         RemoveComponentLibrary()
-        ?"Playlet lib loaded from " uri
+        ?"Playlet lib loaded from " libUrl.link
         scene = m.top.getScene()
+        scene.playletLibLoadedUrl = libUrl
         container = scene.findNode("MainSceneContainer")
         container.createChild("PlayletLib:MainScene")
         return
     end if
 
     if m.lib.loadStatus = "failed"
-        ?"Playlet lib failed to load from " uri
-        if m.playletLibUrls[m.playletLibUrlIndex].type = "registry"
-            ' Delete library url from registry since it failed
-            DeleteRegistryKey("playlet_lib_url", "Playlet")
-        end if
+        ?"Playlet lib failed to load from " libUrl.link
         ' Try next url
         m.playletLibUrlIndex += 1
         LoadPlayletLib()
