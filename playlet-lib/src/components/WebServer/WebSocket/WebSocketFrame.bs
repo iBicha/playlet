@@ -36,13 +36,11 @@ namespace Web
 
             secondByte = m.ReadByte()
             m.is_masked = (secondByte and &h80) <> 0
-            m.payload_size = secondByte and &h7F
-
             if not m.is_masked
                 return false
             end if
 
-            if m.payload_size >= 126
+            if not m.ReadPayloadSize(secondByte)
                 return false
             end if
 
@@ -56,13 +54,41 @@ namespace Web
             return true
         end function
 
+        function ReadPayloadSize(secondByte as integer) as integer
+            payloadSize = secondByte and &h7F
+            if payloadSize < 126
+                m.payload_size = payloadSize
+                return true
+            else if payloadSize = 126
+                payloadSize = (m.ReadByte() << 8) or m.ReadByte()
+                m.payload_size = payloadSize
+                return true
+            else
+                'TODO: Read size in 8 bytes
+                return false
+            end if
+        end function
+
+        function WritePayloadSize(payloadSize as integer)
+            if payloadSize < 126
+                m.WriteByte(payloadSize)
+            else if payloadSize < 65536
+                m.WriteByte(126)
+                m.WriteByte(payloadSize >> 8)
+                m.WriteByte(payloadSize and &hFF)
+            else
+                m.WriteByte(127)
+                'TODO: Write size in 8 bytes
+            end if
+        end function
+
         function WriteToBuffer(buffer as object, index as integer, length as integer) as integer
             m.buffer = buffer
             m.index = index
             m.length = length
 
             m.WriteByte(m.fin or m.opcode)
-            m.WriteByte(m.payload_size)
+            m.WritePayloadSize(m.payload_size)
 
             for i = 0 to m.payload_size - 1
                 m.buffer[m.index] = m.payload[i]
