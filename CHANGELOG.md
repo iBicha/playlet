@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Crash in case GetLocalIpAddress() returns invalid
+- Use Format Stream (720p) instead of DASH (https://github.com/iv-org/invidious/issues/3666)
 
 ## [0.7.0] - 2023-02-04
 ### Added
