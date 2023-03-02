@@ -23,4 +23,5 @@ const parsedVersion = semverParse(version);
     fs.writeFileSync(manifestPath, appManifestContent);
 })
 
-execSync(`npm version ${version} --allow-same-version`, { cwd: 'playlet-web' });
+execSync(`npm version ${version} --allow-same-version --no-git-tag-version`);
+execSync(`npm version ${version} --allow-same-version --no-git-tag-version`, { cwd: 'playlet-web' });
