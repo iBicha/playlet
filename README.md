@@ -44,7 +44,8 @@ Playlet is an unofficial Youtube client for Roku 📺
 
 ## Installation
 ### Roku Store (Published app)
-Search for "Playlet" in the Roku Store, or use the link https://my.roku.com/account/add?channel=PLAYLET
+[Playlet on Roku channel store](https://channelstore.roku.com/en-ca/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
+Or use the link https://my.roku.com/account/add?channel=PLAYLET
 
 ### Sideloaded (Dev app)
 #### Enable Roku Developer Mode
@@ -63,22 +64,6 @@ By now, you should have the following
 - Your Roku Dev password (setup in the previous step)
 - Your Roku TV local IP address
   - You can find this information in your TV network settings. It should look like 192.168.X.X or so
-
-#### Install Playlet (command line)
-
-Install Playlet as a dev channel using this command, and replace:
-- `REPLACE_PASSWORD_HERE` : with your Roku Dev password
-- `REPLACE_IP_ADDRESS_HERE` : with your Roku TV local IP address
-```
-curl https://raw.githubusercontent.com/iBicha/playlet/main/install.sh | ROKU_DEV_TARGET=REPLACE_IP_ADDRESS_HERE DEVPASSWORD=REPLACE_PASSWORD_HERE sh
-```
-Example:
-```
-curl https://raw.githubusercontent.com/iBicha/playlet/main/install.sh | ROKU_DEV_TARGET=192.168.1.2 DEVPASSWORD=1234 sh
-```
-
-
-If successful, you should see some output on your terminal, with `Status: 200`.
 
 #### Install Playlet (Manual)
 1. Go to `https://github.com/iBicha/playlet/releases` and download `playlet.zip`
