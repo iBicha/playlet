@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add watched videos to Invidious watch history
 
 ### Fixed
-- A crash where the metadata of a video is not validated #57
+- A crash where the metadata of a video is not validated [#57](https://github.com/iBicha/playlet/issues/57)
+- A crash where the video details in home screen are null [#56](https://github.com/iBicha/playlet/issues/56)
 
 ## [0.8.0] - 2023-03-02
 ### Added
