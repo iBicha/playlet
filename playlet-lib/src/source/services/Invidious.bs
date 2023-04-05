@@ -13,11 +13,12 @@ namespace Invidious
     const STATS_ENDPOINT = "/api/v1/stats"
 
     const VIDEOS_ENDPOINT = "/api/v1/videos"
+    const HISTORY_ENDPOINT = "/api/v1/auth/history"
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
 
-    const AUTH_SCOPE = "GET:feed,GET:playlists,POST:tokens/unregister"
+    const AUTH_SCOPE = "GET:feed,GET:playlists,POST:tokens/unregister,POST:history*"
     const AUTH_FEED = "/api/v1/auth/feed"
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
@@ -64,6 +65,22 @@ namespace Invidious
             statusCode: response.statuscode,
             data: response.json ?? response.text
         }
+    end function
+
+    function MarkVideoWatched(videoId as string) as void
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
+            return 
+        end if
+
+        url = `${authToken.instance}${Invidious.HISTORY_ENDPOINT}/${videoId}`
+        headers = Invidious.GetAuthenticationHeaders(authToken.token)
+        args = {
+            headers: headers,
+            parseJson: false
+        }
+
+        Requests().post(url, args)
     end function
 
     function SearchSuggestions(q as string) as object 'SearchSuggestionResult
@@ -127,7 +144,8 @@ namespace Invidious
         expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 365 * 2 '2 years from now
 
         callbackUrl = `http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
-        return `${invidiousHost}/authorize_token?scopes=${Invidious.AUTH_SCOPE}&callback_url=${callbackUrl}&expire=${expire}`
+        scope = `${Invidious.AUTH_SCOPE}`.EncodeUriComponent()
+        return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
     end function
 
     function GetAuthenticationHeaders(token as string) as object
