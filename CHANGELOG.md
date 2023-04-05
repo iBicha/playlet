@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add watched videos to Invidious watch history
 
+### Fixed
+- A crash where the metadata of a video is not validated #57
+
 ## [0.8.0] - 2023-03-02
 ### Added
 - SponsorBlock notification
