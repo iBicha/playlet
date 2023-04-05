@@ -67,10 +67,10 @@ namespace Invidious
         }
     end function
 
-    function MarkVideoWatched(videoId as string) as void
+    function MarkVideoWatched(videoId as string) as boolean
         authToken = InvidiousSettings.GetAuthToken()
         if authToken = invalid
-            return
+            return false
         end if
 
         url = `${authToken.instance}${Invidious.HISTORY_ENDPOINT}/${videoId}`
@@ -80,7 +80,8 @@ namespace Invidious
             parseJson: false
         }
 
-        Requests().post(url, args)
+        response = Requests().post(url, args)
+        return response.ok
     end function
 
     function SearchSuggestions(q as string) as object 'SearchSuggestionResult
