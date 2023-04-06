@@ -1,3 +1,5 @@
+import "pkg:/components/VideoPlayer/VideoPlayerCaptionsTask.bs"
+
 function SetCaptions(metadata as object, videoPlayer as object, contentNode as object) as void
     if metadata.captions.Count() = 0
         return
@@ -18,4 +20,35 @@ function SetCaptions(metadata as object, videoPlayer as object, contentNode as o
     end for
     contentNode.ClosedCaptions = True
     contentNode.SubtitleTracks = subtitleTracks
+
+    ' Searching for a working caption could cause a delay in the video player start.
+    ' This is why it is behind a feature flag.
+    #if CAPTION_INSTANCE_SEARCH
+        StartAsyncTask(VideoPlayerCaptionsTask, {
+            videoId: metadata.videoId,
+            instance: instance,
+            subtitleTracks: subtitleTracks
+        }, OnVideoPlayerCaptionsTaskResults)
+    #end if
+end function
+
+function OnVideoPlayerCaptionsTaskResults(output as object) as void
+    changed = output.result.changed
+    if not changed
+        return
+    end if
+
+    videoId = output.result.videoId
+    if m.top.videoId <> videoId
+        return
+    end if
+
+    state = m.top.state
+    contentNode = m.top.content
+    contentNode.Update({
+        SubtitleTracks: output.result.subtitleTracks
+    })
+    if state = "buffering" or state = "playing"
+        m.top.control = "play"
+    end if
 end function
