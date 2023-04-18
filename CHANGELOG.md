@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Add watched videos to Invidious watch history
+- App info screen
 
 ### Fixed
 - A crash where the metadata of a video is not validated [#57](https://github.com/iBicha/playlet/issues/57)
