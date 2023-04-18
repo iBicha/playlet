@@ -1,0 +1,41 @@
+import "pkg:/source/utils/General.bs"
+import "pkg:/components/AppInfoScreen/AppVersionTask.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+
+function Init()
+    m.keyValueList = m.top.findNode("KeyValueListContent")
+    m.appInfo = GetAppInfo()
+    m.appInfo["lib_version_latest"] = "N/A"
+    m.appInfo["lib_url"] = "N/A"
+    m.appInfo["lib_url_type"] = "N/A"
+
+    scene = m.top.getScene()
+    if scene.playletLibLoadedUrl <> invalid
+        m.appInfo["lib_url"] = scene.playletLibLoadedUrl.link
+        m.appInfo["lib_url_type"] = scene.playletLibLoadedUrl.type
+    end if
+
+    UpdateKeyValueList()
+    GetLatestVersion()
+end function
+
+function UpdateKeyValueList()
+    while m.keyValueList.getChildCount() > 0
+        m.keyValueList.removeChildIndex(0)
+    end while
+
+    for each item in m.appInfo
+        value = `${item}: ${m.appInfo[item]}`
+        contentNode = m.keyValueList.createChild("ContentNode")
+        contentNode.title = value
+    end for
+end function
+
+function GetLatestVersion()
+    StartAsyncTask(AppVersionTask, {}, function(output as object) as void
+        if output.result.latest <> invalid
+            m.appInfo["lib_version_latest"] = output.result.latest
+            UpdateKeyValueList()
+        end if
+    end function)
+end function
