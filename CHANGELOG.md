@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add watched videos to Invidious watch history
 - App info screen
+- A dev menu selector to test newer or older versions of playlet lib
+  - Makes it possible to test unstable releases before they officially release
 
 ### Fixed
 - A crash where the metadata of a video is not validated [#57](https://github.com/iBicha/playlet/issues/57)
