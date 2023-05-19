@@ -11,10 +11,16 @@ function Init()
     m.animationTimer.observeField("fire", "OnAnimationTimer")
 end function
 
-function OnSegmentSet()
+function OnActionSet()
+    action = m.top.action
     category = m.top.segment.category
     categoryTitle = SponsorBlock.SegmentShortTitle(category)
-    m.categoryLabel.text = "Skipped" + chr(10) + categoryTitle
+    if action = "AutoSkip"
+        m.categoryLabel.text = "Skipped" + chr(10) + categoryTitle
+    else
+        m.categoryLabel.text = categoryTitle
+    end if
+
     AnimateIn()
 end function
 
@@ -37,21 +43,8 @@ end function
 
 function Animate(reverse as boolean) as void
     ' We are already animating in the requested direction
-    if m.translationAnimationInterpolator.reverse = reverse and m.translationAnimation.state = "running"
+    if m.translationAnimationInterpolator.reverse = reverse and m.translationAnimation.control <> "none"
         return
-    end if
-
-    ' Check if we are already at the destination
-    if m.translationAnimation.state = "stopped"
-        if reverse
-            destination = m.translationAnimationInterpolator.keyValue[0][0]
-        else
-            destination = m.translationAnimationInterpolator.keyValue[1][0]
-        end if
-        current = m.top.translation[0]
-        if current = destination
-            return
-        end if
     end if
 
     m.translationAnimationInterpolator.reverse = reverse

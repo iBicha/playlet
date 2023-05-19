@@ -109,47 +109,42 @@ function OnSponsorBlockTaskResults(output as object)
 end function
 
 function OnPositionChangeSkipSponsorBlockSections() as void
-    shouldMute = false
-    muteCategory = ""
     segments = m.skipSegments
     if segments = invalid
         return
     end if
 
     for each segment in segments
-        ' TODO: handle other action types
-        if segment["actionType"] = "skip"
-            segmentRange = segment["segment"]
-            segmentStart = segmentRange[0]
-            segmentEnd = segmentRange[1]
-            currentPosition = m.top.position
-            if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
-                ' TODO: if segmentEnd is at the end of the video, close video
+        segmentRange = segment["segment"]
+        segmentStart = segmentRange[0]
+        segmentEnd = segmentRange[1]
+        currentPosition = m.top.position
+        if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
+            action = GetActionForSegment(segment)
+            ShowSponsorBlockNotifcation(segment, action)
+
+            if action = "AutoSkip"
                 m.top.seek = segmentEnd
                 print("Skipping section:" + segment["category"])
-                ShowSponsorBlockNotifcation(segment)
                 SendSkippedSectionEvent(segment.UUID)
                 return
             end if
         end if
-
-        if segment["actionType"] = "mute"
-            segmentRange = segment["segment"]
-            segmentStart = segmentRange[0]
-            segmentEnd = segmentRange[1]
-            currentPosition = m.top.position
-            if (segmentStart < currentPosition) and (segmentEnd > currentPosition)
-                shouldMute = true
-                muteCategory = segment["category"]
-                exit for
-            end if
-        end if
     end for
+end function
 
-    if m.top.mute <> shouldMute
-        print(`Muting section: ${muteCategory} - ${shouldMute}`)
-        m.top.mute = shouldMute
+function GetActionForSegment(segment as object) as dynamic
+    category = segment["category"]
+    if category = "sponsor"
+        return "AutoSkip"
+    else if category = "poi_highlight"
+        return "ManualSkip"
+    else if category = "exclusive_access"
+        return "ShowOverlay"
+    else if category = "chapter"
+        return "ShowOverlay"
     end if
+    return ""
 end function
 
 function SendSkippedSectionEvent(segmentId as string)
