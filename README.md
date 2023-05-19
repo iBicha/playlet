@@ -2,12 +2,15 @@
 <p align="center">
   <img src="banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
   <br/><br/>
-  <a href="https://github.com/iBicha/playlet">
-    <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
+  <a href="https://github.com/iBicha/playlet/actions/workflows/release.yml?query=branch%3Amain">
+    <img alt="Build Status" src="https://img.shields.io/github/actions/workflow/status/iBicha/playlet/release.yml.svg?branch=main"/>
   </a>
   <a href="https://github.com/iBicha/playlet/releases">
     <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
     <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
+  </a>
+  <a href="https://github.com/iBicha/playlet">
+    <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
   </a>
   <a href="https://channelstore.roku.com/en-ca/details/840aec36f51bfe6d96cf6db9055a372a/playlet">
     <img alt="Roku Channel Store" src="https://img.shields.io/badge/Roku%20Store-Install-blueviolet?logo=roku&logoColor=blueviolet&labelColor=white"/>

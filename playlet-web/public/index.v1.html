@@ -76,6 +76,15 @@
   <h5>Feedback is welcome over at: <a id="feedback-url" href="https://github.com/iBicha/playlet"
       target="_blank">https://github.com/iBicha/playlet</a></h5>
 
+  <div id="dev-menu" style="display: none;">
+    <h4>Developer menu</h4>
+    <p><small>These are for testing purposes only, and are not meant to be used by end users.</small></p>
+    <label for="playlet-lib-tag">Playlet Lib Tag:</label>
+    <select name="playlet-lib-tag" id="playlet-lib-tag">
+      <option value="">latest (default)</option>
+    </select>
+    <button onclick="SetPlayletLibUrls()">Apply</button>
+  </div>
   <script>
     function Login() {
       if (!window.appState) {
@@ -249,6 +258,49 @@ ${JSON.stringify(window.appState.invidious, null, 2)}
         })
     }
 
+    function FetchReleaseTags() {
+      fetch("https://api.github.com/repos/iBicha/playlet/releases")
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (releases) {
+          releases.filter(release => release.assets.filter(asset => asset.name === "playlet-lib.zip").length > 0)
+            .forEach(r => {
+              var option = document.createElement("option");
+              option.text = r.tag_name;
+              option.value = r.tag_name;
+              document.getElementById("playlet-lib-tag").add(option);
+            })
+        })
+    }
+
+    function SetPlayletLibUrls() {
+      var tags = document.getElementById("playlet-lib-tag");
+      var value = tags.value;
+      let content = null
+
+      if(value !== ""){
+        content = JSON.stringify([{
+          link: `https://github.com/iBicha/playlet/releases/download/${value}/playlet-lib.zip`,
+          type: 'custom'
+        }]);
+      }
+
+      PostJson('/api/command', { command: "set-playlet-lib-urls", content: content })
+        .then(function (response) {
+          alert("Playlet lib tag updated. Restart Playlet to reflect changes.");
+          window.location.reload();
+        })
+        .catch(function (err) {
+          alert(err)
+        });
+    }
+
+    function ShouldShowDevMenu() {
+      const urlSearchParams = new URLSearchParams(window.location.search);
+      return !!urlSearchParams.get('dev')
+    }
+
     function Initialize() {
       fetch("/api/state")
         .then(function (response) {
@@ -293,6 +345,10 @@ ${JSON.stringify(window.appState.invidious, null, 2)}
         });
 
       SetupWebSocket();
+      if(ShouldShowDevMenu()){
+        document.getElementById("dev-menu").style.display = "block";
+        FetchReleaseTags();
+      }
     }
 
     var tableRow;

@@ -4,15 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] - 2023-04-21
 ### Added
 - Add watched videos to Invidious watch history
 - App info screen
+- A dev menu selector to test newer or older versions of playlet lib
+  - Makes it possible to test unstable releases before they officially release
 
 ### Fixed
 - A crash where the metadata of a video is not validated [#57](https://github.com/iBicha/playlet/issues/57)
 - A crash where the video details in home screen are null [#56](https://github.com/iBicha/playlet/issues/56)
 - A crash where the video details are not returned in json [#63](https://github.com/iBicha/playlet/issues/63)
+- Revert to using DASH instead of 720p by default
+- A crash where request cache fails [#62](https://github.com/iBicha/playlet/issues/62)
 
 ## [0.8.0] - 2023-03-02
 ### Added
