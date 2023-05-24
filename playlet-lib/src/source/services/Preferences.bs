@@ -1,0 +1,50 @@
+class Preferences
+    private version = 1
+    private registry_key = "user_prefs"
+    private prefs_model
+    private user_prefs
+
+    function new()
+        m.LoadConfigFile()
+        m.LoadUserPreferences()
+    end function
+
+    function LoadConfigFile()
+        m.prefs_model = ParseJson(ReadAsciiFile("libpkg:/config/preferences.json"))
+    end function
+
+    function LoadUserPreferences()
+        m.user_prefs = RegistryUtils.Read(m.registry_key)
+        if m.user_prefs = invalid
+            m.user_prefs = "{}"
+        end if
+        m.user_prefs = ParseJson(m.user_prefs)
+        m.ApplyDefaultsToUserPreferences()
+    end function
+
+    function SaveUserPreferences()
+        m.user_prefs.__version = m.version
+        RegistryUtils.Write(m.registry_key, FormatJson(m.user_prefs))
+    end function
+
+    function ApplyDefaultsToUserPreferences()
+        for each child in m.prefs_model
+            m.ApplyToUserPreferences(m.user_prefs, child)
+        end for
+    end function
+
+    function ApplyToUserPreferences(userPrefs as object, model as object)
+        if model.children <> invalid
+            if userPrefs[model.key] = invalid
+                userPrefs[model.key] = {}
+            end if
+
+            for each child in model.children
+                m.ApplyToUserPreferences(userPrefs[model.key], child)
+            end for
+        end if
+        if model.default <> invalid
+            userPrefs[model.key] = model.default
+        end if
+    end function
+end class
