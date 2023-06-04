@@ -1,17 +1,207 @@
 import "pkg:/source/utils/General.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/source/services/PreferencesService.bs"
 
 function Init()
-    m.top.url = `http://${GetLocalIpAddress()}:8888`
+    m.service = new PreferencesService()
+    LoadPreferencesTopLevel(m.service.prefs_model)
+    RefreshUI(0)
+
+    m.top.ObserveField("focus", "OnFocusChange")
+    m.top.ObserveField("visible", "OnVisibilityChange")
 end function
 
-function OnUrlSet()
-    url = m.top.url
+function LoadPreferencesTopLevel(model as object)
+    m.uiElements = {}
+    LoadPreferencesAtLevel(model, 0, "")
+end function
 
-    qrCode = m.top.findNode("SettingsQRPoster")
-    qrCode.text = url
+function LoadPreferencesAtLevel(model as object, level as integer, key as string)
+    menu = m.top.findNode("PreferencesMenu")
+    if menu.getChildCount() - 1 < level
+        container = menu.createChild("Group")
+        container.id = `Container${level}`
+    else
+        container = menu.getChild(level)
+    end if
 
-    urlLabel = m.top.findNode("urlLabel")
-    urlLabel.text = url
+    buttonGroup = container.createChild("ButtonGroup")
+    buttonGroup.minWidth = 320
+    buttonGroup.iconUri = ""
+    buttonGroup.id = `ButtonGroup${level}`
+    buttonGroup.visible = false
+
+    m.uiElements[key] = buttonGroup
+    buttonGroup.addFields({
+        "level": level,
+        "key": key
+    })
+
+    buttons = []
+    for each item in model
+        buttons.push(item.displayText)
+        if item.children <> invalid
+            LoadPreferencesAtLevel(item.children, level + 1, item.key)
+        end if
+    end for
+    buttonGroup.buttons = buttons
+
+    buttonGroup.observeField("buttonFocused", "OnButtonFocused")
+end function
+
+function OnButtonFocused(event as object)
+    buttonGroup = event.getRoSGNode()
+    RefreshUI(buttonGroup.level + 1)
+end function
+
+function RefreshUI(maxLevel = 0 as integer)
+    for each key in m.uiElements
+        m.uiElements[key].visible = false
+    end for
+
+    topLevel = m.top.findNode("ButtonGroup0")
+    topLevel.visible = true
+
+    ShowButtonGroup(m.service.prefs_model, topLevel.buttonFocused, maxLevel)
+end function
+
+function ShowButtonGroup(model as object, index as integer, maxLevel as integer) as void
+    item = model[index]
+    element = m.uiElements[item.key]
+    if element = invalid
+        return
+    end if
+
+    if element.level > maxLevel
+        return
+    end if
+
+    element.visible = true
+
+    if item.children <> invalid
+        ShowButtonGroup(item.children, element.buttonFocused, maxLevel)
+    end if
+end function
+
+' function Init()
+'     m.top.url = `http://${GetLocalIpAddress()}:8888`
+' end function
+
+' function OnUrlSet()
+'     url = m.top.url
+
+'     qrCode = m.top.findNode("SettingsQRPoster")
+'     qrCode.text = url
+
+'     urlLabel = m.top.findNode("urlLabel")
+'     urlLabel.text = url
+' end function
+
+function OnFocusChange() as void
+    if m.top.focus <> true
+        return
+    end if
+
+    topLevelButtonGroup = m.top.findNode("ButtonGroup0")
+    if topLevelButtonGroup <> invalid
+        topLevelButtonGroup.setFocus(true)
+        RefreshUI(1)
+    end if
+end function
+
+function OnVisibilityChange() as void
+    if m.top.visible <> true
+        return
+    end if
+
+    topLevelButtonGroup = m.top.findNode("ButtonGroup0")
+    if topLevelButtonGroup <> invalid
+        topLevelButtonGroup.visible = true
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+    if key = "back"
+        m.top.escape = key
+        return true
+    end if
+    if key = "left"
+        if not MenuGoLeft()
+            RefreshUI(0)
+            m.top.escape = key
+        end if
+        return true
+    end if
+    if key = "right"
+        if MenuGoRight()
+            return true
+        end if
+    end if
+
+    return false
+end function
+
+function GetFocusedButtonGroup() as object
+    focusedChild = m.top.focusedChild
+    if focusedChild = invalid
+        return invalid
+    end if
+
+    while not focusedChild.id.StartsWith("ButtonGroup")
+        focusedChild = focusedChild.focusedChild
+        if focusedChild = invalid
+            return invalid
+        end if
+    end while
+    return focusedChild
+end function
+
+function MenuGoLeft() as boolean
+    return MenuNavigate(-1)
+end function
+
+function MenuGoRight() as boolean
+    return MenuNavigate(1)
+end function
+
+function MenuNavigate(direction as integer) as boolean
+    focusedButtonGroup = GetFocusedButtonGroup()
+    container = focusedButtonGroup.getParent()
+    containerParent = container.getParent()
+    containerCount = containerParent.getChildCount()
+    index = GetChildIndex(containerParent, container)
+
+    index += direction
+
+    if index >= containerCount or index < 0
+        return false
+    end if
+
+    newFocusedContainer = containerParent.getChild(index)
+    childCount = newFocusedContainer.getChildCount()
+    for i = 0 to childCount - 1
+        child = newFocusedContainer.getChild(i)
+        if child.visible
+            child.setFocus(true)
+            RefreshUI(index + 1)
+            return true
+        end if
+    end for
+
+    return false
+end function
+
+function GetChildIndex(node as object, child as object) as integer
+    childCount = node.getChildCount()
+    for i = 0 to childCount - 1
+        c = node.getChild(i)
+        if child.id = c.id
+            return i
+        end if
+    end for
+    return -1
 end function
