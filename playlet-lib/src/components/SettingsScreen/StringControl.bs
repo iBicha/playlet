@@ -1,0 +1,35 @@
+function Init()
+    m.textEditBox = m.top.findNode("TextEditBox")
+    m.top.observeField("focusedChild", "OnFocusChanged")
+end function
+
+function OnFocusChanged()
+    focused = m.top.hasFocus()
+    if focused 
+        ShowEditKeyboard()
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    return settingsScreen@.OnkeyEvent(key, press)
+end function
+
+function ShowEditKeyboard()
+    keyboardDialog = createObject("roSGNode", "StandardKeyboardDialog")
+    keyboardDialog.title = m.top.displayText
+    keyboardDialog.text = m.top.value
+    keyboardDialog.observeField("text", "OnKeyboardTextChange")
+    keyboardDialog.observeField("wasClosed", "OnKeyboardClosed")
+    m.top.getScene().dialog = keyboardDialog
+end function
+
+function OnKeyboardTextChange(event as object)
+    keyboard = event.getRoSGNode()
+    m.top.value = keyboard.text
+end function
+
+function OnKeyboardClosed()
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    settingsScreen@.MenuNavigate(-1)
+end function
