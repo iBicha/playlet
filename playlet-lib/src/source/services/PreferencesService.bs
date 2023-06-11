@@ -2,7 +2,6 @@ import "pkg:/source/utils/RegistryUtils.bs"
 
 class PreferencesService
     private version = 1
-    private registry_key = "user_prefs"
     private prefs_model
     private user_prefs
 
@@ -22,34 +21,75 @@ class PreferencesService
     end function
 
     function LoadUserPreferences()
-        m.user_prefs = RegistryUtils.Read(m.registry_key)
+        ' Step 1: Load user preferences from registry
+        m.user_prefs = RegistryUtils.Read(RegistryUtils.USER_PREFERENCES)
         if m.user_prefs = invalid
             m.user_prefs = "{}"
         end if
         m.user_prefs = ParseJson(m.user_prefs)
-        m.ApplyDefaultsToUserPreferences()
+        ' Step 2: Migrate existing preferences to new format (if needed)
+        isDirty = m.MigrateExistingPreferences()
+        ' Step 3: Apply defaults to user preferences (if needed)
+        isDirty = isDirty or m.ApplyDefaultsToUserPreferences()
+        if isDirty
+            m.SaveUserPreferences()
+        end if
     end function
 
     function SaveUserPreferences()
         m.user_prefs.__version = m.version
-        RegistryUtils.Write(m.registry_key, FormatJson(m.user_prefs))
+        RegistryUtils.Write(RegistryUtils.USER_PREFERENCES, FormatJson(m.user_prefs))
     end function
 
-    function ApplyDefaultsToUserPreferences()
+    function MigrateExistingPreferences() as boolean
+        isDirty = false
+
+        ' v0 -> v1
+        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+        if instances <> invalid
+            currentInstance = m.user_prefs["invidious.instance"]
+            if currentInstance = invalid or currentInstance = ""
+                instances = ParseJson(instances)
+                if instances.Count() > 0
+                    instance = instances[0]
+                    if instance <> invalid and instance <> ""
+                        m.user_prefs["invidious.instance"] = instance
+                        isDirty = true
+                    end if
+                end if
+            end if
+            ' TODO: RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
+        end if
+
+        ' v1 -> v2 goes here (if needed)
+        ' if m.user_prefs.__version = 1
+        '   'do stuff
+        ' end if
+
+        ' TODO: handle case where saved preferences version is higher than current version (e.g. user downgraded)
+        return isDirty
+    end function
+
+    function ApplyDefaultsToUserPreferences() as boolean
+        isDirty = false
         for each child in m.prefs_model
-            m.ApplyToUserPreferences(m.user_prefs, child)
+            isDirty = isDirty or m.ApplyToUserPreferences(m.user_prefs, child)
         end for
+        return isDirty
     end function
 
-    function ApplyToUserPreferences(userPrefs as object, model as object)
+    function ApplyToUserPreferences(userPrefs as object, model as object) as boolean
+        isDirty = false
         if model.children <> invalid
             for each child in model.children
-                m.ApplyToUserPreferences(userPrefs, child)
+                isDirty = isDirty or m.ApplyToUserPreferences(userPrefs, child)
             end for
         end if
         if model.default <> invalid and (not userPrefs.DoesExist(model.key) or userPrefs[model.key] = invalid)
             userPrefs[model.key] = model.default
+            isDirty = true
         end if
+        return isDirty
     end function
 
     function GetValue(key as string) as dynamic
