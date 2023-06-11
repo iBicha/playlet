@@ -12,12 +12,15 @@ namespace Http
             m.Get("/api/preferences", function(context as object) as boolean
                 response = context.response
 
-                ' TODO: route to service
-                preferences = {
-                    invidious: InvidiousSettings.GetPreferences(),
-                    sponsorblock: SponsorBlockSettings.GetPreferences()
-                }
+                scene = context.server.task.top.getScene()
+                settings = scene.findNode("SettingsScreen")
+                if settings = invalid 
+                    response.Default(500, `Settings screen not found: scene.findNode("SettingsScreen") returned invalid`)
+                    return true
+                end if
 
+                ' Passing invalid because of call limitation
+                preferences = settings@.GetUserPreferences(invalid)
                 response.Json(preferences)
                 return true
             end function)
