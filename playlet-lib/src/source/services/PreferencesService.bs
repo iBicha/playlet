@@ -30,7 +30,7 @@ class PreferencesService
         ' Step 2: Migrate existing preferences to new format (if needed)
         isDirty = m.MigrateExistingPreferences()
         ' Step 3: Apply defaults to user preferences (if needed)
-        isDirty = isDirty or m.ApplyDefaultsToUserPreferences()
+        isDirty = m.ApplyDefaultsToUserPreferences() or isDirty
         if isDirty
             m.SaveUserPreferences()
         end if
@@ -73,7 +73,7 @@ class PreferencesService
     function ApplyDefaultsToUserPreferences() as boolean
         isDirty = false
         for each child in m.prefs_model
-            isDirty = isDirty or m.ApplyToUserPreferences(m.user_prefs, child)
+            isDirty = m.ApplyToUserPreferences(m.user_prefs, child) or isDirty
         end for
         return isDirty
     end function
@@ -82,9 +82,10 @@ class PreferencesService
         isDirty = false
         if model.children <> invalid
             for each child in model.children
-                isDirty = isDirty or m.ApplyToUserPreferences(userPrefs, child)
+                isDirty = m.ApplyToUserPreferences(userPrefs, child) or isDirty
             end for
         end if
+
         if model.default <> invalid and (not userPrefs.DoesExist(model.key) or userPrefs[model.key] = invalid)
             userPrefs[model.key] = model.default
             isDirty = true
@@ -94,6 +95,23 @@ class PreferencesService
 
     function GetUserPreferences() as object
         return m.user_prefs
+    end function
+
+    function ApplyUserPreferences(preferences as object) as void
+        if preferences = invalid
+            return
+        end if
+        ' TODO: user input validation
+        for each key in preferences
+            m.user_prefs[key] = preferences[key]
+        end for
+        m.SaveUserPreferences()
+    end function
+
+    function ClearUserPreferences() as void
+        m.user_prefs = {}
+        m.ApplyDefaultsToUserPreferences()
+        m.SaveUserPreferences()
     end function
 
     function GetValue(key as string) as dynamic

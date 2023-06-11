@@ -1,6 +1,3 @@
-import "pkg:/source/services/InvidiousSettings.bs"
-import "pkg:/source/services/SponsorBlockSettings.bs"
-
 namespace Http
 
     class PreferencesRouter extends HttpRouter
@@ -11,8 +8,8 @@ namespace Http
             ' Get preferences
             m.Get("/api/preferences", function(context as object) as boolean
                 response = context.response
-
-                scene = context.server.task.top.getScene()
+                task = context.server.task
+                scene = task.top.getScene()
                 settings = scene.findNode("SettingsScreen")
                 if settings = invalid
                     response.Default(500, `Settings screen not found: scene.findNode("SettingsScreen") returned invalid`)
@@ -27,14 +24,43 @@ namespace Http
 
             ' Update preferences
             m.Put("/api/preferences", function(context as object) as boolean
-                ' TODO: route to service
-                return false
+                request = context.request
+                response = context.response
+                task = context.server.task
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                scene = task.top.getScene()
+                settings = scene.findNode("SettingsScreen")
+                if settings = invalid
+                    response.Default(500, `Settings screen not found: scene.findNode("SettingsScreen") returned invalid`)
+                    return true
+                end if
+
+                settings@.ApplyUserPreferences(payload)
+                response.Default(204, "OK")
+                return true
             end function)
 
             ' Reset default preferences
             m.Delete("/api/preferences", function(context as object) as boolean
-                ' TODO: route to service
-                return false
+                response = context.response
+                task = context.server.task
+
+                scene = task.top.getScene()
+                settings = scene.findNode("SettingsScreen")
+                if settings = invalid
+                    response.Default(500, `Settings screen not found: scene.findNode("SettingsScreen") returned invalid`)
+                    return true
+                end if
+
+                settings@.ClearUserPreferences(invalid)
+                response.Default(204, "OK")
+                return true
             end function)
 
         end function
