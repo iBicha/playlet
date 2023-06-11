@@ -43,16 +43,24 @@ class PreferencesService
 
     function ApplyToUserPreferences(userPrefs as object, model as object)
         if model.children <> invalid
-            if userPrefs[model.key] = invalid
-                userPrefs[model.key] = {}
-            end if
-
             for each child in model.children
-                m.ApplyToUserPreferences(userPrefs[model.key], child)
+                m.ApplyToUserPreferences(userPrefs, child)
             end for
         end if
-        if model.default <> invalid
+        if model.default <> invalid and (not userPrefs.DoesExist(model.key) or userPrefs[model.key] = invalid)
             userPrefs[model.key] = model.default
         end if
+    end function
+
+    function GetValue(key as string) as dynamic
+        return m.user_prefs[key]
+    end function
+
+    function SetValue(key as string, value as dynamic) as void
+        if m.user_prefs[key] = value
+            return
+        end if
+        m.user_prefs[key] = value
+        m.SaveUserPreferences()
     end function
 end class

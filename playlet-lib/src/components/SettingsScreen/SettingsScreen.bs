@@ -4,6 +4,7 @@ import "pkg:/source/services/PreferencesService.bs"
 
 function Init()
     m.service = new PreferencesService()
+    
     m.menu = m.top.findNode("PreferencesMenu")
     m.hint = m.top.findNode("HintLabel")
 
@@ -86,6 +87,7 @@ function CreateBooleanControl(container as object, model as object, level as int
     control.key = key
     control.level = level
     m.uiElements[key] = control
+    control.settings = m.top
     return control
 end function
 
@@ -97,6 +99,7 @@ function CreateStringControl(container as object, model as object, level as inte
     control.level = level
     control.displayText = model.displayText
     control.description = model.description
+    control.settings = m.top
     m.uiElements[key] = control
     return control
 end function
@@ -108,6 +111,7 @@ function CreateRadioControl(container as object, model as object, level as integ
     control.key = key
     control.level = level
     control.options = model.options
+    control.settings = m.top
     m.uiElements[key] = control
     return control
 end function
@@ -123,7 +127,7 @@ function CreateRokuComponent(model as object, level as integer, key as string) a
 
     component = CreateObject("roSGNode", model.roku_component.type)
     component.container = container
-    component.settingsScreen = m.top
+    component.settings = m.top
     component.visible = false
     component.key = key
     component.level = level
@@ -324,4 +328,12 @@ function GetChildIndex(node as object, child as object) as integer
         end if
     end for
     return -1
+end function
+
+function GetPreferenceValue(key as string) as dynamic
+    return m.service.GetValue(key)
+end function
+
+function SetPreferenceValue(key as string, value as dynamic)
+    m.service.SetValue(key, value)
 end function
