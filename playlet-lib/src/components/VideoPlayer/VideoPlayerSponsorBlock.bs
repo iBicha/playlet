@@ -2,8 +2,14 @@ import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockTask.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockTrackingTask.bs"
 import "pkg:/components/SponsorBlockNotification/SponsorBlockNotificationManager.bs"
+import "pkg:/components/SettingsScreen/Settings.bs"
 
-function SetupSponsorBlock()
+function SetupSponsorBlock() as void
+    LoadSponsorBlockSettings()
+    if not m.sponsorBlockEnabled = true
+        return
+    end if
+
     PositionChapterLabel()
 
     SponsorBlockNotifcationSetVisible(m.videoContainer.fullscreen)
@@ -13,6 +19,18 @@ function SetupSponsorBlock()
     m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
     m.chapterLabelTimer.observeField("fire", "OnChapterLabelTimer")
     m.top.observeField("videoId", "StartSponsorBlockTask")
+end function
+
+function LoadSponsorBlockSettings() as void
+    settings = FindAndGetPreferenceValues(["sponsorblock.enabled", "sponsorblock.show_notifications"])
+    if settings = invalid
+        m.sponsorBlockEnabled = false
+        m.sponsorBlockShowNotifications = false
+        return
+    end if
+
+    m.sponsorBlockEnabled = settings["sponsorblock.enabled"]
+    m.sponsorBlockShowNotifications = settings["sponsorblock.show_notifications"]
 end function
 
 function PositionChapterLabel()
@@ -121,7 +139,9 @@ function OnPositionChangeSkipSponsorBlockSections() as void
         currentPosition = m.top.position
         if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
             action = GetActionForSegment(segment)
-            ShowSponsorBlockNotifcation(segment, action)
+            if m.sponsorBlockShowNotifications = true
+                ShowSponsorBlockNotifcation(segment, action)
+            end if
 
             if action = "AutoSkip"
                 m.top.seek = segmentEnd
