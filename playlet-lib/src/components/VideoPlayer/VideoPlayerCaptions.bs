@@ -5,9 +5,7 @@ function SetCaptions(metadata as object, videoPlayer as object, contentNode as o
         return
     end if
     isoLanguageList = ParseJson(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json"))
-    ' TODO: loop through instances until valid captions are found
-    ' Captions are rate limited https://github.com/iv-org/invidious/issues/2567
-    instance = InvidiousSettings.GetSelectedInstance()
+    instance = InvidiousSettings.GetCurrentInstance()
 
     subtitleTracks = []
 
@@ -21,6 +19,8 @@ function SetCaptions(metadata as object, videoPlayer as object, contentNode as o
     contentNode.ClosedCaptions = True
     contentNode.SubtitleTracks = subtitleTracks
 
+    ' Captions are rate limited https://github.com/iv-org/invidious/issues/2567
+    ' We loop through a list of backup instances hoping to find working subtitles.
     ' Searching for a working caption could cause a delay in the video player start.
     ' This is why it is behind a feature flag.
     #if CAPTION_INSTANCE_SEARCH
