@@ -6,14 +6,14 @@
     let version;
     let loggedIn = false;
     let auth_url;
-    let selectedInstance;
+    let currentInstance;
     let loggedInInstance;
     
     playletStateStore.subscribe((value) => {
         version = value?.app?.version ?? "";
         loggedIn = value?.invidious?.logged_in;
         auth_url = value?.invidious?.auth_url;
-        selectedInstance = value?.invidious?.selected_instance;
+        currentInstance = value?.invidious?.current_instance;
         loggedInInstance = value?.invidious?.logged_in_instance;
     });
 
@@ -42,7 +42,7 @@
                 <button class="btn" on:click={logout}>Logout</button>
             </div>
         {:else}
-            <div class="tooltip tooltip-left" data-tip={selectedInstance}>
+            <div class="tooltip tooltip-left" data-tip={currentInstance}>
                 <button class="btn" on:click={login}>Login</button>
             </div>
         {/if}

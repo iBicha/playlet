@@ -20,8 +20,8 @@ export class PlayletApi {
         return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "clear-search-history" });
     }
 
-    static async updateInstances(instances) {
-        return await PlayletApi.postJson(`${PlayletApi.host()}/invidious/instances`, instances);
+    static async updateInstance(instance) {
+        return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, {"invidious.instance": instance});
     }
 
     private static postJson(url, payload) {
@@ -30,6 +30,16 @@ export class PlayletApi {
                 'Content-Type': 'application/json'
             },
             method: "POST",
+            body: JSON.stringify(payload)
+        })
+    }
+
+    private static putJson(url, payload) {
+        return fetch(url, {
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            method: "PUT",
             body: JSON.stringify(payload)
         })
     }
