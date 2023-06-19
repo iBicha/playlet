@@ -3,6 +3,8 @@
   import RadioControl from "./SettingControls/RadioControl.svelte";
   import StringControl from "./SettingControls/StringControl.svelte";
 
+  const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
+
   export let displayText: string = "";
   export let key: string = "";
   export let description: string = "";
@@ -17,17 +19,19 @@
   {#if type === "boolean"}
     <BooleanControl {displayText} {key} {description} {level} />
   {:else if type === "radio"}
-    <RadioControl {displayText} {key} {description} {level} {options}/>
+    <RadioControl {displayText} {key} {description} {level} {options} />
   {:else if type === "string"}
     <StringControl {displayText} {key} {description} {level} />
   {:else}
-    <svelte:element this={`h${level + 2}`}>{displayText}</svelte:element>
-    <div class="text-sm text-gray-500">{description}</div>
+    <div class="m-5">
+      <div class={textSizes[level]}>{displayText}</div>
+      <div class="text-xs text-gray-500">{description}</div>
+    </div>
   {/if}
 
   {#if children}
     {#each children as child}
-      <svelte:self {...child} level={level + 2} />
+      <svelte:self {...child} level={level + 1} />
     {/each}
   {/if}
 {/if}

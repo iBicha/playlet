@@ -2,6 +2,8 @@
   import { PlayletApi } from "../PlayletApi";
   import { userPreferencesStore } from "../Stores";
 
+  const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
+
   export let displayText: string = "";
   export let key: string = "";
   export let description: string = "";
@@ -13,15 +15,15 @@
   });
 
   async function handleChange() {
-    if(key !== "") {
-        await PlayletApi.saveUserPreference(key, value);
+    if (key !== "") {
+      await PlayletApi.saveUserPreference(key, value);
     }
   }
 </script>
 
-<div class="form-control">
-  <label class="label cursor-pointer">
-    <span class="label-text">{displayText}</span>
+<div class="form-control m-5">
+  <label class="label p-0 cursor-pointer">
+    <div class="label-text {textSizes[level]}">{displayText}</div>
     <input
       type="checkbox"
       name={key}
@@ -30,9 +32,5 @@
       class="checkbox"
     />
   </label>
-  <div class="text-sm text-gray-500">{description}</div>
+  <div class="text-xs text-gray-500">{description}</div>
 </div>
-<!-- 
-<svelte:element this={`h${level + 2}`}>{displayText}</svelte:element>
-
-<input type="checkbox" checked class="checkbox" /> -->

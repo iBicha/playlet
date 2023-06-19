@@ -19,12 +19,13 @@
   });
 </script>
 
-<!-- <p class="text-sm font-bold m-6">This is a small bold text.</p>
-<p class="text-base text-gray-600">This is a base-sized gray text.</p>
-<p class="text-2xl uppercase">This is an extra large uppercase text.</p> -->
-
-<article class="prose container">
-  {#each preferencesModel as pref}
-    <SettingsNode {...pref} />
+<div class="container">
+  {#each preferencesModel as pref, i}
+    {#if pref.visibility !== "tv"}
+      <SettingsNode {...pref} />
+      {#if i !== preferencesModel.length - 1}
+        <div class="divider" />
+      {/if}
+    {/if}
   {/each}
-</article>
+</div>

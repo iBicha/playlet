@@ -2,6 +2,8 @@
   import { PlayletApi } from "../PlayletApi";
   import { userPreferencesStore } from "../Stores";
 
+  const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
+
   export let displayText: string = "";
   export let key: string = "";
   export let description: string = "";
@@ -16,23 +18,25 @@
 
   async function save() {
     if (key !== "") {
-        const value = inputValue;
-        await PlayletApi.saveUserPreference(key, value);
-        currentValue = inputValue = value;
+      const value = inputValue;
+      await PlayletApi.saveUserPreference(key, value);
+      currentValue = inputValue = value;
     }
   }
 </script>
 
-<svelte:element this={`h${level + 2}`}>{displayText}</svelte:element>
-<div class="text-sm text-gray-500">{description}</div>
+<div class="m-5">
+  <div class={textSizes[level]}>{displayText}</div>
+  <div class="text-xs text-gray-500">{description}</div>
 
-<input
-  type="text"
-  name={key}
-  bind:value="{inputValue}"
-  placeholder={displayText}
-  class="input input-bordered w-full max-w-xs"
-/>
-{#if inputValue !== currentValue}
-<button class="btn" on:click={save}>Save</button>
-{/if}
+  <input
+    type="text"
+    name={key}
+    bind:value={inputValue}
+    placeholder={displayText}
+    class="input input-bordered w-full max-w-xs"
+  />
+  {#if inputValue !== currentValue}
+    <button class="btn" on:click={save}>Save</button>
+  {/if}
+</div>
