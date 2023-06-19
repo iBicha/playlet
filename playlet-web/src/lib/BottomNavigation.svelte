@@ -1,10 +1,9 @@
 <script lang="ts">
+  import HomeIcon from "../assets/home-icon.svg.svelte";
+  import InfoIcon from "../assets/info-icon.svg.svelte";
+  import SearchIcon from "../assets/search-icon.svg.svelte";
+  import SettingsIcon from "../assets/settings-icon.svg.svelte";
   import { appStateStore } from "./Stores";
-
-  import searchIcon from "../assets/search.svg";
-  import homeIcon from "../assets/home.svg";
-  import settingsIcon from "../assets/settings.svg";
-  import infoIcon from "../assets/info.svg";
   import type { AppState } from "./Types";
 
   let currentScreen: AppState["screen"];
@@ -25,24 +24,32 @@
     on:click={() => setScreen("search")}
     class={currentScreen === "search" ? "active" : ""}
   >
-    <img src={searchIcon} class="h-6" alt="Search" />
+    <div class="h-6">
+      <SearchIcon />
+    </div>
   </button>
   <button
     on:click={() => setScreen("home")}
     class={currentScreen === "home" ? "active" : ""}
   >
-    <img src={homeIcon} class="h-6" alt="Home" />
+    <div class="h-6">
+      <HomeIcon />
+    </div>
   </button>
   <button
     on:click={() => setScreen("settings")}
     class={currentScreen === "settings" ? "active" : ""}
   >
-    <img src={settingsIcon} class="h-6" alt="Settings" />
+    <div class="h-6">
+      <SettingsIcon />
+    </div>
   </button>
   <button
     on:click={() => setScreen("info")}
     class={currentScreen === "info" ? "active" : ""}
   >
-    <img src={infoIcon} class="h-6" alt="Info" />
+    <div class="h-6">
+      <InfoIcon />
+    </div>
   </button>
 </div>

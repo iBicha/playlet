@@ -1,8 +1,10 @@
 <script lang="ts">
-  import playletLogo from "../assets/logo-dark.svg";
+  import playletLogoDark from "../assets/logo-dark.svg";
+  import playletLogoLight from "../assets/logo-light.svg";
   import userIcon from "../assets/user.png";
   import { PlayletApi } from "./PlayletApi";
-  import { playletStateStore } from "./Stores";
+  import { appThemeStore, playletStateStore } from "./Stores";
+  import ThemeSelect from "./ThemeToggle.svelte";
 
   let version;
   let loggedIn = false;
@@ -18,6 +20,11 @@
     currentInstance = value?.invidious?.current_instance;
     loggedInInstance = value?.invidious?.logged_in_instance;
     username = value?.invidious?.logged_in_username;
+  });
+
+  let theme;
+  appThemeStore.subscribe((value) => {
+    theme = value;
   });
 
   const login = () => {
@@ -36,14 +43,15 @@
 
 <div class="navbar bg-base-100 sticky top-0 z-50">
   <div class="flex-1">
-    <img src={playletLogo} class="h-8" alt="Playlet Logo" />
+    <img src={theme === 'dark' ? playletLogoDark : playletLogoLight} class="h-8" alt="Playlet Logo" />
     <h4 class="label brightness-75">{version}</h4>
   </div>
   <div class="flex-none">
+    <ThemeSelect />
     {#if loggedIn && username}
-    <div class="badge badge-neutral">
+      <div class="badge badge-neutral">
         <span>{username}</span>
-    </div>
+      </div>
     {/if}
     <div class="dropdown dropdown-end">
       <div tabindex="-1" class="btn btn-ghost btn-circle avatar">
@@ -57,14 +65,20 @@
       >
         {#if loggedIn}
           <li>
-            <div class="tooltip tooltip-left" data-tip={`Logout from ${loggedInInstance}`}>
-                <button on:click={logout}>Logout</button>
+            <div
+              class="tooltip tooltip-left"
+              data-tip={`Logout from ${loggedInInstance}`}
+            >
+              <button on:click={logout}>Logout</button>
             </div>
           </li>
         {:else}
           <li>
-            <div class="tooltip tooltip-left" data-tip={`Login using ${currentInstance}`}>
-                <button on:click={login}>Login</button>
+            <div
+              class="tooltip tooltip-left"
+              data-tip={`Login using ${currentInstance}`}
+            >
+              <button on:click={login}>Login</button>
             </div>
           </li>
         {/if}
