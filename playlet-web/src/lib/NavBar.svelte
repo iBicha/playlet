@@ -49,7 +49,7 @@
   <div class="flex-none">
     <ThemeSelect />
     {#if loggedIn && username}
-      <div class="badge badge-neutral">
+      <div class="badge badge-outline">
         <span>{username}</span>
       </div>
     {/if}
