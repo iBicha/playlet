@@ -8,11 +8,14 @@
   export let displayText: string = "";
   export let key: string = "";
   export let description: string = "";
-  export let type: "boolean" | "radio" | "string" | undefined;
-  export let options: any[] | undefined;
+  export let type: "boolean" | "radio" | "string" | undefined = undefined;
+  export let options: any[] | undefined = undefined;
   export let visibility: string | undefined = undefined;
   export let children: any[] | undefined = [];
   export let level: number = 0;
+
+  // svelte-ignore unused-export-let
+  export let defaultValue: any = undefined;
 </script>
 
 {#if visibility !== "tv"}
