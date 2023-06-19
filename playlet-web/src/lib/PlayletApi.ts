@@ -8,6 +8,21 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getPreferencesFile() {
+        const response = await fetch(`${PlayletApi.host()}/config/preferences.json`);
+        return await response.json();
+    }
+
+    static async getUserPreferences() {
+        const response = await fetch(`${PlayletApi.host()}/api/preferences`);
+        return await response.json();
+    }
+
+    static async saveUserPreference(key, value) {
+        const response = await this.putJson(`${PlayletApi.host()}/api/preferences`, { [key]: value });
+        return await response;
+    }
+
     static async logout() {
         return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "logout" });
     }
