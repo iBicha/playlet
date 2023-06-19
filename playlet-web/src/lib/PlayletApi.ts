@@ -13,6 +13,16 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getHomeLayoutFile() {
+        const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.json`);
+        return await response.json();
+    }
+
+    static async getInvidiousVideoApiFile() {
+        const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.json`);
+        return await response.json();
+    }
+
     static async getUserPreferences() {
         const response = await fetch(`${PlayletApi.host()}/api/preferences`);
         return await response.json();
