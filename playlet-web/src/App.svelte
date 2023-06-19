@@ -23,7 +23,8 @@
 
 <main>
   <NavBar />
-  <div class="container">
+  <!-- TODO: a better way to make the BottomNavigation not hide screens -->
+  <div class="container" style="margin-bottom: 4rem">
     {#if currentScreen == "search"}
       <ScreenSearch />
     {/if}
