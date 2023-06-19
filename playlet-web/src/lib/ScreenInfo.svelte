@@ -12,12 +12,51 @@
     id: "App ID",
   };
 
-  let appState = {};
+  let appInfo = {};
+  let deviceInfo = {};
+  let invidiousInfo = {};
+  let preferencesInfo = {};
+  let githubUrlIssue = "https://github.com/iBicha/playlet/issues/new";
+
   playletStateStore.subscribe((value) => {
-    appState = value.app;
+    appInfo = value.app || {};
+    deviceInfo = value.device || {};
+    invidiousInfo = value.invidious || {};
+    preferencesInfo = value.preferences || {};
+    githubUrlIssue = CreateGithubIssueUrl();
   });
+
+  function CreateGithubIssueUrl() {
+    let title = "[Feedback] Playlet";
+    let body = `### Feedback
+_insert feedback here_
+
+#### App Info
+\`\`\`
+${JSON.stringify(appInfo, null, 2)}
+\`\`\`
+
+#### Device Info
+\`\`\`
+${JSON.stringify(deviceInfo, null, 2)}
+\`\`\`
+
+#### Invidious settings
+\`\`\`
+${JSON.stringify(invidiousInfo, null, 2)}
+\`\`\`
+
+#### User preferences
+\`\`\`
+${JSON.stringify(preferencesInfo, null, 2)}
+\`\`\``;
+    return `https://github.com/iBicha/playlet/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  }
 </script>
 
+<div class="text-base text-center m-8">
+  Thank you for using Playlet.<br/> You have feedback? Let us know by <a class="link" href={githubUrlIssue} target="_blank" rel="noopener noreferrer">creating an issue on Github</a>.
+</div>
 <div class="overflow-x-auto">
   <table class="table">
     <thead>
@@ -30,7 +69,7 @@
       {#each Object.entries(displayNames) as [key, value]}
         <tr>
           <td>{value}</td>
-          <td>{appState[key]}</td>
+          <td>{appInfo[key]}</td>
         </tr>
       {/each}
     </tbody>
