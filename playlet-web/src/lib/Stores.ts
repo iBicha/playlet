@@ -12,3 +12,5 @@ export const appThemeStore = writable("dark" as "dark" | "light");
 export const preferencesModelStore = writable([] as any);
 
 export const userPreferencesStore = writable({} as any);
+
+export const invidiousVideoApiStore = writable({} as any);
