@@ -2,11 +2,7 @@
   import { onMount } from "svelte";
   import NavBar from "./lib/NavBar.svelte";
   import { PlayletApi } from "./lib/PlayletApi";
-  import {
-    appStateStore,
-    invidiousTokenStore,
-    playletStateStore,
-  } from "./lib/Stores";
+  import { appStateStore, playletStateStore } from "./lib/Stores";
   import BottomNavigation from "./lib/BottomNavigation.svelte";
   import ScreenHome from "./lib/ScreenHome.svelte";
   import type { AppState } from "./lib/Types";
@@ -17,9 +13,6 @@
   onMount(async () => {
     PlayletApi.getState().then((value) => {
       playletStateStore.set(value);
-    });
-    PlayletApi.getInvidiousToken().then((value) => {
-      invidiousTokenStore.set(value);
     });
   });
 

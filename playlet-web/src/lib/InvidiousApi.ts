@@ -3,7 +3,7 @@ import { PlayletApi } from "./PlayletApi";
 export class InvidiousApi {
     public instance: string;
     public endpoints: any;
-    public invidiousToken: any = {};
+    public isLoggedIn: boolean = false;
     public userCountryCode: string = 'US';
 
     responseHandlers: any;
@@ -43,15 +43,10 @@ export class InvidiousApi {
 
         if (endpoint.authenticated) {
             // Authenticated requests on the web app would be blocked by CORS, so we use the Playlet API as a proxy
-            if (!this.invidiousToken.token) {
+            if (!this.isLoggedIn) {
                 return null;
             }
-            url = this.invidiousToken.instance + endpoint.url
-            headers = {
-                "Authorization": `Bearer ${this.invidiousToken.token}`
-            }
-
-            url = PlayletApi.host() + "/proxy?url=" + encodeURIComponent(url);
+            return await PlayletApi.invidiousAuthenticatedRequest(requestData);
         }
 
         if (endpoint.queryParams !== undefined) {

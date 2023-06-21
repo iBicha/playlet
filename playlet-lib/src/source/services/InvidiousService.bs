@@ -2,6 +2,7 @@ import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/General.bs"
+import "pkg:/source/utils/Crypto.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
 
 class InvidiousService
@@ -76,7 +77,14 @@ class InvidiousService
 
         responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
-        return responseHandler(m, requestData, response)
+        result = responseHandler(m, requestData, response)
+
+        if result <> invalid and endpoint.authenticated = true
+            ' Cache response for use by web app
+            m.CacheResponse(requestData, result)
+        end if
+
+        return result
     end function
 
     function GetAuthenticationHeaders(token as string) as object
@@ -164,5 +172,12 @@ class InvidiousService
         expire = token["expire"]
         currentTime = TimeUtils.Now().AsSeconds()
         return expire < currentTime
+    end function
+
+    function CacheResponse(requestData as object, result as object)
+        cacheKey = FormatJson(requestData)
+        cacheKey = GetMd5(cacheKey)
+        value = FormatJson(result)
+        WriteAsciiFile(`tmp:/${cacheKey}.json`, value)
     end function
 end class

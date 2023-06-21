@@ -1,7 +1,6 @@
 <script lang="ts">
   import { InvidiousApi } from "./InvidiousApi";
   import {
-    invidiousTokenStore,
     invidiousVideoApiStore,
     playletStateStore,
   } from "./Stores";
@@ -15,19 +14,7 @@
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
     invidiousApi.userCountryCode = value?.app?.user_country_code ?? "US";
-    updateRow();
-  });
-
-  invidiousTokenStore.subscribe((value) => {
-    invidiousApi.invidiousToken = value;
-    if (!invidiousApi.endpoints) {
-      return;
-    }
-    let endpoint = invidiousApi.endpoints[requestData.endpoint];
-    if (!endpoint || !endpoint.authenticated) {
-      return;
-    }
-
+    invidiousApi.isLoggedIn = value.invidious?.logged_in ?? false;
     updateRow();
   });
 

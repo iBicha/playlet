@@ -1,4 +1,5 @@
 import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/services/InvidiousService.bs"
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 
 namespace Http
@@ -53,42 +54,45 @@ namespace Http
                 return true
             end function)
 
-            ' TODO: no need to expose the token, just have a proxy for authenticated invidious endpoints
-            ' TODO: after that, figure out if there's leak in server connections that make the web server hang after a while.
-            ' Symptom: the web requests on the web app show 'pending' and never complete.
-            m.Get("/invidious/authenticated-user", function(context as object) as boolean
-                response = context.response
-
-                token = InvidiousSettings.GetAuthToken()
-                if token = invalid
-                    response.Default(404, "No token, not logged in")
-                    return true
-                end if
-                response.Json(token)
-                return true
-            end function)
-
-            m.Get("/proxy", function(context as object) as boolean
+            m.Get("/invidious/authenticated-request", function(context as object) as boolean
                 request = context.request
                 response = context.response
 
-                url = request.query.url
-                if url = invalid
-                    response.Default(400, "Expected url")
+                requestData = request.query["request-data"]
+                if requestData = invalid
+                    response.Default(400, "Expected request-data")
                     return true
                 end if
 
-                args = {
-                    parseJson: false,
-                    headers: request.headers
-                }
+                token = InvidiousSettings.GetAuthToken()
+                if token = invalid
+                    response.Default(403, "No token, not logged in")
+                    return true
+                end if
 
-                res = Requests().get(url, args)
+                requestData = ParseJson(requestData)
+                ' Format object again because FormatJson formats in a specific way (sorts keys, etc.) 
+                ' so we want an exact string for the md5 hash to match
+                requestDataJson = FormatJson(requestData)
+                cacheKey = GetMd5(requestDataJson)
+                path = `tmp:/${cacheKey}.json`
 
-                response.http_code = res.statuscode
-                response.SetBodyDataString(res.text)
-                response.ContentType(res.headers["content-type"])
-                response.source = Http.HttpResponseSource.GENERATED
+                fs = CreateObject("roFilesystem")
+                if fs.exists(path)
+                    cacheData = ReadAsciiFile(path)
+                    response.SetBodyDataString(cacheData)
+                    response.ContentType("application/json")
+                    response.source = Http.HttpResponseSource.GENERATED
+                    return true
+                end if
+
+                invService = new InvidiousService()
+                result = invService.MakeRequest(requestData)
+                if result = invalid
+                    response.Default(500, "Failed to make request")
+                    return true
+                end if
+                response.Json(result)
                 return true
             end function)
 

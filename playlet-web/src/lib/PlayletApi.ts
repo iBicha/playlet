@@ -23,13 +23,10 @@ export class PlayletApi {
         return await response.json();
     }
 
-    static async getInvidiousToken() {
-        try {
-            const response = await fetch(`${PlayletApi.host()}/invidious/authenticated-user`);
-            return await response.json();
-        } catch (error) {
-            return {}
-        }
+    static async invidiousAuthenticatedRequest(requestData) {
+        const url = PlayletApi.host() + "/invidious/authenticated-request?request-data=" + encodeURIComponent(JSON.stringify(requestData));
+        const response = await fetch(url);
+        return await response.json();
     }
 
     static async getUserPreferences() {
