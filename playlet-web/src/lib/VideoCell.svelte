@@ -32,6 +32,10 @@
   export let liveNow: boolean = undefined;
   // svelte-ignore unused-export-let
   export let premium: boolean = undefined;
+  // svelte-ignore unused-export-let
+  export let index: number = undefined;
+  // svelte-ignore unused-export-let
+  export let indexId: string = undefined;
 
   function getViewCountDateText() {
     if (isUpcoming) {
@@ -96,7 +100,7 @@
   }
 
   function getThumbnailUrl(quality: string = "medium") {
-    if (videoThumbnails.length === 0) {
+    if (!videoThumbnails || videoThumbnails.length === 0) {
       return "";
     }
     const videoThumbnail =

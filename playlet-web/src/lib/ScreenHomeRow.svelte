@@ -1,9 +1,15 @@
 <script lang="ts">
   import { InvidiousApi } from "./InvidiousApi";
-  import { invidiousVideoApiStore, playletStateStore } from "./Stores";
+  import {
+    invidiousTokenStore,
+    invidiousVideoApiStore,
+    playletStateStore,
+  } from "./Stores";
   import VideoCell from "./VideoCell.svelte";
 
   export let requestData: any = undefined;
+  export let videoRowData = undefined;
+
   let invidiousApi = new InvidiousApi();
 
   playletStateStore.subscribe((value) => {
@@ -12,7 +18,18 @@
     updateRow();
   });
 
-  let videos = undefined;
+  invidiousTokenStore.subscribe((value) => {
+    invidiousApi.invidiousToken = value;
+    if (!invidiousApi.endpoints) {
+      return;
+    }
+    let endpoint = invidiousApi.endpoints[requestData.endpoint];
+    if (!endpoint || !endpoint.authenticated) {
+      return;
+    }
+
+    updateRow();
+  });
 
   invidiousVideoApiStore.subscribe((value) => {
     invidiousApi.endpoints = value;
@@ -20,17 +37,28 @@
   });
 
   async function updateRow() {
-    videos = await invidiousApi.makeRequest(requestData);
+    const result = await invidiousApi.makeRequest(requestData);
+    if (result) {
+      videoRowData = result;
+    }
   }
 </script>
 
-{#if videos}
-  <div>{requestData.title}</div>
-  <div class="carousel carousel-center max-w-md p-4 space-x-4 bg-neutral rounded-box">
-    {#each videos as video}
-      <div class="carousel-item">
-        <VideoCell {...video} />
-      </div>
+{#if videoRowData}
+  {#if Array.isArray(videoRowData)}
+    {#each videoRowData as child}
+      <svelte:self videoRowData={child} />
     {/each}
-  </div>
+  {:else if videoRowData.title && videoRowData.videos}
+    <div>{videoRowData.title}</div>
+    <div
+      class="carousel carousel-center max-w-md p-4 space-x-4 bg-neutral rounded-box"
+    >
+      {#each videoRowData.videos as video}
+        <div class="carousel-item">
+          <VideoCell {...video} />
+        </div>
+      {/each}
+    </div>
+  {/if}
 {/if}

@@ -1,14 +1,19 @@
+import { PlayletApi } from "./PlayletApi";
+
 export class InvidiousApi {
     public instance: string;
     public endpoints: any;
+    public invidiousToken: any = {};
     public userCountryCode: string = 'US';
 
     responseHandlers: any;
 
     constructor() {
         this.responseHandlers = {
-            "DefaultHandler": this.DefaultHandler,
-            "AuthFeedHandler": this.AuthFeedHandler,
+            "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
+            "AuthFeedHandler": (requestData, response) => this.AuthFeedHandler(requestData, response),
+            "AuthPlaylistsHandler": (requestData, response) => this.AuthPlaylistsHandler(requestData, response),
+            "PlaylistHandler": (requestData, response) => this.PlaylistHandler(requestData, response),
         }
     }
 
@@ -33,11 +38,20 @@ export class InvidiousApi {
         }
 
         let url = this.instance + endpoint.url
-        let params = {}
+        let queryParams = {}
+        let headers = {}
 
         if (endpoint.authenticated) {
-            // TODO authenticated calls, with token
-            return null;
+            // Authenticated requests on the web app would be blocked by CORS, so we use the Playlet API as a proxy
+            if (!this.invidiousToken.token) {
+                return null;
+            }
+            url = this.invidiousToken.instance + endpoint.url
+            headers = {
+                "Authorization": `Bearer ${this.invidiousToken.token}`
+            }
+
+            url = PlayletApi.host() + "/proxy?url=" + encodeURIComponent(url);
         }
 
         if (endpoint.queryParams !== undefined) {
@@ -45,12 +59,12 @@ export class InvidiousApi {
                 let queryParam = endpoint.queryParams[queryParamKey];
                 if (queryParam.default !== undefined) {
                     if (queryParam.type === "string") {
-                        params[queryParamKey] = queryParam.default;
+                        queryParams[queryParamKey] = queryParam.default;
                     } else if (queryParam.type === "#ISO3166") {
                         if (queryParam.default === "GetUserCountryCode") {
-                            params[queryParamKey] = this.userCountryCode;
+                            queryParams[queryParamKey] = this.userCountryCode;
                         } else {
-                            params[queryParamKey] = queryParam.default;
+                            queryParams[queryParamKey] = queryParam.default;
                         }
                     }
                 }
@@ -58,7 +72,7 @@ export class InvidiousApi {
         }
 
         if (requestData.queryParams !== undefined) {
-            params = { ...params, ...requestData.queryParams };
+            queryParams = { ...queryParams, ...requestData.queryParams };
         }
 
         if (requestData.pathParams !== undefined) {
@@ -67,32 +81,64 @@ export class InvidiousApi {
             }
         }
 
-        url = this.makeUrl(url, params);
-        const response = await fetch(url);
+        url = this.makeUrl(url, queryParams);
+        const response = await fetch(url, { headers: headers });
 
         let responseHandler = endpoint.responseHandler !== undefined ? this.responseHandlers[endpoint.responseHandler] : this.responseHandlers["DefaultHandler"];
-        if (!responseHandler ) {
+        if (!responseHandler) {
             return null;
         }
         return await responseHandler(requestData, response);
     }
 
-    async DefaultHandler(requestData, response) {
-        return await response.json();
-    }
-
-    async AuthFeedHandler(requestData, response) {
+    private async DefaultHandler(requestData, response) {
         const json = await response.json();
-        return [...json.notifications, ...json.videos];
+        return [{ title: requestData.title, videos: json }]
     }
 
-    makeUrl(url: string, queryParams: any) {
-        const params = new URLSearchParams(queryParams);
-        const encodedParams = params.toString();
+    private async AuthFeedHandler(requestData, response) {
+        const json = await response.json();
+        const videos = [...json.notifications, ...json.videos];
+        return [{ title: requestData.title, videos: videos }]
+    }
 
+    private async AuthPlaylistsHandler(requestData, response) {
+        const playlists = await response.json();
+        const result = [];
+        for (let i = 0; i < playlists.length; i++) {
+            result.push(this.ProcessPlaylist(requestData, playlists[i]));
+        }
+        return result;
+    }
+
+    private async PlaylistHandler(requestData, response) {
+        const playlist = await response.json();
+        return [this.ProcessPlaylist(requestData, playlist)]
+    }
+
+    private ProcessPlaylist(requestData, playlist) {
+        const title = this.ProcessTemplate(requestData.title, playlist)
+        return { title: title, videos: playlist.videos }
+    }
+
+    private ProcessTemplate(template: string, data) {
+        let result = template;
+        for (let key in data) {
+            result = result.replace(`%${key}%`, `${data[key]}`);
+        }
+        return result;
+    }
+
+    private makeUrl(url: string, params: any) {
         const encodedUrl = new URL(url);
-        encodedUrl.search = encodedParams;
+        const existingParams = new URLSearchParams(encodedUrl.search);
 
+        let mergedParams = new URLSearchParams({
+            ...Object.fromEntries(existingParams),
+            ...params
+        });
+
+        encodedUrl.search = mergedParams.toString();
         return encodedUrl.toString();
     }
 }

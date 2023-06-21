@@ -87,7 +87,7 @@ class InvidiousService
 
     function DefaultHandler(m as object, requestData as object, response as object) as object
         if response.statuscode = 200
-            return response.json
+            return [{ title: requestData.title, videos: response.json }]
         end if
         return invalid
     end function
@@ -99,7 +99,7 @@ class InvidiousService
             videos = []
             videos.Append(response.json.notifications)
             videos.Append(response.json.videos)
-            return videos
+            return [{ title: requestData.title, videos: videos }]
         end if
         return invalid
     end function
@@ -108,9 +108,9 @@ class InvidiousService
         m.DeleteExpiredToken(response)
         if response.statuscode = 200
             playlists = response.json
-            result = {}
+            result = []
             for each playlist in playlists
-                result.append(m.ProcessPlaylist(requestData, playlist))
+                result.push(m.ProcessPlaylist(requestData, playlist))
             end for
             return result
         end if
@@ -120,17 +120,14 @@ class InvidiousService
     function PlaylistHandler(m as object, requestData as object, response as object) as object
         if response.statuscode = 200
             playlist = response.json
-            return m.ProcessPlaylist(requestData, playlist)
+            return [m.ProcessPlaylist(requestData, playlist)]
         end if
         return invalid
     end function
 
     function ProcessPlaylist(requestData as object, playlist as object) as object
-        title = requestData.title
-        title = m.ProcessTemplate(title, playlist)
-        result = {}
-        result[title] = playlist.videos
-        return result
+        title = m.ProcessTemplate(requestData.title, playlist)
+        return { title: title, videos: playlist.videos }
     end function
 
     function ProcessTemplate(template as string, data as object) as string

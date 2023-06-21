@@ -23,6 +23,15 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getInvidiousToken() {
+        try {
+            const response = await fetch(`${PlayletApi.host()}/invidious/authenticated-user`);
+            return await response.json();
+        } catch (error) {
+            return {}
+        }
+    }
+
     static async getUserPreferences() {
         const response = await fetch(`${PlayletApi.host()}/api/preferences`);
         return await response.json();
@@ -46,7 +55,7 @@ export class PlayletApi {
     }
 
     static async updateInstance(instance) {
-        return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, {"invidious.instance": instance});
+        return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, { "invidious.instance": instance });
     }
 
     private static postJson(url, payload) {
