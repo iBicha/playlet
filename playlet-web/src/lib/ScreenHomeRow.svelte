@@ -8,6 +8,7 @@
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
+    invidiousApi.userCountryCode = value?.app?.user_country_code ?? "US";
     updateRow();
   });
 

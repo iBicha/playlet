@@ -1,6 +1,7 @@
 export class InvidiousApi {
     public instance: string;
     public endpoints: any;
+    public userCountryCode: string = 'US';
 
     responseHandlers: any;
 
@@ -10,7 +11,6 @@ export class InvidiousApi {
             "AuthFeedHandler": this.AuthFeedHandler,
         }
     }
-    // TODO: user country code
 
     public async searchSuggestions(query: string) {
         const response = await fetch(`${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}`);
@@ -35,7 +35,7 @@ export class InvidiousApi {
         let url = this.instance + endpoint.url
         let params = {}
 
-        if (requestData.authenticated) {
+        if (endpoint.authenticated) {
             // TODO authenticated calls, with token
             return null;
         }
@@ -48,7 +48,7 @@ export class InvidiousApi {
                         params[queryParamKey] = queryParam.default;
                     } else if (queryParam.type === "#ISO3166") {
                         if (queryParam.default === "GetUserCountryCode") {
-                            params[queryParamKey] = 'US'; // TODO: user country code
+                            params[queryParamKey] = this.userCountryCode;
                         } else {
                             params[queryParamKey] = queryParam.default;
                         }

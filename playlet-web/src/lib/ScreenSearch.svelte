@@ -5,16 +5,17 @@
 
   let invidiousApi = new InvidiousApi();
   let videos = [];
-  let suggestions: {suggestions: any[]} = {suggestions: []};
+  let suggestions: { suggestions: any[] } = { suggestions: [] };
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
+    invidiousApi.userCountryCode = value?.app?.user_country_code ?? "US";
   });
 
   async function searchSuggestions(event) {
     const query = event.currentTarget.value;
     if (query.length === 0) {
-      suggestions = {suggestions: []};
+      suggestions = { suggestions: [] };
       return;
     }
     suggestions = await invidiousApi.searchSuggestions(query);
@@ -45,7 +46,7 @@
     >
       {#each suggestions.suggestions as suggestion}
         <li>{suggestion}</li>
-       {/each}
+      {/each}
     </ul>
   </div>
 </div>
