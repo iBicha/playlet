@@ -26,18 +26,13 @@
   <NavBar />
   <!-- TODO: a better way to make the BottomNavigation not hide screens -->
   <div class="container" style="margin-bottom: 4rem">
-    {#if currentScreen == "search"}
-      <ScreenSearch />
-    {/if}
-    {#if currentScreen == "home"}
-      <ScreenHome />
-    {/if}
-    {#if currentScreen == "settings"}
-      <ScreenSettings />
-    {/if}
-    {#if currentScreen == "info"}
-      <ScreenInfo />
-    {/if}
+    <ScreenSearch visibility={currentScreen == "search"} />
+
+    <ScreenHome visibility={currentScreen == "home"} />
+
+    <ScreenSettings visibility={currentScreen == "settings"} />
+
+    <ScreenInfo visibility={currentScreen == "info"} />
   </div>
   <BottomNavigation />
 </main>

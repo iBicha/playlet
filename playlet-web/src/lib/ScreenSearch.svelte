@@ -3,6 +3,8 @@
   import { playletStateStore } from "./Stores";
   import VideoCell from "./VideoCell.svelte";
 
+  export let visibility: boolean;
+
   let invidiousApi = new InvidiousApi();
   let videos = [];
   let suggestions: { suggestions: any[] } = { suggestions: [] };
@@ -28,7 +30,7 @@
   }
 </script>
 
-<div>
+<div class={visibility ? "" : "hidden"}>
   <input
     type="search"
     placeholder="Search..."

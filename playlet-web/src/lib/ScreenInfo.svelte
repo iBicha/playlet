@@ -1,6 +1,8 @@
 <script lang="ts">
   import { playletStateStore } from "./Stores";
 
+  export let visibility: boolean;
+
   const displayNames = {
     version: "Playlet Version",
     lib_version: "Playlet Library Version",
@@ -54,24 +56,26 @@ ${JSON.stringify(preferencesInfo, null, 2)}
   }
 </script>
 
-<div class="text-base text-center m-8">
-  Thank you for using Playlet.<br/> You have feedback? Let us know by <a class="link" href={githubUrlIssue} target="_blank" rel="noopener noreferrer">creating an issue on Github</a>.
-</div>
-<div class="overflow-x-auto">
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Key</th>
-        <th>Value</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each Object.entries(displayNames) as [key, value]}
+<div class={visibility ? "" : "hidden"}>
+  <div class="text-base text-center m-8">
+    Thank you for using Playlet.<br/> You have feedback? Let us know by <a class="link" href={githubUrlIssue} target="_blank" rel="noopener noreferrer">creating an issue on Github</a>.
+  </div>
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead>
         <tr>
-          <td>{value}</td>
-          <td>{appInfo[key]}</td>
+          <th>Key</th>
+          <th>Value</th>
         </tr>
-      {/each}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {#each Object.entries(displayNames) as [key, value]}
+          <tr>
+            <td>{value}</td>
+            <td>{appInfo[key]}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>  
 </div>

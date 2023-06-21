@@ -4,23 +4,27 @@
   import ScreenHomeRow from "./ScreenHomeRow.svelte";
   import { invidiousVideoApiStore } from "./Stores";
 
+  export let visibility: boolean;
+
   let homeLayoutFile = [];
   onMount(async () => {
-    const getHomeLayoutFile = PlayletApi.getHomeLayoutFile();
-    const getInvidiousVideoApiFile = PlayletApi.getInvidiousVideoApiFile();
-    homeLayoutFile = await getHomeLayoutFile;
-    const invidiousVideoApiFile = await getInvidiousVideoApiFile;
-    const invidiousVideoApiDefinitions = invidiousVideoApiFile.endpoints.reduce(
-      (acc, endpoint) => {
-        acc[endpoint.name] = endpoint;
-        return acc;
-      },
-      {}
-    );
-    invidiousVideoApiStore.set(invidiousVideoApiDefinitions);
+    PlayletApi.getHomeLayoutFile().then((value) => {
+      homeLayoutFile = value;
+    });
+
+    PlayletApi.getInvidiousVideoApiFile().then((invidiousVideoApiFile) => {
+      const invidiousVideoApiDefinitions =
+        invidiousVideoApiFile.endpoints.reduce((acc, endpoint) => {
+          acc[endpoint.name] = endpoint;
+          return acc;
+        }, {});
+      invidiousVideoApiStore.set(invidiousVideoApiDefinitions);
+    });
   });
 </script>
 
-{#each homeLayoutFile as homeLayoutItem}
+<div class={visibility ? "" : "hidden"}>
+  {#each homeLayoutFile as homeLayoutItem}
     <ScreenHomeRow requestData={homeLayoutItem} />
-{/each}
+  {/each}
+</div>

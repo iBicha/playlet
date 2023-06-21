@@ -6,11 +6,6 @@
   import { appStateStore } from "./Stores";
   import type { AppState } from "./Types";
 
-  let currentScreen: AppState["screen"];
-  appStateStore.subscribe((value) => {
-    currentScreen = value.screen;
-  });
-
   function setScreen(screen: AppState["screen"]) {
     appStateStore.update((state) => {
       state.screen = screen;
@@ -22,7 +17,7 @@
 <div class="btm-nav">
   <button
     on:click={() => setScreen("search")}
-    class={currentScreen === "search" ? "active" : ""}
+    class={$appStateStore.screen === "search" ? "active" : ""}
   >
     <div class="h-6">
       <SearchIcon />
@@ -30,7 +25,7 @@
   </button>
   <button
     on:click={() => setScreen("home")}
-    class={currentScreen === "home" ? "active" : ""}
+    class={$appStateStore.screen === "home" ? "active" : ""}
   >
     <div class="h-6">
       <HomeIcon />
@@ -38,7 +33,7 @@
   </button>
   <button
     on:click={() => setScreen("settings")}
-    class={currentScreen === "settings" ? "active" : ""}
+    class={$appStateStore.screen === "settings" ? "active" : ""}
   >
     <div class="h-6">
       <SettingsIcon />
@@ -46,7 +41,7 @@
   </button>
   <button
     on:click={() => setScreen("info")}
-    class={currentScreen === "info" ? "active" : ""}
+    class={$appStateStore.screen === "info" ? "active" : ""}
   >
     <div class="h-6">
       <InfoIcon />

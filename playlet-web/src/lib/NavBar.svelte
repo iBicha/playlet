@@ -22,11 +22,6 @@
     username = value?.invidious?.logged_in_username;
   });
 
-  let theme;
-  appThemeStore.subscribe((value) => {
-    theme = value;
-  });
-
   const login = () => {
     if (!auth_url) {
       alert("Error with login, please refresh the page.");
@@ -43,7 +38,7 @@
 
 <div class="navbar bg-base-100 sticky top-0 z-50">
   <div class="flex-1">
-    <img src={theme === 'dark' ? playletLogoDark : playletLogoLight} class="h-8" alt="Playlet Logo" />
+    <img src={$appThemeStore === 'dark' ? playletLogoDark : playletLogoLight} class="h-8" alt="Playlet Logo" />
     <h4 class="label brightness-75">{version}</h4>
   </div>
   <div class="flex-none">

@@ -4,6 +4,8 @@
   import { preferencesModelStore, userPreferencesStore } from "./Stores";
   import { onMount } from "svelte";
 
+  export let visibility: boolean;
+
   onMount(async () => {
     const getPreferencesFile = PlayletApi.getPreferencesFile();
     const getUserPreferences = PlayletApi.getUserPreferences();
@@ -12,18 +14,13 @@
     preferencesModelStore.set(preferencesFile);
     userPreferencesStore.set(userPreferences);
   });
-
-  let preferencesModel;
-  preferencesModelStore.subscribe((value) => {
-    preferencesModel = value;
-  });
 </script>
 
-<div class="container">
-  {#each preferencesModel as pref, i}
+<div class="container {visibility ? "" : "hidden"}">
+  {#each $preferencesModelStore as pref, i}
     {#if pref.visibility !== "tv"}
       <SettingsNode {...pref} />
-      {#if i !== preferencesModel.length - 1}
+      {#if i !== $preferencesModelStore.length - 1}
         <div class="divider" />
       {/if}
     {/if}
