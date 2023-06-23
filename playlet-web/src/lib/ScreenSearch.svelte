@@ -133,7 +133,7 @@
 
   <div>
     <div
-      class="grid grid-flow-row-dense gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3"
+      class="grid grid-flow-row-dense gap-4 items-center justify-center sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 m-4"
     >
       {#each videos as video}
         {#if video.type === "video"}

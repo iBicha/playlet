@@ -172,7 +172,7 @@
   }
 </script>
 
-<button class="w-96" on:click="{modal.showModal()}">
+<button class="w-80 p-2" on:click="{modal.showModal()}">
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <figure class="relative">
       <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
