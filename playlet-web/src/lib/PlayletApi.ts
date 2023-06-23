@@ -65,6 +65,19 @@ export class PlayletApi {
         return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, { "invidious.instance": instance });
     }
 
+    static async setPlayletLibVersion(tag) {
+        let content = null
+
+        if (tag !== "") {
+            content = JSON.stringify([{
+                link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
+                type: 'custom'
+            }]);
+        }
+
+        await this.postJson(`${PlayletApi.host()}/api/command`, { command: "set-playlet-lib-urls", content: content });
+    }
+
     private static postJson(url, payload) {
         return fetch(url, {
             headers: {
