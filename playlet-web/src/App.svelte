@@ -25,7 +25,7 @@
 <main>
   <NavBar />
   <!-- TODO: a better way to make the BottomNavigation not hide screens -->
-  <div class="container" style="margin-bottom: 4rem">
+  <div style="margin-bottom: 4rem">
     <ScreenSearch visibility={currentScreen == "search"} />
 
     <ScreenHome visibility={currentScreen == "home"} />

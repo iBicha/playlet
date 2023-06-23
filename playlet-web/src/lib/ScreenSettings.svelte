@@ -16,7 +16,7 @@
   });
 </script>
 
-<div class="container {visibility ? "" : "hidden"}">
+<div class="{visibility ? "" : "hidden"}">
   {#each $preferencesModelStore as pref, i}
     {#if pref.visibility !== "tv"}
       <SettingsNode {...pref} />

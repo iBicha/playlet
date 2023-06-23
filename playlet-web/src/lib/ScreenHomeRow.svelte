@@ -37,9 +37,9 @@
       <svelte:self videoRowData={child} />
     {/each}
   {:else if videoRowData.title && videoRowData.videos}
-    <div>{videoRowData.title}</div>
+    <div class="text-lg font-semibold m-4">{videoRowData.title}</div>
     <div
-      class="carousel carousel-center max-w-md p-4 space-x-4 bg-neutral rounded-box"
+      class="carousel carousel-center rounded-box w-full space-x-4"
     >
       {#each videoRowData.videos as video}
         <div class="carousel-item">
