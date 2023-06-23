@@ -2,16 +2,16 @@
     import { PlayletApi } from "./PlayletApi";
     import { playletStateStore } from "./Stores";
 
-    let selectedInstance;
+    let currentInstance;
     let inputInstance;
 
     playletStateStore.subscribe((value) => {
-        selectedInstance = value?.invidious?.selected_instance ?? "N/A";
-        inputInstance = selectedInstance;
+        currentInstance = value?.invidious?.current_instance ?? "N/A";
+        inputInstance = currentInstance;
     });
 
     const updateInstance = async () => {
-        await PlayletApi.updateInstances([inputInstance]);
+        await PlayletApi.updateInstance(inputInstance);
         // TODO: reload state
         window.location.reload();
     };
@@ -26,7 +26,7 @@
             class="input input-bordered"
             bind:value={inputInstance}
         />
-        {#if inputInstance !== selectedInstance}
+        {#if inputInstance !== currentInstance}
             <button class="btn" on:click={updateInstance}>Update</button>
         {/if}
     </label>

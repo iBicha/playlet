@@ -1,25 +1,38 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import InstanceInfo from "./lib/InstanceInfo.svelte";
   import NavBar from "./lib/NavBar.svelte";
-  import PlayVideo from "./lib/PlayVideo.svelte";
-  import ClearSearchHistory from "./lib/ClearSearchHistory.svelte";
   import { PlayletApi } from "./lib/PlayletApi";
-  import { playletStateStore } from "./lib/Stores";
-  import LegacyUI from "./lib/LegacyUI.svelte";
+  import { appStateStore, playletStateStore } from "./lib/Stores";
+  import BottomNavigation from "./lib/BottomNavigation.svelte";
+  import ScreenHome from "./lib/ScreenHome.svelte";
+  import type { AppState } from "./lib/Types";
+  import ScreenSearch from "./lib/ScreenSearch.svelte";
+  import ScreenSettings from "./lib/ScreenSettings.svelte";
+  import ScreenInfo from "./lib/ScreenInfo.svelte";
 
   onMount(async () => {
-    const playletState = await PlayletApi.getState();
-    playletStateStore.set(playletState);
+    PlayletApi.getState().then((value) => {
+      playletStateStore.set(value);
+    });
+  });
+
+  let currentScreen: AppState["screen"];
+  appStateStore.subscribe((value) => {
+    currentScreen = value.screen;
   });
 </script>
 
 <main>
   <NavBar />
-  <div class="p-6 space-y-2 form-control">
-    <InstanceInfo />
-    <PlayVideo />
-    <ClearSearchHistory />
-    <LegacyUI />
+  <!-- TODO: a better way to make the BottomNavigation not hide screens -->
+  <div style="margin-bottom: 4rem">
+    <ScreenSearch visibility={currentScreen == "search"} />
+
+    <ScreenHome visibility={currentScreen == "home"} />
+
+    <ScreenSettings visibility={currentScreen == "settings"} />
+
+    <ScreenInfo visibility={currentScreen == "info"} />
   </div>
+  <BottomNavigation />
 </main>

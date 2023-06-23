@@ -1,32 +1,13 @@
+import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/services/InvidiousService.bs"
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+
 namespace Http
 
     class InvidiousRouter extends HttpRouter
 
         function new()
             super()
-
-            ' TODO: use new preferences system
-            m.Post("/invidious/instances", function(context as object) as boolean
-                request = context.request
-                response = context.response
-
-                instances = request.Json()
-
-                if GetInterface(instances, "ifArray") = invalid
-                    response.Default(400, "Expected json array")
-                    return true
-                end if
-
-                for i = 0 to instances.Count() - 1
-                    if instances[i].right(1) = "/"
-                        instances[i] = instances[i].left(instances[i].len() - 1)
-                    end if
-                end for
-
-                ' InvidiousSettings.SetRegistryInstances(instances)
-                response.Default(200, "OK")
-                return true
-            end function)
 
             m.Get(Invidious.TOKEN_CALLBACK, function(context as object) as boolean
                 request = context.request
@@ -49,6 +30,49 @@ namespace Http
                 response.Redirect("/")
                 return true
             end function)
+
+            m.Get("/invidious/authenticated-request", function(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                requestData = request.query["request-data"]
+                if requestData = invalid
+                    response.Default(400, "Expected request-data")
+                    return true
+                end if
+
+                token = InvidiousSettings.GetAuthToken()
+                if token = invalid
+                    response.Default(403, "No token, not logged in")
+                    return true
+                end if
+
+                requestData = ParseJson(requestData)
+                ' Format object again because FormatJson formats in a specific way (sorts keys, etc.) 
+                ' so we want an exact string for the md5 hash to match
+                requestDataJson = FormatJson(requestData)
+                cacheKey = GetMd5(requestDataJson)
+                path = `tmp:/${cacheKey}.json`
+
+                fs = CreateObject("roFilesystem")
+                if fs.exists(path)
+                    cacheData = ReadAsciiFile(path)
+                    response.SetBodyDataString(cacheData)
+                    response.ContentType("application/json")
+                    response.source = Http.HttpResponseSource.GENERATED
+                    return true
+                end if
+
+                invService = new InvidiousService()
+                result = invService.MakeRequest(requestData)
+                if result = invalid
+                    response.Default(500, "Failed to make request")
+                    return true
+                end if
+                response.Json(result)
+                return true
+            end function)
+
         end function
 
     end class
