@@ -1,5 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "./PlayletApi";
+  import { playletStateStore } from "./Stores";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;
@@ -36,6 +37,15 @@
   export let index: number = undefined;
   // svelte-ignore unused-export-let
   export let indexId: string = undefined;
+
+  let modal;
+  let tvName = "Roku TV";
+  let invidiousInstance;
+
+  playletStateStore.subscribe((value) => {
+    tvName = value?.device?.friendly_name ?? "Roku TV";
+    invidiousInstance = value?.invidious?.current_instance;
+  });
 
   function getViewCountDateText() {
     if (isUpcoming) {
@@ -139,12 +149,16 @@
     return X;
   }
 
-  async function playVideo() {
+  async function playVideoOnTv() {
     await PlayletApi.playVideo(videoId);
+  }
+
+  function openInvidiousInNewTab() {
+    window.open(`${invidiousInstance}/watch?v=${videoId}`)
   }
 </script>
 
-<button class="w-96" on:click={playVideo}>
+<button class="w-96" on:click="{modal.showModal()}">
   <div class="card bg-base-100 shadow-xl border border-neutral">
     <figure>
       <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
@@ -156,3 +170,17 @@
     </div>
   </div>
 </button>
+<!-- TODO: a dialog for every video is very slow. Need to reuse the same one -->
+<dialog bind:this={modal} id="modal_{videoId}" class="modal">
+  <form method="dialog" class="modal-box">
+    <h3 class="font-bold text-lg">{title}</h3>
+    <div class="modal-action">
+      <button class="btn" on:click={playVideoOnTv}>Play on {tvName}</button>
+      <button class="btn" on:click={openInvidiousInNewTab}>Play on Invidious</button>
+      <button class="btn">Cancel</button>
+    </div>
+  </form>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>
