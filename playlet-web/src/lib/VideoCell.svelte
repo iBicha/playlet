@@ -147,7 +147,7 @@
 <button class="w-96" on:click={playVideo}>
   <div class="card bg-base-100 shadow-xl border border-neutral">
     <figure>
-      <img class="w-full rounded-box" loading="lazy" src={getThumbnailUrl()} alt={title} />
+      <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
     </figure>
     <div class="card-body">
       <h2 class="card-title">{title}</h2>
