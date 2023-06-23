@@ -29,14 +29,16 @@
   <div class={textSizes[level]}>{displayText}</div>
   <div class="text-xs text-gray-500">{description}</div>
 
-  <input
-    type="text"
-    name={key}
-    bind:value={inputValue}
-    placeholder={displayText}
-    class="input input-bordered w-full max-w-xs"
-  />
-  {#if inputValue !== currentValue}
-    <button class="btn" on:click={save}>Save</button>
-  {/if}
+  <div class="join w-full m-1">
+    <input
+      type="text"
+      name={key}
+      bind:value={inputValue}
+      placeholder={displayText}
+      class="join-item input w-full mr-1"
+    />
+    {#if inputValue !== currentValue}
+      <button class="join-item btn" on:click={save}>Save</button>
+    {/if}
+  </div>
 </div>
