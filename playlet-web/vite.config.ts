@@ -2,7 +2,7 @@ import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { readFileSync, existsSync } from 'fs'
 import { parse as dotEnvParse } from 'dotenv'
-import { internalIpV4Sync } from 'internal-ip';
+import ip from 'ip';
 
 const PORT = 5173
 
@@ -19,7 +19,7 @@ if (existsSync('../.vscode/.env')) {
   config.server = {
     host: true,
     port: PORT,
-    open: `http://${internalIpV4Sync()}:${PORT}/?host=${envVars.ROKU_DEV_TARGET}:8888`
+    open: `http://${ip.address()}:${PORT}/?host=${envVars.ROKU_DEV_TARGET}:8888`
   }
 }
 
