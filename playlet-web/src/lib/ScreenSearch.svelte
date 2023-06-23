@@ -26,7 +26,10 @@
     const newSuggestions = await invidiousApi.searchSuggestions(query);
     // If we're late and the user walked away, no need for suggestions
     if (document.activeElement === searchBox) {
-      suggestions = newSuggestions;
+      // Check if this query is old or new
+      if (searchBoxText === newSuggestions.query) {
+        suggestions = newSuggestions;
+      }
     }
   }
 
