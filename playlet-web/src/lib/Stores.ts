@@ -14,3 +14,5 @@ export const preferencesModelStore = writable([] as any);
 export const userPreferencesStore = writable({} as any);
 
 export const invidiousVideoApiStore = writable({} as any);
+
+export const searchHistoryStore = writable([] as any);

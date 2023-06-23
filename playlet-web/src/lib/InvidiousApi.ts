@@ -18,12 +18,12 @@ export class InvidiousApi {
     }
 
     public async searchSuggestions(query: string) {
-        const response = await fetch(`${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`);
         return await response.json();
     }
 
     public async search(query: string) {
-        const response = await fetch(`${this.instance}/api/v1/search?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`);
         return await response.json();
     }
 

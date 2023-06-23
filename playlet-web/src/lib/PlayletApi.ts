@@ -47,8 +47,18 @@ export class PlayletApi {
         return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "play", videoId: videoId });
     }
 
+    static async getSearchHistory() {
+        const response = await fetch(`${PlayletApi.host()}/api/search-history`);
+        return await response.json();
+    }
+
+    static async putSearchHistory(query: string) {
+        const response = await PlayletApi.putJson(`${PlayletApi.host()}/api/search-history`, { query });
+        return await response.json();
+    }
+
     static async clearSearchHistory() {
-        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "clear-search-history" });
+        return await fetch(`${PlayletApi.host()}/api/search-history`, { method: "DELETE" });
     }
 
     static async updateInstance(instance) {

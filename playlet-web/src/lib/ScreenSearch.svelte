@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { InvidiousApi } from "./InvidiousApi";
-  import { playletStateStore } from "./Stores";
+  import { PlayletApi } from "./PlayletApi";
+  import { playletStateStore, searchHistoryStore } from "./Stores";
   import VideoCell from "./VideoCell.svelte";
 
   export let visibility: boolean;
@@ -11,26 +13,60 @@
   let searchBoxText = "";
   let suggestions: { suggestions: any[] } = { suggestions: [] };
   let videos = [];
+  let searchHistory = [];
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
-    invidiousApi.userCountryCode = value?.app?.user_country_code ?? "US";
+    invidiousApi.userCountryCode = value?.device?.user_country_code ?? "US";
+  });
+
+  searchHistoryStore.subscribe((value) => {
+    searchHistory = value;
+  });
+
+  onMount(async () => {
+    const currentSearchHistory = await PlayletApi.getSearchHistory();
+    searchHistoryStore.set(currentSearchHistory);
   });
 
   async function searchSuggestions(event) {
     const query = event.currentTarget.value;
+    let newSuggestions;
     if (query.length === 0) {
-      suggestions = { suggestions: [] };
-      return;
+      newSuggestions = { suggestions: [], query: "" };
+    } else {
+      newSuggestions = await invidiousApi.searchSuggestions(query);
     }
-    const newSuggestions = await invidiousApi.searchSuggestions(query);
+
     // If we're late and the user walked away, no need for suggestions
     if (document.activeElement === searchBox) {
       // Check if this query is old or new
       if (searchBoxText === newSuggestions.query) {
-        suggestions = newSuggestions;
+        suggestions = makeSuggestionList(newSuggestions);
       }
     }
+  }
+
+  function makeSuggestionList(newSuggestions, maxItems = 10) {
+    const matchingHistory = getSavedHistoryMatchingQuery(searchBoxText);
+    const matchingHistoryAndSuggestions = [
+      ...matchingHistory,
+      ...newSuggestions.suggestions,
+    ];
+    const uniqueMatchingHistoryAndSuggestions = [
+      ...new Set(matchingHistoryAndSuggestions),
+    ];
+    return {
+      suggestions: uniqueMatchingHistoryAndSuggestions.slice(0, maxItems),
+      query: newSuggestions.query,
+    };
+  }
+
+  function getSavedHistoryMatchingQuery(query) {
+    if (query.length === 0) {
+      return searchHistory;
+    }
+    return searchHistory.filter((item) => item.startsWith(query));
   }
 
   async function suggestionClicked(query) {
@@ -46,6 +82,8 @@
     }
 
     videos = await invidiousApi.search(searchBoxText);
+    const newSearchHistory = await PlayletApi.putSearchHistory(searchBoxText);
+    searchHistoryStore.set(newSearchHistory);
   }
 </script>
 
@@ -65,6 +103,7 @@
         bind:this={searchBox}
         bind:value={searchBoxText}
         on:input={searchSuggestions}
+        on:focus={searchSuggestions}
         on:blur={() => {
           // A delay before clearing the suggestions allows the user to click on a suggestion
           // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
