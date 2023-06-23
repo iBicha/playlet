@@ -149,6 +149,20 @@
     return X;
   }
 
+  function getFormattedTime(length) {
+    const minutes = Math.floor(length / 60).toString();
+    const seconds = (length % 60);
+    const secondsString = seconds < 10 ? `0${seconds}` : seconds.toString();
+    return minutes + ":" + secondsString;
+  }
+
+  function isVideoLive() {
+    if (liveNow) {
+      return true;
+    }
+    return lengthSeconds === 0 && viewCount === 0;
+  }
+
   async function playVideoOnTv() {
     await PlayletApi.playVideo(videoId);
   }
@@ -160,8 +174,15 @@
 
 <button class="w-96" on:click="{modal.showModal()}">
   <div class="card bg-base-100 shadow-xl border border-neutral">
-    <figure>
+    <figure class="relative">
       <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
+      {#if isVideoLive()}
+        <div class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2">LIVE</div>
+      {:else}
+        {#if lengthSeconds}
+          <div class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2">{getFormattedTime(lengthSeconds)}</div>
+        {/if}
+      {/if}
     </figure>
     <div class="card-body">
       <h2 class="card-title">{title}</h2>
