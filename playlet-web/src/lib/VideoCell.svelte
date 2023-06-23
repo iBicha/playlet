@@ -173,7 +173,7 @@
 </script>
 
 <button class="w-96" on:click="{modal.showModal()}">
-  <div class="card bg-base-100 shadow-xl border border-neutral">
+  <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <figure class="relative">
       <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
       {#if isVideoLive()}
@@ -185,9 +185,9 @@
       {/if}
     </figure>
     <div class="card-body">
-      <h2 class="card-title">{title}</h2>
-      <p>{author}</p>
-      <p>{getViewCountDateText()}</p>
+      <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
+      <div class="font-semibold">{author}</div>
+      <div>{getViewCountDateText()}</div>
     </div>
   </div>
 </button>
