@@ -193,12 +193,12 @@
 </button>
 <!-- TODO: a dialog for every video is very slow. Need to reuse the same one -->
 <dialog bind:this={modal} id="modal_{videoId}" class="modal">
-  <form method="dialog" class="modal-box">
-    <h3 class="font-bold text-lg">{title}</h3>
-    <div class="modal-action">
-      <button class="btn" on:click={playVideoOnTv}>Play on {tvName}</button>
-      <button class="btn" on:click={openInvidiousInNewTab}>Play on Invidious</button>
-      <button class="btn">Cancel</button>
+  <form method="dialog" class="modal-box bg-base-100">
+    <h3 class="text-lg m-5">{title}</h3>
+    <div class="flex flex-col">
+      <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
+      <button class="btn m-2" on:click={openInvidiousInNewTab}>Open in Invidious</button>
+      <button class="btn m-2">Cancel</button>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
