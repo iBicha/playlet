@@ -86,6 +86,7 @@
 
   function GetVideoId(url) {
     // Share/Short url
+    // TODO: use regex, and support timestamped videos
     const YoutubeUrls = [
       "https://youtu.be/",
       "http://youtu.be/",

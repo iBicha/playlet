@@ -9,10 +9,9 @@ export class InvidiousApi {
     responseHandlers: any;
 
     constructor() {
+        // Note: AuthFeedHandler and AuthPlaylistsHandler are not needed, since it is handled server side
         this.responseHandlers = {
             "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
-            "AuthFeedHandler": (requestData, response) => this.AuthFeedHandler(requestData, response),
-            "AuthPlaylistsHandler": (requestData, response) => this.AuthPlaylistsHandler(requestData, response),
             "PlaylistHandler": (requestData, response) => this.PlaylistHandler(requestData, response),
         }
     }
@@ -94,21 +93,6 @@ export class InvidiousApi {
     private async DefaultHandler(requestData, response) {
         const json = await response.json();
         return [{ title: requestData.title, videos: json }]
-    }
-
-    private async AuthFeedHandler(requestData, response) {
-        const json = await response.json();
-        const videos = [...json.notifications, ...json.videos];
-        return [{ title: requestData.title, videos: videos }]
-    }
-
-    private async AuthPlaylistsHandler(requestData, response) {
-        const playlists = await response.json();
-        const result = [];
-        for (let i = 0; i < playlists.length; i++) {
-            result.push(this.ProcessPlaylist(requestData, playlists[i]));
-        }
-        return result;
     }
 
     private async PlaylistHandler(requestData, response) {

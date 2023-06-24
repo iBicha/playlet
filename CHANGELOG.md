@@ -16,15 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Hidden by default, use `dev=1` in the browser to show it
   - Improved drag and drop functionality (drag and drop a link from Youtube into the web app)
 - New settings page, available on TV and web app
+- New preferences system
+  - Unified settings between TV and web app
+  - Web API allowing to import/export preferences (no UI for that yet)
 
 ### Changed
 
 - SponsorBlock segments are not skipped by default, except for sponsor segments
+- Web app QR Code is now in its own page
 
 ### Removed
 
 - The ability to set multiple Invidious instances. This was anticipated to use as fallback in case of failure, but it was never implemented. This is now removed to avoid confusion
   - Sometimes it is necesary to check multiple instances for closed captions in case one instance is saturated. For this case, publicly hosted Invidious instances will be used.
+  - Of course, if no instance if provided, and public instance will be used by default. This behaviour did not change. It is now implicit.
 
 ## [0.9.0] - 2023-04-21
 
@@ -170,3 +175,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial version
 - Reads feeds from popular and trending videos using Invidious APIs
 - Skips sections using SponsorBlock
+
+<!-- markdownlint-configure-file {"MD024": { "siblings_only": true } } -->

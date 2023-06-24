@@ -1,5 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "../PlayletApi";
+  import { searchHistoryStore } from "../Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -11,6 +12,7 @@
 
   async function clearSeachHistory() {
     await PlayletApi.clearSearchHistory();
+    searchHistoryStore.set([]);
     alert("Search history cleared.");
   }
 </script>
