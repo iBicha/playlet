@@ -41,7 +41,7 @@ function LoadPreferencesAtLevel(model as object, level as integer, key as string
             LoadPreferencesAtLevel(item.children, level + 1, item.key)
         else if item.type <> invalid
             CreateControl(item, level + 1, item.key)
-        else if item.roku_component <> invalid
+        else if item.rokuComponent <> invalid
             CreateRokuComponent(item, level + 1, item.key)
         end if
     end for
@@ -129,16 +129,12 @@ function CreateRokuComponent(model as object, level as integer, key as string) a
         container = menu.getChild(level)
     end if
 
-    component = CreateObject("roSGNode", model.roku_component.type)
-    component.container = container
+    component = container.createChild(model.rokuComponent)
+    component.id = `Control${level}`
     component.settings = m.top
     component.visible = false
     component.key = key
     component.level = level
-
-    for each prop in model.roku_component.props
-        component[prop.key] = prop.value
-    end for
 
     m.uiElements[key] = component
     return invalid
@@ -302,8 +298,8 @@ function MenuGoRight() as boolean
 end function
 
 function MenuNavigate(direction as integer) as boolean
-    focusedButtonGroup = GetFocusedControl()
-    container = focusedButtonGroup.getParent()
+    focusedControl = GetFocusedControl()
+    container = focusedControl.getParent()
     containerParent = container.getParent()
     containerCount = containerParent.getChildCount()
     index = GetChildIndex(containerParent, container)
