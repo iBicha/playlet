@@ -1,0 +1,54 @@
+import "pkg:/source/utils/General.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
+
+namespace SearchHistory
+    function Save(q as string, maxItems = 10 as integer)
+        history = GetAllSaved()
+        index = ArrayIndexOf(history, q)
+        if index <> -1
+            history.Delete(index)
+        end if
+
+        history.Unshift(q)
+
+        if history.Count() > maxItems
+            history.Pop()
+        end if
+
+        history = FormatJson(history)
+
+        RegistryUtils.Write(RegistryUtils.SEARCH_HISTORY, history)
+    end function
+
+    function GetSaved(q as string) as object
+        history = GetAllSaved()
+        if history.count() = 0
+            return []
+        end if
+
+        if q = ""
+            return history
+        end if
+        result = []
+        for each keyword in history
+            if keyword.InStr(q) = 0
+                result.push(keyword)
+            end if
+        end for
+        return result
+    end function
+
+    function GetAllSaved() as object
+        history = RegistryUtils.Read(RegistryUtils.SEARCH_HISTORY)
+        if history = invalid
+            return []
+        end if
+        return ParseJson(history)
+    end function
+
+
+    function Clear()
+        RegistryUtils.Delete(RegistryUtils.SEARCH_HISTORY)
+    end function
+
+end namespace

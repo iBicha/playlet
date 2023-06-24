@@ -1,0 +1,54 @@
+function Init()
+    m.textEditBox = m.top.findNode("TextEditBox")
+    m.top.observeField("focusedChild", "OnFocusChanged")
+    m.top.observeField("value", "OnValueChanged")
+    m.top.observeField("settings", "OnSettingsScreen")
+end function
+
+function OnSettingsScreen()
+    m.top.value = m.top.settings@.GetPreferenceValue(m.top.key)
+end function
+
+function OnFocusChanged()
+    focused = m.top.hasFocus()
+    if focused
+        ShowEditKeyboard()
+    end if
+end function
+
+function OnValueChanged()
+    value = m.top.value
+    m.top.editText = value
+    m.top.settings@.SetPreferenceValue(m.top.key, value)
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    return settingsScreen@.OnkeyEvent(key, press)
+end function
+
+function ShowEditKeyboard()
+    keyboardDialog = createObject("roSGNode", "StandardKeyboardDialog")
+    keyboardDialog.title = m.top.displayText
+    keyboardDialog.message = [m.top.description]
+    keyboardDialog.text = m.top.value
+    keyboardDialog.buttons = ["OK", "Cancel"]
+    keyboardDialog.observeField("wasClosed", "OnKeyboardClosed")
+    keyboardDialog.observeField("buttonSelected", "OnButtonSelected")
+
+    m.top.getScene().dialog = keyboardDialog
+end function
+
+function OnButtonSelected(event as object)
+    keyboard = event.getRoSGNode()
+    buttonSelected = keyboard.buttonSelected
+    if buttonSelected = 0
+        m.top.value = keyboard.text
+    end if
+    keyboard.close = true
+end function
+
+function OnKeyboardClosed()
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    settingsScreen@.MenuNavigate(-1)
+end function

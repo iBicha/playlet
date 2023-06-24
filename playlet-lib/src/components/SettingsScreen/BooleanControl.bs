@@ -1,0 +1,43 @@
+function Init()
+    m.radioButtonList = m.top.findNode("RadioButtonList")
+
+    m.top.observeField("value", "OnValueChanged")
+    m.radioButtonList.observeField("checkedItem", "OnCheckedItemChanged")
+    m.top.observeField("focusedChild", "OnFocusChanged")
+    m.top.observeField("settings", "OnSettingsScreen")
+end function
+
+function OnSettingsScreen()
+    m.top.value = m.top.settings@.GetPreferenceValue(m.top.key)
+end function
+
+function OnValueChanged()
+    value = m.top.value
+    if value = true
+        m.radioButtonList.checkedItem = 0
+    else if value = false
+        m.radioButtonList.checkedItem = 1
+    end if
+
+    m.top.settings@.SetPreferenceValue(m.top.key, value)
+end function
+
+function OnCheckedItemChanged()
+    checkedItem = m.radioButtonList.checkedItem
+    if checkedItem = 0
+        m.top.value = true
+    else if checkedItem = 1
+        m.top.value = false
+    end if
+end function
+
+function OnFocusChanged()
+    if m.top.hasFocus()
+        m.radioButtonList.setFocus(true)
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    return settingsScreen@.OnkeyEvent(key, press)
+end function

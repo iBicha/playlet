@@ -1,5 +1,6 @@
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 import "pkg:/components/VideoPlayer/Video.bs"
+import "pkg:/components/Invidious/InvidiousPublicInstancesTask.bs"
 
 function Init()
     log.initializeLogManager(["log_PrintTransport"], 2)
@@ -15,7 +16,11 @@ function Init()
     m.currentFocued = m.homeGridScreen
 
     m.settingsScreen = m.top.findNode("SettingsScreen")
+    m.settingsScreen.ObserveField("escape", "OnSettingsScreenEscape")
+
     m.appInfoScreen = m.top.findNode("AppInfoScreen")
+
+    m.webAppScreen = m.top.findNode("WebAppScreen")
 
     m.searchScreen = m.top.findNode("SearchScreen")
     m.searchScreen.ObserveField("escape", "OnSearchScreenEscape")
@@ -29,6 +34,9 @@ function Init()
         canEscape: true
     }, {
         node: m.settingsScreen,
+        canEscape: true
+    }, {
+        node: m.webAppScreen,
         canEscape: false
     }, {
         node: m.appInfoScreen,
@@ -38,6 +46,17 @@ function Init()
     m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
 
     InitWebServer()
+
+    StartAsyncTask(InvidiousPublicInstancesTask, {}, OnInvidiousPublicInstancesTaskResults)
+end function
+
+function OnInvidiousPublicInstancesTaskResults(output as object)
+    backupInstances = output.result.backupInstances
+    m.global.addFields({
+        invidiousBackupInstances: backupInstances
+    })
+
+    m.homeGridScreen.refresh = true
 
     LaunchArgumentsReceived()
 
@@ -57,6 +76,12 @@ end function
 function OnSearchScreenEscape()
     m.navBar.SetFocus(true)
     m.navBar.focusIndex = 0
+    m.currentFocued = m.navBar
+end function
+
+function OnSettingsScreenEscape()
+    m.navBar.SetFocus(true)
+    m.navBar.focusIndex = 2
     m.currentFocued = m.navBar
 end function
 

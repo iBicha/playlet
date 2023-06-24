@@ -1,0 +1,64 @@
+function Init()
+    m.radioButtonList = m.top.findNode("RadioButtonList")
+    m.radioButtonListContent = m.top.findNode("RadioButtonListContent")
+
+    m.top.observeField("value", "OnValueChanged")
+    m.top.observeField("options", "OnOptionsChanged")
+    m.radioButtonList.observeField("checkedItem", "OnCheckedItemChanged")
+    m.top.observeField("focusedChild", "OnFocusChanged")
+    m.top.observeField("settings", "OnSettingsScreen")
+end function
+
+function OnSettingsScreen()
+    m.top.value = m.top.settings@.GetPreferenceValue(m.top.key)
+end function
+
+function OnValueChanged()
+    value = m.top.value
+    options = m.top.options
+
+    checkedItem = -1
+    for i = 0 to options.Count() - 1
+        option = options[i].value
+        if value = option
+            checkedItem = i
+            exit for
+        end if
+    end for
+
+    m.radioButtonList.checkedItem = checkedItem
+
+    m.top.settings@.SetPreferenceValue(m.top.key, value)
+end function
+
+function OnCheckedItemChanged()
+    checkedItem = m.radioButtonList.checkedItem
+    options = m.top.options
+
+    if checkedItem >= 0 and checkedItem < options.Count()
+        m.top.value = options[checkedItem].value
+    end if
+end function
+
+function OnFocusChanged()
+    if m.top.hasFocus()
+        m.radioButtonList.setFocus(true)
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    settingsScreen = m.top.getScene().findNode("SettingsScreen")
+    return settingsScreen@.OnkeyEvent(key, press)
+end function
+
+function OnOptionsChanged()
+    options = m.top.options
+
+    m.radioButtonListContent.removeChildrenIndex(m.radioButtonListContent.getChildCount(), 0)
+    for i = 0 to options.Count() - 1
+        option = options[i].displayText
+        node = CreateObject("roSGNode", "ContentNode")
+        node.title = option
+        m.radioButtonListContent.appendChild(node)
+    end for
+end function

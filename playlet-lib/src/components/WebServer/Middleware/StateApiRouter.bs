@@ -11,8 +11,9 @@ namespace Http
             m.Get("/api/state", function(context as object) as boolean
                 request = context.request
                 response = context.response
+                task = context.server.task
 
-                keys = ["app", "device", "invidious"]
+                keys = ["app", "device", "invidious", "preferences"]
 
                 if request.query.DoesExist("key")
                     keys = request.query["key"]
@@ -25,6 +26,13 @@ namespace Http
 
                 if ArrayIndexOf(keys, "app") <> -1
                     state["app"] = GetAppInfo()
+                    scene = task.top.getScene()
+                    if scene.playletLibLoadedUrl <> invalid
+                        state["app"]["lib_url"] = scene.playletLibLoadedUrl.link
+                        state["app"]["lib_url_type"] = scene.playletLibLoadedUrl.type
+                    end if
+                    latestPlayletLibVersion = GetLatestPlayletLibVersion()
+                    state["app"]["lib_version_latest"] = latestPlayletLibVersion
                 end if
 
                 if ArrayIndexOf(keys, "device") <> -1
@@ -34,13 +42,24 @@ namespace Http
                 if ArrayIndexOf(keys, "invidious") <> -1
                     authToken = InvidiousSettings.GetAuthToken()
                     state["invidious"] = {
-                        instances: InvidiousSettings.GetCurrentInstances(),
-                        selected_instance: InvidiousSettings.GetSelectedInstance(),
+                        current_instance: InvidiousSettings.GetCurrentInstance(),
+                        backup_instances: InvidiousSettings.GetBackupInstances(),
                         auth_url: Invidious.GetAuthorizeTokenLink(),
                         logged_in: authToken <> invalid,
                         logged_in_instance: authToken <> invalid ? authToken.instance : invalid,
                         logged_in_username: authToken <> invalid ? authToken.username : invalid
                     }
+                end if
+
+                if ArrayIndexOf(keys, "preferences") <> -1
+                    scene = task.top.getScene()
+                    settings = scene.findNode("SettingsScreen")
+                    if settings = invalid
+                        response.Default(500, `Settings screen not found: scene.findNode("SettingsScreen") returned invalid`)
+                        return true
+                    end if
+
+                    state["preferences"] = settings@.GetUserPreferences(invalid)
                 end if
 
                 response.Json(state)

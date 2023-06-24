@@ -1,4 +1,6 @@
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/components/SettingsScreen/Settings.bs"
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 
 namespace InvidiousSettings
 
@@ -6,36 +8,17 @@ namespace InvidiousSettings
 
     const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
 
-    function GetCurrentInstances() as object
-        ' TODO: cache this call to avoid json parsing every time
-        instances = InvidiousSettings.GetRegistryInstances()
-        if instances.Count() > 0
-            return instances
+    function GetCurrentInstance() as object
+        settings = FindAndGetPreferenceValues(["invidious.instance"])
+        if settings <> invalid and settings["invidious.instance"] <> invalid and settings["invidious.instance"] <> ""
+            return settings["invidious.instance"]
         end if
 
-        publicInstances = InvidiousSettings.GetPublicInstances()
-        if publicInstances <> invalid
-            for i = 0 to publicInstances.Count() - 1
-                if InvidiousSettings.IsValidPublicInstance(publicInstances[i])
-                    instances.push(publicInstances[i].uri)
-                end if
-                if instances.Count() >= 5
-                    exit for
-                end if
-            end for
+        backupInstances = InvidiousSettings.GetBackupInstances()
+        if backupInstances.Count() > 0
+            return backupInstances[0]
         end if
-
-        if instances.Count() > 0
-            InvidiousSettings.SetRegistryInstances(instances)
-            return instances
-        end if
-
-        return [InvidiousSettings.DEFAULT_INSTANCE]
-    end function
-
-    function GetSelectedInstance() as string
-        instances = InvidiousSettings.GetCurrentInstances()
-        return instances[0]
+        return InvidiousSettings.DEFAULT_INSTANCE
     end function
 
     function SetAuthToken(token as string, instance as string, username as dynamic)
@@ -49,13 +32,6 @@ namespace InvidiousSettings
 
         json = FormatJson(obj)
         RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
-
-        instances = InvidiousSettings.GetCurrentInstances()
-        index = ArrayIndexOf(instances, instance)
-        if index = -1
-            instances.push(instance)
-            InvidiousSettings.SetRegistryInstances(instances)
-        end if
     end function
 
     function GetAuthToken() as dynamic
@@ -66,27 +42,34 @@ namespace InvidiousSettings
         return ParseJson(tokenPayload)
     end function
 
-    function GetRegistryInstances() as object
-        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
-        if instances = invalid
-            return []
+    function GetBackupInstances() as object
+        if m.global.hasField("invidiousBackupInstances")
+            return m.global.invidiousBackupInstances
         end if
-        return ParseJson(instances)
+        return []
     end function
 
-    function SetRegistryInstances(instances as object)
-        RegistryUtils.Write(RegistryUtils.INVIDIOUS_INSTANCES, FormatJson(instances))
+    function FetchBackupInstances() as object
+        backupInstances = []
+        publicInstances = InvidiousSettings.GetPublicInstances()
+        for i = 0 to publicInstances.Count() - 1
+            if InvidiousSettings.IsValidPublicInstance(publicInstances[i])
+                backupInstances.push(publicInstances[i].uri)
+            end if
+            if backupInstances.Count() >= 5
+                exit for
+            end if
+        end for
+
+        return backupInstances
     end function
 
     function GetPublicInstances() as object
-        if m.invidiousPublicInstances <> invalid
-            return m.invidiousPublicInstances
-        end if
+        instances = []
 
         response = Requests().get(InvidiousSettings.INSTANCES_API)
         if response.statuscode = 200
             json = response.json
-            instances = []
 
             for each instance in json
                 data = instance[1]
@@ -97,10 +80,9 @@ namespace InvidiousSettings
                 instances.push(data)
             end for
 
-            m.invidiousPublicInstances = instances
         end if
 
-        return m.invidiousPublicInstances
+        return instances
     end function
 
     function IsValidPublicInstance(instance as object) as boolean

@@ -117,27 +117,20 @@ function OnVideoDetailsTaskResults(output as object) as void
         end if
         playletStreamUrls.push(hlsUrlLocal)
     else
-        if metadata.dashUrl <> invalid
-
-            #if DASH_THUMBNAILS
-                ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
-                dashUrl = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
-            #else
-                dashUrl = metadata.dashUrl
-            #end if
-            playletStreamUrls.push(dashUrl)
-
-            if dashUrl.InStr("?") = -1
-                dashUrlLocal = dashUrl + "?local=true"
-            else
-                dashUrlLocal = dashUrl + "&local=true"
-            end if
-            playletStreamUrls.push(dashUrlLocal)
+        settings = FindAndGetPreferenceValues(["playback.preferred_quality", "invidious.proxy_videos"])
+        if settings = invalid
+            settings = {
+                "playback.preferred_quality": "auto",
+                "invidious.proxy_videos": "if_needed"
+            }
         end if
 
-        if metadata.formatStreams.Count() > 0
-            playletStreamUrls.push(Invidious.GetVideoStreamUrl(videoId, false))
-            playletStreamUrls.push(Invidious.GetVideoStreamUrl(videoId, true))
+        if settings["playback.preferred_quality"] = "720p"
+            AddStreamUrls(playletStreamUrls, metadata, settings)
+            AddDashUrls(playletStreamUrls, metadata, settings)
+        else
+            AddDashUrls(playletStreamUrls, metadata, settings)
+            AddStreamUrls(playletStreamUrls, metadata, settings)
         end if
     end if
 
@@ -157,6 +150,57 @@ function OnVideoDetailsTaskResults(output as object) as void
     m.top.control = "play"
 
     m.videoContainer@.watchedVideosAdd(videoId)
+end function
+
+function AddDashUrls(playletStreamUrls as object, metadata as object, settings as object) as void
+    if metadata.dashUrl = invalid
+        return
+    end if
+
+    #if DASH_THUMBNAILS
+        ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
+        dashUrl = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
+    #else
+        dashUrl = metadata.dashUrl
+    #end if
+
+    if dashUrl.InStr("?") = -1
+        dashUrlLocal = dashUrl + "?local=true"
+    else
+        dashUrlLocal = dashUrl + "&local=true"
+    end if
+
+    proxyVideos = settings["invidious.proxy_videos"]
+    if proxyVideos = "if_needed"
+        playletStreamUrls.push(dashUrl)
+        playletStreamUrls.push(dashUrlLocal)
+    else if proxyVideos = "never"
+        playletStreamUrls.push(dashUrl)
+    else if proxyVideos = "always"
+        playletStreamUrls.push(dashUrlLocal)
+    else
+        playletStreamUrls.push(dashUrl)
+        playletStreamUrls.push(dashUrlLocal)
+    end if
+end function
+
+function AddStreamUrls(playletStreamUrls as object, metadata as object, settings as object) as void
+    if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
+        return
+    end if
+
+    proxyVideos = settings["invidious.proxy_videos"]
+    if proxyVideos = "if_needed"
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
+    else if proxyVideos = "never"
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
+    else if proxyVideos = "always"
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
+    else
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
+        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
+    end if
 end function
 
 function FindChildNodeOfType(node as object, nodeType as string) as object
@@ -296,6 +340,11 @@ function OnVideoPlayerStateChange() as void
 end function
 
 function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
+    settings = FindAndGetPreferenceValues(["playback.autoplay"])
+    if settings = invalid or settings["playback.autoplay"] <> true
+        return false
+    end if
+
     if recommendedVideos = invalid or recommendedVideos.Count() = 0
         return false
     end if

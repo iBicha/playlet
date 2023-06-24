@@ -1,0 +1,122 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+
+class PreferencesService
+    private version = 1
+    private prefs_model
+    private user_prefs
+
+    function new()
+        m.LoadConfigFile()
+        m.LoadUserPreferences()
+    end function
+
+    function LoadConfigFile()
+        m.prefs_model = ParseJson(ReadAsciiFile("libpkg:/config/preferences.json"))
+    end function
+
+    function LoadUserPreferences()
+        ' Step 1: Load user preferences from registry
+        m.user_prefs = RegistryUtils.Read(RegistryUtils.USER_PREFERENCES)
+        if m.user_prefs = invalid
+            m.user_prefs = "{}"
+        end if
+        m.user_prefs = ParseJson(m.user_prefs)
+        ' Step 2: Migrate existing preferences to new format (if needed)
+        isDirty = m.MigrateExistingPreferences()
+        ' Step 3: Apply defaults to user preferences (if needed)
+        isDirty = m.ApplyDefaultsToUserPreferences() or isDirty
+        if isDirty
+            m.SaveUserPreferences()
+        end if
+    end function
+
+    function SaveUserPreferences()
+        m.user_prefs.__version = m.version
+        RegistryUtils.Write(RegistryUtils.USER_PREFERENCES, FormatJson(m.user_prefs))
+    end function
+
+    function MigrateExistingPreferences() as boolean
+        isDirty = false
+
+        ' v0 -> v1
+        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+        if instances <> invalid
+            currentInstance = m.user_prefs["invidious.instance"]
+            if currentInstance = invalid or currentInstance = ""
+                instances = ParseJson(instances)
+                if instances.Count() > 0
+                    instance = instances[0]
+                    if instance <> invalid and instance <> ""
+                        m.user_prefs["invidious.instance"] = instance
+                        isDirty = true
+                    end if
+                end if
+            end if
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
+        end if
+
+        ' v1 -> v2 goes here (if needed)
+        ' if m.user_prefs.__version = 1
+        '   'do stuff
+        ' end if
+
+        ' TODO: handle case where saved preferences version is higher than current version (e.g. user downgraded)
+        return isDirty
+    end function
+
+    function ApplyDefaultsToUserPreferences() as boolean
+        isDirty = false
+        for each child in m.prefs_model
+            isDirty = m.ApplyToUserPreferences(m.user_prefs, child) or isDirty
+        end for
+        return isDirty
+    end function
+
+    function ApplyToUserPreferences(userPrefs as object, model as object) as boolean
+        isDirty = false
+        if model.children <> invalid
+            for each child in model.children
+                isDirty = m.ApplyToUserPreferences(userPrefs, child) or isDirty
+            end for
+        end if
+
+        if model.defaultValue <> invalid and (not userPrefs.DoesExist(model.key) or userPrefs[model.key] = invalid)
+            userPrefs[model.key] = model.defaultValue
+            isDirty = true
+        end if
+        return isDirty
+    end function
+
+    function GetUserPreferences() as object
+        return m.user_prefs
+    end function
+
+    function ApplyUserPreferences(preferences as object) as void
+        if preferences = invalid
+            return
+        end if
+        ' TODO: user input validation
+        for each key in preferences
+            m.user_prefs[key] = preferences[key]
+        end for
+        m.SaveUserPreferences()
+    end function
+
+    function ClearUserPreferences() as void
+        m.user_prefs = {}
+        m.ApplyDefaultsToUserPreferences()
+        m.SaveUserPreferences()
+    end function
+
+    function GetValue(key as string) as dynamic
+        return m.user_prefs[key]
+    end function
+
+    function SetValue(key as string, value as dynamic) as void
+        if m.user_prefs[key] = value
+            return
+        end if
+        m.user_prefs[key] = value
+        m.SaveUserPreferences()
+    end function
+end class

@@ -38,8 +38,8 @@ function onTextChanged()
 end function
 
 function setIconSize()
-    height = m.buttonBackground.height
-    width = m.buttonBackground.width
+    height = m.top.height
+    width = m.top.width
     if height > 0 and width > 0
         ' TODO: Use smallest number between them
         m.buttonIcon.height = m.top.height
@@ -62,7 +62,8 @@ function onHeightChanged()
 end function
 
 function onWidthChanged()
-    m.buttonBackground.width = m.top.width
+    m.buttonBackground.width = m.top.width - 10
+    m.buttonBackground.translation = [5, 0]
     setIconSize()
 end function
 
