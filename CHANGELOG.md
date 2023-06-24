@@ -10,10 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - New web app, mirroring Playlet app
-  - Includes home page, search, settings, into
+  - Includes home page, search, settings and info
+  - Dark mode
   - Also includes a dev menu
     - Hidden by default, use `dev=1` in the browser to show it
-    - Improved drag and drop functionality (drag and drop a link from Youtube into the web app)
+  - Improved drag and drop functionality (drag and drop a link from Youtube into the web app)
 - New settings page, available on TV and web app
 
 ### Changed
