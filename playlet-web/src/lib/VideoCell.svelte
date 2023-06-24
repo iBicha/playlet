@@ -10,6 +10,8 @@
   export let publishedText: string | undefined = undefined;
   export let isUpcoming: boolean = undefined;
   export let premiereTimestamp: number | undefined = undefined;
+  export let lengthSeconds: number = undefined;
+  export let liveNow: boolean = undefined;
 
   // svelte-ignore unused-export-let
   export let type: string = undefined;
@@ -27,10 +29,6 @@
   export let viewCountText: string = undefined;
   // svelte-ignore unused-export-let
   export let published: number = undefined;
-  // svelte-ignore unused-export-let
-  export let lengthSeconds: number = undefined;
-  // svelte-ignore unused-export-let
-  export let liveNow: boolean = undefined;
   // svelte-ignore unused-export-let
   export let premium: boolean = undefined;
   // svelte-ignore unused-export-let

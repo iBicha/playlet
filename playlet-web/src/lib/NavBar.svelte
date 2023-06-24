@@ -36,7 +36,7 @@
   };
 </script>
 
-<div class="navbar bg-base-100 sticky top-0 z-50">
+<div class="navbar bg-base-100 sticky top-0 z-40">
   <div class="flex-1">
     <img src={$appThemeStore === 'dark' ? playletLogoDark : playletLogoLight} class="h-8" alt="Playlet Logo" />
     <h4 class="label brightness-75">{version}</h4>

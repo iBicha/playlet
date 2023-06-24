@@ -9,6 +9,7 @@
   import ScreenSearch from "./lib/ScreenSearch.svelte";
   import ScreenSettings from "./lib/ScreenSettings.svelte";
   import ScreenInfo from "./lib/ScreenInfo.svelte";
+  import LinkDragDrop from "./lib/LinkDragDrop.svelte";
 
   onMount(async () => {
     PlayletApi.getState().then((value) => {
@@ -23,6 +24,8 @@
 </script>
 
 <main>
+  <LinkDragDrop />
+
   <NavBar />
   <!-- TODO: a better way to make the BottomNavigation not hide screens -->
   <div style="margin-bottom: 4rem">

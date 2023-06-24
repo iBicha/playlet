@@ -27,6 +27,11 @@ export class InvidiousApi {
         return await response.json();
     }
 
+    public async getVideoMetadata(videoId: string) {
+        const response = await fetch(`${this.instance}/api/v1/videos/${videoId}`);
+        return await response.json();
+    }
+
     public async makeRequest(requestData: any) {
         if (!requestData || !this.instance || !this.endpoints) {
             return null;

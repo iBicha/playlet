@@ -44,6 +44,9 @@ export class PlayletApi {
     }
 
     static async playVideo(videoId) {
+        if (!videoId) {
+            return;
+        }
         return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "play", videoId: videoId });
     }
 
