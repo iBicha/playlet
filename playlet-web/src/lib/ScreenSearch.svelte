@@ -24,11 +24,6 @@
     searchHistory = value;
   });
 
-  onMount(async () => {
-    const currentSearchHistory = await PlayletApi.getSearchHistory();
-    searchHistoryStore.set(currentSearchHistory);
-  });
-
   async function searchSuggestions(event) {
     const query = event.currentTarget.value;
     let newSuggestions;

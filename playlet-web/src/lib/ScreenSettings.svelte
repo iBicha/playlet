@@ -1,8 +1,7 @@
 <script lang="ts">
   import DevSettings from "./DevSettings.svelte";
-  import { PlayletApi } from "./PlayletApi";
   import SettingsNode from "./SettingsNode.svelte";
-  import { preferencesModelStore, userPreferencesStore } from "./Stores";
+  import { preferencesModelStore } from "./Stores";
   import { onMount } from "svelte";
 
   export let visibility: boolean;
@@ -10,13 +9,6 @@
   let developerOptionsEnabled = false;
 
   onMount(async () => {
-    PlayletApi.getPreferencesFile().then((value) => {
-      preferencesModelStore.set(value);
-    });
-    PlayletApi.getUserPreferences().then((value) => {
-      userPreferencesStore.set(value);
-    });
-
     const urlParams = new URLSearchParams(window.location.search);
     developerOptionsEnabled = !!urlParams.get("dev");
   });
