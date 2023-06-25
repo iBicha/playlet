@@ -62,8 +62,10 @@
     try {
       isLoading = true;
       videoMetadata = await invidiousApi.getVideoMetadata(videoId);
-      videoStartAtTimestamp = timestamp;
-      videoStartAtChecked = videoStartAtTimestamp !== undefined;
+      videoStartAtChecked = timestamp !== undefined;
+      if (videoStartAtChecked) {
+        videoStartAtTimestamp = timestamp;
+      }
       modal.showModal();
     } finally {
       isLoading = false;
@@ -93,12 +95,10 @@
   function parseYouTubeUrl(url) {
     const urlSearchParams = new URLSearchParams(new URL(url).search);
 
-    function getTimestamp(){
+    function getTimestamp() {
       const timestamp = urlSearchParams.get("t");
       if (timestamp) {
-        return timestamp.endsWith("s")
-          ? timestamp.slice(0, -1)
-          : timestamp;
+        return timestamp.endsWith("s") ? timestamp.slice(0, -1) : timestamp;
       }
     }
 
@@ -140,7 +140,7 @@
 
     const timestamp = getTimestamp();
     if (timestamp) {
-      result.timestamp = timestamp
+      result.timestamp = timestamp;
     }
 
     return result;
