@@ -30,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The ability to set multiple Invidious instances. This was anticipated to use as fallback in case of failure, but it was never implemented. This is now removed to avoid confusion
-  - Sometimes it is necesary to check multiple instances for closed captions in case one instance is saturated. For this case, publicly hosted Invidious instances will be used.
+  - Sometimes it is necesary to check multiple instances for closed captions in case one instance is saturated. For this case, publicly hosted Invidious instances will be used. This feature is still behind a feature flag, and not on by default, because it might delay the start of videos.
   - Of course, if no instance if provided, and public instance will be used by default. This behaviour did not change. It is now implicit.
 
 ## [0.9.0] - 2023-04-21
