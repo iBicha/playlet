@@ -24,8 +24,14 @@
   }
 
   async function apply() {
-    await PlayletApi.setPlayletLibVersion(selectedRelease);
-    alert("Playlet Library version set. Restart playlet to apply changes.");
+    let version = selectedRelease;
+    if (version === "") {
+      version = "latest";
+    }
+    if (confirm(`Are you sure you want to change the Playlet Library version to "${version}"?`)) {
+      await PlayletApi.setPlayletLibVersion(selectedRelease);
+      alert("Playlet Library version set. Restart playlet to apply changes.");
+    }
   }
 </script>
 
