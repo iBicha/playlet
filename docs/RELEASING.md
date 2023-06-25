@@ -22,6 +22,9 @@ These are mostly the steps when releasing a new version:
   - Uncheck `Set as a pre-release`
   - Check `Set as the latest release`
   - Click `update release`
+- Update [Roadmap](https://github.com/iBicha/playlet/issues/6)
+  - If current versions says `Planned for $VERSION`, change it to `Released for $VERSION`
+  - Add a `Planned for $VERSION` for the next version
 
 **The newest Playlet lib is now LIVE**
 
