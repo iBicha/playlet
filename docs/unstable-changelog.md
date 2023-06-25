@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD041 -->
+
 This is an automated release. It is generated when new code is pushed to the main branch.
 
 To test this release:

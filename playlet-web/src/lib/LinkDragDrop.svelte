@@ -3,11 +3,15 @@
   import { PlayletApi } from "./PlayletApi";
   import { playletStateStore } from "./Stores";
   import { InvidiousApi } from "./InvidiousApi";
+  import VideoStartAt from "./VideoStartAt.svelte";
 
   let modal;
   let isDragging;
   let isLoading;
   let dragEndTimeout;
+
+  let videoStartAtChecked;
+  let videoStartAtTimestamp;
 
   let videoMetadata;
 
@@ -43,10 +47,11 @@
         let dataString = await new Promise((resolve) =>
           item.getAsString(resolve)
         );
-        if (IsValidHttpUrl(dataString)) {
-          const videoId = GetVideoId(dataString);
-          if (videoId) {
-            searchForVideoById(videoId);
+        if (isValidHttpUrl(dataString)) {
+          const videoInfo = parseYouTubeUrl(dataString);
+          if (videoInfo.videoId) {
+            console.log(videoInfo);
+            searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
             return;
           }
         }
@@ -54,10 +59,12 @@
     }
   }
 
-  async function searchForVideoById(videoId) {
+  async function searchForVideoById(videoId, timestamp) {
     try {
       isLoading = true;
       videoMetadata = await invidiousApi.getVideoMetadata(videoId);
+      videoStartAtTimestamp = timestamp;
+      videoStartAtChecked = videoStartAtTimestamp !== undefined;
       modal.showModal();
     } finally {
       isLoading = false;
@@ -74,7 +81,7 @@
     event.preventDefault();
   }
 
-  function IsValidHttpUrl(string) {
+  function isValidHttpUrl(string) {
     let url;
     try {
       url = new URL(string);
@@ -84,7 +91,18 @@
     return url.protocol === "http:" || url.protocol === "https:";
   }
 
-  function GetVideoId(url) {
+  function parseYouTubeUrl(url) {
+    const urlSearchParams = new URLSearchParams(new URL(url).search);
+
+    function getTimestamp(){
+      const timestamp = urlSearchParams.get("t");
+      if (timestamp) {
+        return timestamp.endsWith("s")
+          ? timestamp.slice(0, -1)
+          : timestamp;
+      }
+    }
+
     // Share/Short url
     // TODO: use regex, and support timestamped videos
     const YoutubeUrls = [
@@ -100,33 +118,52 @@
     for (var i in YoutubeUrls) {
       let youtubeUrl = YoutubeUrls[i];
       if (url.startsWith(youtubeUrl)) {
-        url = url.replace(youtubeUrl, "");
-        if (url.includes("?")) {
-          url = url.substring(0, url.indexOf("?"));
+        let videoId = url.replace(youtubeUrl, "");
+        if (videoId.includes("?")) {
+          videoId = videoId.substring(0, videoId.indexOf("?"));
         }
-        return url;
+        const result: any = {
+          videoId,
+        };
+
+        const timestamp = getTimestamp();
+        if (timestamp) {
+          result.timestamp = timestamp;
+        }
+        return result;
       }
     }
 
     // regular url
-    url = new URL(url);
-    const urlSearchParams = new URLSearchParams(url.search);
-    return urlSearchParams.get("v");
+    const result: any = {
+      videoId: urlSearchParams.get("v"),
+    };
+
+    const timestamp = getTimestamp();
+    if (timestamp) {
+      result.timestamp = timestamp
+    }
+
+    return result;
   }
 
   async function playVideoOnTv() {
-    await PlayletApi.playVideo(videoMetadata?.videoId);
+    await PlayletApi.playVideo(videoMetadata?.videoId, videoStartAtTimestamp);
   }
 
   function openInvidiousInNewTab() {
-    window.open(`${invidiousInstance}/watch?v=${videoMetadata?.videoId}`);
+    let url = `${invidiousInstance}/watch?v=${videoMetadata?.videoId}`;
+    if (videoStartAtChecked && videoStartAtTimestamp) {
+      url += `&t=${videoStartAtTimestamp}`;
+    }
+    window.open(url);
   }
 </script>
 
 <div
   class="{isDragging || isLoading
     ? ''
-    : 'hidden'} absolute w-full h-full bg-base-100/80 z-50 flex justify-center items-center"
+    : 'hidden'} fixed w-full h-full bg-base-100/80 z-50 flex justify-center items-center"
 >
   {#if isDragging}
     <div class="text-2xl font-bold">Drop a Youtube link here</div>
@@ -139,6 +176,11 @@
   <form method="dialog" class="modal-box bg-base-100">
     <h3 class="text-lg m-5">{videoMetadata?.title}</h3>
     <div class="flex flex-col">
+      <VideoStartAt
+        bind:checked={videoStartAtChecked}
+        bind:timestamp={videoStartAtTimestamp}
+        lengthSeconds={videoMetadata?.lengthSeconds}
+      />
       <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
       <button class="btn m-2" on:click={openInvidiousInNewTab}
         >Open in Invidious</button

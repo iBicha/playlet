@@ -113,8 +113,11 @@ function OnWebServerLogin()
     m.homeGridScreen.refresh = true
 end function
 
-function OnWebServerCommand()
-    if m.serverTask.command.StartsWith("play:")
+function OnWebServerCommand() as void
+    if m.serverTask.command = invalid or m.serverTask.command.command = invalid
+        return
+    end if
+    if m.serverTask.command.command = "play"
         sender = m.videoContainer.sender ?? m.currentFocued
         if m.videoContainer.fullscreen
             dialog = m.top.getScene().dialog
@@ -122,7 +125,7 @@ function OnWebServerCommand()
                 dialog.close = true
             end if
         end if
-        PlayVideo(m.serverTask.command.Mid(5), { sender: sender })
+        PlayVideo(m.serverTask.command.videoId, { sender: sender, timestamp: m.serverTask.command.timestamp })
     end if
 end function
 
@@ -146,5 +149,5 @@ function PlayVideoFromArgs(args as object) as void
     end if
 
     sender = m.videoContainer.sender ?? m.currentFocued
-    PlayVideo(args.contentId, { sender: sender })
+    PlayVideo(args.contentId, { sender: sender, timestamp: args.timestamp })
 end function
