@@ -3,6 +3,7 @@ function Init()
     m.top.observeField("focusedChild", "OnFocusChanged")
     m.top.observeField("value", "OnValueChanged")
     m.top.observeField("settings", "OnSettingsScreen")
+    m.keyboardWasClosedByButton = false
 end function
 
 function OnSettingsScreen()
@@ -23,8 +24,7 @@ function OnValueChanged()
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
-    settingsScreen = m.top.getScene().findNode("SettingsScreen")
-    return settingsScreen@.OnkeyEvent(key, press)
+    return m.top.settings@.OnkeyEvent(key, press)
 end function
 
 function ShowEditKeyboard()
@@ -45,10 +45,15 @@ function OnButtonSelected(event as object)
     if buttonSelected = 0
         m.top.value = keyboard.text
     end if
+    m.keyboardWasClosedByButton = true
     keyboard.close = true
 end function
 
-function OnKeyboardClosed()
-    settingsScreen = m.top.getScene().findNode("SettingsScreen")
-    settingsScreen@.MenuNavigate(-1)
+function OnKeyboardClosed() as void
+    ' The keyboard was closed by something else (like cast from web app)
+    ' In this case, we do nothing, since the focus might be moved to the video player
+    if not m.keyboardWasClosedByButton
+        return
+    end if
+    m.top.settings@.MenuNavigate(-1)
 end function
