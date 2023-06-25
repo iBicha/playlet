@@ -18,6 +18,8 @@
   
   // svelte-ignore unused-export-let
   export let defaultValue: any = undefined;
+  // svelte-ignore unused-export-let
+  export let rokuComponent: any = undefined;
 
   const customComponents = {
     ClearSearchHistoryControl

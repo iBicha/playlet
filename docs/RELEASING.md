@@ -1,3 +1,5 @@
+<!-- markdownlint-disable MD036 -->
+
 # Releasing
 
 These are mostly the steps when releasing a new version:

@@ -43,11 +43,15 @@ export class PlayletApi {
         return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "logout" });
     }
 
-    static async playVideo(videoId) {
+    static async playVideo(videoId, timestamp) {
         if (!videoId) {
             return;
         }
-        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "play", videoId: videoId });
+        const payload = { command: "play", videoId: videoId };
+        if (timestamp !== undefined) {
+            payload["timestamp"] = timestamp;
+        }
+        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, payload);
     }
 
     static async getSearchHistory() {

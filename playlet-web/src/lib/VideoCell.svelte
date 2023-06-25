@@ -1,6 +1,7 @@
 <script lang="ts">
   import { PlayletApi } from "./PlayletApi";
   import { playletStateStore } from "./Stores";
+  import VideoStartAt from "./VideoStartAt.svelte";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;
@@ -39,6 +40,8 @@
   let modal;
   let tvName = "Roku TV";
   let invidiousInstance;
+  let videoStartAtChecked;
+  let videoStartAtTimestamp;
 
   playletStateStore.subscribe((value) => {
     tvName = value?.device?.friendly_name ?? "Roku TV";
@@ -49,14 +52,14 @@
     if (isUpcoming) {
       return `Premeres in ${getFormattedTimeLeft(premiereTimestamp)}`;
     }
-    const pubText = publishedText || '';
+    const pubText = publishedText || "";
     const viewCountText = formatViewCount(viewCount);
 
-    if (pubText === '' && viewCountText === '') {
-      return '';
+    if (pubText === "" && viewCountText === "") {
+      return "";
     }
-    
-    return `${pubText} • ${viewCountText}`; 
+
+    return `${pubText} • ${viewCountText}`;
   }
 
   function getFormattedTimeLeft(unixTimestamp) {
@@ -149,7 +152,7 @@
 
   function getFormattedTime(length) {
     const minutes = Math.floor(length / 60).toString();
-    const seconds = (length % 60);
+    const seconds = length % 60;
     const secondsString = seconds < 10 ? `0${seconds}` : seconds.toString();
     return minutes + ":" + secondsString;
   }
@@ -162,24 +165,37 @@
   }
 
   async function playVideoOnTv() {
-    await PlayletApi.playVideo(videoId);
+    await PlayletApi.playVideo(videoId, videoStartAtTimestamp);
   }
 
   function openInvidiousInNewTab() {
-    window.open(`${invidiousInstance}/watch?v=${videoId}`)
+    window.open(`${invidiousInstance}/watch?v=${videoId}`);
   }
 </script>
 
-<button class="w-80 p-2" on:click="{modal.showModal()}">
+<button class="w-80 p-2" on:click={modal.showModal()}>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <figure class="relative">
-      <img class="w-full rounded-box" loading="lazy" width="320" height="180" src={getThumbnailUrl()} alt={title} />
+      <img
+        class="w-full rounded-box"
+        loading="lazy"
+        width="320"
+        height="180"
+        src={getThumbnailUrl()}
+        alt={title}
+      />
       {#if isVideoLive()}
-        <div class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2">LIVE</div>
-      {:else}
-        {#if lengthSeconds}
-          <div class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2">{getFormattedTime(lengthSeconds)}</div>
-        {/if}
+        <div
+          class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
+        >
+          LIVE
+        </div>
+      {:else if lengthSeconds}
+        <div
+          class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2"
+        >
+          {getFormattedTime(lengthSeconds)}
+        </div>
       {/if}
     </figure>
     <div class="card-body">
@@ -194,8 +210,15 @@
   <form method="dialog" class="modal-box bg-base-100">
     <h3 class="text-lg m-5">{title}</h3>
     <div class="flex flex-col">
+      <VideoStartAt
+        bind:checked={videoStartAtChecked}
+        bind:timestamp={videoStartAtTimestamp}
+        {lengthSeconds}
+      />
       <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
-      <button class="btn m-2" on:click={openInvidiousInNewTab}>Open in Invidious</button>
+      <button class="btn m-2" on:click={openInvidiousInNewTab}
+        >Open in Invidious</button
+      >
       <button class="btn m-2">Cancel</button>
     </div>
   </form>
