@@ -31,8 +31,9 @@
   };
   const logout = async () => {
     await PlayletApi.logout();
-    // TODO: reload state
-    window.location.reload();
+    PlayletApi.getState().then((value) => {
+      playletStateStore.set(value);
+    });
   };
 </script>
 
