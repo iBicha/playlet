@@ -4,9 +4,9 @@ These are mostly the steps when releasing a new version:
 
 ## Playlet lib
 
-- Create local branch "release/$VERSION" e.g. "release/0.10.0"
+- Create local branch `release/$VERSION` e.g. `release/0.10.0`
 - Set version in package.json
-- Update CHANGELOG.md section from "[Unreleased]" to "[$VERSION] - DATE"
+- Update CHANGELOG.md section from `[Unreleased]` to `[$VERSION] - DATE`
 - `npm run build:release`
   - This should fail because there are uncommitted changes. This is expected.
 - Commit changes
@@ -23,13 +23,13 @@ These are mostly the steps when releasing a new version:
   - Check `Set as the latest release`
   - Click `update release`
 
-- The newest Playlet lib is now LIVE
+**The newest Playlet lib is now LIVE**
 
-## Playet
+## Playlet
 
 For releasing to the store (when needed), this is done following a Playlet lib release:
 
-- Switch to main branch and pull changes - match commit corresponding to the release.
+- Switch to main branch and pull changes - **match commit corresponding to the release.**
 - `npm run build:release`
-  - This should create the signed package
+  - This should create the signed package under `release/playlet.pkg`
 - Upload to dashboard, and schedule a release (takes a couple of days)
