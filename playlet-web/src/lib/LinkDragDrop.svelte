@@ -50,7 +50,6 @@
         if (isValidHttpUrl(dataString)) {
           const videoInfo = parseYouTubeUrl(dataString);
           if (videoInfo.videoId) {
-            console.log(videoInfo);
             searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
             return;
           }
