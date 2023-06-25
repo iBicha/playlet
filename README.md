@@ -25,14 +25,15 @@ Playlet is an unofficial Youtube client for Roku 📺
 - 🕵️ No Tracking
 - 🛡️ Privacy driven (uses Invidious backend)
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
-- 📱 Cast from phone
+- 📱 Browse, search, and cast from phone using the web app
 - 🔮 Picture-in-picture mode
 - ⚡ Fast! [Check out how we compare with the official Youtube app](https://youtu.be/qmSvA-QQW20)
 
 ### Cast from phone
-1. Open settings in Playlet
+1. Open "Web app" tab in Playlet
 1. Scan QR Code with Phone
-1. Enter video ID or video url, and press Play button
+1. Browse or search videos
+1. Click the video and choose the "Play on TV" option
 
 ### Picture-in-picture
 - When viewing a video in full screen, press ⬇️ (down) button on your remote to shrink the video
@@ -43,6 +44,7 @@ Playlet is an unofficial Youtube client for Roku 📺
 1. Open settings in Playlet
 1. Scan QR Code with Phone
 1. Change the Invidious instance
+1. You can also do this from the settings tab
 
 ## Screenshots
 | ![](screenshots/screenshot1.jpg) | ![](screenshots/screenshot2.jpg) | ![](screenshots/screenshot3.jpg) |
