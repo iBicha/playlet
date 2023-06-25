@@ -169,7 +169,11 @@
   }
 
   function openInvidiousInNewTab() {
-    window.open(`${invidiousInstance}/watch?v=${videoId}`);
+    let url = `${invidiousInstance}/watch?v=${videoId}`;
+    if (videoStartAtChecked && videoStartAtTimestamp) {
+      url += `&t=${videoStartAtTimestamp}`;
+    }
+    window.open(url);
   }
 </script>
 
