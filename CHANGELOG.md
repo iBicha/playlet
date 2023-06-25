@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New preferences system
   - Unified settings between TV and web app
   - Web API allowing to import/export preferences (no UI for that yet)
+- Added launch argument `clearPlayletLibUrls`
+  - If the dev menu is used to load a custom Playlet lib url, but the lib does not have a functionality to revert back, `curl -d '' "http://$ROKU_DEV_TARGET:8060/launch/dev?clearPlayletLibUrls=true"` can be used to remove the custom lib, and revert to using default.
 
 ### Changed
 
