@@ -1,17 +1,32 @@
 import "pkg:/source/utils/Types.bs"
 
 namespace TimeUtils
-    ' Helper function convert seconds to mm:ss format
+    ' Helper function convert seconds to [hh:]mm:ss format
     ' getTime(138) returns 2:18
     function GetFormattedTime(length as integer) as string
-        minutes = (length \ 60).ToStr()
+        hours = length \ 3600
+        minutes = (length \ 60) mod 60
         seconds = length mod 60
+    
         if seconds < 10
             seconds = "0" + seconds.ToStr()
         else
             seconds = seconds.ToStr()
         end if
-        return minutes + ":" + seconds
+
+        if minutes < 10 and hours > 0
+            minutes = "0" + minutes.ToStr()
+        else
+            minutes = minutes.ToStr()
+        end if
+
+        formattedTime = minutes + ":" + seconds
+
+        if hours > 0
+            formattedTime = hours.ToStr() + ":" + formattedTime
+        end if
+
+        return formattedTime
     end function
 
     function GetFormattedTimeLeft(unixTimestamp as integer) as string
