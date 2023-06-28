@@ -9,7 +9,7 @@
 
   $: {
     if (document.activeElement !== textInputElemet) {
-      timestampText = getTimeStampText(timestamp);
+      timestampText = getFormattedTime(timestamp);
     }
   }
 
@@ -19,27 +19,38 @@
     if (timestampText === "") {
       return 0;
     }
-    const match = /^(\d{1,3}):(\d{1,2})$/.exec(timestampText);
+
+    const match = /^((\d+):)?(\d{1,2}):(\d{1,2})$/.exec(timestampText);
     if (match) {
-      const minutes = parseInt(match[1]);
-      const seconds = parseInt(match[2]);
-      if (seconds < 60) {
-        return minutes * 60 + seconds;
+      const hours = match[2] ? parseInt(match[2]) : 0;
+      const minutes = parseInt(match[3]);
+      const seconds = parseInt(match[4]);
+
+      if (minutes < 60 && seconds < 60) {
+        return hours * 3600 + minutes * 60 + seconds;
       }
     }
   }
 
-  function getTimeStampText(timestamp) {
-    if (timestamp === undefined) {
-      return "";
+  function getFormattedTime(length) {
+    if (length === undefined) {
+      return undefined;
     }
-    const minutes = Math.floor(timestamp / 60);
-    const remainingSeconds = timestamp % 60;
+    const hours = Math.floor(length / 3600);
+    const minutes = Math.floor((length / 60) % 60);
+    const seconds = length % 60;
 
-    const formattedMinutes = String(minutes);
-    const formattedSeconds = String(remainingSeconds).padStart(2, "0");
+    const secondsString = seconds < 10 ? `0${seconds}` : seconds.toString();
+    const minutesString =
+      minutes < 10 && hours > 0 ? `0${minutes}` : minutes.toString();
 
-    return `${formattedMinutes}:${formattedSeconds}`;
+    let formattedTime = minutesString + ":" + secondsString;
+
+    if (hours > 0) {
+      formattedTime = hours.toString() + ":" + formattedTime;
+    }
+
+    return formattedTime;
   }
 </script>
 
@@ -52,11 +63,19 @@
     <input
       bind:this={textInputElemet}
       disabled={!checked}
-      class="input w-24"
+      class="input w-28"
       placeholder="0:00"
       bind:value={timestampText}
       on:input={(e) => {
-        timestamp = getTimeStamp(e.currentTarget.value);
+        let newTimestamp = getTimeStamp(e.currentTarget.value);
+        if (newTimestamp !== undefined && lengthSeconds) {
+          newTimestamp = Math.min(newTimestamp, lengthSeconds);
+        }
+        timestamp = newTimestamp;
+      }}
+      on:change={(e) => {
+        timestampText = getFormattedTime(timestamp) ?? "0:00";
+        timestamp = getTimeStamp(timestampText);
       }}
     />
     {#if checked}
