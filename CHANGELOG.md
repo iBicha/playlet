@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support playing a video from a specific time (cast from phone, drag and drop, open in Invidious)
 
+### Fixed
+
+- A crash where the saved auth token is not in a valid format
+
 ## [0.10.0] - 2023-06-25
 
 ### Added
