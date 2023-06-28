@@ -1,0 +1,23 @@
+# Playlet documentation
+
+- Playlet development
+  - Environment setup
+    - [Roku Developer mode](./roku-dev-mode.md)
+    - Setting up VS Code
+  - DevTools
+    - BrighterScript
+    - BrightScript Language Extension for VS Code
+    - BrighterScript Linter/Formatter
+    - RALE (Roku Advanced Layout Editor)
+  - Playlet (Loader)
+  - Playlet Lib
+    - Component Library concept
+    - Releases from github
+    - Dev library hosted by VS Code Extension
+    - AsyncAwait Task Generator
+    - WebServer
+    - Feature flags
+  - Playlet Web App
+    - Svelte development
+    - Tailwind/Daisy UI
+    - API calls (proxy authenticated)
