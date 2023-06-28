@@ -151,10 +151,21 @@
   }
 
   function getFormattedTime(length) {
-    const minutes = Math.floor(length / 60).toString();
+    const hours = Math.floor(length / 3600);
+    const minutes = Math.floor((length / 60) % 60);
     const seconds = length % 60;
+
     const secondsString = seconds < 10 ? `0${seconds}` : seconds.toString();
-    return minutes + ":" + secondsString;
+    const minutesString =
+      minutes < 10 && hours > 0 ? `0${minutes}` : minutes.toString();
+
+    let formattedTime = minutesString + ":" + secondsString;
+
+    if (hours > 0) {
+      formattedTime = hours.toString() + ":" + formattedTime;
+    }
+
+    return formattedTime;
   }
 
   function isVideoLive() {
