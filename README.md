@@ -47,7 +47,7 @@ Playlet is an unofficial Youtube client for Roku 📺
 1. You can also do this from the settings tab
 
 ## Screenshots
-  <a href="./screenshots">
+  <a href="./screenshots/README.md">
     
 | ![](screenshots/screenshot1.jpg) | ![](screenshots/screenshot2.jpg) | ![](screenshots/screenshot3.jpg) |
 |----------------------------------|----------------------------------|----------------------------------|
