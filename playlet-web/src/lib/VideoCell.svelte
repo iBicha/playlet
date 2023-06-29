@@ -192,7 +192,7 @@
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <figure class="relative">
       <img
-        class="w-full rounded-box"
+        class="w-full rounded-box aspect-video object-cover"
         loading="lazy"
         width="320"
         height="180"
