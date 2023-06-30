@@ -2,12 +2,12 @@ name: Release
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
-jobs:    
-  release: 
+jobs:
+  release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -16,11 +16,11 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: 18.x
-          cache: 'npm'
-          
+          cache: "npm"
+
       - name: Install dependencies
         run: npm ci
-        
+
       - name: Build Playlet
         run: npm run build:release:ci
 
@@ -28,8 +28,13 @@ jobs:
         uses: dev-drprasad/delete-tag-and-release@v1.0
         with:
           tag_name: unstable
-          github_token: ${{ secrets.GH_TOKEN }} 
-     
+          github_token: ${{ secrets.GH_TOKEN }}
+
+      - name: Extract changelog
+        run: |
+          latest_release=$(awk 'BEGIN { RS="## \\[" } NR==2 { print "## ["$0 }' CHANGELOG.md)
+          echo -e "\n$latest_release" >> docs/unstable-changelog.md
+
       - name: Create unstable release
         run: gh release create unstable ./release/playlet.zip ./playlet/src/lib/playlet-lib.zip --notes-file docs/unstable-changelog.md --prerelease --title unstable
         env:
