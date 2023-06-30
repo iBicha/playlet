@@ -59,7 +59,6 @@ More under [Screenshots](./screenshots/README.md)
 ## Installation
 ### Roku Store (Published app)
 [Playlet on Roku channel store](https://channelstore.roku.com/en-ca/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
-Or use the link https://my.roku.com/account/add?channel=PLAYLET
 
 ### Sideloaded (Dev app)
 #### Enable Roku Developer Mode
