@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Video duration formatting in cast dialog
+- (Removed) Workaround for Invidious token expiring due to misconfigured instance
 
 ## [0.10.1] - 2023-06-28
 
