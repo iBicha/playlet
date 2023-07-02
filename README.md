@@ -70,8 +70,6 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 For everything related to Playlet app development, please see the [documentation](./docs/README.md)
 
-Then you can open the project using VS Code and deploy to your Roku TV using the Debug button.
-
 ## Why Playlet
 
 ```none
