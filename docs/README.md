@@ -279,13 +279,13 @@ Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base stylin
 
 ### API calls (proxy authenticated)
 
-When making authenticated calls to Invidious (for example to fetch the) the Bearer token is needed.
+When making authenticated calls to Invidious (for example to fetch the user Subscription feed) the Bearer token is needed.
 
 In this case specifically, the web server acts as a proxy between Invidious and the web app. This is for a few reasons:
 
 - CORS: Bearer token can't go through to Invidious from the web app (due to missing `Access-Control-Allow-Credentials` header)
 - The web server is not secure: it's not on HTTPS
-- It's best if the Invidious access token would not be served to the web app (makes it even easier to sniff)
+- It's best if the Invidious access token would not be served to the web app, and remain on the Roku device
 
 For API calls that don't require authentication, the web app fetches data from invidious directly.
 
