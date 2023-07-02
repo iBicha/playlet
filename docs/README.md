@@ -42,7 +42,7 @@ This documents contains verious kinds of information related to Playlet developm
 
 ### Roku Developer mode
 
-To develop Playlet applications, you need to enable Developer mode on your Roku device.
+To develop Roku applications, you need to enable Developer mode on your Roku device.
 Using your Roku remote, enter the following sequence:
 
 <!-- markdownlint-disable-next-line -->
