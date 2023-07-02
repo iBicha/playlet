@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { InvidiousApi } from "./InvidiousApi";
   import { PlayletApi } from "./PlayletApi";
   import { playletStateStore, searchHistoryStore } from "./Stores";
   import VideoCell from "./VideoCell.svelte";
+  import SearchThinIcon from "../assets/search-thin-icon.svg.svelte";
 
   export let visibility: boolean;
 
@@ -90,23 +90,30 @@
         await searchVideos();
       }}
     >
-      <input
-        type="search"
-        dir="auto"
-        placeholder="Search..."
-        class="input w-full border border-neutral rounded-full"
-        bind:this={searchBox}
-        bind:value={searchBoxText}
-        on:input={searchSuggestions}
-        on:focus={searchSuggestions}
-        on:blur={() => {
-          // A delay before clearing the suggestions allows the user to click on a suggestion
-          // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
-          setTimeout(() => {
-            suggestions = { suggestions: [] };
-          }, 200);
-        }}
-      />
+      <div class="join w-full border border-neutral rounded-full">
+        <input
+          type="search"
+          dir="auto"
+          placeholder="Search..."
+          class="join-item input w-full border border-neutral rounded-full"
+          bind:this={searchBox}
+          bind:value={searchBoxText}
+          on:input={searchSuggestions}
+          on:focus={searchSuggestions}
+          on:blur={() => {
+            // A delay before clearing the suggestions allows the user to click on a suggestion
+            // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
+            setTimeout(() => {
+              suggestions = { suggestions: [] };
+            }, 200);
+          }}
+        />
+        <button class="join-item btn" on:click={searchVideos}>
+          <div class="h-6">
+            <SearchThinIcon />
+          </div>
+        </button>
+      </div>
       {#if suggestions.suggestions.length > 0}
         <ul
           class="dropdown-content menu z-10 p-2 shadow-xl bg-base-200 rounded-box"
