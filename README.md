@@ -21,6 +21,17 @@
 
 Playlet is an unofficial Youtube client for Roku 📺
 
+## Screenshots
+
+  <a href="./docs/screenshots/README.md">
+
+| ![Screenshot](docs/screenshots/screenshot1.jpg) | ![Screenshot](docs/screenshots/screenshot2.jpg) | ![Screenshot](docs/screenshots/screenshot3.jpg) |
+|-------------------------------------------------|-------------------------------------------------|-------------------------------------------------|
+
+  </a>
+
+More under [Screenshots](./docs/screenshots/README.md)
+
 ## Features
 
 - 🔥 No Ads (Not now, not ever)
@@ -50,17 +61,6 @@ Playlet is an unofficial Youtube client for Roku 📺
 1. Scan QR Code with Phone
 1. Change the Invidious instance
 1. You can also do this from the settings tab
-
-## Screenshots
-
-  <a href="./docs/screenshots/README.md">
-
-| ![Screenshot](docs/screenshots/screenshot1.jpg) | ![Screenshot](docs/screenshots/screenshot2.jpg) | ![Screenshot](docs/screenshots/screenshot3.jpg) |
-|-------------------------------------------------|-------------------------------------------------|-------------------------------------------------|
-
-  </a>
-
-More under [Screenshots](./docs/screenshots/README.md)
 
 ## Installation
 
