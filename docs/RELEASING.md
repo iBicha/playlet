@@ -2,6 +2,13 @@
 
 # Releasing
 
+The release process for Playlet is very simple, since most of the work is automated.
+The automation makes `unstable` releases.
+
+```makefile
+unstable release + QA = stable version
+```
+
 These are mostly the steps when releasing a new version:
 
 ## Playlet lib
@@ -21,6 +28,7 @@ These are mostly the steps when releasing a new version:
   - Tag: `v$VERSION`
   - Title: `v$VERSION`
   - Body: the content from CHANGELOG.md for this version
+    - This should be already included, just remove the notes about testing the unstable release
   - Uncheck `Set as a pre-release`
   - Check `Set as the latest release`
   - Click `update release`
