@@ -253,7 +253,7 @@ It's important to note that if Playlet is not ON (on your Roku device) or the TV
 
 When Playlet gets built, several steps happen:
 
-1. The web app get kicks off first. The web app artifacts gets written to `playlet-lib/src/www`
+1. The web app gets kicked off first. The web app artifacts gets written to `playlet-lib/src/www`
 1. Playlet lib gets built second. As part of the build pipeline, a copy of `playlet-lib.zip` is made under `playlet/src/lib/playlet-lib.zip`
 1. Finally, Playlet app is built.
 
