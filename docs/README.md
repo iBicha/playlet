@@ -223,7 +223,7 @@ Playlet uses [bs_const](https://developer.roku.com/en-ca/docs/references/brights
 
 ### User preferences
 
-Playlet uses a json file that lists user preferences. It should be under `playlet-lib/src/config/preferences.json`
+Playlet uses a json file that lists user preferences. It should be under [playlet-lib/src/config/preferences.json](/playlet-lib/src/config/preferences.json)
 This file defines the kind of preferences that users can change, such as autoplay, preferred quality, and so on.
 
 This file is parsed at runtime and UI for the settings is generated. The same mechanism is used to Playlet and the Web App.
@@ -234,13 +234,13 @@ Additionally, The web server exposes the settings under `/api/preferences`, whic
 
 When playlet starts, it shows a video feed in the screen. Subscription, Trending videos, and so on.
 
-The layout is defined under `playlet-lib/src/config/default_home_layout.json`.
+The layout is defined under [playlet-lib/src/config/default_home_layout.json](/playlet-lib/src/config/default_home_layout.json).
 
 This could allow users to define custom layouts, so they can see what they find relevant in the home page. This can include Subscription, Trending, Popular videos, Search per keywords, or Playlists.
 
 Additionally each feed has information on how it is fetched. For now, only Invidious can be data source, but other systems should be configured in the same way.
 
-Invidious API definitions are defined under `playlet-lib/src/config/invidious_video_api.json`, and Playlet parses these at runtime and make the right api calls to fetch the data.
+Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json](/playlet-lib/src/config/invidious_video_api.json), and Playlet parses these at runtime and make the right api calls to fetch the data.
 
 Finally, this layout system is what allows both the BrightScript app and the Web app to display the same homepage.
 
