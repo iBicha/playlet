@@ -315,7 +315,8 @@ This will remove the custom lib, and revert to using default (latest release fro
 
 On pull requests, a Github action will run `lint:fix` and `format:fix` and push changes to the PR branch, to keep things tidy.
 
-When merged to main branch, a Github action will build Playlet, and release a new version tagged `unstable`, with the build artifacts attached, and changelog included.
+When merged to main branch, a Github action will build Playlet, run static analysis using Roku's [Static Channel Analysis tool](https://devtools.web.roku.com/#static-channel-analysis-tool), and release a new version tagged `unstable`, with the build artifacts attached, and changelog included.
+
 Existing `unstable` release will be removed before creating a new one.
 
 This makes [Releasing](./RELEASING.md) simpler.
