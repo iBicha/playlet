@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Video duration formatting in cast dialog
 - (Removed) Workaround for Invidious token expiring due to misconfigured instance
 - Crash when loading the home screen [#83](https://github.com/iBicha/playlet/issues/83)
+- Performance of home screen in web app
 
 ## [0.10.1] - 2023-06-28
 
