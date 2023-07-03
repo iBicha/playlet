@@ -24,6 +24,24 @@ jobs:
       - name: Build Playlet
         run: npm run build:release:ci
 
+      - name: Use Java
+        uses: actions/setup-java@v3
+
+      - name: Download the Static Channel Analysis CLI
+        run: |
+          curl -sSL "https://devtools.web.roku.com/static-channel-analysis/sca-cmd.zip" -o sca-cmd.zip
+          unzip sca-cmd.zip
+
+      - name: Run Analysis on Playlet Lib
+        # Note: we don't set the exit code to on error, because sca treats the lib
+        # as a standalone app, and logs all sorts of errors that are not relevant to
+        # a Component Library.
+        # This run is simply to check if there's any interesting output comes up.
+        run: ./sca-cmd/bin/sca-cmd ./playlet/src/lib/playlet-lib.zip
+
+      - name: Run Analysis on Playlet App
+        run: ./sca-cmd/bin/sca-cmd ./release/playlet.zip --exit error
+
       - name: Delete unstable release
         uses: dev-drprasad/delete-tag-and-release@v1.0
         with:
