@@ -49,7 +49,7 @@
 
   function recalculateVisibileCells() {
     const scrollLeft = carouselElement.scrollLeft;
-    const clientWidth = carouselElement.clientWidth;
+    const clientWidth = carouselElement.clientWidth || window.innerWidth;
 
     scrollStart = Math.floor(scrollLeft / itemWidth) - 1;
     scrollEnd = Math.ceil((scrollLeft + clientWidth) / itemWidth) + 1;
