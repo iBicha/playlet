@@ -14,6 +14,7 @@
   let suggestions: { suggestions: any[] } = { suggestions: [] };
   let videos = [];
   let searchHistory = [];
+  let isLoading = false;
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
@@ -76,7 +77,13 @@
       return;
     }
 
-    videos = await invidiousApi.search(searchBoxText);
+    try {
+      isLoading = true;
+      videos = await invidiousApi.search(searchBoxText);
+    } finally {
+      isLoading = false;
+    }
+
     const newSearchHistory = await PlayletApi.putSearchHistory(searchBoxText);
     searchHistoryStore.set(newSearchHistory);
   }
@@ -134,6 +141,12 @@
   </div>
 
   <div>
+    {#if isLoading}
+      <div class="fixed w-full h-1/2 z-50 flex justify-center items-center">
+        <span class="loading loading-spinner loading-md" />
+      </div>
+    {/if}
+
     <div
       class="grid grid-flow-row-dense gap-4 items-center justify-center sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 m-4"
     >
