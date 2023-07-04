@@ -38,19 +38,21 @@
   let deviceInfo = {};
   let invidiousInfo = {};
   let preferencesInfo = {};
+  const feedbackTitle = encodeURIComponent("[Feedback] Playlet");
   let githubUrlIssue = "https://github.com/iBicha/playlet/issues/new";
+  let mailToUrl = "mailto:brahim.hadriche@gmail.com";
 
   playletStateStore.subscribe((value) => {
     appInfo = value.app || {};
     deviceInfo = value.device || {};
     invidiousInfo = value.invidious || {};
     preferencesInfo = value.preferences || {};
-    githubUrlIssue = CreateGithubIssueUrl();
+    githubUrlIssue = createGithubIssueUrl();
+    mailToUrl = createMailToUrl();
   });
 
-  function CreateGithubIssueUrl() {
-    let title = "[Feedback] Playlet";
-    let body = `### Feedback
+  function createFeedbackBody() {
+    return `### Feedback
 _insert feedback here_
 
 #### App Info
@@ -72,9 +74,16 @@ ${JSON.stringify(invidiousInfo, null, 2)}
 \`\`\`
 ${JSON.stringify(preferencesInfo, null, 2)}
 \`\`\``;
-    title = encodeURIComponent(title);
-    body = encodeURIComponent(body);
-    return `https://github.com/iBicha/playlet/issues/new?title=${title}&body=${body}`;
+  }
+
+  function createGithubIssueUrl() {
+    const body = encodeURIComponent(createFeedbackBody());
+    return `https://github.com/iBicha/playlet/issues/new?title=${feedbackTitle}&body=${body}`;
+  }
+
+  function createMailToUrl() {
+    const body = encodeURIComponent(createFeedbackBody());
+    return `mailto:brahim.hadriche@gmail.com?subject=${feedbackTitle}&body=${body}`;
   }
 </script>
 
@@ -86,6 +95,10 @@ ${JSON.stringify(preferencesInfo, null, 2)}
       href={githubUrlIssue}
       target="_blank"
       rel="noopener noreferrer">creating an issue on Github</a
+    >
+    or by
+    <a class="link" href={mailToUrl} target="_blank" rel="noopener noreferrer"
+      >sending an email</a
     >.
   </div>
   <div class="overflow-x-auto">

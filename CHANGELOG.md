@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Links to the app info in web app
 - Loading indicator for search page in web app
+- Feedback link through email
 
 ### Fixed
 
