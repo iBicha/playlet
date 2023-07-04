@@ -3,26 +3,14 @@ import "pkg:/source/services/SponsorBlock.bs"
 @asynctask
 function SponsorBlockTask(input as object) as object
     videoId = input.videoId
+    lengthSeconds = input.metadata.lengthSeconds
 
-    sponsorBlockResponse = SponsorBlock.GetSkipSegmentsForVideo(videoId)
+    skipSegments = SponsorBlock.GetSkipSegmentsForVideo(videoId)
     barPath = invalid
-
-    skipSegments = []
-    if sponsorBlockResponse <> invalid
-        for each segment in sponsorBlockResponse
-            if segment.videoDuration > 0
-                skipSegments.push(segment)
-            end if
-        end for
-    end if
-
-    if skipSegments.Count() = 0
-        skipSegments = invalid
-    end if
 
     if skipSegments <> invalid
         barPath = `tmp:/sponsorblock_bar_${videoId}.png`
-        SponsorBlock.GenerateProgressBarBackground(skipSegments, barPath)
+        SponsorBlock.GenerateProgressBarBackground(skipSegments, lengthSeconds, barPath)
     end if
 
     return {

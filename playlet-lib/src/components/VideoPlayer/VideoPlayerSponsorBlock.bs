@@ -18,7 +18,6 @@ function SetupSponsorBlock() as void
     m.top.trickPlayBar.observeField("visible", "OnTrickPlayBarVisible")
     m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
     m.chapterLabelTimer.observeField("fire", "OnChapterLabelTimer")
-    m.top.observeField("videoId", "StartSponsorBlockTask")
 end function
 
 function LoadSponsorBlockSettings() as void
@@ -103,12 +102,19 @@ function UpdateSponsorBlockChapter(time as integer) as void
     m.top.chapter = ""
 end function
 
-function StartSponsorBlockTask()
+function StartSponsorBlockTask() as void
+    if not m.sponsorBlockEnabled = true
+        return
+    end if
+
     if m.sponsorBlockTask <> invalid
         m.sponsorBlockTask.control = "stop"
     end if
 
-    m.sponsorBlockTask = StartAsyncTask(SponsorBlockTask, { videoId: m.top.videoId }, OnSponsorBlockTaskResults)
+    m.sponsorBlockTask = StartAsyncTask(SponsorBlockTask, {
+        videoId: m.top.videoId,
+        metadata: m.top.content.metadata
+    }, OnSponsorBlockTaskResults)
 end function
 
 function OnSponsorBlockTaskResults(output as object)
