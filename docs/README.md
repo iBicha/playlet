@@ -273,6 +273,8 @@ You will notice that thr browser tab that just opened shows an url like `http://
 
 This is because the web app will be served from Vite, while API calls to the playlet will be done to the Playlet lib webserver.
 
+For debugging, choose the compound target `Playlet Web (Debug)`.
+
 ### Tailwind/Daisy UI
 
 Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base styling library. Additionally, it uses [DaisyUI](https://daisyui.com/) as it offers a versatile set of components, and has built-in supports for themes.
