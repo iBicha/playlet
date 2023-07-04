@@ -1,7 +1,7 @@
 <script lang="ts">
   import playletLogoDark from "../assets/logo-dark.svg";
   import playletLogoLight from "../assets/logo-light.svg";
-  import userIcon from "../assets/user.png";
+  import UserIcon from "../assets/user.svg.svelte";
   import { PlayletApi } from "./PlayletApi";
   import { appThemeStore, playletStateStore } from "./Stores";
   import ThemeSelect from "./ThemeToggle.svelte";
@@ -39,7 +39,11 @@
 
 <div class="navbar bg-base-100 sticky top-0 z-40">
   <div class="flex-1">
-    <img src={$appThemeStore === 'dark' ? playletLogoDark : playletLogoLight} class="h-8" alt="Playlet Logo" />
+    <img
+      src={$appThemeStore === "dark" ? playletLogoDark : playletLogoLight}
+      class="h-8"
+      alt="Playlet Logo"
+    />
     <h4 class="label brightness-75">{version}</h4>
   </div>
   <div class="flex-none">
@@ -52,7 +56,7 @@
     <div class="dropdown dropdown-end">
       <div tabindex="-1" class="btn btn-ghost btn-circle avatar">
         <div class="w-8 rounded-full">
-          <img src={userIcon} alt="User" />
+          <UserIcon />
         </div>
       </div>
       <ul
