@@ -81,14 +81,24 @@ namespace SponsorBlock
         return response.statuscode = 200
     end function
 
-    function GenerateProgressBarBackground(segments as object, path as string)
+    function GenerateProgressBarBackground(segments as object, lengthSeconds as integer, path as string)
         bar = CreateObject("roBitmap", { width: 1000, height: 20, AlphaEnable: true })
         bar.Clear(&hFFFFFF80)
         width = bar.GetWidth()
         height = bar.GetHeight()
         for each segment in segments
-            pixelStart = (segment.segment[0] / segment.videoDuration) * width
-            pixelEnd = (segment.segment[1] / segment.videoDuration) * width
+            videoDuration = lengthSeconds
+            if videoDuration = 0 or videoDuration = invalid
+                ' We should ignore segment.videoDuration https://github.com/iBicha/playlet/pull/23#issuecomment-1431520676
+                ' But in case where we don't have lengthSeconds from Invidious, it's better than nothing
+                videoDuration = segment.videoDuration
+            end if
+            if videoDuration = 0 or videoDuration = invalid
+                continue for
+            end if
+
+            pixelStart = (segment.segment[0] / videoDuration) * width
+            pixelEnd = (segment.segment[1] / videoDuration) * width
             color = SponsorBlock.SegmentColor(segment.category)
             ' highlight's duration is zero, so it is not visble on the bar.
             ' Add a couple of pixels to see it

@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Removed) Workaround for Invidious token expiring due to misconfigured instance
 - Crash when loading the home screen [#83](https://github.com/iBicha/playlet/issues/83)
 - Performance of home screen in web app
+- SponsorBlock segments where video duration is not provided (follow up to [#23](https://github.com/iBicha/playlet/pull/23))
 
 ## [0.10.1] - 2023-06-28
 
