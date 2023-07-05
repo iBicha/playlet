@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
+  <img src="docs/banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
   <br/><br/>
   <a href="https://github.com/iBicha/playlet/actions/workflows/release.yml?query=branch%3Amain">
     <img alt="Build Status" src="https://img.shields.io/github/actions/workflow/status/iBicha/playlet/release.yml.svg?branch=main"/>

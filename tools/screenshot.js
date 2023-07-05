@@ -1,7 +1,7 @@
 const rokuDeploy = require('roku-deploy');
-const dotenv = require('dotenv');
 const fs = require('fs');
 const { exit } = require('process');
+const getEnvVars = require('./get-env-vars');
 
 if(process.argv.length !== 3) {
     console.error("Invalid usage! usage: npm run screenshot -- filename");
@@ -9,7 +9,7 @@ if(process.argv.length !== 3) {
 }
 
 const filename = process.argv[2];
-const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
+const config = getEnvVars();
 
 const options = {
     host: config.ROKU_DEV_TARGET,

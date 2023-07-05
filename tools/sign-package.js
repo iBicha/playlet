@@ -1,8 +1,7 @@
-const dotenv = require('dotenv');
-const fs = require('fs');
+const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 
-const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
+const config = getEnvVars();
 
 const options = {
     host: config.ROKU_DEV_TARGET,

@@ -3,12 +3,12 @@
 
 const { ArgumentParser } = require('argparse')
 const fs = require('fs');
-const dotenv = require('dotenv');
+const getEnvVars = require('./get-env-vars');
 const spawn = require('child_process').spawn;
 const express = require('express')
 const ip = require('ip');
 
-const config = dotenv.parse(fs.readFileSync('.vscode/.env'));
+const config = getEnvVars();
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
 async function importInvidiousProfile(invidiousInstance, token, profile) {
