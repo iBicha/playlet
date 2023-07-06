@@ -14,10 +14,4 @@ function getEnvVars() {
     return envVars;
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = getEnvVars;
-}
-
-if (typeof exports !== 'undefined') {
-    exports.getEnvVars = getEnvVars;
-}
+module.exports = getEnvVars

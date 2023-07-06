@@ -2,7 +2,6 @@
 
 const { ArgumentParser } = require('argparse')
 const rokuDeploy = require('roku-deploy');
-const fs = require('fs');
 const getEnvVars = require('./get-env-vars');
 
 function getArgumentParser() {
