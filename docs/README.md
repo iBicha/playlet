@@ -35,9 +35,9 @@ This documents contains verious kinds of information related to Playlet developm
 ### Project setup
 
 ```bash
-1. `git clone https://github.com/iBicha/playlet.git`
-1. `cd playlet`
-1. `npm install`
+git clone https://github.com/iBicha/playlet.git
+cd playlet
+npm install
 ```
 
 ### Roku Developer mode
