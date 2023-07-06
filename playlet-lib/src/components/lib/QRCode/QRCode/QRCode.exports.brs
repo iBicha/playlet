@@ -17,10 +17,9 @@ end function
 
 function QRModes() as object
 	return {
-		MODE_NUMERIC   : 1 << 0
-		MODE_ALPHANUMERIC : 1 << 1
-		MODE_BYTE     : 1 << 2
-		MODE_KANJI    : 1 << 3
+		MODE_NUMERIC: 1 << 0
+		MODE_ALPHANUMERIC: 1 << 1
+		MODE_BYTE: 1 << 2
 	}
 end function
 
@@ -59,7 +58,7 @@ function QRMath() as object
 		LOG_TABLE[EXP_TABLE[i]] = i
 	end for
 
-	m.QRMath.glog = function (n as integer) as dynamic
+	m.QRMath.glog = function(n as integer) as dynamic
 		if n < 1
 			' print "ERROR: invalid n passed to glog", n
 			return invalid
@@ -68,7 +67,7 @@ function QRMath() as object
 		return m.LOG_TABLE[n]
 	end function
 
-	m.QRMath.gexp = function (n as integer) as integer
+	m.QRMath.gexp = function(n as integer) as integer
 		while n < 0
 			n += 255
 		end while
@@ -112,7 +111,7 @@ function QRPolynomial(num as object, shift as integer) as object
 		QRMath: QRMath()
 	}
 
-	result.getAt = function (index as integer) as integer
+	result.getAt = function(index as integer) as integer
 		if m._num[index] = invalid
 			return 0
 		else
@@ -120,11 +119,11 @@ function QRPolynomial(num as object, shift as integer) as object
 		end if
 	end function
 
-	result.getLength = function () as integer
+	result.getLength = function() as integer
 		return m._num.count()
 	end function
 
-	result.multiply = function (e) as object
+	result.multiply = function(e) as object
 		num = createObject("roArray", m.getLength() + e.getLength() - 1, false)
 
 		for i = 0 to m.getLength() - 1 step 1
@@ -132,14 +131,14 @@ function QRPolynomial(num as object, shift as integer) as object
 				if num[i + j] = invalid
 					num[i + j] = 0
 				end if
-	  			num[i + j] = qrXOR(num[i + j], m.QRMath.gexp(m.QRMath.glog(m.getAt(i)) + m.QRMath.glog(e.getAt(j))))
-	  		end for
-	  	end for
+				num[i + j] = qrXOR(num[i + j], m.QRMath.gexp(m.QRMath.glog(m.getAt(i)) + m.QRMath.glog(e.getAt(j))))
+			end for
+		end for
 
 		return QRPolynomial(num, 0)
 	end function
 
-	result.modulo = function (e) as object
+	result.modulo = function(e) as object
 		if m.getLength() - e.getLength() < 0
 			return m
 		end if
@@ -165,36 +164,36 @@ end function
 function QRMaskFunctions() as object
 	result = {}
 
-	result.PATTERN000 = function (i, j) as boolean
-		return (i + j) MOD 2 = 0
+	result.PATTERN000 = function(i, j) as boolean
+		return (i + j) mod 2 = 0
 	end function
-	
-	result.PATTERN001 = function (i, _j) as boolean
-		return i MOD 2 = 0
+
+	result.PATTERN001 = function(i, _j) as boolean
+		return i mod 2 = 0
 	end function
-	
-	result.PATTERN010 = function (_i, j) as boolean
-		return j MOD 3 = 0
+
+	result.PATTERN010 = function(_i, j) as boolean
+		return j mod 3 = 0
 	end function
-	
-	result.PATTERN011 = function (i, j) as boolean
-		return (i + j) MOD 3 = 0
+
+	result.PATTERN011 = function(i, j) as boolean
+		return (i + j) mod 3 = 0
 	end function
-	
-	result.PATTERN100 = function (i, j) as boolean
-		return ((i \ 2) + (j \ 3)) MOD 2 = 0
+
+	result.PATTERN100 = function(i, j) as boolean
+		return ((i \ 2) + (j \ 3)) mod 2 = 0
 	end function
-	
-	result.PATTERN101 = function (i, j) as boolean
-		return ((i * j) MOD 2) + ((i * j) MOD 3) = 0
+
+	result.PATTERN101 = function(i, j) as boolean
+		return ((i * j) mod 2) + ((i * j) mod 3) = 0
 	end function
-	
-	result.PATTERN110 = function (i, j) as boolean
-		return (((i * j) MOD 2) + ((i * j) MOD 3)) MOD 2 = 0
+
+	result.PATTERN110 = function(i, j) as boolean
+		return (((i * j) mod 2) + ((i * j) mod 3)) mod 2 = 0
 	end function
-	
-	result.PATTERN111 = function (i, j) as boolean
-		return (((i * j) MOD 3) + ((i + j) MOD 2)) MOD 2 = 0
+
+	result.PATTERN111 = function(i, j) as boolean
+		return (((i * j) mod 3) + ((i + j) mod 2)) mod 2 = 0
 	end function
 
 	return result
@@ -266,7 +265,7 @@ function QRUtil() as object
 
 	m.QRUtil = util
 
-	util.getBCHDigit = function (data as integer) as integer
+	util.getBCHDigit = function(data as integer) as integer
 		digit = 0
 		data = abs(data)
 		while data <> 0
@@ -279,15 +278,15 @@ function QRUtil() as object
 	util.G15_BCHDigit = util.getBCHDigit(util.G15)
 	util.G18_BCHDigit = util.getBCHDigit(util.G18)
 
-	util.getBCHTypeInfo = function (data as integer) as integer
-	  d = data << 10
-	  while m.getBCHDigit(d) - m.G15_BCHDigit >= 0
-		d = qrXOR(d, (m.G15 << (m.getBCHDigit(d) - m.G15_BCHDigit)))
-	  end while
-	  return qrXOR((data << 10) or d, m.G15_MASK)
+	util.getBCHTypeInfo = function(data as integer) as integer
+		d = data << 10
+		while m.getBCHDigit(d) - m.G15_BCHDigit >= 0
+			d = qrXOR(d, (m.G15 << (m.getBCHDigit(d) - m.G15_BCHDigit)))
+		end while
+		return qrXOR((data << 10) or d, m.G15_MASK)
 	end function
 
-	util.getBCHTypeNumber = function (data as integer) as integer
+	util.getBCHTypeNumber = function(data as integer) as integer
 		d = data << 12
 		while m.getBCHDigit(d) - m.G18_BCHDigit >= 0
 			d = qrXOR(d, (m.G18 << (m.getBCHDigit(d) - m.G18_BCHDigit)))
@@ -295,11 +294,11 @@ function QRUtil() as object
 		return (data << 12) or d
 	end function
 
-	util.getPatternPosition = function (typeNumber as integer) as object
+	util.getPatternPosition = function(typeNumber as integer) as object
 		return m.PATTERN_POSITION_TABLE[typeNumber - 1]
 	end function
 
-	util.getMaskFunction = function (maskPattern as integer) as function
+	util.getMaskFunction = function(maskPattern as integer) as function
 		masks = QRMaskFunctions()
 		patterns = QRMaskPatterns()
 
@@ -315,7 +314,7 @@ function QRUtil() as object
 		return masks[maskId]
 	end function
 
-	util.getErrorCorrectPolynomial = function (errorCorrectLength as integer) as object
+	util.getErrorCorrectPolynomial = function(errorCorrectLength as integer) as object
 		a = QRPolynomial([1], 0)
 		for i = 0 to errorCorrectLength - 1 step 1
 			a = a.multiply(QRPolynomial([1, m.QRMath.gexp(i)], 0))
@@ -323,7 +322,7 @@ function QRUtil() as object
 		return a
 	end function
 
-	util.getLengthInBits = function (mode as integer, typeNumber as integer) as integer
+	util.getLengthInBits = function(mode as integer, typeNumber as integer) as integer
 		modes = QRModes()
 
 		if 1 <= typeNumber and typeNumber < 10
@@ -331,19 +330,16 @@ function QRUtil() as object
 			if mode = modes.MODE_NUMERIC then return 10
 			if mode = modes.MODE_ALPHANUMERIC then return 9
 			if mode = modes.MODE_BYTE then return 8
-			if mode = modes.MODE_KANJI then return 8
 		else if typeNumber < 27
 			' 10 - 26
 			if mode = modes.MODE_NUMERIC then return 12
 			if mode = modes.MODE_ALPHANUMERIC then return 11
 			if mode = modes.MODE_BYTE then return 16
-			if mode = modes.MODE_KANJI then return 10
 		else if typeNumber < 41
 			' 27 - 40
 			if mode = modes.MODE_NUMERIC then return 14
 			if mode = modes.MODE_ALPHANUMERIC then return 13
 			if mode = modes.MODE_BYTE then return 16
-			if mode = modes.MODE_KANJI then return 12
 		end if
 
 		print "Invalid mode and/or type", mode, typeNumber
