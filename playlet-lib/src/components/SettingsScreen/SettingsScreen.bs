@@ -275,18 +275,22 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 end function
 
 function GetFocusedControl() as object
-    focusedChild = m.top.focusedChild
-    if focusedChild = invalid
+    node = m.top.focusedChild
+    if node = invalid
         return invalid
     end if
 
-    while not focusedChild.id.StartsWith("Control")
-        focusedChild = focusedChild.focusedChild
-        if focusedChild = invalid
+    while not node.id.StartsWith("Control")
+        child = node.focusedChild
+        if child = invalid
             return invalid
         end if
+        if node.isSameNode(child)
+            return invalid
+        end if
+        node = child
     end while
-    return focusedChild
+    return node
 end function
 
 function MenuGoLeft() as boolean
@@ -299,6 +303,9 @@ end function
 
 function MenuNavigate(direction as integer) as boolean
     focusedControl = GetFocusedControl()
+    if focusedControl = invalid
+        return false
+    end if
     container = focusedControl.getParent()
     containerParent = container.getParent()
     containerCount = containerParent.getChildCount()

@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Crash when loading the home screen [#83](https://github.com/iBicha/playlet/issues/83)
 - Performance of home screen in web app
 - SponsorBlock segments where video duration is not provided (follow up to [#23](https://github.com/iBicha/playlet/pull/23))
+- Focus with the settings input field
 
 ## [0.10.1] - 2023-06-28
 
