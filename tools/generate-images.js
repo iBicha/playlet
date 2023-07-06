@@ -1,3 +1,6 @@
+// Description: Generates images for the project.
+// Converts SVGs to PNGs and resizes them to the correct dimensions. 
+
 const fs = require('fs');
 const path = require('path');
 const { convertFile } = require('convert-svg-to-png');

@@ -1,14 +1,24 @@
+// Description: Take a screenshot of the Roku device
+
+const { ArgumentParser } = require('argparse')
 const rokuDeploy = require('roku-deploy');
 const fs = require('fs');
-const { exit } = require('process');
 const getEnvVars = require('./get-env-vars');
 
-if(process.argv.length !== 3) {
-    console.error("Invalid usage! usage: npm run screenshot -- filename");
-    exit(-1);
+function getArgumentParser() {
+    const parser = new ArgumentParser({
+        description: 'Take a screenshot of the Roku device'
+    });
+
+    parser.add_argument('filename', { help: 'Path where the screenshot will be saved (without extension)' });
+
+    return parser;
 }
 
-const filename = process.argv[2];
+const parser = getArgumentParser();
+const args = parser.parse_args()
+const filename = args.filename;
+
 const config = getEnvVars();
 
 const options = {
@@ -25,5 +35,6 @@ const options = {
     }
     catch (error) {
         console.error(error);
+        throw error;
     }
 })();

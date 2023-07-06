@@ -1,14 +1,25 @@
+// Description: Generates the SponsorBlock config for Playlet
+
 const fs = require('fs');
 const path = require('path');
+const { ArgumentParser } = require('argparse')
 
-if (process.argv.length !== 3) {
-    console.error("Invalid usage! usage: npm run generate-sponsorblock-config -- sponsorblock_root");
-    exit(-1);
+function getArgumentParser() {
+    const parser = new ArgumentParser({
+        description: 'Generate SponsorBlock config'
+    });
+
+    parser.add_argument('--sponsorblock-root', { help: 'Local path to the SponsorBlock repository', required: true });
+
+    return parser;
 }
+
+const parser = getArgumentParser();
+const args = parser.parse_args()
 
 const PLAYLEY_CONFIG_PATH = "./playlet-lib/src/config/sponsorblock_config.json"
 
-const sponsorblockRoot = process.argv[2];
+const sponsorblockRoot = args.sponsorblock_root;
 
 const configExamplePath = path.join(sponsorblockRoot, "config.json.example")
 const englishLocalePath = path.join(sponsorblockRoot, "public/_locales/en/messages.json")

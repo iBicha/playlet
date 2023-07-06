@@ -1,8 +1,9 @@
 import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
-import { readFileSync, existsSync } from 'fs'
-import { parse as dotEnvParse } from 'dotenv'
 import ip from 'ip';
+import { existsSync, readFileSync } from 'fs'
+import { join as joinPath } from 'path'
+import { parse as dotEnvParse } from 'dotenv'
 
 const PORT = 5173
 
@@ -14,8 +15,22 @@ const config: UserConfig = {
   }
 }
 
-if (existsSync('../.vscode/.env')) {
-  const envVars = dotEnvParse(readFileSync('../.vscode/.env'))
+// TODO: refactor this with the same code in tools/get-env-vars.js
+function getEnvVars() {
+  const envFile = joinPath(__dirname, '../.env');
+
+  let envVars = process.env;
+  if (existsSync(envFile)) {
+    const envConfig = dotEnvParse(readFileSync(envFile));
+    envVars = { ...envVars, ...envConfig };
+  }
+
+  return envVars;
+}
+
+const envVars = getEnvVars();
+
+if (envVars.ROKU_DEV_TARGET) {
   config.server = {
     host: true,
     port: PORT,

@@ -60,7 +60,7 @@ Visual Studio Code is pretty much necessary for development.
 
 Once you have it installed, you probably want to install the recommened plugins for this project, such as [BrightScript Language extension for VSCode](https://marketplace.visualstudio.com/items?itemName=RokuCommunity.brightscript) and [Svelte for VS Code](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode)
 
-Next, create a file in `.vscode/.env` containing the following:
+Next, create a file `.env` containing the following:
 
 ```makefile
 ROKU_DEV_TARGET=INSERT_IP_HERE

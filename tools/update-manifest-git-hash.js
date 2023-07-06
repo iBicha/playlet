@@ -1,3 +1,7 @@
+// Description: Updates the git commit hash in the manifest files.
+// It will update both Playlet and Playlet-lib manifest files.
+// It will abort if there are any changes in the working directory.
+
 const fs = require('fs');
 const shell = require('shelljs');
 

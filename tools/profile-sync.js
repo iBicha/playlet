@@ -1,5 +1,5 @@
-// This script reads recommendations, subscriptions, watch later, liked, and history from Youtube
-// and imports them into invidious.
+// Description: Read recommendations, subscriptions, watch later, liked, and history from Youtube
+// and import them into invidious. Requires yt-dlp to be installed.
 
 const { ArgumentParser } = require('argparse')
 const fs = require('fs');
@@ -7,6 +7,20 @@ const getEnvVars = require('./get-env-vars');
 const spawn = require('child_process').spawn;
 const express = require('express')
 const ip = require('ip');
+const fetch = require('cross-fetch');
+
+function getArgumentParser() {
+    const parser = new ArgumentParser({
+        description: 'Sync Youtube profile with Invidious'
+    });
+
+    parser.add_argument('--browser', { help: 'Use cookies from browser' });
+    parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
+    parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
+    parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', default: 500 });
+
+    return parser;
+}
 
 const config = getEnvVars();
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
@@ -167,8 +181,8 @@ async function getInvidiousInstance() {
         throw new Error("Playlet not logged in")
     }
 
-    console.log(`Invidious instance: ${state.invidious.logged_in_instance}`)
-    return state.invidious.logged_in_instance;
+    console.log(`Invidious instance: ${state.invidious.current_instance}`)
+    return state.invidious.current_instance;
 }
 
 async function getAccessToken(invidiousInstance) {
@@ -216,16 +230,9 @@ async function deleteAccessToken(invidiousInstance, token) {
     let invidiousInstance = undefined
     let token = undefined;
     try {
-        const parser = new ArgumentParser({
-            description: 'Sync Youtube profile with Invidious'
-        });
+        const parser = getArgumentParser()
+        const args = parser.parse_args()
 
-        parser.add_argument('--browser', { help: 'Use cookies from browser' });
-        parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
-        parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
-        parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', default: 500 });
-
-        let args = parser.parse_args()
         invidiousInstance = args.invidious
         browser = args.browser
         outputFile = args.output_file
