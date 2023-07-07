@@ -1,11 +1,36 @@
 <script>
   import { onMount } from "svelte";
   import { PlayletApi } from "./PlayletApi";
+  import { playletStateStore } from "./Stores";
 
-  let selectedRelease = ''
+  let selectedRelease = "";
   let releases = [];
+
+  let libUrl;
+  let libUrlType;
+
+  $: {
+    if (libUrlType === "custom") {
+      for (let i = 0; i < releases.length; i++) {
+        const release = releases[i].name;
+        if (
+          libUrl ===
+          `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.zip`
+        ) {
+          selectedRelease = release;
+          break;
+        }
+      }
+    }
+  }
+
   onMount(async () => {
     releases = await fetchReleaseTags();
+  });
+
+  playletStateStore.subscribe((value) => {
+    libUrl = value?.app?.lib_url;
+    libUrlType = value?.app?.lib_url_type;
   });
 
   async function fetchReleaseTags() {
@@ -28,7 +53,11 @@
     if (version === "") {
       version = "latest";
     }
-    if (confirm(`Are you sure you want to change the Playlet Library version to "${version}"?`)) {
+    if (
+      confirm(
+        `Are you sure you want to change the Playlet Library version to "${version}"?`
+      )
+    ) {
       await PlayletApi.setPlayletLibVersion(selectedRelease);
       alert("Playlet Library version set. Restart playlet to apply changes.");
     }
@@ -51,7 +80,10 @@
   </div>
 
   <div class="join w-full m-1">
-    <select bind:value={selectedRelease} class="select select-bordered join-item w-full mr-1">
+    <select
+      bind:value={selectedRelease}
+      class="select select-bordered join-item w-full mr-1"
+    >
       <option selected value="">latest (default)</option>
       {#each releases as release}
         <option disabled={!release.enabled} value={release.name}
