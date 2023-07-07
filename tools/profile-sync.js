@@ -203,10 +203,10 @@ async function getAccessToken(invidiousInstance) {
             server.close()
         })
 
-        const scope = ":*"
+        const scopes = ":*"
         const expire = Date.now() + 60 * 60 * 2;
         const callbackUrl = `http://${ip.address()}:${port}/invidious/token_callback`
-        const authLink = `${invidiousInstance}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
+        const authLink = `${invidiousInstance}/authorize_token?scopes=${scopes}&callback_url=${callbackUrl}&expire=${expire}`
 
         server = app.listen(port, () => {
             console.log(`server is listening on http://localhost:${port}`);

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Links to the app info in web app
 - Loading indicator for search page in web app
 - Feedback link through email
+- Scopes and expire fields to the Invidious auth token. This is to detect when a token is close to expiry, or if we have missing permissions.
 
 ### Fixed
 

@@ -18,10 +18,11 @@ namespace Invidious
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
 
-    const AUTH_SCOPE = "GET:feed,GET:playlists,POST:tokens/unregister,POST:history*"
+    const AUTH_SCOPES = "GET:feed,GET:playlists,POST:tokens/register,POST:tokens/unregister,POST:history*"
     const AUTH_FEED = "/api/v1/auth/feed"
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
+    const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
 
     function DefaultArgs() as object
         return {
@@ -155,7 +156,7 @@ namespace Invidious
         expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 365 * 2 '2 years from now
 
         callbackUrl = `http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
-        scope = `${Invidious.AUTH_SCOPE}`.EncodeUriComponent()
+        scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
         return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
     end function
 
@@ -165,11 +166,63 @@ namespace Invidious
         }
     end function
 
-    function Logout() as boolean
-        authToken = InvidiousSettings.GetAuthToken()
-        if authToken = invalid
+    function RefreshAuthToken() as boolean
+        currentAuthToken = InvidiousSettings.GetAuthToken()
+        if currentAuthToken = invalid
             return false
         end if
+
+        expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 365 * 2 '2 years from now
+
+        newToken = RegisterToken(currentAuthToken, expire)
+        if newToken = invalid
+            return false
+        end if
+        InvidiousSettings.SetAuthToken(newToken.token, newToken.instance, newToken.username, newToken.scopes, newToken.expire)
+
+        UnregisterToken(currentAuthToken)
+
+        return true
+    end function
+
+    function RegisterToken(authToken as object, expire as integer) as dynamic
+        headers = Invidious.GetAuthenticationHeaders(authToken.token)
+        url = `${authToken.instance}${Invidious.AUTH_TOKENS_REGISTER}`
+
+        scopes = authToken.scopes
+        if scopes = invalid
+            parsedToken = ParseJson(authToken.token)
+            if GetInterface(parsedToken.scopes, "ifArray") <> invalid
+                scopes = parsedToken.scopes.join(",")
+            else
+                scopes = Invidious.AUTH_SCOPES
+            end if
+        end if
+
+        args = {
+            headers: headers,
+            json: {
+                "scopes": scopes.Split(","),
+                "expire": expire
+            },
+            parseJson: false
+        }
+
+        response = Requests().post(url, args)
+        if not response.ok
+            return invalid
+        end if
+
+        return {
+            token: response.text,
+            instance: authToken.instance,
+            username: authToken.username,
+            scopes: scopes,
+            expire: expire
+        }
+    end function
+
+    function UnregisterToken(authToken as object) as boolean
         headers = Invidious.GetAuthenticationHeaders(authToken.token)
 
         url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
@@ -178,10 +231,21 @@ namespace Invidious
         headers["Content-Type"] = "application/json"
         args = {
             headers: headers,
-            data: authToken.token
+            data: authToken.token,
+            parseJson: false
         }
 
-        Requests().post(url, args)
+        response = Requests().post(url, args)
+        return response.ok
+    end function
+
+    function Logout() as boolean
+        authToken = InvidiousSettings.GetAuthToken()
+        if authToken = invalid
+            return false
+        end if
+
+        UnregisterToken(authToken)
 
         RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         return true
