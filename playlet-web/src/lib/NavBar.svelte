@@ -15,6 +15,9 @@
 
   playletStateStore.subscribe((value) => {
     version = value?.app?.lib_version ?? "";
+    if (value?.app?.id === "dev") {
+      version += "-dev";
+    }
     loggedIn = value?.invidious?.logged_in;
     auth_url = value?.invidious?.auth_url;
     currentInstance = value?.invidious?.current_instance;
