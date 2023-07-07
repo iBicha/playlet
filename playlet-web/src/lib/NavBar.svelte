@@ -18,6 +18,13 @@
     if (value?.app?.id === "dev") {
       version += "-dev";
     }
+    if (
+      value?.app?.lib_url_type === "custom" &&
+      value?.app?.lib_url ===
+        "https://github.com/iBicha/playlet/releases/download/unstable/playlet-lib.zip"
+    ) {
+      version += "-unstable";
+    }
     loggedIn = value?.invidious?.logged_in;
     auth_url = value?.invidious?.auth_url;
     currentInstance = value?.invidious?.current_instance;
