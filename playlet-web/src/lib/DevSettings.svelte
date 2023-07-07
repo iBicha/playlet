@@ -9,29 +9,36 @@
   let libUrl;
   let libUrlType;
 
-  $: {
-    if (libUrlType === "custom") {
-      for (let i = 0; i < releases.length; i++) {
-        const release = releases[i].name;
-        if (
-          libUrl ===
-          `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.zip`
-        ) {
-          selectedRelease = release;
-          break;
-        }
-      }
-    }
-  }
-
   onMount(async () => {
     releases = await fetchReleaseTags();
+    setCurrentlyUsedRelease();
   });
 
   playletStateStore.subscribe((value) => {
     libUrl = value?.app?.lib_url;
     libUrlType = value?.app?.lib_url_type;
+    setCurrentlyUsedRelease();
   });
+
+  function setCurrentlyUsedRelease() {
+    if (libUrlType !== "custom") {
+      return;
+    }
+    if (releases.length === 0) {
+      return;
+    }
+
+    for (let i = 0; i < releases.length; i++) {
+      const release = releases[i].name;
+      if (
+        libUrl ===
+        `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.zip`
+      ) {
+        selectedRelease = release;
+        break;
+      }
+    }
+  }
 
   async function fetchReleaseTags() {
     const response = await fetch(
