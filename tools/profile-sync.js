@@ -27,6 +27,8 @@ const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
 const PLAYLIST_DESCRIPTION = "[Automatically imported from Youtube using profile-sync script]"
 
+const INVIDIOUS_SCOPES = "POST:tokens/unregister,POST:import/invidious,GET:playlists,DELETE:playlists*"
+
 async function importInvidiousProfile(invidiousInstance, token, profile) {
     const pieces = splitProfile(profile);
     console.log(`Importing Invidious profile (${pieces.length} items)`)
@@ -244,9 +246,9 @@ async function getAccessToken(invidiousInstance) {
             server.close()
         })
 
-        const scopes = ":*"
+        const scopes = encodeURIComponent(INVIDIOUS_SCOPES)
         const expire = Date.now() + 60 * 60 * 2;
-        const callbackUrl = `http://${ip.address()}:${port}/invidious/token_callback`
+        const callbackUrl = encodeURIComponent(`http://${ip.address()}:${port}/invidious/token_callback`)
         const authLink = `${invidiousInstance}/authorize_token?scopes=${scopes}&callback_url=${callbackUrl}&expire=${expire}`
 
         server = app.listen(port, () => {
