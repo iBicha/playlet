@@ -24,6 +24,8 @@ namespace Invidious
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
     const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
 
+    const TOKEN_TIMESPAN = 60 * 60 * 24 * 365 * 2 '2 years
+
     function DefaultArgs() as object
         return {
             params: {
@@ -153,7 +155,7 @@ namespace Invidious
 
         localIp = GetLocalIpAddress()
         webServerPort = 8888
-        expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 365 * 2 '2 years from now
+        expire = TimeUtils.Now().AsSeconds() + TOKEN_TIMESPAN
 
         callbackUrl = `http://${localIp}:${webServerPort}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
         scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
@@ -172,7 +174,7 @@ namespace Invidious
             return false
         end if
 
-        expire = TimeUtils.Now().AsSeconds() + 60 * 60 * 24 * 365 * 2 '2 years from now
+        expire = TimeUtils.Now().AsSeconds() + TOKEN_TIMESPAN
 
         newToken = RegisterToken(currentAuthToken, expire)
         if newToken = invalid
