@@ -17,7 +17,7 @@ function getArgumentParser() {
     parser.add_argument('--browser', { help: 'Use cookies from browser' });
     parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
     parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
-    parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', default: 500 });
+    parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', type: 'int', default: 500 });
 
     return parser;
 }
@@ -190,9 +190,10 @@ async function extractYtDlp(sourceUrl, browser = undefined, limit = 100) {
                 .map(item => item.trim())
                 .filter(i => i);
 
-            newItems.forEach(item => {
-                items.push(item)
-            });
+
+            for (let i = 0; i < newItems.length && (items.length < limit || limit === -1); i++) {
+                items.push(newItems[i])
+            }
 
             if (limit > 0 && items.length >= limit) {
                 ytDlpProcess.kill()
