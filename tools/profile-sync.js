@@ -25,6 +25,8 @@ function getArgumentParser() {
 const config = getEnvVars();
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
+const PLAYLIST_DESCRIPTION = "[Automatically imported from Youtube using profile-sync script]"
+
 async function importInvidiousProfile(invidiousInstance, token, profile) {
     console.log(`Importing Invidious profile`)
     await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
@@ -44,7 +46,7 @@ async function generatePlaylist(sourceUrl, playlistName, browser = undefined, li
 
     return {
         title: playlistName,
-        description: "Imported from Youtube",
+        description: PLAYLIST_DESCRIPTION,
         privacy: "private",
         videos: videos
     };
@@ -52,7 +54,8 @@ async function generatePlaylist(sourceUrl, playlistName, browser = undefined, li
 
 async function deletePlaylists(invidiousInstance, token, playlistNames) {
     const playlistsToDelete = (await getPlaylists(invidiousInstance, token))
-        .filter(playlist => playlistNames.indexOf(playlist.title) !== -1);
+        .filter(playlist => playlistNames.indexOf(playlist.title) !== -1)
+        .filter(playlist => playlist.description === PLAYLIST_DESCRIPTION);
 
     for (let i = 0; i < playlistsToDelete.length; i++) {
         const playlist = playlistsToDelete[i];
