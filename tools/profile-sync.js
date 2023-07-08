@@ -28,15 +28,52 @@ const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 const PLAYLIST_DESCRIPTION = "[Automatically imported from Youtube using profile-sync script]"
 
 async function importInvidiousProfile(invidiousInstance, token, profile) {
-    console.log(`Importing Invidious profile`)
-    await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
-        headers: {
-            "Authorization": `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        method: "POST",
-        body: JSON.stringify(profile)
-    })
+    const pieces = splitProfile(profile);
+    console.log(`Importing Invidious profile (${pieces.length} items)`)
+    for (let i = 0; i < pieces.length; i++) {
+        const piece = pieces[i];
+        console.log(`Importing "${piece.name}" (${i + 1}/${pieces.length})`)
+
+        await fetch(`${invidiousInstance}/api/v1/auth/import/invidious`, {
+            headers: {
+                "Authorization": `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            method: "POST",
+            body: JSON.stringify(piece.profile)
+        })    
+    }
+}
+
+function splitProfile(profile) {
+    const pieces = []
+    if (profile.subscriptions) {
+        pieces.push({
+            name: "Subscriptions",
+            profile: {
+                subscriptions: profile.subscriptions
+            }
+        })
+    }
+    if (profile.watch_history) {
+        pieces.push({
+            name: "Watch History",
+            profile: {
+                watch_history: profile.watch_history
+            }
+        })
+    }
+    if (profile.playlists) {
+        profile.playlists.forEach(playlist => {
+            pieces.push({
+                name: `Playlist: ${playlist.title}`,
+                profile: {
+                    playlists: [playlist]
+                }
+            })
+        })
+    }
+    return pieces;
 }
 
 async function generatePlaylist(sourceUrl, playlistName, browser = undefined, limit = 100) {
