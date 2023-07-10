@@ -5,6 +5,11 @@ const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 
 const config = getEnvVars();
+['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD', 'ROKU_SIGN_PASSWORD'].forEach((key) => {
+    if (!config[key]) {
+        throw new Error(`Missing environment variable ${key}`);
+    }
+});
 
 const options = {
     host: config.ROKU_DEV_TARGET,
