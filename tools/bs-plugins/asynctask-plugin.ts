@@ -1,3 +1,5 @@
+// This plugin generates a task component for each function annotated with @asynctask
+
 import {
     CompilerPlugin,
     BscFile,
@@ -17,7 +19,7 @@ declare type FunctionInFile = {
 }
 
 export class AsyncTaskPlugin implements CompilerPlugin {
-    public name = 'asyncTaskPlugin';
+    public name = 'AsyncTaskPlugin';
 
     private asyncTaskFunctions: FunctionInFile[] = []
     private duplicatesReporeted: FunctionInFile[] = []

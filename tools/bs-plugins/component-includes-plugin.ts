@@ -1,3 +1,5 @@
+// Plugin to allow including other components in a component
+
 import {
     BeforeFileTranspileEvent,
     CompilerPlugin,
