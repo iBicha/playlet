@@ -1,5 +1,5 @@
 // Description: Publish, sign the package and retrieve it from the Roku device
-// It expects release/playelt.zip to exist
+// It expects release/playlet.zip to exist
 
 const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
@@ -12,7 +12,7 @@ const options = {
     outDir: 'release',
     outFile: 'playlet.zip',
     failOnCompileError: true,
-    stagingDir: 'dist/build/playlet',
+    stagingDir: 'dist/build/playlet-app',
     retainStagingDir: true,
     signingPassword: config.ROKU_SIGN_PASSWORD,
 };

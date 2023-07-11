@@ -17,7 +17,7 @@ declare type FunctionInFile = {
 }
 
 export class AsyncTaskPlugin implements CompilerPlugin {
-    public name = 'asyncTaskPlugin';
+    public name = 'AsyncTaskPlugin';
 
     private asyncTaskFunctions: FunctionInFile[] = []
     private duplicatesReporeted: FunctionInFile[] = []

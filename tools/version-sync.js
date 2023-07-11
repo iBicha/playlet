@@ -13,7 +13,7 @@ const packageJson = JSON.parse(packageJsonContent);
 const version = packageJson.version;
 const parsedVersion = semverParse(version);
 
-["playlet/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
+["playlet-app/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
     let appManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' });
 
     const majorPattern = /major_version=(\d+)/;
@@ -25,7 +25,8 @@ const parsedVersion = semverParse(version);
     appManifestContent = appManifestContent.replace(buildPattern, `build_version=${String(parsedVersion.patch).padStart(5, '0')}`);
 
     fs.writeFileSync(manifestPath, appManifestContent);
-})
+});
 
-execSync(`npm version ${version} --allow-same-version --no-git-tag-version`);
-execSync(`npm version ${version} --allow-same-version --no-git-tag-version`, { cwd: 'playlet-web' });
+[".", "playlet-app", "playlet-lib", "playlet-web"].forEach(function (packageFolder) {
+    execSync(`npm version ${version} --allow-same-version --no-git-tag-version`, { cwd: packageFolder });
+});
