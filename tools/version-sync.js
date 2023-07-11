@@ -1,6 +1,6 @@
 // Description: Updates the version in the manifest files.
 // Reads the version from the root package.json and updates the manifest files,
-// as well as the package.json files in the playlet-web folder.
+// as well as the package.json files in the playlet-app/playlet-lib/playlet-web folders.
 
 const fs = require('fs');
 const { execSync } = require("child_process");
