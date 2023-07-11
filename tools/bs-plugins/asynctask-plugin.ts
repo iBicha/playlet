@@ -1,3 +1,5 @@
+// This plugin generates a task component for each function annotated with @asynctask
+
 import {
     CompilerPlugin,
     BscFile,

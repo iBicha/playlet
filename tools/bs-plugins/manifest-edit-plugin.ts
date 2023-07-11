@@ -1,3 +1,11 @@
+// Plugin to edit the manifest file before the build, and restore it after publishing
+//  - --debug=true|false would set the DEBUG flag in the manifest file
+//    - This is to make sure stuff in #IF DEBUG would not get stripped out by brighterscript
+//  - --test-mode=true|false would comment out the sg_component_libs_provided line in the manifest file
+//    - This allows Playlet-lib to be tested independently
+//  - DEBUG_HOST_IP_ADDRESS would be replaced with the host IP address in the manifest file
+//    - This is to playlet app to pull playlet lib from the locally hosted server
+
 import {
     CompilerPlugin,
     ProgramBuilder
