@@ -1,0 +1,129 @@
+function AutoBindNodes() as void
+    if not m.global.hasField("AutoBindNodes")
+        m.global.addField("AutoBindNodes", "nodearray", false)
+    end if
+
+    nodes = m.global.AutoBindNodes
+    m.global.AutoBindNodes = []
+
+    for each node in nodes
+        BindNodeFields(node)
+    end for
+
+    for each node in nodes
+        if node.hasField("binding_fields_done")
+            node.binding_fields_done = true
+        end if
+    end for
+end function
+
+function BindNodeFields(node as object) as void
+    if node.binding_fields_done = true
+        return
+    end if
+
+    types = node.getFieldTypes()
+    for each key in types
+        if types[key] <> "node" or key.Instr(":") = -1
+            continue for
+        end if
+
+        nodeInfo = FindNode(node, key)
+        if nodeInfo = invalid
+            throw "Could not find node for " + key
+        end if
+
+        if nodeInfo.id = ""
+            throw "Referenced node " + key + " has no id"
+        end if
+
+        node.setField(key, nodeInfo.node)
+        if not node.hasField(nodeInfo.id)
+            node.addField(nodeInfo.id, "node", false)
+        end if
+        node.setField(nodeInfo.id, nodeInfo.node)
+    end for
+end function
+
+function FindNode(root as object, key as string) as object
+    id = ""
+    splitPosition = key.Instr(":")
+    if splitPosition = -1
+        return invalid
+    end if
+
+    if splitPosition = 0
+        path = key.Mid(1)
+    else
+        parts = key.Tokenize(":")
+        id = parts[0]
+        path = parts[1]
+    end if
+
+    node = root
+
+    if path.StartsWith("/")
+        node = node.getScene()
+        path = path.Mid(1)
+    end if
+
+    path = path.Tokenize("/")
+
+    for i = 0 to path.Count() - 1
+        if node = invalid
+            return invalid
+        end if
+        if path[i] = "."
+            continue for
+        end if
+        if path[i] = ".."
+            node = node.getParent()
+            continue for
+        end if
+        node = node.findNode(path[i])
+    end for
+
+    if root.isSameNode(node)
+        return invalid
+    end if
+
+    if id = ""
+        id = node.id
+    end if
+
+    return {
+        node: node,
+        id: id
+    }
+end function
+
+@oninit
+function RegisterAutoBind()
+    if not m.global.hasField("AutoBindNodes")
+        m.global.addField("AutoBindNodes", "nodearray", false)
+    end if
+    nodes = m.global.AutoBindNodes
+    newNodes = [m.top]
+    newNodes.append(nodes)
+    m.global.AutoBindNodes = newNodes
+end function
+
+function OnBindingFieldsDone()
+    types = m.top.getFieldTypes()
+    for each key in types
+        if m.DoesExist(key)
+            continue for
+        end if
+
+        if types[key] <> "node"
+            continue for
+        end if
+
+        node = m.top.getField(key)
+        m[key] = node
+    end for
+
+    if m.top.hasField("binding_done")
+        m.top.binding_done = true
+    end if
+end function
