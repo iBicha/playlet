@@ -250,7 +250,21 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
             return;
         }
 
-        mainXml.component.children[0] = { ...includeXml.component.children[0], ...mainXml.component.children[0] };
+        const mergedChildren: { [key: string]: any } = {};
+        for (let key in mainXml.component.children[0]) {
+            if (Array.isArray(mainXml.component.children[0][key]) && Array.isArray(includeXml.component.children[0][key])) {
+                mergedChildren[key] = includeXml.component.children[0][key].concat(mainXml.component.children[0][key]);
+            } else {
+                mergedChildren[key] = mainXml.component.children[0][key];
+            }
+        }
+        for (let key in includeXml.component.children[0]) {
+            if (!mergedChildren.hasOwnProperty(key)) {
+                mergedChildren[key] = includeXml.component.children[0][key];
+            }
+        }
+
+        mainXml.component.children[0] = mergedChildren;
     }
 
     parseXmlFile(file: XmlFile): any {
