@@ -7,7 +7,9 @@
 //    - This is to playlet app to pull playlet lib from the locally hosted server
 
 import {
+    BeforeProgramDisposeEvent,
     CompilerPlugin,
+    Program,
     ProgramBuilder
 } from 'brighterscript';
 import path from 'path';
@@ -21,9 +23,10 @@ export class ManifestEditPlugin implements CompilerPlugin {
 
     beforeProgramCreate(builder: ProgramBuilder) {
         const manifestPath = path.join(builder.options.rootDir!, "manifest")
-        this.originalManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' })
+        let originalManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' })
 
-        let manifestContent = this.originalManifestContent;
+        let manifestContent = originalManifestContent;
+        let changes = false;
 
         // Debug flag
         const debugFlag = process.argv.find(arg => /--debug=(true|false)/i.test(arg))
@@ -31,6 +34,13 @@ export class ManifestEditPlugin implements CompilerPlugin {
             const value = /--debug=(true|false)/i.exec(debugFlag)![1].toLowerCase()
             builder.logger.log(`Setting bs_const DEBUG to ${value}`)
             manifestContent = manifestContent.replace(/DEBUG=(true|false)/i, `DEBUG=${value}`);
+
+            // Host IP address
+            if (value === 'true') {
+                manifestContent = manifestContent.replace(/DEBUG_HOST_IP_ADDRESS/i, `${ip.address()}`)
+            }
+
+            changes = true;
         }
 
         // Test flag
@@ -39,22 +49,38 @@ export class ManifestEditPlugin implements CompilerPlugin {
             const value = /--test-mode=(true|false)/i.exec(testFlag)![1].toLowerCase()
             if (value === 'true') {
                 builder.logger.log(`Commenting out "sg_component_libs_provided"`)
+                manifestContent = manifestContent.replace(/sg_component_libs_provided=/i, `# sg_component_libs_provided=`);
+                changes = true;
             }
-            manifestContent = manifestContent.replace(/sg_component_libs_provided=/i, `# sg_component_libs_provided=`);
         }
 
-        // Host IP address
-        manifestContent = manifestContent.replace(/DEBUG_HOST_IP_ADDRESS/i, `${ip.address()}`)
+        if (!changes) {
+            return;
+        }
 
+        this.originalManifestContent = originalManifestContent;
+        builder.logger.info(this.name, 'Writing manifest file: ' + manifestPath);
         fs.writeFileSync(manifestPath, manifestContent)
     }
 
     afterPublish(builder: ProgramBuilder) {
+        this.restoreManifest(builder.program);
+    }
+
+    beforeProgramDispose(event: BeforeProgramDisposeEvent) {
+        this.restoreManifest(event.program);
+    }
+
+    restoreManifest(program: Program) {
         if (!this.originalManifestContent) {
             return
         }
-        const manifestPath = path.join(builder.options.rootDir!, "manifest")
-        fs.writeFileSync(manifestPath, this.originalManifestContent!)
+
+        const manifestPath = path.join(program.options.rootDir!, "manifest")
+        program.logger.info(this.name, 'Restoring manifest: ' + manifestPath);
+        fs.writeFileSync(manifestPath, this.originalManifestContent)
+
+        this.originalManifestContent = undefined;
     }
 }
 

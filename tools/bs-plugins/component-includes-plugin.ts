@@ -17,11 +17,7 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
 
     private pendingFiles: { [key: string]: Set<string> } = {};
 
-    private scopeProcessingRegistry: { [key: string]: number } = {};
-    private scopeEventCount = 0;
-
     afterScopeCreate(scope: Scope) {
-        this.scopeEventCount++;
         if (!isXmlScope(scope)) {
             return;
         }
@@ -31,15 +27,12 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
 
     processFile(file: XmlFile) {
         file.program.logger.info(this.name, 'Processing file: ' + file.pkgPath);
-        this.scopeProcessingRegistry[file.pkgPath] = this.scopeEventCount;
 
         const component = file.parser.ast.component;
         const includes = this.getIncludes(component);
 
         if (includes.length === 0) {
-            // Bug, maybe fixed by https://github.com/rokucommunity/brighterscript/pull/843
-            // this.processMissingFiles(file);
-            this.processAllFiles(file.program);
+            this.processMissingFiles(file);
             return;
         }
 
@@ -61,27 +54,7 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         }
         file.program.setFile(file.pkgPath, newFile);
 
-        // Bug, maybe fixed by https://github.com/rokucommunity/brighterscript/pull/843
-        // this.processMissingFiles(file);
-        this.processAllFiles(file.program);
-    }
-
-    // This is jank, but temporary jank
-    processAllFiles(program: Program) {
-        let loopSafety = 0;
-        let done = false;
-        while (!done && loopSafety++ < 1000) {
-            done = true;
-            for (const filePath in this.pendingFiles) {
-                if (this.scopeEventCount > this.scopeProcessingRegistry[filePath]) {
-                    const pendingFile = program.getFile(filePath) as XmlFile;
-                    if (pendingFile) {
-                        this.processFile(pendingFile);
-                    }
-                    done = false;
-                }
-            }
-        }
+        this.processMissingFiles(file);
     }
 
     processMissingFiles(currentFile: XmlFile) {
