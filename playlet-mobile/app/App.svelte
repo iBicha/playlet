@@ -3,7 +3,7 @@
   // @ts-ignore-next-line
   import * as application from "tns-core-modules/application";
 
-  let message: string = "Hello!";
+  let sharedText: string | undefined = "N/A";
 
   application.android.on(
     application.AndroidApplication.activityResumedEvent,
@@ -12,12 +12,12 @@
         args.activity.getIntent().getAction() ===
         android.content.Intent.ACTION_SEND
       ) {
-        const sharedText = args.activity
+        const newSharedText = args.activity
           .getIntent()
           .getStringExtra(android.content.Intent.EXTRA_TEXT);
 
-        if (sharedText) {
-          message = sharedText;
+        if (newSharedText) {
+          sharedText = newSharedText;
         }
       }
     }
@@ -25,5 +25,5 @@
 </script>
 
 <frame>
-  <Home {message} />
+  <Home {sharedText} />
 </frame>

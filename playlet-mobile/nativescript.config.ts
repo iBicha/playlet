@@ -1,7 +1,7 @@
 import { NativeScriptConfig } from '@nativescript/core';
 
 export default {
-  id: 'org.nativescript.playletmobile',
+  id: 'com.ibicha.playlet',
   appPath: 'app',
   appResourcesPath: 'App_Resources',
   android: {
