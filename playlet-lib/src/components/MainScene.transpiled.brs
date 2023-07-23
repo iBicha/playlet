@@ -1,11 +1,10 @@
-import "pkg:/components/AutoBind/AutoBind.bs"
+'import "pkg:/components/AutoBind/AutoBind.bs"
 
 function Init()
+    InitializeBindings() ' auto-generated!
     LaunchArgumentsReceived()
-
     scene = m.top.getScene()
     scene.ObserveField("inputArgs", "InputArgumentsReceived")
-
     AutoBindSceneGraph()
     appController = m.top.findNode("AppController")
     ? "Root from main: ", appController.root
@@ -22,4 +21,4 @@ function InputArgumentsReceived() as void
     scene = m.top.getScene()
     inputArgs = scene.inputArgs
     ? "InputArgumentsReceived " inputArgs
-end function
+end function'//# sourceMappingURL=./MainScene.bs.map

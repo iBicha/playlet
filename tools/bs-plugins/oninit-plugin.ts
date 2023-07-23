@@ -1,17 +1,15 @@
 // This plugin takes functions annotated with @oninit and adds them to the component's Init function
 
 import {
+    AnnotationExpression,
     BeforeFileTranspileEvent,
     CompilerPlugin,
     FunctionStatement,
-    WalkMode,
-    XmlScope,
-    createVisitor,
     isBrsFile,
     isXmlScope,
 } from 'brighterscript';
 
-import { RawCodeStatement } from './RawCodeStatement';
+import { RawCodeStatement } from './Classes/RawCodeStatement';
 
 export class OnInitPlugin implements CompilerPlugin {
     public name = 'OnInitPlugin';
@@ -21,64 +19,87 @@ export class OnInitPlugin implements CompilerPlugin {
             return
         }
 
-        event.file.ast.walk(createVisitor({
-            FunctionExpression: (func) => {
-                if (!this.hasOnInitAnnotation(func.functionStatement)) {
-                    return
-                }
+        const program = event.program;
 
-                if (!func.functionStatement) {
-                    event.program.logger.warn(this.name, `Function had an @oninit annotation, but function statement is not found.`)
-                    return
-                }
+        const initFunction = event.file.callables.find((callable) => {
+            return callable.functionStatement?.name.text === "Init";
+        });
 
-                event.program.logger.info(this.name, `Found @oninit function ${func.functionStatement!.name.text} in file ${event.file.pkgPath}`)
+        if (!initFunction) {
+            program.logger.info(this.name, `No Init found in ${event.file.pkgPath}`)
+            return;
+        }
 
-                const scopes = event.program.getScopesForFile(event.file);
-                for (let i = 0; i < scopes.length; i++) {
-                    const scope = scopes[i];
-                    event.program.logger.info(this.name, `  Found scope ${scope.name}`)
-                }
+        const scopes = program.getScopesForFile(event.file).filter((scope) => {
+            return isXmlScope(scope);
+        });
 
-                for (let i = 0; i < scopes.length; i++) {
-                    const scope = scopes[i];
+        if (scopes.length !== 1) {
+            program.logger.info(this.name, `No Init processing: Number of scopes ${scopes.length} != 1 for ${event.file.pkgPath}`)
+            return;
+        }
 
-                    if (!isXmlScope(scope)) {
-                        continue;
-                    }
+        const scope = scopes[0];
+        const onInitCallables = scope.getOwnCallables().map((callable) => {
+            return {
+                callable: callable,
+                annotation: this.getOnInitAnnotation(callable.callable.functionStatement)
+            }
+        }).filter((callable) => {
+            return callable.annotation;
+        });
 
-                    const initFunction = scope.getCallableByName("Init");
+        if (onInitCallables.length === 0) {
+            program.logger.info(this.name, `No Init processing: No @oninit functions found in ${scope.name}`)
+            return;
+        }
 
-                    if (!initFunction) {
-                        // TODO: force create an Init function in a new file (scope.xmlFile.componentName.text + "_initializer.brs")
-                        event.program.logger.warn(this.name, `No Init function found in scope ${scope.name}. Function ${func.functionStatement.name.text} will not be added to the component's Init function`)
-                        continue;
-                    }
 
-                    const callStatement = new RawCodeStatement(`${func.functionStatement.name.text}()`, initFunction.file);
-                    event.editor.arrayPush(initFunction.functionStatement.func.body.statements, callStatement);
+        const orderedStatements = initFunction.functionStatement.func.body.statements.map((statement) => {
+            return { order: 0, statement: statement }
+        });
 
-                    event.program.logger.info(this.name, `Added call to ${func.functionStatement.name.text} in Init function`)
+        for (let i = 0; i < onInitCallables.length; i++) {
+            const onInitCallable = onInitCallables[i];
+            const functionName = onInitCallable.callable.callable.functionStatement?.name.text;
+            if (!functionName) {
+                program.logger.info(this.name, `No Init processing: No function name found for @oninit function in ${scope.name}`)
+                continue;
+            }
 
-                }
-            },
-        }), {
-            walkMode: WalkMode.visitExpressionsRecursive
+            const callSource = `${functionName}() ' auto-generated!`
+
+            const callStatement = new RawCodeStatement(callSource, initFunction.file);
+
+            const order = this.getOnInitOrder(onInitCallable.annotation!);
+
+            orderedStatements.push({ order, statement: callStatement });
+
+            program.logger.info(this.name, `Added call to ${functionName} in Init function of ${scope.name} (${initFunction.file.pkgPath})`)
+        }
+
+        const statements = orderedStatements.sort((a, b) => {
+            return a.order - b.order;
+        }).map((orderedStatement) => {
+            return orderedStatement.statement;
+        });
+
+        event.editor.setProperty(initFunction.functionStatement.func.body, 'statements', statements);
+    }
+
+    getOnInitAnnotation(functionStatement: FunctionStatement | undefined) {
+        return functionStatement?.annotations?.find((annotation) => {
+            return annotation.name === "oninit";
         });
     }
 
-    hasOnInitAnnotation(functionStatement: FunctionStatement | undefined) {
-        const annotations = functionStatement?.annotations
-        if (!annotations || annotations.length === 0) {
-            return false
+    getOnInitOrder(annotation: AnnotationExpression): number {
+        const args = annotation.getArguments();
+        if (!args || args.length === 0) {
+            return 0;
         }
-        for (let index = 0; index < annotations.length; index++) {
-            const annotation = annotations[index];
-            if (annotation.name === "oninit") {
-                return true
-            }
-        }
-        return false
+
+        return args[0].valueOf() as number;
     }
 }
 

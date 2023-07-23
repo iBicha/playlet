@@ -1,4 +1,4 @@
-function AutoBindNodes() as void
+function AutoBindSceneGraph() as void
     if not m.global.hasField("AutoBindNodes")
         m.global.addField("AutoBindNodes", "nodearray", false)
     end if
@@ -7,59 +7,49 @@ function AutoBindNodes() as void
     m.global.AutoBindNodes = []
 
     for each node in nodes
-        BindNodeFields(node)
+        node@.BindNodeFieldsAndProps(invalid)
     end for
 
     for each node in nodes
-        if node.hasField("binding_fields_done")
-            node.binding_fields_done = true
-        end if
+        node.binding_fields_done = true
     end for
 end function
 
-function BindNodeFields(node as object) as void
-    if node.binding_fields_done = true
+function BindNodeFieldsAndProps(unused as dynamic) as void
+    node = m.top
+    bindings = node.bindings
+    if bindings = invalid
         return
     end if
 
-    types = node.getFieldTypes()
-    for each key in types
-        if types[key] <> "node" or key.Instr(":") = -1
-            continue for
-        end if
+    if bindings.fields <> invalid
+        for each fieldId in bindings.fields
+            reference = FindNodeFromPath(node, bindings.fields[fieldId])
+            if reference <> invalid
+                node[fieldId] = reference
+            end if
+        end for
+    end if
 
-        nodeInfo = FindNode(node, key)
-        if nodeInfo = invalid
-            throw "Could not find node for " + key
-        end if
+    if bindings.childProps <> invalid
+        for each nodeId in bindings.childProps
+            child = node.findNode(nodeId)
+            if child = invalid
+                continue for
+            end if
 
-        if nodeInfo.id = ""
-            throw "Referenced node " + key + " has no id"
-        end if
-
-        node.setField(key, nodeInfo.node)
-        if not node.hasField(nodeInfo.id)
-            node.addField(nodeInfo.id, "node", false)
-        end if
-        node.setField(nodeInfo.id, nodeInfo.node)
-    end for
+            childProps = bindings.childProps[nodeId]
+            for each childPropId in childProps
+                reference = FindNodeFromPath(node, childProps[childPropId])
+                if reference <> invalid
+                    child[childPropId] = reference
+                end if
+            end for
+        end for
+    end if
 end function
 
-function FindNode(root as object, key as string) as object
-    id = ""
-    splitPosition = key.Instr(":")
-    if splitPosition = -1
-        return invalid
-    end if
-
-    if splitPosition = 0
-        path = key.Mid(1)
-    else
-        parts = key.Tokenize(":")
-        id = parts[0]
-        path = parts[1]
-    end if
-
+function FindNodeFromPath(root as object, path as string) as object
     node = root
 
     if path.StartsWith("/")
@@ -67,37 +57,30 @@ function FindNode(root as object, key as string) as object
         path = path.Mid(1)
     end if
 
-    path = path.Tokenize("/")
+    pathParts = path.Tokenize("/")
 
-    for i = 0 to path.Count() - 1
+    for i = 0 to pathParts.Count() - 1
         if node = invalid
             return invalid
         end if
-        if path[i] = "."
+        if pathParts[i] = "."
             continue for
         end if
-        if path[i] = ".."
+        if pathParts[i] = ".."
             node = node.getParent()
             continue for
         end if
-        node = node.findNode(path[i])
+        node = node.findNode(pathParts[i])
     end for
 
     if root.isSameNode(node)
+        ' if a node is referencing itself, it's probably a mistake
         return invalid
     end if
 
-    if id = ""
-        id = node.id
-    end if
-
-    return {
-        node: node,
-        id: id
-    }
+    return node
 end function
 
-@oninit
 function RegisterAutoBind()
     if not m.global.hasField("AutoBindNodes")
         m.global.addField("AutoBindNodes", "nodearray", false)
