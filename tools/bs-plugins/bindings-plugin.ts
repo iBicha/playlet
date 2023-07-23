@@ -27,6 +27,7 @@ type ChildProps = {
 }
 
 type Bindings = {
+    isAutoBindComponent: boolean,
     fields: { [key: string]: string },
     childProps: ChildProps
 }
@@ -35,6 +36,7 @@ export class BindingsPlugin implements CompilerPlugin {
     public name = 'BindingsPlugin';
 
     private bindingsForScope: { [key: string]: Bindings } = {};
+    private processedXmlContent: { [key: string]: boolean } = {};
 
     afterScopeCreate(scope: Scope) {
         if (!isXmlScope(scope)) {
@@ -44,7 +46,7 @@ export class BindingsPlugin implements CompilerPlugin {
         const program = scope.program;
 
         const bindings = this.getBindingsForXmlFile(scope.xmlFile)
-        if (!bindings) {
+        if (!bindings.isAutoBindComponent || this.processedXmlContent[scope.xmlFile.fileContents]) {
             return;
         }
 
@@ -69,7 +71,10 @@ export class BindingsPlugin implements CompilerPlugin {
         this.deleteBindingsInChildProps(xmlFile);
 
         const newXmlContent = xmlFile.stringify();
-        program.setFile(scope.xmlFile.pkgPath, newXmlContent);
+        if (scope.xmlFile.fileContents !== newXmlContent) {
+            this.processedXmlContent[newXmlContent] = true;
+            program.setFile(scope.xmlFile.pkgPath, newXmlContent);
+        }
     }
 
     beforeFileTranspile(event: BeforeFileTranspileEvent) {
@@ -125,7 +130,15 @@ export class BindingsPlugin implements CompilerPlugin {
         return bindingScriptPath;
     }
 
-    getBindingsForXmlFile(xmlFile: XmlFile): Bindings | undefined {
+    getBindingsForXmlFile(xmlFile: XmlFile): Bindings {
+        const isAutoBindComponent = !!xmlFile.ast.component?.api?.fields?.find((field) => {
+            return field.id === 'binding_done';
+        }) && xmlFile.componentName.text !== 'AutoBind';
+
+        if (!isAutoBindComponent) {
+            return { isAutoBindComponent, fields: {}, childProps: {} };
+        }
+
         const fields = xmlFile.ast.component?.api?.fields?.filter((field) => {
             return field.attributes.find((attr) => attr.key.text === 'bind');
         });
@@ -133,17 +146,13 @@ export class BindingsPlugin implements CompilerPlugin {
         const childProps: ChildProps = {};
         this.getChildBindings(childProps, xmlFile.ast.component?.children);
 
-        if (!fields?.length && !Object.keys(childProps).length) {
-            return undefined;
-        }
-
         const bindingFields = fields?.reduce((acc, field) => {
             const bindAttr = field.attributes.find((attr) => attr.key.text === 'bind');
             acc[field.id] = bindAttr!.value.text;
             return acc;
         }, {} as { [key: string]: string }) || {};
 
-        return { fields: bindingFields, childProps: childProps };
+        return { isAutoBindComponent, fields: bindingFields, childProps: childProps };
     }
 
     getChildBindings(bindings: ChildProps, node: SGNode | undefined) {
