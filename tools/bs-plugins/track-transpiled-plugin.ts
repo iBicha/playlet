@@ -1,5 +1,5 @@
 // This plugin keeps track of transpiled files and keeps them in the src files, for testing purposes
-// This plugin only runs when the --test-mode=true flag
+// This plugin only runs when the --test-mode flag
 //
 // - Any folder ending in .transpiled will contain the transpiled files. .map files are ignored.
 //   - Example: src/components/tests.transpiled will contain transpiled files for src/components/tests
@@ -20,15 +20,9 @@ import fs from 'fs-extra'
 export class TrackTranspiledPlugin implements CompilerPlugin {
     public name = 'TrackTranspiledPlugin';
 
-    private enabled: boolean;
-
-    constructor() {
-        const testFlag = process.argv.find(arg => /--test-mode=(true|false)/i.test(arg));
-        this.enabled = !!(testFlag && (/--test-mode=(true|false)/i.exec(testFlag)![1].toLowerCase() === 'true'));
-    }
-
     afterPublish(builder: ProgramBuilder, files: FileObj[]) {
-        if (!this.enabled) {
+        // @ts-ignore 
+        if (!builder.options.testMode) {
             return;
         }
 
