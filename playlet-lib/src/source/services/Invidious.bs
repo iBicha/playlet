@@ -13,6 +13,7 @@ namespace Invidious
     const STATS_ENDPOINT = "/api/v1/stats"
 
     const VIDEOS_ENDPOINT = "/api/v1/videos"
+    const PLAYLISTS_ENDPOINT = "/api/v1/playlists"
     const HISTORY_ENDPOINT = "/api/v1/auth/history"
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
@@ -78,6 +79,18 @@ namespace Invidious
             data: response.json,
             failureReason: response.GetFailureReason
         }
+    end function
+
+    function GetPlaylist(playlistId as string) as object
+        instance = InvidiousSettings.GetCurrentInstance()
+        url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
+
+        args = Invidious.DefaultArgs()
+        response = Requests().get(url, args)
+        if not response.ok
+            return invalid
+        end if
+        return response.json
     end function
 
     function MarkVideoWatched(videoId as string) as boolean
