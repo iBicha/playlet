@@ -4,6 +4,7 @@ import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/General.bs"
 import "pkg:/source/utils/Crypto.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/services/Invidious.bs"
 
 class InvidiousService
     private endpoints
@@ -118,7 +119,14 @@ class InvidiousService
             playlists = response.json
             result = []
             for each playlist in playlists
-                result.push(m.ProcessPlaylist(requestData, playlist))
+                ' Saved playlists are not included in the response
+                ' https://github.com/iv-org/invidious/issues/3995
+                if playlist.videos.count() = 0 and playlist.authorId = invalid and not playlist.playlistId.StartsWith("IV")
+                    playlist = Invidious.GetPlaylist(playlist.playlistId)
+                end if
+                if playlist <> invalid
+                    result.push(m.ProcessPlaylist(requestData, playlist))
+                end if
             end for
             return result
         end if
