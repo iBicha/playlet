@@ -2,11 +2,11 @@
 function InitializeBindings()
     m.top.bindings = {
         fields: {
-            "reference1": "./AppController"
+    
         },
         childProps: {
             "AppController": {
-                "root": "./NavBar"
+                "root": "./ScreensRoot"
             }
         }
     }
