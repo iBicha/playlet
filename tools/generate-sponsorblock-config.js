@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ArgumentParser } = require('argparse')
+const json5 = require('json5');
 
 function getArgumentParser() {
     const parser = new ArgumentParser({
@@ -17,7 +18,7 @@ function getArgumentParser() {
 const parser = getArgumentParser();
 const args = parser.parse_args()
 
-const PLAYLEY_CONFIG_PATH = "./playlet-lib/src/config/sponsorblock_config.json"
+const PLAYLEY_CONFIG_PATH = "./playlet-lib/src/config/sponsorblock_config.json5"
 
 const sponsorblockRoot = args.sponsorblock_root;
 
@@ -137,4 +138,4 @@ playletConfig.categoryList.forEach(categoryId => {
     playletConfig.categories[categoryId] = category;
 });
 
-fs.writeFileSync(PLAYLEY_CONFIG_PATH, JSON.stringify(playletConfig, null, 4));
+fs.writeFileSync(PLAYLEY_CONFIG_PATH, json5.stringify(playletConfig, null, 2));
