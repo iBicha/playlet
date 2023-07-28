@@ -1,6 +1,8 @@
 import "pkg:/source/utils/WebUtils.bs"
 import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/services/Invidious.bs"
 import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/DashManifest.bs"
 
 namespace Http
 
@@ -8,6 +10,37 @@ namespace Http
 
         function new()
             super()
+
+            m.Get("/dash/generate", function(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                v = request.query.v
+                local = request.query.local
+
+                metadataRequest = Invidious.GetVideoMetadata(v)
+                if not metadataRequest.success
+                    response.Default(metadataRequest.statusCode, metadataRequest.failureReason)
+                    return true
+                end if
+
+                metadata = metadataRequest.data
+                formats = ParseJson(ReadAsciiFile("libpkg:/config/video_formats.json"))
+                instance = InvidiousSettings.GetCurrentInstance()
+
+                dash = new DashManifest(formats)
+                dash.setInvidiousInstance(instance)
+                dash.createFromVideoMetadata(metadata, local <> invalid)
+
+                xmlContent = dash.stringify()
+
+                response.http_code = 200
+                response.SetBodyDataString(xmlContent)
+                response.ContentType("application/dash+xml")
+                response.source = Http.HttpResponseSource.GENERATED
+
+                return true
+            end function)
 
             m.Get("/dash", function(context as object) as boolean
                 request = context.request
