@@ -44,7 +44,7 @@ export class ManifestEditPlugin implements CompilerPlugin {
         const testMode = !!builder.options.testMode;
         if (testMode) {
             builder.logger.log(`Commenting out "sg_component_libs_provided"`)
-            manifestContent = manifestContent.replace(/^sg_component_libs_provided=/i, `# sg_component_libs_provided=`);
+            manifestContent = manifestContent.replace(/sg_component_libs_provided=/i, `# sg_component_libs_provided=`);
         }
 
         this.originalManifestContent = originalManifestContent;
