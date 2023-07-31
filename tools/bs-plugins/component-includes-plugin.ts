@@ -1,99 +1,145 @@
 // Plugin to allow including other components in a component
 
 import {
+    BscFile,
     CompilerPlugin,
+    DiagnosticSeverity,
     Program,
-    Scope,
     XmlFile,
-    XmlScope,
-    isXmlScope,
+    isXmlFile,
     util,
 } from 'brighterscript';
-import { SGComponent, SGField, SGFunction, SGNode, SGScript } from 'brighterscript/dist/parser/SGTypes';
-import { PluginXmlFile } from './Classes/PluginXmlFile';
-import { type } from 'os';
-
-type PendingFile = {
-    missing: Set<string>;
-    fileContent: string;
-}
+import { SGChildren, SGComponent, SGInterface, SGScript } from 'brighterscript/dist/parser/SGTypes';
+import { globSync } from 'glob';
+import fs from 'fs-extra'
+import path from 'path';
 
 export class ComponentIncludesPlugin implements CompilerPlugin {
     public name = 'ComponentIncludesPlugin';
 
-    private pendingFiles: { [key: string]: PendingFile } = {};
-
-    private debugProcessedFiles: Set<string> = new Set();
-
-    afterScopeCreate(scope: Scope) {
-        if (!isXmlScope(scope)) {
+    afterFileParse(file: BscFile) {
+        if (!isXmlFile(file)) {
             return;
         }
-
-        this.processFile(scope.xmlFile);
-    }
-
-    processFile(file: XmlFile) {
         const program = file.program;
-        program.logger.info(this.name, 'Processing file: ' + file.pkgPath);
 
         const component = file.parser.ast.component;
+        if (!component) {
+            return;
+        }
         const includes = this.getIncludes(component);
-
         if (includes.length === 0) {
-            if (this.debugProcessedFiles.has(file.pkgPath)) {
-                this.debugProcessedFiles.delete(file.pkgPath);
-                program.logger.info(this.name, 'Processed file: ' + file.pkgPath);
+            return;
+        }
+
+        includes.forEach((include) => {
+            const rootDir = program.options.rootDir!;
+
+            const includePaths = globSync(`**/${include.name}.part.xml`, { cwd: rootDir });
+            if (includePaths.length === 0) {
+                file.addDiagnostics([{
+                    file: file,
+                    range: include.range!,
+                    message: `Could not find include: ${include}`,
+                    severity: DiagnosticSeverity.Error,
+                    code: 'INCLUDE_NOT_FOUND',
+                }]);
+                return;
             }
-            this.processMissingFiles(file);
-            return;
-        }
+            if (includePaths.length > 1) {
+                file.addDiagnostics([{
+                    file: file,
+                    range: include.range!,
+                    message: `Found multiple include files for include: ${include}`,
+                    severity: DiagnosticSeverity.Error,
+                    code: 'MULTIPLE_INCLUDES_FOUND',
+                }]);
+                return;
+            }
 
-        const { scopes, missing } = this.getIncludedScopes(file.program, includes);
+            const includePath = includePaths[0];
+            const srcPath = path.join(rootDir, includePath);
+            const xmlFile = new XmlFile(srcPath, includePath, program);
+            const includeFileContents = fs.readFileSync(srcPath, 'utf8');
+            xmlFile.parse(includeFileContents);
 
-        if (missing.length > 0) {
-            program.logger.info(this.name, 'PendingFiles file: ' + file.pkgPath, 'Missing: ' + missing.join(', '));
+            const includeComponent = xmlFile.ast.component;
+            if (!includeComponent) {
+                return;
+            }
 
-            this.pendingFiles[file.pkgPath] = {
-                missing: new Set(missing),
-                fileContent: file.fileContents,
-            };
-            // We remove the file entirely to prevent it from being validated.
-            // We will add it back once all the missing includes are ready.
-            program.removeFile(file.pkgPath);
-            return;
-        }
+            this.addScripts(component, includeComponent, includePath, program);
+            this.addFields(component, includeComponent);
+            this.addFunctions(component, includeComponent);
+            this.addChildren(component, includeComponent);
+        });
 
-        const newFileContent = this.generateXmlFile(file, scopes);
-        if (!newFileContent) {
-            return;
-        }
-        if (this.pendingFiles[file.pkgPath]) {
-            delete this.pendingFiles[file.pkgPath];
-        }
-        this.debugProcessedFiles.add(file.pkgPath);
-        program.setFile(file.pkgPath, newFileContent);
+        component.attributes = component.attributes.filter((attr) => {
+            return attr.key.text !== 'includes';
+        });
+
+        file.parser.invalidateReferences();
     }
 
-    processMissingFiles(currentFile: XmlFile) {
-        const componentName = currentFile.componentName.text;
-        if (!componentName) {
-            return;
-        }
+    addScripts(component: SGComponent, includeComponent: SGComponent, includePath: string, program: Program) {
+        component.scripts.push(...includeComponent.scripts);
+        if (program.options.autoImportComponentScript) {
+            const possibleCodeBehindPkgPaths = [
+                includePath.replace('.xml', '.bs'),
+                includePath.replace('.xml', '.brs')
+            ];
+            possibleCodeBehindPkgPaths.forEach((scriptPkgPath) => {
+                const scriptFilePath = path.join(program.options.rootDir!, scriptPkgPath);
+                if (fs.existsSync(scriptFilePath)) {
+                    const scriptTag = new SGScript();
+                    scriptTag.type = "text/brightscript"
+                    scriptTag.uri = util.getRokuPkgPath(scriptPkgPath);
 
-        for (const filePath in this.pendingFiles) {
-            if (this.pendingFiles[filePath].missing.has(componentName)) {
-                this.pendingFiles[filePath].missing.delete(componentName);
-            }
-
-            if (this.pendingFiles[filePath].missing.size === 0) {
-                const pendingFile = this.pendingFiles[filePath];
-                delete this.pendingFiles[filePath];
-
-                currentFile.program.setFile(filePath, pendingFile.fileContent);
-            }
+                    component.scripts.push(scriptTag);
+                }
+            });
         }
     }
+
+    addFields(component: SGComponent, includeComponent: SGComponent) {
+        if (!includeComponent.api) {
+            return;
+        }
+        if (!includeComponent.api.fields || includeComponent.api.fields.length === 0) {
+            return;
+        }
+        if (!component.api) {
+            component.api = new SGInterface({ text: 'interface' }, [])
+        }
+        component.api.fields.push(...includeComponent.api.fields);
+    }
+
+    addFunctions(component: SGComponent, includeComponent: SGComponent) {
+        if (!includeComponent.api) {
+            return;
+        }
+        if (!includeComponent.api.functions || includeComponent.api.functions.length === 0) {
+            return;
+        }
+        if (!component.api) {
+            component.api = new SGInterface({ text: 'interface' }, [])
+        }
+        component.api.functions.push(...includeComponent.api.functions);
+    }
+
+    addChildren(component: SGComponent, includeComponent: SGComponent) {
+        if (!includeComponent.children) {
+            return;
+        }
+        if (!includeComponent.children.children || includeComponent.children.children.length === 0) {
+            return;
+        }
+        if (!component.children) {
+            component.children = new SGChildren({ text: 'children' }, [])
+        }
+        component.children.children.push(...includeComponent.children.children);
+    }
+
 
     getIncludes(component?: SGComponent) {
         if (!component || !component.attributes) {
@@ -104,90 +150,12 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
             return attr.key.text === 'includes';
         }).map((attr) => {
             return attr.value.text.split(',').map((item) => {
-                return item.trim();
+                return {
+                    name: item.trim(),
+                    range: attr.value.range,
+                }
             });
         }).flat();
-    }
-
-    getIncludedScopes(program: Program, includes: string[]) {
-        const neededScopes: XmlScope[] = [];
-        const missing: string[] = [];
-
-        for (let i = 0; i < includes.length; i++) {
-            const include = includes[i];
-            const scope = program.getComponentScope(include);
-
-            if (!scope) {
-                missing.push(include);
-            } else {
-                neededScopes.push(scope);
-            }
-        }
-
-        return {
-            missing,
-            scopes: neededScopes,
-        };
-    }
-
-    generateXmlFile(file: XmlFile, scopes: XmlScope[]): string | undefined {
-        let mainXml = new PluginXmlFile(file);
-        mainXml.parse();
-        if (!mainXml.parsed || !mainXml.parsed.component) {
-            return undefined;
-        }
-
-        for (let i = 0; i < scopes.length; i++) {
-            const scope = scopes[i];
-
-            const { scripts, fields, functions, children } = this.getIncludeItems(scope.xmlFile);
-
-            mainXml.addScripts(scripts);
-            mainXml.addFields(fields);
-            mainXml.addFunctions(functions);
-            if (children.length > 0) {
-                mainXml.addChildren(scope.xmlFile);
-            }
-        }
-
-        delete mainXml!.parsed.component.$.includes
-
-        return mainXml.stringify();
-    }
-
-    getIncludeItems(xmlFile: XmlFile) {
-        let fields: SGField[] = [];
-        let functions: SGFunction[] = [];
-        let children: SGNode[] = [];
-        let scripts: SGScript[] = [];
-
-        const component = xmlFile.parser.ast.component;
-        if (!component) {
-            return { fields, functions, children, scripts };
-        }
-
-        const scriptImports = xmlFile.getAvailableScriptImports();
-        scripts = scriptImports.map((scriptImport) => {
-            const script = new SGScript();
-            script.uri = util.getRokuPkgPath(scriptImport);
-            return script;
-        });
-
-        if (component.api) {
-            fields = component.api.fields;
-            functions = component.api.functions;
-        }
-
-        if (component.children) {
-            children = component.children.children;
-        }
-
-        return {
-            scripts,
-            fields,
-            functions,
-            children,
-        }
     }
 }
 

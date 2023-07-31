@@ -1,14 +1,14 @@
 import {
     BeforeFileTranspileEvent,
+    BscFile,
     CompilerPlugin,
-    Scope,
     XmlFile,
     isBrsFile,
+    isXmlFile,
     isXmlScope,
     util
 } from "brighterscript";
 import path from "path";
-import { PluginXmlFile } from "./Classes/PluginXmlFile";
 import { SGNode, SGScript } from "brighterscript/dist/parser/SGTypes";
 import { RawCodeStatement } from "./Classes/RawCodeStatement";
 
@@ -35,29 +35,22 @@ type Bindings = {
 export class BindingsPlugin implements CompilerPlugin {
     public name = 'BindingsPlugin';
 
-    private bindingsForScope: { [key: string]: Bindings } = {};
-    private processedXmlContent: { [key: string]: boolean } = {};
+    private bindingsForFile: { [key: string]: Bindings } = {};
 
-    afterScopeCreate(scope: Scope) {
-        if (!isXmlScope(scope)) {
+    afterFileParse(file: BscFile) {
+        if (!isXmlFile(file)) {
             return;
         }
 
-        const program = scope.program;
-
-        const bindings = this.getBindingsForXmlFile(scope.xmlFile)
-        if (!bindings.isAutoBindComponent || this.processedXmlContent[scope.xmlFile.fileContents]) {
+        const program = file.program;
+        const bindings = this.getBindingsForXmlFile(file)
+        if (!bindings.isAutoBindComponent) {
             return;
         }
 
-        program.logger.info('BindingsPlugin', `Found bindings in ${scope.xmlFile.pkgPath}`);
+        this.bindingsForFile[file.pkgPath] = bindings;
 
-        this.bindingsForScope[scope.name] = bindings;
-
-        const xmlFile = new PluginXmlFile(scope.xmlFile);
-        xmlFile.parse();
-
-        const bindingsFilePath = this.getBindingScriptPathForXmlFile(scope.xmlFile.pkgPath);
+        const bindingsFilePath = this.getBindingScriptPathForXmlFile(file.pkgPath);
         if (!program.hasFile(bindingsFilePath)) {
             program.setFile(bindingsFilePath, bindings_script_template);
         }
@@ -65,16 +58,15 @@ export class BindingsPlugin implements CompilerPlugin {
         const scriptTag = new SGScript();
         scriptTag.type = "text/brightscript"
         scriptTag.uri = util.getRokuPkgPath(bindingsFilePath);
-        xmlFile.addScripts([scriptTag]);
-
-        this.deleteBindingsInFields(xmlFile);
-        this.deleteBindingsInChildProps(xmlFile);
-
-        const newXmlContent = xmlFile.stringify();
-        if (scope.xmlFile.fileContents !== newXmlContent) {
-            this.processedXmlContent[newXmlContent] = true;
-            program.setFile(scope.xmlFile.pkgPath, newXmlContent);
+        if (!file.ast.component!.scripts) {
+            file.ast.component!.scripts = [];
         }
+        file.ast.component!.scripts.push(scriptTag);
+
+        this.deleteBindingsInFields(file);
+        this.deleteBindingsInChildPropsNode(file.ast.component!.children);
+
+        file.parser.invalidateReferences();
     }
 
     beforeFileTranspile(event: BeforeFileTranspileEvent) {
@@ -88,7 +80,7 @@ export class BindingsPlugin implements CompilerPlugin {
             return;
         }
 
-        const bindings = this.bindingsForScope[scope.name];
+        const bindings = this.bindingsForFile[scope.xmlFile.pkgPath];
         if (!bindings) {
             return;
         }
@@ -179,42 +171,29 @@ export class BindingsPlugin implements CompilerPlugin {
         }
     }
 
-    deleteBindingsInFields(xmlFile: PluginXmlFile) {
-        if (!xmlFile.parsed!.component.interface.length || !xmlFile.parsed!.component.interface[0].field) {
-            return;
-        }
-
-        xmlFile.parsed!.component.interface[0].field =
-            (xmlFile.parsed!.component.interface[0].field as any[]).map((field) => {
-                delete field.$.bind;
-                return field;
-            });
-    }
-
-    deleteBindingsInChildProps(xmlFile: PluginXmlFile) {
-        this.deleteBindingsInChildPropsNode(xmlFile.parsed!.component.children);
-    }
-
-    deleteBindingsInChildPropsNode(node: any) {
-        if (!(Array.isArray(node))) {
-            return;
-        }
-        node.forEach((child: any) => {
-            Object.keys(child).forEach((key) => {
-                if (key === '$') {
-                    Object.keys(child.$).forEach((key) => {
-                        if (child.$[key].startsWith('bind:')) {
-                            delete child.$[key];
-                        }
-                    });
-                } else {
-                    this.deleteBindingsInChildPropsNode(child[key]);
-                }
+    deleteBindingsInFields(xmlFile: XmlFile) {
+        xmlFile.ast.component!.api!.fields.forEach((field) => {
+            field.attributes = field.attributes.filter((attr) => {
+                return attr.key.text !== 'bind';
             });
         });
     }
-}
 
+    deleteBindingsInChildPropsNode(node: SGNode) {
+        if (!node) {
+            return;
+        }
+        node.attributes = node.attributes.filter((attr) => {
+            return !attr.value.text.startsWith('bind:');
+        });
+        if (node.children) {
+            for (let i = 0; i < node.children.length; i++) {
+                const child = node.children[i];
+                this.deleteBindingsInChildPropsNode(child);
+            }
+        }
+    }
+}
 
 export default () => {
     return new BindingsPlugin();
