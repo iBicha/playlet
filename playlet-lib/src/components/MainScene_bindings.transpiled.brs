@@ -6,7 +6,10 @@ function InitializeBindings()
         },
         childProps: {
             "AppController": {
-                "root": "./ScreensRoot"
+                "root": "./AppRoot"
+            }, 
+            "AppRoot": {
+                "appController": ".."
             }
         }
     }

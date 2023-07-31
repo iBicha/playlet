@@ -192,14 +192,13 @@ export class BindingsPlugin implements CompilerPlugin {
     }
 
     deleteBindingsInChildProps(xmlFile: PluginXmlFile) {
-        if (!xmlFile.parsed!.component.children || !xmlFile.parsed!.component.children.length) {
-            return;
-        }
-
         this.deleteBindingsInChildPropsNode(xmlFile.parsed!.component.children);
     }
 
     deleteBindingsInChildPropsNode(node: any) {
+        if (!(Array.isArray(node))) {
+            return;
+        }
         node.forEach((child: any) => {
             Object.keys(child).forEach((key) => {
                 if (key === '$') {
