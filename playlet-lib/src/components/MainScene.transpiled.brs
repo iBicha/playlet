@@ -1,14 +1,23 @@
 'import "pkg:/components/AutoBind/AutoBind.bs"
+'import "pkg:/source/utils/LoadingScreen.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
-    LaunchArgumentsReceived()
-    scene = m.top.getScene()
-    scene.ObserveField("inputArgs", "InputArgumentsReceived")
+    ' At this point, the "MainScene" node is not yet added to the scene, and does not have a parent yet.
+    ' Let's wait until it has one.
+    m.scene = m.top.getScene()
+    m.MainSceneContainer = m.scene.findNode("MainSceneContainer")
+    m.MainSceneContainer.ObserveField("change", "MainSceneContainerChanged")
+end function
+
+function MainSceneContainerChanged()
     AutoBindSceneGraph()
-    appController = m.top.findNode("AppController")
-    ? "Root from main: ", appController.root
-    ? "AppController from main: ", m.reference1.root
+    LaunchArgumentsReceived()
+    m.scene.ObserveField("inputArgs", "InputArgumentsReceived")
+    if m.scene.inputArgs <> invalid
+        InputArgumentsReceived()
+    end if
+    HideLoadingScreen()
 end function
 
 function LaunchArgumentsReceived() as void
