@@ -11,11 +11,17 @@ import {
 } from 'brighterscript';
 import { SGComponent, SGField, SGFunction, SGNode, SGScript } from 'brighterscript/dist/parser/SGTypes';
 import { PluginXmlFile } from './Classes/PluginXmlFile';
+import { type } from 'os';
+
+type PendingFile = {
+    missing: Set<string>;
+    fileContent: string;
+}
 
 export class ComponentIncludesPlugin implements CompilerPlugin {
     public name = 'ComponentIncludesPlugin';
 
-    private pendingFiles: { [key: string]: Set<string> } = {};
+    private pendingFiles: { [key: string]: PendingFile } = {};
 
     private debugProcessedFiles: Set<string> = new Set();
 
@@ -48,7 +54,13 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         if (missing.length > 0) {
             program.logger.info(this.name, 'PendingFiles file: ' + file.pkgPath, 'Missing: ' + missing.join(', '));
 
-            this.pendingFiles[file.pkgPath] = new Set(missing);
+            this.pendingFiles[file.pkgPath] = {
+                missing: new Set(missing),
+                fileContent: file.fileContents,
+            };
+            // We remove the file entirely to prevent it from being validated.
+            // We will add it back once all the missing includes are ready.
+            program.removeFile(file.pkgPath);
             return;
         }
 
@@ -70,17 +82,15 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         }
 
         for (const filePath in this.pendingFiles) {
-            if (this.pendingFiles[filePath].has(componentName)) {
-                this.pendingFiles[filePath].delete(componentName);
+            if (this.pendingFiles[filePath].missing.has(componentName)) {
+                this.pendingFiles[filePath].missing.delete(componentName);
             }
 
-            if (this.pendingFiles[filePath].size === 0) {
+            if (this.pendingFiles[filePath].missing.size === 0) {
+                const pendingFile = this.pendingFiles[filePath];
                 delete this.pendingFiles[filePath];
 
-                const pendingFile = currentFile.program.getFile(filePath) as XmlFile;
-                if (pendingFile) {
-                    this.processFile(pendingFile);
-                }
+                currentFile.program.setFile(filePath, pendingFile.fileContent);
             }
         }
     }
