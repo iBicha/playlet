@@ -17,7 +17,7 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
 
     private pendingFiles: { [key: string]: Set<string> } = {};
 
-    private processedFiles: Set<string> = new Set();
+    private debugProcessedFiles: Set<string> = new Set();
 
     afterScopeCreate(scope: Scope) {
         if (!isXmlScope(scope)) {
@@ -35,8 +35,8 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         const includes = this.getIncludes(component);
 
         if (includes.length === 0) {
-            if (this.processedFiles.has(file.pkgPath)) {
-                this.processedFiles.delete(file.pkgPath);
+            if (this.debugProcessedFiles.has(file.pkgPath)) {
+                this.debugProcessedFiles.delete(file.pkgPath);
                 program.logger.info(this.name, 'Processed file: ' + file.pkgPath);
             }
             this.processMissingFiles(file);
@@ -59,10 +59,8 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         if (this.pendingFiles[file.pkgPath]) {
             delete this.pendingFiles[file.pkgPath];
         }
-        this.processedFiles.add(file.pkgPath);
+        this.debugProcessedFiles.add(file.pkgPath);
         program.setFile(file.pkgPath, newFileContent);
-
-        this.processMissingFiles(file);
     }
 
     processMissingFiles(currentFile: XmlFile) {
