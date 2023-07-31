@@ -19,6 +19,11 @@ const args = parser.parse_args()
 const filename = args.filename;
 
 const config = getEnvVars();
+['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD'].forEach((key) => {
+    if (!config[key]) {
+        throw new Error(`Missing environment variable ${key}`);
+    }
+});
 
 const options = {
     host: config.ROKU_DEV_TARGET,

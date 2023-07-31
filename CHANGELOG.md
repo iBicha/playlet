@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Slightly more information in the error dialog when videos fail to play
+
+## [0.10.3] - 2023-07-24
+
+### Added
+
+- Support for saved playlists. By adding a playlist from a youtube channel to your Invidious profile, you can see the playlist on Playlet.
+
+## [0.10.2] - 2023-07-10
+
+### Added
+
 - Links to the app info in web app
 - Loading indicator for search page in web app
 - Feedback link through email

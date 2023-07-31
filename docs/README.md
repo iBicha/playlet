@@ -48,7 +48,7 @@ Using your Roku remote, enter the following sequence:
 <!-- markdownlint-disable-next-line -->
 <img src="https://image.roku.com/ZHZscHItMTc2/dev-startup1.png" alt="DevSequence" width="350"/>
 
-For full instructions, see [Set up your Roku device to enable Developer Settings](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md#step-1-set-up-your-roku-device-to-enable-developer-settings)
+For full instructions, see [Activating developer mode](https://developer.roku.com/en-ca/docs/developer-program/getting-started/developer-setup.md) (if the link does not work, try refreshing or opening in private navigation)
 
 Make sure to remember the password you set during this step, you will need it later.
 
