@@ -6,6 +6,7 @@ const { BooleanOptionalAction } = require('argparse');
 const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 const path = require('path');
+const { writeFileSync } = require('fs');
 const spawn = require('child_process').spawn;
 
 function getArgumentParser() {
@@ -14,7 +15,7 @@ function getArgumentParser() {
     });
 
     parser.add_argument('--package', { help: 'Path to zip file', required: true });
-    parser.add_argument('--timeout', { help: 'Timeout in seconds', type: 'int', default: 900 });
+    parser.add_argument('--timeout', { help: 'Timeout in seconds', type: 'int', default: 120 });
     parser.add_argument('--report-only', { help: 'Only log the test report', action: BooleanOptionalAction, default: true });
 
     return parser;
@@ -32,6 +33,7 @@ function getArgumentParser() {
         packagePath = args.package
         timeout = args.timeout
         reportOnly = args.report_only
+        outputFile = replaceFileExtension(packagePath, 'txt')
 
         const packageFile = path.basename(packagePath)
         const packageFolder = path.dirname(packagePath)
@@ -58,13 +60,13 @@ function getArgumentParser() {
         await rokuDeploy.publish(options);
 
         console.log('Waiting for test to finish');
-        let data = await readFromProcessUntil(telnet);
+        let data = await readFromProcessUntil(telnet, timeout);
 
         if (reportOnly) {
             data = parseTestReport(data);
         }
 
-        console.log(data);
+        writeFileSync(outputFile, data);
 
         success = data.includes('RESULT: Success');
     }
@@ -89,6 +91,7 @@ function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
         }
 
         telnet.stdout.on('data', (data) => {
+            console.log(data.toString());
             clearTimeout(timeoutID);
             timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
         });
@@ -102,7 +105,7 @@ function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
     });
 }
 
-function readFromProcessUntil(process, endToken = 'AppExitComplete', timeoutSeconds = 10) {
+function readFromProcessUntil(process, timeoutSeconds = 20, endToken = 'AppExitComplete') {
     return new Promise((resolve, reject) => {
         let data = '';
 
@@ -114,6 +117,7 @@ function readFromProcessUntil(process, endToken = 'AppExitComplete', timeoutSeco
         }
 
         process.stdout.on('data', (chunk) => {
+            console.log(data.toString());
             clearTimeout(timeoutID);
             data += chunk;
             if (data.includes(endToken)) {
@@ -143,4 +147,14 @@ function parseTestReport(input, startString = '[START TEST REPORT]', endString =
     } else {
         return input;
     }
+}
+
+function replaceFileExtension(filePath, ext) {
+    const directoryPath = path.dirname(filePath);
+    const extension = path.extname(filePath);
+
+    const baseFileName = path.basename(filePath, extension);
+    const newFilePath = path.join(directoryPath, `${baseFileName}.${ext}`);
+
+    return newFilePath;
 }

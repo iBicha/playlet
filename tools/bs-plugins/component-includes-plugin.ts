@@ -10,12 +10,14 @@ import {
     util,
 } from 'brighterscript';
 import { SGComponent, SGField, SGFunction, SGNode, SGScript } from 'brighterscript/dist/parser/SGTypes';
-import { parseString, Builder } from 'xml2js'
+import { PluginXmlFile } from './Classes/PluginXmlFile';
 
 export class ComponentIncludesPlugin implements CompilerPlugin {
     public name = 'ComponentIncludesPlugin';
 
     private pendingFiles: { [key: string]: Set<string> } = {};
+
+    private processedFiles: Set<string> = new Set();
 
     afterScopeCreate(scope: Scope) {
         if (!isXmlScope(scope)) {
@@ -26,12 +28,17 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
     }
 
     processFile(file: XmlFile) {
-        file.program.logger.info(this.name, 'Processing file: ' + file.pkgPath);
+        const program = file.program;
+        program.logger.info(this.name, 'Processing file: ' + file.pkgPath);
 
         const component = file.parser.ast.component;
         const includes = this.getIncludes(component);
 
         if (includes.length === 0) {
+            if (this.processedFiles.has(file.pkgPath)) {
+                this.processedFiles.delete(file.pkgPath);
+                program.logger.info(this.name, 'Processed file: ' + file.pkgPath);
+            }
             this.processMissingFiles(file);
             return;
         }
@@ -39,20 +46,21 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         const { scopes, missing } = this.getIncludedScopes(file.program, includes);
 
         if (missing.length > 0) {
-            file.program.logger.info(this.name, 'PendingFiles file: ' + file.pkgPath, 'Missing: ' + missing.join(', '));
+            program.logger.info(this.name, 'PendingFiles file: ' + file.pkgPath, 'Missing: ' + missing.join(', '));
 
             this.pendingFiles[file.pkgPath] = new Set(missing);
             return;
         }
 
-        const newFile = this.generateXmlFile(file, scopes);
-        if (!newFile) {
+        const newFileContent = this.generateXmlFile(file, scopes);
+        if (!newFileContent) {
             return;
         }
         if (this.pendingFiles[file.pkgPath]) {
             delete this.pendingFiles[file.pkgPath];
         }
-        file.program.setFile(file.pkgPath, newFile);
+        this.processedFiles.add(file.pkgPath);
+        program.setFile(file.pkgPath, newFileContent);
 
         this.processMissingFiles(file);
     }
@@ -114,10 +122,11 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         };
     }
 
-    generateXmlFile(file: XmlFile, scopes: XmlScope[]): any {
-        let mainXml = this.parseXmlFile(file);
-        if (!mainXml || !mainXml.component) {
-            return null;
+    generateXmlFile(file: XmlFile, scopes: XmlScope[]): string | undefined {
+        let mainXml = new PluginXmlFile(file);
+        mainXml.parse();
+        if (!mainXml.parsed || !mainXml.parsed.component) {
+            return undefined;
         }
 
         for (let i = 0; i < scopes.length; i++) {
@@ -125,129 +134,17 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
 
             const { scripts, fields, functions, children } = this.getIncludeItems(scope.xmlFile);
 
-            this.addScripts(mainXml, scripts);
-            this.addFields(mainXml, fields);
-            this.addFunctions(mainXml, functions);
-            this.addChildren(mainXml, children, scope.xmlFile);
-        }
-
-        delete mainXml!.component.$.includes
-
-        const builder = new Builder();
-        return builder.buildObject(mainXml);
-    }
-
-    addScripts(mainXml: any, scripts: SGScript[]) {
-        if (scripts.length === 0) {
-            return;
-        }
-
-        if (!mainXml.component.script) {
-            mainXml.component.script = [];
-        }
-
-        for (let i = 0; i < scripts.length; i++) {
-            const script = scripts[i];
-            const attributes = script.attributes.reduce((acc, attr) => {
-                acc[attr.key.text] = attr.value.text;
-                return acc;
-            }, {} as any);
-            mainXml.component.script.push({
-                $: attributes,
-            });
-        }
-    }
-
-    addFields(mainXml: any, fields: SGField[]) {
-        if (fields.length === 0) {
-            return;
-        }
-
-        if (!mainXml.component.interface || mainXml.component.interface.length === 0) {
-            mainXml.component.interface = [{}];
-        }
-
-        if (!mainXml.component.interface[0].field) {
-            mainXml.component.interface[0].field = [];
-        }
-
-        for (let i = 0; i < fields.length; i++) {
-            const field = fields[i];
-            const attributes = field.attributes.reduce((acc, attr) => {
-                acc[attr.key.text] = attr.value.text;
-                return acc;
-            }, {} as any);
-            mainXml.component.interface[0].field.push({
-                $: attributes,
-            });
-        }
-    }
-
-    addFunctions(mainXml: any, functions: SGFunction[]) {
-        if (functions.length === 0) {
-            return;
-        }
-
-        if (!mainXml.component.interface || mainXml.component.interface.length === 0) {
-            mainXml.component.interface = [{}];
-        }
-
-        if (!mainXml.component.interface[0].function) {
-            mainXml.component.interface[0].function = [];
-        }
-
-        for (let i = 0; i < functions.length; i++) {
-            const func = functions[i];
-            const attributes = func.attributes.reduce((acc, attr) => {
-                acc[attr.key.text] = attr.value.text;
-                return acc;
-            }, {} as any);
-            mainXml.component.interface[0].function.push({
-                $: attributes,
-            });
-        }
-    }
-
-    addChildren(mainXml: any, children: SGNode[], includeFile: XmlFile) {
-        if (children.length === 0) {
-            return;
-        }
-
-        if (!mainXml.component.children || mainXml.component.children.length === 0) {
-            mainXml.component.children = [{}];
-        }
-
-        const includeXml = this.parseXmlFile(includeFile);
-
-        if (!includeXml || !includeXml.component || !includeXml.component.children || !includeXml.component.children.length) {
-            return;
-        }
-
-        const mergedChildren: { [key: string]: any } = {};
-        for (let key in mainXml.component.children[0]) {
-            if (Array.isArray(mainXml.component.children[0][key]) && Array.isArray(includeXml.component.children[0][key])) {
-                mergedChildren[key] = includeXml.component.children[0][key].concat(mainXml.component.children[0][key]);
-            } else {
-                mergedChildren[key] = mainXml.component.children[0][key];
-            }
-        }
-        for (let key in includeXml.component.children[0]) {
-            if (!mergedChildren.hasOwnProperty(key)) {
-                mergedChildren[key] = includeXml.component.children[0][key];
+            mainXml.addScripts(scripts);
+            mainXml.addFields(fields);
+            mainXml.addFunctions(functions);
+            if (children.length > 0) {
+                mainXml.addChildren(scope.xmlFile);
             }
         }
 
-        mainXml.component.children[0] = mergedChildren;
-    }
+        delete mainXml!.parsed.component.$.includes
 
-    parseXmlFile(file: XmlFile): any {
-        let parsed;
-
-        parseString(file.fileContents, (err, res) => {
-            parsed = res;
-        });
-
-        return parsed;
+        return mainXml.stringify();
     }
 
     getIncludeItems(xmlFile: XmlFile) {
