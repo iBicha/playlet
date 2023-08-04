@@ -1,0 +1,35 @@
+namespace Tests
+
+    @suite
+    class ApplicationInfoTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.ipAddressRegex = CreateObject("roRegex", "\d+\.\d+\.\d+.\d+", "")
+        end function
+
+        protected override function beforeEach()
+            m.appInfo = new ApplicationInfo()
+        end function
+
+        @describe("ApplicationInfo")
+
+        @it("Returns a valid local ip address")
+        function _()
+            ip = m.appInfo.GetLocalIpAddress()
+            m.assertTrue(m.ipAddressRegex.IsMatch(ip))
+        end function
+
+        @it("Returns an invalid if no ip address is available")
+        function _()
+            m.appInfo.roDeviceInfo = {
+                GetIPAddrs: function() as dynamic
+                    return []
+                end function
+            }
+
+            m.assertInvalid(m.appInfo.GetLocalIpAddress())
+        end function
+
+    end class
+
+end namespace

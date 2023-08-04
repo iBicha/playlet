@@ -1,0 +1,135 @@
+import "pkg:/source/utils/ColorUtils.bs"
+
+function Init()
+end function
+
+function OnNodeReady()
+    m.screens = {}
+    m.navBarItems = GetNavBarItems()
+    PopulateButtons()
+    m.top.observeField("focusedChild", "OnFocusChange")
+    m.top.observeField("change", "OnChildrenChange")
+end function
+
+function OnFocusChange()
+    m.top.focusIndex = m.top.focusIndex
+end function
+
+function OnChildrenChange() as void
+    m.navBarItems = GetNavBarItems()
+    PopulateButtons()
+end function
+
+function GetNavBarItems() as object
+    navBarItems = []
+    children = m.top.getChildren(-1, 0)
+    for each child in children
+        if child.subtype() = "NavBarItem"
+            navBarItems.push(child)
+        end if
+    end for
+    return navBarItems
+end function
+
+function PopulateButtons()
+    buttonCount = m.buttonGroup.getChildCount()
+    if buttonCount > 0
+        m.buttonGroup.removeChildrenIndex(m.buttonGroup.getChildCount(), 0)
+    end if
+
+    buttons = []
+    for each item in m.navBarItems
+        button = CreateObject("roSGNode", "IconButton")
+        button.background = ColorUtils.HexToInt("242424")
+        button.focusBackground = ColorUtils.HexToInt("ff1c30")
+        button.padding = 20
+        button.height = 50
+        button.width = 90
+
+        button.icon = item.icon
+        button.text = item.text
+
+        buttons.push(button)
+    end for
+    m.buttonGroup.appendChildren(buttons)
+
+    m.top.focusIndex = m.top.focusIndex
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+    if key = "down"
+        i = m.top.focusIndex
+        target = i + 1
+        if target >= m.buttonGroup.getChildCount()
+            return false
+        end if
+        m.top.focusIndex = target
+        return true
+    else if key = "up"
+        i = m.top.focusIndex
+        target = i - 1
+        if target < 0
+            return false
+        end if
+        m.top.focusIndex = target
+        return true
+    end if
+
+    return false
+end function
+
+function OnFocusIndexChange() as void
+    buttonCount = m.buttonGroup.getChildCount()
+    if buttonCount = 0
+        return
+    end if
+    focusIndex = m.top.focusIndex
+    if focusIndex < 0
+        m.top.focusIndex = 0
+        return
+    end if
+    if focusIndex >= buttonCount
+        m.top.focusIndex = buttonCount - 1
+        return
+    end if
+    buttons = m.buttonGroup.getChildren(-1, 0)
+    for i = 0 to buttonCount - 1
+        if i <> focusIndex
+            buttons[i].focus = false
+            HideScreen(m.navBarItems[i].screen)
+        end if
+    end for
+    if focusIndex <> -1
+        if m.top.hasFocus()
+            m.buttonGroup.getChild(focusIndex).focus = true
+        end if
+        ShowScreen(m.navBarItems[focusIndex].screen)
+    end if
+end function
+
+function HideScreen(screenName as string) as void
+    if not m.screens.DoesExist(screenName)
+        return
+    end if
+    screen = m.screens[screenName]
+    if screen = invalid
+        return
+    end if
+    screen.visible = false
+end function
+
+function ShowScreen(screenName as string) as void
+    if not m.screens.DoesExist(screenName)
+        screen = CreateObject("roSGNode", screenName)
+        m.screens[screenName] = screen
+        m.screensNode.appendChild(screen)
+    end if
+    screen = m.screens[screenName]
+    if screen = invalid
+        return
+    end if
+    screen.visible = true
+end function

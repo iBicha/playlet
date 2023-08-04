@@ -1,0 +1,128 @@
+import "pkg:/source/utils/StringUtils.bs"
+
+class ApplicationInfo
+    public roDeviceInfo as object
+    public roAppInfo as object
+
+    function new()
+        m.roDeviceInfo = CreateObject("roDeviceInfo")
+        m.roAppInfo = CreateObject("roAppInfo")
+    end function
+
+    function GetLocalIpAddress() as dynamic
+        if StringUtils.IsNullOrEmpty(m.ipAddress)
+            ips = m.roDeviceInfo.GetIPAddrs()
+            for each ip in ips
+                m.ipAddress = ips[ip]
+                return m.ipAddress
+            end for
+        end if
+        return m.ipAddress
+    end function
+
+    function GetUserCountryCode() as string
+        if StringUtils.IsNullOrEmpty(m.countryCode)
+            m.countryCode = m.roDeviceInfo.GetUserCountryCode()
+        end if
+        return m.countryCode
+    end function
+
+    function GetAppInfo() as object
+        if m.appInfo = invalid
+            m.appInfo = {
+                id: m.roAppInfo.GetID(),
+                version: m.roAppInfo.GetVersion(),
+                git_commit_hash: m.roAppInfo.GetValue("git_commit_sha"),
+                lib_version: m.GetLibVersion(),
+                lib_git_commit_hash: m.GetLibGitCommitHash()
+            }
+        end if
+        return m.appInfo
+    end function
+
+    function GetDeviceInfo() as object
+        if m.deviceInfo = invalid
+            m.deviceInfo = {
+                model: m.roDeviceInfo.GetModel(),
+                model_display_name: m.roDeviceInfo.GetModelDisplayName(),
+                model_type: m.roDeviceInfo.GetModelType(),
+                model_details: m.roDeviceInfo.GetModelDetails(),
+                os_version: m.roDeviceInfo.GetOSVersion(),
+                display_type: m.roDeviceInfo.GetDisplayType(),
+                display_mode: m.roDeviceInfo.GetDisplayMode(),
+                display_aspect_ratio: m.roDeviceInfo.GetDisplayAspectRatio(),
+                display_size: m.roDeviceInfo.GetDisplaySize(),
+                video_mode: m.roDeviceInfo.GetVideoMode(),
+                ui_resolution: m.roDeviceInfo.GetUIResolution(),
+                graphics_platform: m.roDeviceInfo.GetGraphicsPlatform(),
+                internet_status: m.roDeviceInfo.GetInternetStatus(),
+                user_country_code: m.roDeviceInfo.GetUserCountryCode(),
+                friendly_name: m.roDeviceInfo.GetFriendlyName()
+            }
+        end if
+        return m.deviceInfo
+    end function
+
+    function GetLibVersion() as string
+        values = m.GetLibManifestValues()
+
+        Major = values["major_version"].toInt()
+        Minor = values["minor_version"].toInt()
+        Build = values["build_version"].toInt()
+
+        return `${Major}.${Minor}.${Build}`
+    end function
+
+    function GetLibGitCommitHash() as string
+        values = m.GetLibManifestValues()
+
+        if values.doesexist("git_commit_sha")
+            return values["git_commit_sha"]
+        end if
+        return ""
+    end function
+
+    function GetLibManifestValues() as object
+        if m.libManifestValues = invalid
+            libManifest = ReadAsciiFile("libpkg:/manifest")
+            lines = libManifest.Tokenize(`\n`)
+            values = {}
+            for each line in lines
+                if line.left(1) = "#"
+                    continue for
+                end if
+                keyValuePair = line.Tokenize("=")
+                if keyValuePair.Count() <> 2
+                    continue for
+                end if
+
+                values[keyValuePair[0]] = keyValuePair[1]
+            end for
+            m.libManifestValues = values
+        end if
+        return m.libManifestValues
+    end function
+
+    function GetLatestPlayletLibVersion() as dynamic
+        if m.latestPlayletLibVersion = invalid
+            args = {
+                parseJson: false
+            }
+            response = Requests().request("HEAD", "https://github.com/iBicha/playlet/releases/latest", args)
+
+            if response.statusCode = 200
+                if response.headers.location <> invalid
+                    regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
+                    match = regex.match(response.headers.location)
+                    if match.Count() = 2
+                        m.latestPlayletLibVersion = match[1]
+                        return m.latestPlayletLibVersion
+                    end if
+                end if
+            end if
+            m.latestPlayletLibVersion = "N/A"
+        end if
+        return m.latestPlayletLibVersion
+    end function
+
+end class

@@ -40,7 +40,7 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
                 file.addDiagnostics([{
                     file: file,
                     range: include.range!,
-                    message: `Could not find include: ${include}`,
+                    message: `Could not find include: ${include.name}`,
                     severity: DiagnosticSeverity.Error,
                     code: 'INCLUDE_NOT_FOUND',
                 }]);
