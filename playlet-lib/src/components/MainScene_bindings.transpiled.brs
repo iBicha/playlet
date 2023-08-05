@@ -10,6 +10,9 @@ function InitializeBindings()
             }, 
             "AppRoot": {
                 "appController": ".."
+            }, 
+            "NavBar": {
+                "screensNode": "../Screens"
             }
         }
     }

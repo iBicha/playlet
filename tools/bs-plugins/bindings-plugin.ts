@@ -1,3 +1,5 @@
+// Plugin to generate node bindings for AutoBind components
+
 import {
     BeforeFileTranspileEvent,
     BscFile,

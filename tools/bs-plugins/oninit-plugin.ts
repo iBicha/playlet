@@ -47,7 +47,7 @@ export class OnInitPlugin implements CompilerPlugin {
                 scope.xmlFile.addDiagnostics([{
                     file: scope.xmlFile,
                     range: onInitCallable.annotation!.range,
-                    message: `function with @oninit annotation is included in ${scope.name}, but no Init function was found in the component.`,
+                    message: `function ${onInitCallable.callable.functionStatement.name.text} with @oninit annotation is included in ${scope.name}, but no Init function was found in the component.`,
                     severity: DiagnosticSeverity.Error,
                     code: 1818
                 }]);

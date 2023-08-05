@@ -6,7 +6,7 @@ const { BooleanOptionalAction } = require('argparse');
 const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 const path = require('path');
-const { writeFileSync } = require('fs');
+const fs = require('fs');
 const spawn = require('child_process').spawn;
 
 function getArgumentParser() {
@@ -21,6 +21,34 @@ function getArgumentParser() {
     return parser;
 }
 
+const childProcesses = [];
+
+function processCleanup() {
+    childProcesses.forEach(function (child) {
+        try {
+            child.kill();
+        } catch (error) {
+
+        }
+    });
+}
+
+function exitHandler(options, exitCode) {
+    if (options.cleanup) {
+        processCleanup();
+    }
+    if (options.exit) {
+        process.exit(exitCode);
+    }
+}
+
+process.on('exit', exitHandler.bind(null, { cleanup: true }));
+process.on('SIGINT', exitHandler.bind(null, { exit: true }));
+process.on('SIGUSR1', exitHandler.bind(null, { exit: true }));
+process.on('SIGUSR2', exitHandler.bind(null, { exit: true }));
+process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
+
+
 (async () => {
     let success = false;
     let telnet;
@@ -30,10 +58,14 @@ function getArgumentParser() {
         const parser = getArgumentParser()
         const args = parser.parse_args()
 
-        packagePath = args.package
-        timeout = args.timeout
-        reportOnly = args.report_only
-        outputFile = replaceFileExtension(packagePath, 'txt')
+        const packagePath = args.package
+        const timeout = args.timeout
+        const reportOnly = args.report_only
+        const outputFile = replaceFileExtension(packagePath, 'txt')
+
+        if (fs.existsSync(outputFile)) {
+            fs.unlinkSync(outputFile);
+        }
 
         const packageFile = path.basename(packagePath)
         const packageFolder = path.dirname(packagePath)
@@ -66,7 +98,7 @@ function getArgumentParser() {
             data = parseTestReport(data);
         }
 
-        writeFileSync(outputFile, data);
+        fs.writeFileSync(outputFile, data);
 
         success = data.includes('RESULT: Success');
     }
@@ -84,6 +116,7 @@ function getArgumentParser() {
 function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
     return new Promise((resolve, reject) => {
         const telnet = spawn('telnet', [host, port]);
+        childProcesses.push(telnet);
 
         let timeoutID;
         function timeoutReached() {
