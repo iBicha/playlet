@@ -1,4 +1,4 @@
-'import "pkg:/components/AutoBind/AutoBind.part.bs"
+'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
 
 function Init()

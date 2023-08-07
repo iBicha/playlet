@@ -1,5 +1,6 @@
 import "pkg:/source/utils/ColorUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
 
 function Init()
 end function
@@ -22,6 +23,7 @@ function PopulateButtons() as void
     end if
 
     if m.top.items = invalid
+        m.top.focusable = false
         return
     end if
 
@@ -42,6 +44,8 @@ function PopulateButtons() as void
         buttons.push(button)
     end for
     m.buttonGroup.appendChildren(buttons)
+
+    m.top.focusable = buttons.Count() > 0
 
     m.top.focusIndex = m.top.focusIndex
 end function
@@ -65,6 +69,20 @@ function onKeyEvent(key as string, press as boolean) as boolean
             return false
         end if
         m.top.focusIndex = target
+        return true
+    else if key = "right"
+        if m.top.items = invalid or m.top.focusIndex = -1 or m.top.focusIndex >= m.top.items.getChildCount()
+            return false
+        end if
+        navBarItem = m.top.items.getChild(m.top.focusIndex)
+        if navBarItem.canFocus <> true
+            return false
+        end if
+        screen = GetScreen(navBarItem.screen)
+        if screen = invalid
+            return false
+        end if
+        NodeSetFocus(screen, true)
         return true
     end if
 
@@ -128,10 +146,21 @@ function ShowScreen(screenName as string) as void
         screen.id = screenName
         m.screens[screenName] = screen
         m.screensNode.appendChild(screen)
+        AutoBindSceneGraph()
     end if
     screen = m.screens[screenName]
     if screen = invalid
         return
     end if
     screen.visible = true
+end function
+
+function GetScreen(screenName as string) as object
+    if StringUtils.IsNullOrEmpty(screenName)
+        return invalid
+    end if
+    if not m.screens.DoesExist(screenName)
+        return invalid
+    end if
+    return m.screens[screenName]
 end function

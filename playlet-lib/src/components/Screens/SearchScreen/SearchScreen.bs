@@ -1,6 +1,217 @@
+import "pkg:/components/Navigation.bs"
+import "pkg:/components/Screens/SearchScreen/SearchSuggestionsTask.bs"
+import "pkg:/components/Screens/SearchScreen/SearchTask.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/source/services/SearchHistory.bs"
+import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/ColorUtils.bs"
+import "pkg:/source/utils/LoadingScreen.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
 
 function Init()
-    rect = m.top.findNode("rect")
-    rect.color = ColorUtils.RandomSoftColorInt()
+    m.container = m.top.FindNode("container")
+    m.keyboard = m.top.FindNode("keyboard")
+    m.rowList = m.top.FindNode("rowList")
+    m.scrollAnimation = m.top.FindNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
+    m.suggestions = m.top.FindNode("suggestions")
+end function
+
+function OnNodeReady()
+    m.keyboard.ObserveField("text", "OnTextChange")
+    m.rowList.ObserveField("rowItemSelected", "OnSearchVideoSelected")
+    m.suggestions.ObserveField("buttonFocused", "OnSearchButtonFocused")
+    m.suggestions.ObserveField("buttonSelected", "OnSearchButtonSelected")
+    m.top.ObserveField("focus", "OnFocusChange")
+    m.top.ObserveField("visible", "OnVisibilityChange")
+
+    SetNavigation(invalid, "back", m.navBar, function()
+        ScrollUp()
+    end function)
+    SetNavigation(m.suggestions, "right", m.keyboard)
+    SetNavigation(m.keyboard, "left", m.suggestions)
+    SetNavigation(m.suggestions, "left", m.navBar)
+    SetNavigation(m.keyboard, "left", m.navBar)
+    SetNavigation(m.rowList, "left", m.navBar, function()
+        ScrollUp()
+    end function)
+    SetNavigation(invalid, "down", m.rowList, function()
+        ScrollDown()
+    end function)
+    SetNavigation(m.rowList, "up", m.suggestions, function()
+        ScrollUp()
+    end function)
+
+    ' Trigger suggestions
+    OnTextChange()
+end function
+
+function OnFocusChange() as void
+    if m.top.focus <> true
+        return
+    end if
+
+    if m.rowlist.focusable
+        NodeSetFocus(m.rowlist, true)
+        ScrollDown()
+        return
+    end if
+    if m.suggestions.focusable
+        if m.suggestions.buttonFocused >= m.suggestions.buttons.Count()
+            m.suggestions.focusButton = 0
+        end if
+        NodeSetFocus(m.suggestions, true)
+        OnSearchButtonFocused()
+        return
+    end if
+    NodeSetFocus(m.keyboard, true)
+end function
+
+function OnTextChange() as void
+    if m.suggestions.isInFocusChain()
+        return
+    end if
+
+    if m.searchSuggestionsTask <> invalid
+        m.searchSuggestionsTask.control = "stop"
+    end if
+
+    m.searchSuggestionsTask = StartAsyncTask(SearchSuggestionsTask, {
+        q: m.keyboard.text
+    }, OnSearchSuggestionsTaskResults)
+end function
+
+function OnSearchSuggestionsTaskResults(output as object) as void
+    ' In case this is an old request, discard suggestions
+    q = output.result.q
+    if q <> m.keyboard.text
+        return
+    end if
+    suggestions = output.result.response
+    if suggestions = invalid
+        return
+    end if
+
+    if q.len() > 0 and ArrayUtils.IndexOf(suggestions, q) = -1
+        suggestions.Unshift(q)
+    end if
+
+    ' Capture current focused button and restore it after resetting the buttons
+    buttonFocused = -1
+    if m.suggestions.isInFocusChain()
+        buttonFocused = m.suggestions.buttonFocused
+    end if
+    if buttonFocused >= m.suggestions.buttons.Count()
+        buttonFocused = m.suggestions.buttons.Count() - 1
+    end if
+    m.suggestions.buttons = suggestions
+    if buttonFocused <> -1
+        m.suggestions.focusButton = buttonFocused
+    end if
+    m.suggestions.focusable = m.suggestions.buttons.Count() > 0
+end function
+
+function OnSearchButtonSelected()
+    selected = m.suggestions.buttonSelected
+    text = m.suggestions.buttons[selected]
+    SearchHistory.Save(text)
+    Search(text)
+end function
+
+function OnSearchButtonFocused() as void
+    if not m.suggestions.isInFocusChain()
+        return
+    end if
+
+    selected = m.suggestions.buttonFocused
+    if selected >= m.suggestions.buttons.Count() or selected < 0
+        return
+    end if
+    text = m.suggestions.buttons[selected]
+    m.keyboard.text = text
+end function
+
+function Search(text as string)
+    if m.searchTask <> invalid
+        m.searchTask.control = "stop"
+    end if
+
+    ShowLoadingScreen()
+    m.searchTask = StartAsyncTask(SearchTask, {
+        q: text
+    }, OnSearchTaskResults)
+end function
+
+function OnSearchTaskResults(output as object)
+    rootChildren = output.result.rootChildren
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.Update({
+        children: rootChildren
+    }, true)
+    m.rowList.content = contentNode
+    m.rowlist.focusable = true
+    NodeSetFocus(m.rowlist, true)
+    m.rowList.jumpToRowItem = [0, 0]
+    ScrollDown()
+    HideLoadingScreen()
+end function
+
+function OnVisibilityChange()
+    if m.top.visible = false
+        ClearSearch()
+    else
+        OnTextChange()
+    end if
+end function
+
+function ClearSearch()
+    m.keyboard.text = ""
+    m.rowlist.content = invalid
+    m.rowlist.focusable = false
+    ScrollUp()
+end function
+
+function ScrollUp() as void
+    destination = m.scrollAnimationInterpolator.keyValue[0][1]
+    current = m.container.translation[1]
+    if current = destination
+        return
+    end if
+    m.scrollAnimationInterpolator.reverse = true
+    m.scrollAnimation.control = "start"
+end function
+
+function ScrollDown() as void
+    destination = m.scrollAnimationInterpolator.keyValue[2][1]
+    current = m.container.translation[1]
+    if current = destination
+        return
+    end if
+    m.scrollAnimationInterpolator.reverse = false
+    m.scrollAnimation.control = "start"
+end function
+
+function OnSearchVideoSelected(event as object)
+    grid = event.GetRoSGNode()
+
+    selectedPair = event.GetData()
+    selectedRow = selectedPair[0]
+    selectedRowItem = selectedPair[1]
+
+    rowContent = grid.content.GetChild(selectedRow)
+    itemContent = rowContent.GetChild(selectedRowItem)
+
+    videoId = itemContent.videoId
+    ? "Play video: " + videoId
+    ' PlayVideo(videoId, {
+    '     metadata: itemContent,
+    '     sender: m.top
+    ' })
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press)
+        return true
+    end if
+    return false
 end function

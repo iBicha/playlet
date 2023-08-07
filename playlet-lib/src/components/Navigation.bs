@@ -1,0 +1,41 @@
+import "pkg:/source/utils/NodeSetFocus.bs"
+
+function SetNavigation(fromNode as object, direction as string, toNode as object, callback = invalid as dynamic)
+    if m._navigation = invalid
+        m._navigation = {}
+    end if
+
+    if not m._navigation.DoesExist(direction)
+        m._navigation[direction] = []
+    end if
+
+    m._navigation[direction].push({
+        fromNode: fromNode,
+        toNode: toNode,
+        callback: callback
+    })
+end function
+
+function NavigationKeyHandler(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+
+    navigations = m._navigation[key]
+    if navigations = invalid
+        return false
+    end if
+    for each item in navigations
+        if (item.fromNode = invalid or item.fromNode.isInFocusChain()) and item.toNode.focusable
+            if item.fromNode <> invalid
+                NodeSetFocus(item.fromNode, false)
+            end if
+            NodeSetFocus(item.toNode, true)
+            if item.callback <> invalid
+                item.callback()
+            end if
+            return true
+        end if
+    end for
+    return false
+end function

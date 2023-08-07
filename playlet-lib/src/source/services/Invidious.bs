@@ -1,0 +1,68 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/services/InvidiousSettings.bs"
+
+namespace Invidious
+
+    const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+    const SEARCH_ENDPOINT = "/api/v1/search"
+
+    function DefaultArgs() as object
+        return {
+            params: {
+                ' region: GetUserCountryCode()
+            }
+        }
+    end function
+
+    function SearchSuggestions(q as string) as object
+        instance = InvidiousSettings.GetCurrentInstance()
+        url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
+
+        args = Invidious.DefaultArgs()
+        args.params.q = q
+        args.cacheSeconds = 60 * 60 * 6 ' 6 hours
+
+        response = Requests().get(url, args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function Search(q as string, args = invalid as dynamic) as object
+        instance = InvidiousSettings.GetCurrentInstance()
+        url = `${instance}${Invidious.SEARCH_ENDPOINT}`
+
+        _args = Invidious.DefaultArgs()
+        _args.params.q = q
+
+        if args <> invalid
+            if args.page <> invalid
+                _args.params.page = Str(args.page).Trim()
+            end if
+            if args.sort_by <> invalid
+                _args.params.sort_by = args.sort_by
+            end if
+            if args.date <> invalid
+                _args.params.date = args.date
+            end if
+            if args.duration <> invalid
+                _args.params.duration = args.duration
+            end if
+            if args.type <> invalid
+                _args.params.type = args.type
+            end if
+            if args.features <> invalid
+                _args.params.features = args.features.join(",")
+            end if
+        end if
+        response = Requests().get(url, _args)
+
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+end namespace

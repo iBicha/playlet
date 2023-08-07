@@ -1,0 +1,127 @@
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
+    m.viewCountDateLabel = m.top.FindNode("viewCountDateLabel")
+    m.thumbnail = m.top.FindNode("thumbnail")
+    m.liveRect = m.top.FindNode("liveRect")
+    m.durationRect = m.top.FindNode("durationRect")
+    m.durationLabel = m.top.FindNode("durationLabel")
+
+    m.thumbnail.observeField("loadStatus", "OnThumbnailLoadFailed")
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    m.authorLabel.text = content.author
+
+    if IsVideoUpcoming(content)
+        m.viewCountDateLabel.text = `Premeres in ${TimeUtils.GetFormattedTimeLeft(content.premiereTimestamp)}`
+    else
+        publishedText = ValidString(content.publishedText)
+        viewCount = FormatViewCount(content.viewCount)
+        if publishedText = "" and viewCount = ""
+            m.viewCountDateLabel.text = ""
+        else
+            m.viewCountDateLabel.text = `${publishedText} • ${viewCount}`
+        end if
+    end if
+
+    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
+
+    if IsVideoLive(content)
+        m.liveRect.visible = true
+        m.durationRect.visible = false
+    else
+        m.liveRect.visible = false
+        if content.lengthSeconds <> invalid and content.lengthSeconds <> 0
+            SetDurationText(TimeUtils.GetFormattedTime(content.lengthSeconds))
+            m.durationRect.visible = true
+        else
+            m.durationRect.visible = false
+        end if
+    end if
+
+end function
+
+function SetDurationText(text as string)
+    label = m.durationLabel
+    rect = m.durationRect
+
+    rectParent = rect.getParent()
+
+    label.text = text
+    size = label.localBoundingRect()
+
+    rect.width = size.width + 16
+    rect.translation = [rectParent.width - rect.width, 162]
+end function
+
+function OnThumbnailLoadFailed() as void
+    if m.thumbnail.loadStatus <> "failed"
+        return
+    end if
+    m.thumbnail.uri = "pkg:/images/thumbnail-missing.jpg"
+end function
+
+function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string) as string
+    if videoThumbnails.Count() = 0
+        return ""
+    end if
+    for each thumbnail in videoThumbnails
+        if thumbnail.quality = quality
+            return thumbnail.url
+        end if
+    end for
+    return videoThumbnails[0].url
+end function
+
+function IsVideoUpcoming(metadata as object) as boolean
+    return metadata.isUpcoming = true
+end function
+
+function IsVideoLive(metadata as object) as boolean
+    if metadata.liveNow = true
+        return true
+    end if
+    ' TODO: metadata.liveNow is returning false for live videos...
+    return metadata.lengthSeconds = 0 and metadata.viewCount = 0
+end function
+
+function FormatViewCount(viewCount as dynamic) as string
+    if viewCount = invalid
+        return ""
+    end if
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)} views`
+    end if
+
+    viewCount = viewCount / 1000
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)}K views`
+    end if
+
+    viewCount = viewCount / 1000
+    if viewCount < 1000
+        return `${FormatFloat(viewCount)}M views`
+    end if
+
+    viewCount = viewCount / 1000
+    return `${FormatFloat(viewCount)}B views`
+end function
+
+function FormatFloat(X as integer) as integer
+    X = X * 10
+    X = X + 0.5
+    X = Fix(X)
+    X = X / 10
+    return X
+end function
