@@ -4,9 +4,11 @@ namespace Tests
     class LoadingScreenTests extends Rooibos.BaseTestSuite
 
         protected override function setup()
-            m.currentLoadingIndicator = m.global.loadingIndicator
-            if not m.global.hasField("loadingIndicator")
-                m.global.addField("loadingIndicator", "node")
+            m.hasLoadingIndicator = m.global.hasField("loadingIndicator")
+            if m.hasLoadingIndicator
+                m.currentLoadingIndicator = m.global.loadingIndicator
+            else
+                m.global.addField("loadingIndicator", "node", false)
             end if
 
             if m.global.loadingIndicator = invalid
@@ -15,7 +17,11 @@ namespace Tests
         end function
 
         protected override function tearDown()
-            m.global.loadingIndicator = m.currentLoadingIndicator
+            if m.hasLoadingIndicator
+                m.global.loadingIndicator = m.currentLoadingIndicator
+            else
+                m.global.removeField("loadingIndicator")
+            end if
         end function
 
         @describe("LoadingScreen")

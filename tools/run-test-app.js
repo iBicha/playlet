@@ -108,9 +108,12 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
     finally {
         telnet?.kill();
     }
-    if (!success) {
-        throw new Error('Tests failed');
+    if (success) {
+        console.log('Tests passed!');
+    } else {
+        console.error('Tests failed!');
     }
+    process.exit(success ? 0 : 1);
 })();
 
 function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
