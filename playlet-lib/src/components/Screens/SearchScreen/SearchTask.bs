@@ -4,30 +4,29 @@ import "pkg:/source/services/Invidious.bs"
 function SearchTask(input as object) as object
     q = input.q
 
-    rootChildren = []
+    contentNode = CreateObject("roSGNode", "ContentNode")
 
-    response = Invidious.Search(q, { type: "video" })
+    response = Invidious.Search(q, { type: "video" }) 'video,playlist,channel
 
-    rowContent = GetCategoryContent(`Search - ${q}`, response)
+    rowContent = GetCategoryContent(contentNode, `Search - ${q}`, response)
     if rowContent <> invalid
-        rootChildren.Push(rowContent)
+        contentNode.appendChild(rowContent)
     end if
 
     return {
         q: q,
-        rootChildren: rootChildren
+        content: contentNode
     }
 end function
 
-function GetCategoryContent(category as string, json as object) as object
+function GetCategoryContent(contentNode as object, category as string, json as object) as object
     if json <> invalid and json.Count() > 0
-        row = {}
+        row = contentNode.CreateChild("ContentNode")
         row.title = category
-        row.children = []
-        for each item in json ' parse items and push them to row
+        for each item in json
             itemData = GetItemData(item)
             if itemData <> invalid
-                row.children.Push(itemData)
+                row.appendChild(itemData)
             end if
         end for
         return row
@@ -36,10 +35,18 @@ function GetCategoryContent(category as string, json as object) as object
 end function
 
 function GetItemData(video as object) as object
-    ' TODO: handle playlists and channels
-    if video.videoId = invalid
+    if video.type <> "video" and video.type <> "playlist" and video.type <> "channel"
         return invalid
     end if
 
-    return video
+    videoItem = CreateObject("roSGNode", "ContentNode")
+    videoItem.addField("HDItemWidth", "float", false)
+    videoItem.append(video)
+
+    if video.type = "channel"
+        videoItem.HDItemWidth = "200"
+    else
+        videoItem.HDItemWidth = "350"
+    end if
+    return videoItem
 end function

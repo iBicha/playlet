@@ -143,12 +143,7 @@ function Search(text as string)
 end function
 
 function OnSearchTaskResults(output as object)
-    rootChildren = output.result.rootChildren
-    contentNode = CreateObject("roSGNode", "ContentNode")
-    contentNode.Update({
-        children: rootChildren
-    }, true)
-    m.rowList.content = contentNode
+    m.rowList.content = output.result.content
     m.rowlist.focusable = true
     NodeSetFocus(m.rowlist, true)
     m.rowList.jumpToRowItem = [0, 0]
@@ -201,12 +196,21 @@ function OnSearchVideoSelected(event as object)
     rowContent = grid.content.GetChild(selectedRow)
     itemContent = rowContent.GetChild(selectedRowItem)
 
-    videoId = itemContent.videoId
-    ? "Play video: " + videoId
-    ' PlayVideo(videoId, {
-    '     metadata: itemContent,
-    '     sender: m.top
-    ' })
+    if itemContent.type = "video"
+        videoId = itemContent.videoId
+        ? "Play video: " + videoId
+        ' PlayVideo(videoId, {
+        '     metadata: itemContent,
+        '     sender: m.top
+        ' })
+    else if itemContent.type = "playlist"
+        playlistId = itemContent.playlistId
+        ? "Open playlist: " + playlistId
+    else if itemContent.type = "channel"
+        authorId = itemContent.authorId
+        ? "Open channel: " + authorId
+    end if
+
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
