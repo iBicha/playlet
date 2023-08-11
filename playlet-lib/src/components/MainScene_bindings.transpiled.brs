@@ -6,13 +6,14 @@ function InitializeBindings()
         },
         childProps: {
             "AppController": {
-                "root": "./AppRoot"
+                "root": "./AppRoot", 
+                "screensNode": "./Screens"
             }, 
             "AppRoot": {
                 "appController": ".."
             }, 
             "NavBar": {
-                "screensNode": "../Screens"
+                "appController": "/AppController"
             }
         }
     }

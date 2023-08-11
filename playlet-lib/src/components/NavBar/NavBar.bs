@@ -1,12 +1,10 @@
 import "pkg:/source/utils/ColorUtils.bs"
-import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/NodeSetFocus.bs"
 
 function Init()
 end function
 
 function OnNodeReady()
-    m.screens = {}
     PopulateButtons()
     m.top.observeField("focusedChild", "OnFocusChange")
     m.top.observeField("items", "PopulateButtons")
@@ -78,7 +76,7 @@ function onKeyEvent(key as string, press as boolean) as boolean
         if navBarItem.canFocus <> true
             return false
         end if
-        screen = GetScreen(navBarItem.screen)
+        screen = m.appController@.GetRootScreen(navBarItem.screen)
         if screen = invalid
             return false
         end if
@@ -114,53 +112,11 @@ function OnFocusIndexChange() as void
     for i = 0 to buttonCount - 1
         if i <> focusIndex
             buttons[i].focus = false
-            HideScreen(navBarItems[i].screen)
+            m.appController@.HideRootScreen(navBarItems[i].screen)
         end if
     end for
     if focusIndex <> -1
         m.buttonGroup.getChild(focusIndex).focus = m.top.hasFocus()
-        ShowScreen(navBarItems[focusIndex].screen)
+        m.appController@.ShowRootScreen(navBarItems[focusIndex].screen)
     end if
-end function
-
-function HideScreen(screenName as string) as void
-    if StringUtils.IsNullOrEmpty(screenName)
-        return
-    end if
-    if not m.screens.DoesExist(screenName)
-        return
-    end if
-    screen = m.screens[screenName]
-    if screen = invalid
-        return
-    end if
-    screen.visible = false
-end function
-
-function ShowScreen(screenName as string) as void
-    if StringUtils.IsNullOrEmpty(screenName)
-        return
-    end if
-    if not m.screens.DoesExist(screenName)
-        screen = CreateObject("roSGNode", screenName)
-        screen.id = screenName
-        m.screens[screenName] = screen
-        m.screensNode.appendChild(screen)
-        AutoBindSceneGraph()
-    end if
-    screen = m.screens[screenName]
-    if screen = invalid
-        return
-    end if
-    screen.visible = true
-end function
-
-function GetScreen(screenName as string) as object
-    if StringUtils.IsNullOrEmpty(screenName)
-        return invalid
-    end if
-    if not m.screens.DoesExist(screenName)
-        return invalid
-    end if
-    return m.screens[screenName]
 end function

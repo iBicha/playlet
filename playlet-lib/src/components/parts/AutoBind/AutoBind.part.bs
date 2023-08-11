@@ -1,3 +1,6 @@
+' Bind all nodes that registered for auto-binding
+' Should be called once from a root node
+' Can be called later to rebind nodes that were added after the first call
 function AutoBindSceneGraph() as void
     if not m.global.hasField("AutoBindNodes")
         m.global.addField("AutoBindNodes", "nodearray", false)
@@ -11,10 +14,15 @@ function AutoBindSceneGraph() as void
     end for
 
     for each node in nodes
-        node.binding_fields_done = true
+        node@.BindScopeFields(invalid)
+    end for
+
+    for each node in nodes
+        node.binding_done = true
     end for
 end function
 
+' Bind the node fields, to be called with interface function
 function BindNodeFieldsAndProps(unused as dynamic) as void
     node = m.top
     bindings = node.bindings
@@ -24,6 +32,9 @@ function BindNodeFieldsAndProps(unused as dynamic) as void
 
     if bindings.fields <> invalid
         for each fieldId in bindings.fields
+            if node.getField(fieldId) <> invalid
+                continue for
+            end if
             reference = FindNodeFromPath(node, bindings.fields[fieldId])
             if reference <> invalid
                 node[fieldId] = reference
@@ -40,6 +51,9 @@ function BindNodeFieldsAndProps(unused as dynamic) as void
 
             childProps = bindings.childProps[nodeId]
             for each childPropId in childProps
+                if child.getField(childPropId) <> invalid
+                    continue for
+                end if
                 reference = FindNodeFromPath(child, childProps[childPropId])
                 if reference <> invalid
                     child[childPropId] = reference
@@ -81,17 +95,9 @@ function FindNodeFromPath(root as object, path as string) as object
     return node
 end function
 
-function RegisterAutoBind()
-    if not m.global.hasField("AutoBindNodes")
-        m.global.addField("AutoBindNodes", "nodearray", false)
-    end if
-    nodes = m.global.AutoBindNodes
-    newNodes = [m.top]
-    newNodes.append(nodes)
-    m.global.AutoBindNodes = newNodes
-end function
-
-function OnBindingFieldsDone()
+' Create scoped fields (m.fieldName) for all fields in this node
+' To be called after BindNodeFieldsAndProps
+function BindScopeFields(unused as dynamic)
     types = m.top.getFieldTypes()
     for each key in types
         if m.DoesExist(key)
@@ -105,8 +111,37 @@ function OnBindingFieldsDone()
         node = m.top.getField(key)
         m[key] = node
     end for
+end function
 
-    if m.top.hasField("binding_done")
-        m.top.binding_done = true
+' Bind a single node. This for nodes created dynamically, and all its dependencies are expected to be bound already
+function BindNode(unused as dynamic)
+    RemoveNodeFromGlobalAutoBind()
+    BindNodeFieldsAndProps(invalid)
+    BindScopeFields(invalid)
+    m.top.binding_done = true
+end function
+
+function RemoveNodeFromGlobalAutoBind() as void
+    if not m.global.hasField("AutoBindNodes")
+        return
     end if
+
+    nodes = m.global.AutoBindNodes
+    for i = 0 to nodes.Count() - 1
+        if m.top.isSameNode(nodes[i])
+            nodes.Delete(i)
+            m.global.AutoBindNodes = nodes
+            return
+        end if
+    end for
+end function
+
+function OnBindingSetRegisterAutoBind()
+    if not m.global.hasField("AutoBindNodes")
+        m.global.addField("AutoBindNodes", "nodearray", false)
+    end if
+    nodes = m.global.AutoBindNodes
+    newNodes = [m.top]
+    newNodes.append(nodes)
+    m.global.AutoBindNodes = newNodes
 end function
