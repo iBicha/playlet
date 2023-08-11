@@ -141,8 +141,8 @@ There are a few reasons we made this separation:
 - The ability to roll back: Sometimes an app breaking bug gets released. Allowing users to choose a seperate version is a flexible way to keep things working. Although right now rollbacks are behind a - hidden by default - developer menu, the reasoning still stands.
 - It is simply easier to release: Releasing Playlet Lib on Github, and everyone receiving the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
   - I've had instances where I was trying to pass the certfication for Playlet to publish it. One of the criterias is to pass a some automated tests. But the tests were failing because their system could not connect to their Roku test devices (connection keeps timing out). My only option was to keep trying over and over until it worked.
-
-It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
+  - It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
+- Enable forks. If for some reason someone wanted to use a fork of Playlet (for example, another folk had other features or bug fixes that this repo doesn't), they don't need to publish a complete new app. The url to load playlet is configurable, and can be changed through a simple web api. Allowing and enabling forks is what makes FOSS thrive.
 
 ## Playlet Lib
 
