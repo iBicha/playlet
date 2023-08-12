@@ -1,0 +1,85 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/services/InvidiousSettings.bs"
+import "pkg:/source/services/Invidious.bs"
+
+class InvidiousService
+    private endpoints
+    private responseHanlders
+
+    function new()
+        apiDefnitions = ParseJson(ReadAsciiFile("libpkg:/config/invidious_video_api.json5"))
+        m.endpoints = {}
+
+        for each apiDefnition in apiDefnitions.endpoints
+            m.endpoints[apiDefnition.name] = apiDefnition
+        end for
+
+        m.responseHanlders = {
+            DefaultHandler: m.DefaultHandler
+        }
+    end function
+
+    function MakeRequest(requestData as object) as object
+        endpoint = m.endpoints[requestData.endpoint]
+        if endpoint = invalid
+            return invalid
+        end if
+
+        instance = InvidiousSettings.GetCurrentInstance()
+
+        url = instance + endpoint.url
+
+        args = { params: {} }
+
+        if endpoint.queryParams <> invalid
+            for each queryParamKey in endpoint.queryParams
+                queryParam = endpoint.queryParams[queryParamKey]
+                if queryParam.default <> invalid
+                    if queryParam.type = "string"
+                        args.params[queryParamKey] = queryParam.default
+                    else if queryParam.type = "#ISO3166"
+                        if queryParam.default = "GetUserCountryCode"
+                            args.params[queryParamKey] = m.GetUserCountryCode()
+                        else
+                            args.params[queryParamKey] = queryParam.default
+                        end if
+                    end if
+                end if
+            end for
+        end if
+
+        if requestData.queryParams <> invalid
+            args.params.append(requestData.queryParams)
+        end if
+
+        if requestData.pathParams <> invalid
+            for each param in requestData.pathParams
+                url = url.Replace(`:${param}`, requestData.pathParams[param])
+            end for
+        end if
+
+        response = Requests().get(url, args)
+
+        responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+
+        result = responseHandler(m, requestData, response)
+
+        return result
+    end function
+
+    function DefaultHandler(m as object, requestData as object, response as object) as object
+        if response.statuscode = 200
+            return response.json
+        end if
+        return invalid
+    end function
+
+    function GetUserCountryCode() as string
+        if m.countryCode = invalid or m.countryCode = ""
+            m.countryCode = CreateObject("roDeviceInfo").GetUserCountryCode()
+        end if
+        return m.countryCode
+    end function
+end class

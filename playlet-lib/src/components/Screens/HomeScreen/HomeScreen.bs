@@ -1,6 +1,129 @@
 import "pkg:/source/utils/ColorUtils.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/Screens/HomeScreen/HomeScreenContentTask.bs"
+import "pkg:/components/Screens/HomeScreen/HomeScreenRowContentTask.bs"
 
 function Init()
-    rect = m.top.findNode("rect")
-    rect.color = ColorUtils.RandomSoftColorInt()
+    m.rowList = m.top.FindNode("rowList")
+end function
+
+function OnNodeReady()
+    m.top.ObserveField("focus", "OnFocusChange")
+    m.top.ObserveField("visible", "OnVisibilityChange")
+    m.rowList.ObserveField("itemFocused", "OnItemFocused")
+
+    SetNavigation(invalid, "back", m.navBar)
+    SetNavigation(invalid, "left", m.navBar)
+
+    InitContent()
+end function
+
+function OnFocusChange()
+    if m.top.focus = true
+        LoadItemsIfNeeded()
+        NodeSetFocus(m.rowList, true)
+    end if
+end function
+
+function OnVisibilityChange()
+    if m.top.visible = true
+        LoadItemsIfNeeded(true)
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press)
+        return true
+    end if
+    return false
+end function
+
+function InitContent()
+    if m.contentTask <> invalid
+        m.contentTask.control = "stop"
+    end if
+
+    m.contentTask = StartAsyncTask(HomeScreenContentTask, {
+        node: m.rowList,
+        contentFilePath: "libpkg:/config/default_home_layout.json"
+    }, HomeScreenContentTaskResults)
+end function
+
+function HomeScreenContentTaskResults(output as object)
+    LoadItemsIfNeeded()
+end function
+
+function OnItemFocused()
+    LoadItemsIfNeeded()
+end function
+
+function LoadItemsIfNeeded(visibleOnly = false as boolean) as void
+    if m.rowList.content = invalid
+        return
+    end if
+
+    itemsToLoad = GetItemsToLoad(visibleOnly)
+    for each item in itemsToLoad
+        LoadItemContent(item)
+    end for
+end function
+
+function GetItemsToLoad(visibleOnly = false as boolean) as object
+    focus = m.rowList.itemFocused
+    if focus = -1
+        focus = 0
+    end if
+
+    contentNode = m.rowList.content
+    rowCount = contentNode.getChildCount()
+    if rowCount = 0
+        return []
+    end if
+
+    subContentNodes = []
+    range = m.rowList.numRows
+    for i = -range to range
+        index = focus + i
+        if index < 0
+            continue for
+        end if
+        if index >= rowCount
+            continue for
+        end if
+        subContentNode = contentNode.getChild(index)
+        if subContentNode.loadState <> "notLoaded"
+            continue for
+        end if
+        subContentNodes.push(subContentNode)
+    end for
+
+    if not visibleOnly
+        if subContentNodes.count() = 0 and m.top.visible
+            for i = 0 to rowCount - 1
+                subContentNode = contentNode.getChild(i)
+                if subContentNode.loadState <> "notLoaded"
+                    continue for
+                end if
+                subContentNodes.push(subContentNode)
+                if subContentNodes.count() >= 5
+                    exit for
+                end if
+            end for
+        end if
+    end if
+
+    return subContentNodes
+end function
+
+function LoadItemContent(contentNode as object)
+    contentNode.loadState = "loading"
+    StartAsyncTask(HomeScreenRowContentTask, {
+        node: contentNode
+    }, HomeScreenRowContentTaskResults)
+end function
+
+function HomeScreenRowContentTaskResults(output as object)
+    LoadItemsIfNeeded()
 end function

@@ -1,0 +1,27 @@
+@asynctask
+function HomeScreenContentTask(input as object)
+    contentNode = CreateObject("roSGNode", "ContentNode")
+    contentNode.AddField("isLoaded", "boolean", false)
+    contentNode.isLoaded = false
+
+    feeds = ParseJson(ReadAsciiFile("libpkg:/config/default_home_layout.json5"))
+
+    for each feed in feeds
+        feedContentNode = CreateObject("roSGNode", "ContentNode")
+        feedContentNode.AddField("feed", "assocarray", false)
+        feedContentNode.AddField("loadState", "string", false)
+
+        feedContentNode.feed = feed
+        feedContentNode.loadState = "notLoaded"
+
+        feedContentNode.title = feed.title
+
+        feedContentNode.createChild("ContentNode")
+        feedContentNode.createChild("ContentNode")
+        feedContentNode.createChild("ContentNode")
+
+        contentNode.appendChild(feedContentNode)
+    end for
+
+    input.node.content = contentNode
+end function

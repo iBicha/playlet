@@ -1,0 +1,49 @@
+import "pkg:/source/services/InvidiousService.bs"
+
+@asynctask
+function HomeScreenRowContentTask(input as object) as boolean
+    contentNode = input.node
+
+    service = new InvidiousService()
+    response = service.MakeRequest(contentNode.feed)
+
+    if response = invalid
+        contentNode.loadState = "failed"
+        contentNode.title += " (Failed to load)"
+        return false
+    end if
+
+    itemNodes = []
+    for each item in response
+        itemNode = GetItemData(item)
+        if itemNode <> invalid
+            itemNodes.Push(itemNode)
+        end if
+    end for
+
+    contentNode.removeChildrenIndex(contentNode.getChildCount(), 0)
+    contentNode.appendChildren(itemNodes)
+    contentNode.loadState = "loaded"
+    return true
+end function
+
+function GetItemData(video as object) as object
+    if video.videoId <> invalid and video.type = invalid
+        video.type = "video"
+    end if
+
+    if video.type <> "video" and video.type <> "playlist" and video.type <> "channel"
+        return invalid
+    end if
+
+    videoItem = CreateObject("roSGNode", "ContentNode")
+    videoItem.addField("HDItemWidth", "float", false)
+    videoItem.append(video)
+
+    if video.type = "channel"
+        videoItem.HDItemWidth = "200"
+    else
+        videoItem.HDItemWidth = "350"
+    end if
+    return videoItem
+end function
