@@ -1,0 +1,165 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+
+function Init()
+    m.disableSavingToRegistry = false
+    LoadPreferencesFile()
+    AddNodeFields()
+    LoadUserPreferencesFromRegistry()
+    AddNodeFieldsObservers()
+end function
+
+function LoadPreferencesFile()
+    m.prefsModel = ParseJson(ReadAsciiFile("libpkg:/config/preferences.json5"))
+end function
+
+function AddNodeFields()
+    fields = {}
+    for each child in m.prefsModel
+        AddNodeFieldsFromPreference(child, fields)
+    end for
+    ' We keep reference to fields specific to preferences, to avoid default fields like focusedChild
+    m.top.preferenceFields = fields
+end function
+
+function AddNodeFieldsFromPreference(pref as object, fields as object)
+    if pref.key <> invalid and pref.type <> invalid
+        fieldType = ""
+        if pref.type = "boolean"
+            fieldType = "boolean"
+        else if pref.type = "string"
+            fieldType = "string"
+        else if pref.type = "radio"
+            fieldType = "string"
+        end if
+        m.top.addField(pref.key, fieldType, false)
+        fields[pref.key] = true
+    end if
+    if pref.children <> invalid
+        for each child in pref.children
+            AddNodeFieldsFromPreference(child, fields)
+        end for
+    end if
+end function
+
+function AddNodeFieldsObservers()
+    prefsFields = m.top.preferenceFields
+    for each key in prefsFields
+        m.top.observeField(key, "SaveUserPreferencesToRegistry")
+    end for
+end function
+
+function LoadUserPreferencesFromRegistry()
+    ' Step 1: Load user preferences from registry
+    userPrefs = RegistryUtils.Read(RegistryUtils.USER_PREFERENCES)
+    if userPrefs = invalid
+        userPrefs = {}
+    else
+        userPrefs = ParseJson(userPrefs)
+    end if
+
+    ' Step 2: Migrate existing preferences to new format (if needed)
+    isDirty = MigrateExistingPreferences(userPrefs)
+    ' Step 3: Apply defaults to user preferences (if needed)
+    isDirty = ApplyDefaultsToUserPreferences(userPrefs) or isDirty
+
+    ' Step 4: set field values in node
+    for each key in userPrefs
+        m.top[key] = userPrefs[key]
+    end for
+
+    ' Step 5: Save user preferences (if needed)
+    if isDirty
+        SaveUserPreferencesToRegistry()
+    end if
+end function
+
+function SaveUserPreferencesToRegistry() as void
+    if m.disableSavingToRegistry
+        return
+    end if
+    userPrefs = {}
+    prefsFields = m.top.preferenceFields
+    for each key in prefsFields
+        userPrefs[key] = m.top[key]
+    end for
+    userPrefs.__version = m.top.__version
+    RegistryUtils.Write(RegistryUtils.USER_PREFERENCES, FormatJson(userPrefs))
+end function
+
+function MigrateExistingPreferences(userPrefs as object) as boolean
+    isDirty = false
+
+    ' v0 -> v1
+    instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+    if instances <> invalid
+        currentInstance = userPrefs["invidious.instance"]
+        if currentInstance = invalid or currentInstance = ""
+            instances = ParseJson(instances)
+            if instances.Count() > 0
+                instance = instances[0]
+                if instance <> invalid and instance <> ""
+                    userPrefs["invidious.instance"] = instance
+                    isDirty = true
+                end if
+            end if
+        end if
+        RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
+    end if
+
+    ' v1 -> v2 goes here (if needed)
+    ' if userPrefs.__version = 1
+    '   'do stuff
+    ' end if
+
+    ' TODO: handle case where saved preferences version is higher than current version (e.g. user downgraded)
+    return isDirty
+end function
+
+function ApplyDefaultsToUserPreferences(userPrefs as object) as boolean
+    isDirty = false
+    for each child in m.prefsModel
+        isDirty = ApplyToUserPreferences(userPrefs, child) or isDirty
+    end for
+    return isDirty
+end function
+
+function ApplyToUserPreferences(userPrefs as object, model as object) as boolean
+    isDirty = false
+    if model.children <> invalid
+        for each child in model.children
+            isDirty = ApplyToUserPreferences(userPrefs, child) or isDirty
+        end for
+    end if
+
+    if model.defaultValue <> invalid and (not userPrefs.DoesExist(model.key) or userPrefs[model.key] = invalid)
+        userPrefs[model.key] = model.defaultValue
+        isDirty = true
+    end if
+    return isDirty
+end function
+
+function GetUserPreferences(unused as dynamic) as object
+    userPrefs = {}
+    prefsFields = m.top.preferenceFields
+    for each key in prefsFields
+        userPrefs[key] = m.top[key]
+    end for
+    return userPrefs
+end function
+
+function ApplyUserPreferences(preferences as object) as void
+    if preferences = invalid
+        return
+    end if
+    ' TODO: user input validation
+    m.disableSavingToRegistry = true
+    m.top.setFields(preferences)
+    m.disableSavingToRegistry = false
+    SaveUserPreferencesToRegistry()
+end function
+
+function ClearUserPreferences(unused as dynamic) as void
+    userPrefs = {}
+    ApplyDefaultsToUserPreferences(userPrefs)
+    ApplyUserPreferences(userPrefs)
+end function
