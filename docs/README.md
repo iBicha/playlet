@@ -126,7 +126,7 @@ Playlet app is responsible for a few things:
   - By default, it tries to load the latest version from Github
   - If that fails (for example, if Github was down), it fallsback to loading an embedded copy of Playlet Lib
     - `if Github was down` -> yes, this has happened in the past, and it did not stop Playlet for working.
-  - In dev mode, it loads playlet lib that's being served by [BrightScript Language Extension for VS Code](#brightscript-language-extension-for-vs-code)
+  - In dev mode, it loads Playlet lib that's being served by [BrightScript Language Extension for VS Code](#brightscript-language-extension-for-vs-code)
   - Once loaded, Playlet loads the `MainScene` from Playlet Lib
 - Pass Launch parameters and Input parameters to Playlet Lib
 - Show a loading screen and wait for Playlet Lib to hide it
@@ -150,14 +150,14 @@ Playlet Lib is a [ComponentLibrary](https://developer.roku.com/en-ca/docs/refere
 
 ### WebServer
 
-Playlet lib comes equipped with a web server that runs on 8888 when the app starts. This server enables:
+Playlet lib comes equipped with a web server that runs on port 8888 when the app starts. This server enables:
 
 - The communication between Playlet and [Playlet Web App](#playlet-web-app)
   - Through http calls, and even through web sockets for real time events
-  - Allows remotely casting videos, change preferences, etc
+  - Allows remotely casting videos, change preferences, etc.
 - Authentication using Invidious
 
-The web server runs on a continiously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serving static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more
+The web server runs on a continiously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serve static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more.
 
 #### Debug endpoints
 
@@ -228,11 +228,11 @@ This file defines the kind of preferences that users can change, such as autopla
 
 This file is parsed at runtime and UI for the settings is generated. The same mechanism is used for Playlet and the Web App.
 
-Additionally, The web server exposes the settings under `/api/preferences`, which can enable importing/exporting user preferences.
+Additionally, the web server exposes the settings under `/api/preferences`, which can enable importing/exporting user preferences.
 
 ### Home page layout
 
-When playlet starts, it shows a video feed in the screen. Subscription, Trending videos, and so on.
+When Playlet starts, it shows a video feed in the screen. Subscription, Trending videos, and so on.
 
 The layout is defined under [playlet-lib/src/config/default_home_layout.json](/playlet-lib/src/config/default_home_layout.json).
 
@@ -240,7 +240,7 @@ This could allow users to define custom layouts, so they can see what they find 
 
 Additionally each feed has information on how it is fetched. For now, only Invidious can be data source, but other systems should be configured in the same way.
 
-Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json](/playlet-lib/src/config/invidious_video_api.json), and Playlet parses these at runtime and make the right api calls to fetch the data.
+Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json](/playlet-lib/src/config/invidious_video_api.json), and Playlet parses these at runtime and make the right API calls to fetch the data.
 
 Finally, this layout system is what allows both the BrightScript app and the Web app to display the same homepage.
 
@@ -248,7 +248,7 @@ Finally, this layout system is what allows both the BrightScript app and the Web
 
 Playlet comes with a web app built with [Svelte](https://svelte.dev/). The web app can be used to browse videos, search, cast videos to TV, and even change preferences.
 
-The web app gets served using the Playlet Web server. It also interact with the web apis from web server.
+The web app gets served using the Playlet web server. It also interacts with the web APIs from the web server.
 It's important to note that if Playlet is not ON (on your Roku device) or the TV is in screen saver mode, then the web app can't be used.
 
 When Playlet gets built, several steps happen:
@@ -261,7 +261,7 @@ When Playlet gets built, several steps happen:
 
 The web app uses [Svelte](https://svelte.dev/), [Vite](https://vitejs.dev/) and [Typescript](https://www.typescriptlang.org/) primarily. It currently does not use [SvelteKit](https://kit.svelte.dev/), since it doesn't need some of the more advanced features that SvelteKit offers, such as routing or server-side rendering (SSR)
 
-Since modifying the web app code requires building all three projects (playlet, playlet lib, and web app) this makes the iteration speed very slow, and we lose the benefits of web development, such as hot reloads.
+Since modifying the web app code requires building all three projects (Playlet, Playlet lib, and Playlet web app) this makes the iteration speed very slow, and we lose the benefits of web development, such as hot reloads.
 
 For that reason, the recommended iteration when working on the dev app is:
 
@@ -289,7 +289,7 @@ In this case specifically, the web server acts as a proxy between Invidious and 
 - The web server is not secure: it's not on HTTPS
 - It's best if the Invidious access token would not be served to the web app, and remain on the Roku device
 
-For API calls that don't require authentication, the web app fetches data from invidious directly.
+For API calls that don't require authentication, the web app fetches data from Invidious directly.
 
 ### Developer settings
 
