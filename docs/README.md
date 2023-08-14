@@ -97,7 +97,7 @@ Well, if you do happen to use it, Playlet is configured to connect to RALE.
 
 ### BrighterScript
 
-[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language compiler to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a couple of BrighterScript plugins (More on that later).
+[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language that compiles to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a couple of BrighterScript plugins (More on that later).
 
 ### BrighterScript Linter/Formatter
 
