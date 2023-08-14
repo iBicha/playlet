@@ -1,6 +1,6 @@
 # Playlet documentation
 
-This documents contains verious kinds of information related to Playlet development. It's a bit of a [brain dump](https://en.wiktionary.org/wiki/brain_dump) that I tried to keep structured.
+This document contains various kinds of information related to Playlet development. It's a bit of a [brain dump](https://en.wiktionary.org/wiki/brain_dump) that I tried to keep structured.
 
 - [Environment setup](#environment-setup)
   - [Project setup](#project-setup)
@@ -84,7 +84,7 @@ The [BrightScript Language extension for VSCode](https://marketplace.visualstudi
 - Roku Registry
   - Allows you to inspect the content of the [Registry](https://developer.roku.com/en-ca/docs/references/brightscript/components/roregistry.md)
 
-Playlet is configured to have all these features available when ran in debug mode.
+Playlet is configured to have all these features available when run in debug mode.
 
 ### RALE (Roku Advanced Layout Editor)
 
@@ -97,7 +97,7 @@ Well, if you do happen to use it, Playlet is configured to connect to RALE.
 
 ### BrighterScript
 
-[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language compiles to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a couple of BrighterScript plugins (More on that later).
+[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language compiler to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a couple of BrighterScript plugins (More on that later).
 
 ### BrighterScript Linter/Formatter
 
@@ -137,9 +137,9 @@ That's pretty much it.
 
 There are a few reasons we made this separation:
 
-- Playlet relies on [Invidious](https://github.com/iv-org/invidious). Invidious tries to keep up with Youtube making changes to their platform, but sometimes, a breaking change happens the requires Playlet to react quickly. Releasing through the Roku Channel store can take days, or a week. During this time, Playlet would be not functional, and that's not acceptable.
+- Playlet relies on [Invidious](https://github.com/iv-org/invidious). Invidious tries to keep up with Youtube making changes to their platform, but sometimes, a breaking change happens that requires Playlet to react quickly. Releasing through the Roku Channel store can take days, or a week. During this time, Playlet would be not functional, and that's not acceptable.
 - The ability to roll back: Sometimes an app breaking bug gets released. Allowing users to choose a seperate version is a flexible way to keep things working. Although right now rollbacks are behind a - hidden by default - developer menu, the reasoning still stands.
-- It is simply easier to release: Releasing Playlet Lib on Github, and everyone receiving the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
+- It is simply easier to release: Releasing Playlet Lib on Github, and everyone receives the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
   - I've had instances where I was trying to pass the certfication for Playlet to publish it. One of the criterias is to pass a some automated tests. But the tests were failing because their system could not connect to their Roku test devices (connection keeps timing out). My only option was to keep trying over and over until it worked.
 
 It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
@@ -167,11 +167,11 @@ Additionally, the web server exposes Web APIs in debug mode to help with debuggi
 - `/debug/libpkg` to inspect files under Playlet Lib
 - `/debug/tmp` and `/debug/cachefs` to inspect files in temporary and cache
 
-These are useful to see if the files and caching are working as expected
+These are useful to see if the files and caching are working as expected.
 
 ### Releases from Github
 
-Since Component Libraries are simply zip files hosted some https endpoint, Github releases are used to host and deliever Playet Lib to users. By default, Playlet grabs `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip` and loads it, but this can be pointed to somewhere else, if for some reason the Github repository becomes unavailable.
+Since Component Libraries are simply zip files hosted at some https endpoint, Github releases are used to host and deliver Playet Lib to users. By default, Playlet grabs `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip` and loads it, but this can be pointed to somewhere else, if for some reason the Github repository becomes unavailable.
 
 ### Dev library hosted by VS Code Extension
 
@@ -186,7 +186,7 @@ When in debug mode, Playlet lib is packaged and served locally on port 8080, and
 
 To implement functionality that runs in background threads, [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md)s must be used.
 
-Setting up a task involes lots of boilerplate: setting up the task in an xml file, defining inputs and outputs, code to listen for a task to finish, and so on.
+Setting up a task involves lots of boilerplate: setting up the task in an xml file, defining inputs and outputs, code to listen for a task to finish, and so on.
 
 That's why there's a BrighterScript plugin that generates a task for a function with the attribute `@asynctask`.
 
@@ -215,7 +215,7 @@ StartAsyncTask(MyBackgroundTask, {myVar: "some input"}, function(output as objec
 end function)
 ```
 
-Although very useful, but this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `StartAsyncTask` create a new instance of the task every time.
+Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `StartAsyncTask` create a new instance of the task every time.
 
 ### Feature flags
 
@@ -226,7 +226,7 @@ Playlet uses [bs_const](https://developer.roku.com/en-ca/docs/references/brights
 Playlet uses a json file that lists user preferences. It should be under [playlet-lib/src/config/preferences.json](/playlet-lib/src/config/preferences.json)
 This file defines the kind of preferences that users can change, such as autoplay, preferred quality, and so on.
 
-This file is parsed at runtime and UI for the settings is generated. The same mechanism is used to Playlet and the Web App.
+This file is parsed at runtime and UI for the settings is generated. The same mechanism is used for Playlet and the Web App.
 
 Additionally, The web server exposes the settings under `/api/preferences`, which can enable importing/exporting user preferences.
 
@@ -263,21 +263,21 @@ The web app uses [Svelte](https://svelte.dev/), [Vite](https://vitejs.dev/) and 
 
 Since modifying the web app code requires building all three projects (playlet, playlet lib, and web app) this makes the iteration speed very slow, and we lose the benefits of web development, such as hot reloads.
 
-For that reason, the recommeneded iteration when working on the dev app is:
+For that reason, the recommended iteration when working on the dev app is:
 
 1. Start `Playlet (dev)` (by selecting `Playlet (dev)` and pressing Play in VS Code)
 1. Once Playlet starts, switch to `Playlet Web (dev)` and press play. Do not stop `Playlet (dev)`
 1. The web app should start in the browser
 
-You will notice that thr browser tab that just opened shows an url like `http://192.168.1.X:5173/?host=192.168.1.Y:8888`
+You will notice that the browser tab that just opened shows an url like `http://192.168.1.X:5173/?host=192.168.1.Y:8888`
 
-This is because the web app will be served from Vite, while API calls to the playlet will be done to the Playlet lib webserver.
+This is because the web app will be served from Vite, while API calls to the Playlet will be done to the Playlet lib webserver.
 
 For debugging, choose the compound target `Playlet Web (Debug)`.
 
 ### Tailwind/Daisy UI
 
-Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base styling library. Additionally, it uses [DaisyUI](https://daisyui.com/) as it offers a versatile set of components, and has built-in supports for themes.
+The Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base styling library. Additionally, it uses [DaisyUI](https://daisyui.com/) as it offers a versatile set of components, and has built-in supports for themes.
 
 ### API calls (proxy authenticated)
 
