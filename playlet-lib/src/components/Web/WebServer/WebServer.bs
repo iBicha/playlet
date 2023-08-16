@@ -1,13 +1,77 @@
-function Init()
-    m.top.functionName = "WebServerLoop"
+import "pkg:/components/Web/WebServer/Http/HttpServer.bs"
+import "pkg:/components/Web/WebServer/Middleware/HttpDefaultRouter.bs"
+import "pkg:/source/utils/Logging.bs"
 
-    m.routers = []
+function Init()
+    InitializeLogging()
+    m.log = new log.Logger("WebServer")
+
+    m.top.functionName = "WebServerLoop"
+end function
+
+function StartServer(unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopServer(unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
 end function
 
 function WebServerLoop()
+    msgPort = CreateObject("roMessagePort")
 
+    settings = new Http.HttpSettings(msgPort)
+    settings.IdleTimeInSeconds = m.top.idleTimeInSeconds
+    settings.MaxConnections = m.top.maxConnections
+    settings.MaxRequestLength = m.top.maxRequestLength
+    settings.PackageName = m.top.packageName
+    settings.Port = m.top.port
+    settings.ServerName = m.top.serverName
+    settings.TimeoutInMs = m.top.timeoutInMs
+
+    server = new Http.HttpServer(settings, m.top)
+
+    SetupRoutes(server)
+    server.UseRouter(new Http.HttpDefaultRouter())
+
+    m.top.shouldQuit = false
+    m.top.observeField("shouldQuit", msgPort, ["shouldQuit"])
+    m.top.isRunning = true
+
+    timeout = settings.TimeoutInMs
+    msgPort = settings.MessagePort
+
+    while true
+        server.PreWait()
+
+        msg = wait(timeout, msgPort)
+        msgType = type(msg)
+
+        if msgType = "roSocketEvent" or msg = invalid
+            server.PostWait()
+        else if msgType = "roSGNodeEvent"
+            info = msg.getInfo()
+            if info.shouldQuit = true
+                exit while
+            end if
+        end if
+    end while
+
+    m.log.info("closing server")
+    server.Close()
+    m.top.isRunning = false
+    m.top.unobserveField("shouldQuit")
 end function
 
-function Get(path as string, handler as function)
-    m.routers.push({ path: path, handler: handler })
+function SetupRoutes(server as object)
+    m.log.warn("No routes configured")
 end function

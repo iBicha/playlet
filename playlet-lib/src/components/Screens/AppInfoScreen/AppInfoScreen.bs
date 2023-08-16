@@ -1,6 +1,4 @@
-import "pkg:/components/Screens/AppInfoScreen/AppVersionTask.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
-import "pkg:/source/utils/ApplicationInfo.bs"
 
 function Init()
     m.displayNames = {
@@ -14,23 +12,22 @@ function Init()
         "id": "App ID"
     }
 
-    appInfo = new ApplicationInfo()
-
     m.keyValueList = m.top.findNode("KeyValueListContent")
-    'TODO: arguably, appInfo.GetAppInfo should return all fields
-    m.appInfo = appInfo.GetAppInfo()
-    m.appInfo["lib_version_latest"] = "N/A"
-    m.appInfo["lib_url"] = "N/A"
-    m.appInfo["lib_url_type"] = "N/A"
+end function
 
-    scene = m.top.getScene()
-    if scene.playletLibLoadedUrl <> invalid
-        m.appInfo["lib_url"] = scene.playletLibLoadedUrl.link
-        m.appInfo["lib_url_type"] = scene.playletLibLoadedUrl.type
-    end if
+function OnNodeReady()
+    m.appInfo = m.applicationInfo@.GetAppInfo(invalid)
 
     UpdateKeyValueList()
-    GetLatestVersion()
+
+    if m.appInfo.lib_version_latest = "N/A"
+        m.applicationInfo.ObserveFieldScoped("lib_version_latest", "OnAppInfoChanged")
+    end if
+end function
+
+function OnAppInfoChanged()
+    m.appInfo["lib_version_latest"] = m.applicationInfo.lib_version_latest
+    UpdateKeyValueList()
 end function
 
 function UpdateKeyValueList()
@@ -43,13 +40,4 @@ function UpdateKeyValueList()
         contentNode = m.keyValueList.createChild("ContentNode")
         contentNode.title = value
     end for
-end function
-
-function GetLatestVersion()
-    StartAsyncTask(AppVersionTask, {}, function(output as object) as void
-        if output.result.latest <> invalid
-            m.appInfo["lib_version_latest"] = output.result.latest
-            UpdateKeyValueList()
-        end if
-    end function)
 end function

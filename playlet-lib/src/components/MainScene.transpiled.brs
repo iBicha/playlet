@@ -22,16 +22,22 @@ function MainSceneContainerChanged()
         InputArgumentsReceived()
     end if
     HideLoadingScreen()
+    StartWebServer()
 end function
 
 function LaunchArgumentsReceived() as void
     scene = m.top.getScene()
     launchArgs = scene.launchArgs
-    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:31", "LaunchArgumentsReceived", launchArgs)
+    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:32", "LaunchArgumentsReceived", launchArgs)
 end function
 
 function InputArgumentsReceived() as void
     scene = m.top.getScene()
     inputArgs = scene.inputArgs
-    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:37", "InputArgumentsReceived", inputArgs)
+    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:38", "InputArgumentsReceived", inputArgs)
+end function
+
+function StartWebServer()
+    m.webServer = m.top.findNode("WebServer")
+    m.webServer.callfunc("StartServer", invalid)
 end function'//# sourceMappingURL=./MainScene.bs.map

@@ -1,0 +1,206 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+namespace Invidious
+    const DEFAULT_INSTANCE = "https://vid.puffyan.us"
+
+    const TOKEN_CALLBACK = "/invidious/token_callback"
+
+    const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+    const SEARCH_ENDPOINT = "/api/v1/search"
+
+    const AUTH_SCOPES = "GET:feed,GET:playlists,POST:tokens/register,POST:tokens/unregister,POST:history*"
+    const AUTH_FEED = "/api/v1/auth/feed"
+    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
+    const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
+    const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
+
+    const TOKEN_TIMESPAN = 60 * 60 * 24 * 365 * 2 '2 years
+
+    class InvidiousService
+        public node as object
+
+        function new(node as object)
+            m.node = node
+            apiDefinitions = node.apiDefinitions
+
+            m.endpoints = {}
+
+            for each apiDefinition in apiDefinitions.endpoints
+                m.endpoints[apiDefinition.name] = apiDefinition
+            end for
+
+            m.responseHanlders = {
+                DefaultHandler: m.DefaultHandler
+            }
+        end function
+
+        function DefaultArgs() as object
+            if m._defaultArgs = invalid
+                m._defaultArgs = {
+                    params: {
+                        region: m.node.applicationInfo@.GetUserCountryCode(invalid)
+                    }
+                }
+            end if
+            return m._defaultArgs
+        end function
+
+        function GetInstance() as string
+            instance = m.node.preferences["invidious.instance"]
+            if not StringUtils.IsNullOrEmpty(instance)
+                return instance
+            end if
+
+            return DEFAULT_INSTANCE
+        end function
+
+
+        function SearchSuggestions(q as string) as object
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
+
+            args = m.DefaultArgs()
+            args.params.q = q
+            args.cacheSeconds = 60 * 60 * 6 ' 6 hours
+
+            response = Requests().get(url, args)
+
+            if response.statuscode = 200
+                return response.json
+            end if
+            return invalid
+        end function
+
+        function Search(q as string, args = invalid as dynamic) as object
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.SEARCH_ENDPOINT}`
+
+            _args = m.DefaultArgs()
+            _args.params.q = q
+
+            if args <> invalid
+                if args.page <> invalid
+                    _args.params.page = Str(args.page).Trim()
+                end if
+                if args.sort_by <> invalid
+                    _args.params.sort_by = args.sort_by
+                end if
+                if args.date <> invalid
+                    _args.params.date = args.date
+                end if
+                if args.duration <> invalid
+                    _args.params.duration = args.duration
+                end if
+                if args.type <> invalid
+                    _args.params.type = args.type
+                end if
+                if args.features <> invalid
+                    _args.params.features = args.features.join(",")
+                end if
+            end if
+            response = Requests().get(url, _args)
+
+            if response.statuscode = 200
+                return response.json
+            end if
+            return invalid
+        end function
+
+        function MakeRequest(requestData as object) as object
+            endpoint = m.endpoints[requestData.endpoint]
+            if endpoint = invalid
+                return invalid
+            end if
+
+            instance = m.GetInstance()
+
+            url = instance + endpoint.url
+
+            args = { params: {} }
+
+            if endpoint.queryParams <> invalid
+                for each queryParamKey in endpoint.queryParams
+                    queryParam = endpoint.queryParams[queryParamKey]
+                    if queryParam.default <> invalid
+                        if queryParam.type = "string"
+                            args.params[queryParamKey] = queryParam.default
+                        else if queryParam.type = "#ISO3166"
+                            if queryParam.default = "GetUserCountryCode"
+                                args.params[queryParamKey] = m.node.applicationInfo@.GetUserCountryCode(invalid)
+                            else
+                                args.params[queryParamKey] = queryParam.default
+                            end if
+                        end if
+                    end if
+                end for
+            end if
+
+            if requestData.queryParams <> invalid
+                args.params.append(requestData.queryParams)
+            end if
+
+            if requestData.pathParams <> invalid
+                for each param in requestData.pathParams
+                    url = url.Replace(`:${param}`, requestData.pathParams[param])
+                end for
+            end if
+
+            response = Requests().get(url, args)
+
+            responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+
+            result = responseHandler(m, requestData, response)
+
+            return result
+        end function
+
+        function DefaultHandler(m as object, requestData as object, response as object) as object
+            if response.statuscode = 200
+                return response.json
+            end if
+            return invalid
+        end function
+
+        function SetAuthToken(token as string, instance as string, username as dynamic, scopes as dynamic, expire as dynamic)
+            obj = {
+                token: token,
+                instance: instance
+            }
+            if username <> invalid
+                obj.username = username
+            end if
+            if scopes <> invalid
+                obj.scopes = scopes
+            end if
+            if expire <> invalid
+                obj.expire = expire
+            end if
+
+            json = FormatJson(obj)
+            RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
+
+            m.node.authToken = obj
+        end function
+
+        function GetAuthorizeTokenLink() as dynamic
+            instance = m.GetInstance()
+            ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
+            invidiousHost = instance.Replace("https://", "http://")
+
+            address = m.node.webServer@.GetServerAddress()
+            if address = invalid
+                return invalid
+            end if
+
+            expire = TimeUtils.Now().AsSeconds() + Invidious.TOKEN_TIMESPAN
+
+            callbackUrl = `${address}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
+            scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
+            return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
+        end function
+    end class
+
+end namespace

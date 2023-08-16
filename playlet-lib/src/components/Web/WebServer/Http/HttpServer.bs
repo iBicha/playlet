@@ -1,0 +1,182 @@
+import "pkg:/source/utils/WebUtils.bs"
+import "HttpSettings.bs"
+import "HttpRouter.bs"
+import "HttpConnectionState.bs"
+import "HttpConnection.bs"
+
+namespace Http
+
+    function InitGlobals()
+        WebUtils.MimeType()
+        WebUtils.HttpTitle()
+    end function
+
+    class HttpServer
+        private log as log.Logger
+
+        ' members
+        private connections = invalid
+        private sockin = invalid
+        private uptime = invalid
+
+        ' initializable (copied) members
+        private num_requests = 0
+        private total_in = 0
+        private total_out = 0
+
+        private routers
+
+        public settings as Http.HttpSettings
+        public task as object
+
+        function new(settings as HttpSettings, task as object)
+            m.log = new log.Logger("HttpServer")
+            m.settings = settings
+            m.task = task
+            m.routers = []
+            Http.InitGlobals()
+            m.Init()
+        end function
+
+        function Init()
+            m.uptime = CreateObject("roTimespan")
+            m.connections = CreateObject("roAssociativeArray")
+
+            ' create incoming socket
+            sockin = CreateObject("roStreamSocket")
+            if sockin = invalid
+                m.log.error("socket()")
+            end if
+
+            ' reuse address
+            if not sockin.setReuseAddr(true)
+                m.log.error("setsockopt(SO_REUSEADDR)", sockin.status())
+            end if
+
+            ' bind socket
+            addrin = CreateObject("roSocketAddress")
+            addrin.setPort(m.settings.Port)
+            if not sockin.setAddress(addrin)
+                m.log.error("bind(port" + Stri(m.settings.Port) + ")", sockin.status())
+            end if
+            ' listen on socket
+            if not sockin.listen(m.settings.MaxConnections)
+                m.log.error("listen()", sockin.status())
+            end if
+            ' monitor socket
+            sockin.setMessagePort(m.settings.MessagePort)
+            sockin.notifyReadable(true)
+
+            m.sockin = sockin
+
+            m.log.info("listening on " + addrin.getAddress())
+        end function
+
+        function UseRouter(router as HttpRouter)
+            m.routers.Push(router)
+        end function
+
+        function PreWait()
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.CheckTimeout(m.settings.TimeoutInMs)
+                cs = conn.state
+                if cs = Http.HttpConnectionState.DONE
+                    conn.socket.notifyReadable(false)
+                    conn.socket.notifyWritable(false)
+                else if cs = Http.HttpConnectionState.RECV_REQUEST
+                    conn.socket.notifyReadable(true)
+                    conn.socket.notifyWritable(false)
+                else if cs = Http.HttpConnectionState.SEND_HEADER or cs = Http.HttpConnectionState.SEND_RESPONSE
+                    conn.socket.notifyWritable(true)
+                    conn.socket.notifyReadable(false)
+                else
+                    m.log.error("invalid state")
+                end if
+            end for
+        end function
+
+        function PostWait()
+            connections = m.connections
+            if m.sockin.isReadable()
+                conn = m.AcceptHttpConnection()
+                if conn <> invalid
+                    connections[conn.id] = conn
+                end if
+            end if
+            for each id in connections
+                conn = connections[id]
+                cs = conn.state
+                if cs = Http.HttpConnectionState.RECV_REQUEST
+                    if conn.socket.isReadable()
+                        conn.PollRequest(m)
+                    end if
+                else if cs = Http.HttpConnectionState.SEND_HEADER
+                    if conn.socket.isWritable()
+                        conn.PollHeader(m)
+                    end if
+                else if cs = Http.HttpConnectionState.SEND_RESPONSE
+                    if conn.socket.isWritable()
+                        conn.PollResponse(m)
+                    end if
+                else if cs = Http.HttpConnectionState.DONE
+                    ' handle with other connections that might transition to done
+                else
+                    m.log.error("invalid state")
+                end if
+                cs = conn.state
+                if cs = Http.HttpConnectionState.DONE
+                    if conn.close
+                        conn.socket.close()
+                        connections.delete(id)
+                    else if conn.ws_upgrade and m.websocket <> invalid
+                        m.log.info("upgrading connection to web socket")
+                        m.websocket.AddConnection(conn.socket)
+                        connections.delete(id)
+                    else
+                        conn.Recycle()
+                        conn.PollRequest(m)
+                    end if
+                end if
+            end for
+        end function
+
+        function AcceptHttpConnection() as HttpConnection
+            sockin = m.sockin
+            socket = sockin.accept()
+            if not sockin.eOK()
+                m.log.error("accept()", sockin.status())
+            end if
+            if socket = invalid
+                return invalid
+            end if
+            conn = new HttpConnection(m, m.settings)
+            conn.Accepted(m, socket)
+            return conn
+        end function
+
+        function Close()
+            ' close all the sockets
+            m.sockin.close()
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.socket.close()
+            end for
+            if m.websocket <> invalid
+                m.websocket.Close()
+            end if
+            ' final stats
+            m.log.info(`\n` + m.stats())
+        end function
+
+        function Stats() as string
+            stats = "  Uptime" + Stri(m.uptime.totalSeconds()) + " secs" + `\n`
+            stats = stats + "  Requests" + Stri(m.num_requests) + `\n`
+            stats = stats + "  Bytes" + Stri(m.total_in) + " in," + Stri(m.total_out) + " out"
+            return stats
+        end function
+    end class
+
+end namespace

@@ -1,8 +1,67 @@
+import "pkg:/components/Web/WebServer/Middleware/HttpStaticFilesRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/RpcRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/SearchHistoryRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/StateApiRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/PreferencesRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/InvidiousRouter.bs"
+import "pkg:/components/Web/WebServer/Middleware/CorsMiddleware.bs"
+import "pkg:/components/Web/WebServer/Middleware/BasicAuthMiddleware.bs"
+
 function Init()
-    Get("/test", TestFunction)
+    m.top.packageName = "Playlet"
+    m.top.serverName = "Playlet Web Server"
 end function
 
+function GetServerAddress(unused as dynamic) as dynamic
+    port = m.top.port
+    ip = m.top.applicationInfo@.GetLocalIpAddress()
+    if StringUtils.IsNullOrEmpty(ip)
+        return invalid
+    end if
+    return `http://${ip}:${port}`
+end function
 
-function TestFunction(context as object)
+function SetupRoutes(server as object)
+    homeRouter = new Http.HttpRouter()
+    homeRouter.Get("/", function(context as object) as boolean
+        response = context.response
+        response.Redirect("/index.html")
+        return true
+    end function)
 
+    #if DEBUG
+        allowedOrigin = "*"
+    #else
+        ip = server.task.applicationInfo@.GetLocalIpAddress(invalid)
+        isValidIp = not StringUtils.IsNullOrEmpty(ip)
+        if isValidIp
+            port = server.settings.port
+            allowedOrigin = `http://${ip}:${port}`
+        else
+            allowedOrigin = "*"
+        end if
+    #end if
+
+    server.UseRouter(new Http.CorsMiddleware(allowedOrigin))
+    #if WEB_SOCKETS
+        m.server.UseRouter(new Http.WebSocketMiddleware())
+    #end if
+    server.UseRouter(homeRouter)
+    server.UseRouter(new Http.RpcRouter())
+    server.UseRouter(new Http.StateApiRouter())
+    server.UseRouter(new Http.PreferencesRouter())
+    server.UseRouter(new Http.InvidiousRouter())
+    server.UseRouter(new Http.SearchHistoryRouter())
+    server.UseRouter(new Http.HttpStaticFilesRouter("/", "libpkg:/www", false, false, false))
+    server.UseRouter(new Http.HttpStaticFilesRouter("/config", "libpkg:/config", false, false, false))
+    #if DEBUG
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", true, true, false))
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/pkg", "pkg:/", true, true))
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/tmp", "tmp:/", true, true))
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/cachefs", "cachefs:/", true, true))
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/common", "common:/", true, true))
+    #end if
+    #if WEB_SERVER_BASIC_AUTH
+        server.UseRouter(new Http.BasicAuthMiddleware())
+    #end if
 end function

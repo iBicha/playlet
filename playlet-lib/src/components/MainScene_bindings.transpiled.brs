@@ -14,6 +14,16 @@ function InitializeBindings()
             }, 
             "NavBar": {
                 "appController": "/AppController"
+            }, 
+            "Invidious": {
+                "webServer": "../WebServer", 
+                "applicationInfo": "../ApplicationInfo", 
+                "preferences": "../Preferences"
+            }, 
+            "WebServer": {
+                "applicationInfo": "../ApplicationInfo", 
+                "invidious": "../Invidious", 
+                "preferences": "../Preferences"
             }
         }
     }
