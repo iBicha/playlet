@@ -28,13 +28,13 @@ end function
 function LaunchArgumentsReceived() as void
     scene = m.top.getScene()
     launchArgs = scene.launchArgs
-    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:32", "LaunchArgumentsReceived", launchArgs)
+    m.log.info("file" + ":///home/runner/work/playlet/playlet/playlet-lib/src/components/MainScene.bs:32", "LaunchArgumentsReceived", launchArgs)
 end function
 
 function InputArgumentsReceived() as void
     scene = m.top.getScene()
     inputArgs = scene.inputArgs
-    m.log.info("file" + ":///Users/brahim/Roku/playlet/playlet-lib/src/components/MainScene.bs:38", "InputArgumentsReceived", inputArgs)
+    m.log.info("file" + ":///home/runner/work/playlet/playlet/playlet-lib/src/components/MainScene.bs:38", "InputArgumentsReceived", inputArgs)
 end function
 
 function StartWebServer()
