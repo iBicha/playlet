@@ -1,5 +1,6 @@
 namespace Tests
 
+    @SGNode("ApplicationInfo")
     @suite
     class ApplicationInfoTests extends Rooibos.BaseTestSuite
 
@@ -8,26 +9,27 @@ namespace Tests
         end function
 
         protected override function beforeEach()
-            m.appInfo = new ApplicationInfo()
+            m.node.service = new ApplicationInfo(m.top)
         end function
 
         @describe("ApplicationInfo")
 
         @it("Returns a valid local ip address")
         function _()
-            ip = m.appInfo.GetLocalIpAddress()
+            ip = m.top@.GetLocalIpAddress(invalid)
             m.assertTrue(m.ipAddressRegex.IsMatch(ip))
         end function
 
         @it("Returns an invalid if no ip address is available")
         function _()
-            m.appInfo.roDeviceInfo = {
+            m.node.service.roDeviceInfo = {
                 GetIPAddrs: function() as dynamic
                     return []
                 end function
             }
 
-            m.assertInvalid(m.appInfo.GetLocalIpAddress())
+            ip = m.top@.GetLocalIpAddress(invalid)
+            m.assertInvalid(ip)
         end function
 
     end class

@@ -1,0 +1,87 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+
+namespace Http
+
+    class InvidiousRouter extends HttpRouter
+
+        function new()
+            super()
+            m.Get(Invidious.TOKEN_CALLBACK, function(context as object) as boolean
+                request = context.request
+                response = context.response
+                invidiousNode = context.task.invidious
+
+                if request.query["token"] <> invalid and request.query["ref"] <> invalid
+                    ' Token is encoded twice for some reason
+                    token = request.query["token"].DecodeUri().DecodeUriComponent()
+                    referer = request.query["ref"].DecodeUri()
+                    username = request.query["username"]
+                    scopes = request.query["scopes"]
+                    expire = request.query["expire"]
+
+                    if username <> invalid
+                        username = username.DecodeUriComponent().DecodeUriComponent()
+                    end if
+                    if scopes <> invalid
+                        scopes = scopes.DecodeUriComponent()
+                    end if
+
+                    invidiousNode@.SetAuthToken(token, referer, username, scopes, expire)
+                end if
+                response.Redirect("/")
+                return true
+            end function)
+
+
+            ' This is an endpoint allowing the web app to make an authenticated request
+            ' without needing the Invidious token
+            m.Get("/invidious/authenticated-request", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                invidiousNode = context.task.invidious
+
+                requestData = request.query["request-data"]
+                if requestData = invalid
+                    response.Default(400, "Expected request-data")
+                    return true
+                end if
+
+                token = invidiousNode.authToken
+                if token = invalid
+                    response.Default(403, "No token, not logged in")
+                    return true
+                end if
+
+                requestData = ParseJson(requestData)
+                ' Format object again because FormatJson formats in a specific way (sorts keys, etc.)
+                ' so we want an exact string for the md5 hash to match
+                requestDataJson = FormatJson(requestData)
+                cacheKey = CryptoUtils.GetMd5(requestDataJson)
+                path = `tmp:/${cacheKey}.json`
+
+                fs = CreateObject("roFilesystem")
+                if fs.exists(path)
+                    cacheData = ReadAsciiFile(path)
+                    response.SetBodyDataString(cacheData)
+                    response.ContentType("application/json")
+                    response.source = Http.HttpResponseSource.GENERATED
+                    return true
+                end if
+
+                invService = new Invidious.InvidiousService(invidiousNode)
+                result = invService.MakeRequest(requestData)
+                if result = invalid
+                    response.Default(500, "Failed to make request")
+                    return true
+                end if
+                response.Json(result)
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,27 @@
+import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+
+@asynctask
+function LatestLibVersionTask() as object
+    latest = GetLatestPlayletLibVersionFromGithubReleases()
+    return {
+        latest: latest
+    }
+end function
+
+function GetLatestPlayletLibVersionFromGithubReleases() as string
+    args = {
+        parseJson: false
+    }
+    response = Requests().request("HEAD", "https://github.com/iBicha/playlet/releases/latest", args)
+
+    if response.statusCode = 200
+        if response.headers.location <> invalid
+            regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
+            match = regex.match(response.headers.location)
+            if match.Count() = 2
+                return match[1]
+            end if
+        end if
+    end if
+    return "N/A"
+end function

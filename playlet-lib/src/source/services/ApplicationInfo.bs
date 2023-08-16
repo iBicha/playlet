@@ -1,12 +1,12 @@
 import "pkg:/source/utils/StringUtils.bs"
-import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 
-' TODO: should ApplicationInfo be a node for better caching across components?
 class ApplicationInfo
+    public node as object
     public roDeviceInfo as object
     public roAppInfo as object
 
-    function new()
+    function new(node as object)
+        m.node = node
         m.roDeviceInfo = CreateObject("roDeviceInfo")
         m.roAppInfo = CreateObject("roAppInfo")
     end function
@@ -38,7 +38,26 @@ class ApplicationInfo
                 lib_version: m.GetLibVersion(),
                 lib_git_commit_hash: m.GetLibGitCommitHash()
             }
+
+            m.appInfo["lib_version_latest"] = "N/A"
+            m.appInfo["lib_url"] = "N/A"
+            m.appInfo["lib_url_type"] = "N/A"
+
+            scene = m.node.getScene()
+            if scene.playletLibLoadedUrl <> invalid
+                m.appInfo["lib_url"] = scene.playletLibLoadedUrl.link
+                m.appInfo["lib_url_type"] = scene.playletLibLoadedUrl.type
+            end if
         end if
+
+        if m.appInfo.lib_version_latest = "N/A"
+            if not StringUtils.IsNullOrEmpty(m.node.lib_version_latest)
+                m.appInfo["lib_version_latest"] = m.node.lib_version_latest
+            else
+                m.node@.GetLatestPlayletLibVersion(invalid)
+            end if
+        end if
+
         return m.appInfo
     end function
 
@@ -103,28 +122,6 @@ class ApplicationInfo
             m.libManifestValues = values
         end if
         return m.libManifestValues
-    end function
-
-    function GetLatestPlayletLibVersion() as dynamic
-        if m.latestPlayletLibVersion = invalid
-            args = {
-                parseJson: false
-            }
-            response = Requests().request("HEAD", "https://github.com/iBicha/playlet/releases/latest", args)
-
-            if response.statusCode = 200
-                if response.headers.location <> invalid
-                    regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
-                    match = regex.match(response.headers.location)
-                    if match.Count() = 2
-                        m.latestPlayletLibVersion = match[1]
-                        return m.latestPlayletLibVersion
-                    end if
-                end if
-            end if
-            m.latestPlayletLibVersion = "N/A"
-        end if
-        return m.latestPlayletLibVersion
     end function
 
 end class

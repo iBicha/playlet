@@ -9,17 +9,17 @@ export class PlayletApi {
     }
 
     static async getPreferencesFile() {
-        const response = await fetch(`${PlayletApi.host()}/config/preferences.json`);
+        const response = await fetch(`${PlayletApi.host()}/config/preferences.json5`);
         return await response.json();
     }
 
     static async getHomeLayoutFile() {
-        const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.json`);
+        const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.json5`);
         return await response.json();
     }
 
     static async getInvidiousVideoApiFile() {
-        const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.json`);
+        const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.json5`);
         return await response.json();
     }
 
@@ -40,18 +40,19 @@ export class PlayletApi {
     }
 
     static async logout() {
-        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, { command: "logout" });
+        await this.rpcCall("InvidiousLogout");
     }
 
     static async playVideo(videoId, timestamp) {
         if (!videoId) {
             return;
         }
-        const payload = { command: "play", videoId: videoId };
+        const args = { videoId };
         if (timestamp !== undefined) {
-            payload["timestamp"] = timestamp;
+            args["timestamp"] = timestamp;
         }
-        return await PlayletApi.postJson(`${PlayletApi.host()}/api/command`, payload);
+
+        await this.rpcCall("PlayVideo", args);
     }
 
     static async getSearchHistory() {
@@ -82,7 +83,11 @@ export class PlayletApi {
             }]);
         }
 
-        await this.postJson(`${PlayletApi.host()}/api/command`, { command: "set-playlet-lib-urls", content: content });
+        await this.rpcCall("SetPlayletLibUrls", { content });
+    }
+
+    private static async rpcCall(func, args = undefined) {
+        await this.postJson(`${PlayletApi.host()}/api/rpc`, { func, args });
     }
 
     private static postJson(url, payload) {
