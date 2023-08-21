@@ -14,7 +14,7 @@ info:
 
 servers:
   - url: http://{ROKU_DEV_TARGET}:{PORT}
-    description: Playlet server server
+    description: Playlet server
     variables:
       ROKU_DEV_TARGET:
         description: The IP address of the Roku device
@@ -157,6 +157,84 @@ paths:
       responses:
         "204":
           description: No Content
+
+  # Roku External Control Protocol (ECP)
+  /input/{appId}:
+    servers:
+      - url: http://{ROKU_DEV_TARGET}:8060
+        description: Roku ECP endpoint
+        variables:
+          ROKU_DEV_TARGET:
+            description: The IP address of the Roku device
+            default: 192.168.1.x
+    post:
+      summary: Play video using ECP input
+      description: Play a video using the ECP input API. This enables the deep-linking functionality.
+      operationId: ecpInputPlayVideo
+      parameters:
+        - name: appId
+          in: path
+          description: The app ID of the Playlet app
+          required: true
+          schema:
+            type: string
+            enum:
+              - "693751" # Playlet app id
+              - dev
+            default: "693751"
+        - name: contentId
+          in: query
+          description: The video ID of the video to play
+          required: true
+          schema:
+            type: string
+        - name: timestamp
+          in: query
+          description: The timestamp of the video to play
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /launch/{appId}:
+    servers:
+      - url: http://{ROKU_DEV_TARGET}:8060
+        description: Roku ECP endpoint
+        variables:
+          ROKU_DEV_TARGET:
+            description: The IP address of the Roku device
+            default: 192.168.1.x
+    post:
+      summary: Play video using ECP launch arguments
+      description: Play a video using the ECP launch API. This enables the deep-linking functionality.
+      operationId: ecpLaunchPlayVideo
+      parameters:
+        - name: appId
+          in: path
+          description: The app ID of the Playlet app
+          required: true
+          schema:
+            type: string
+            enum:
+              - "693751" # Playlet app id
+              - dev
+            default: "693751"
+        - name: contentId
+          in: query
+          description: The video ID of the video to play
+          required: true
+          schema:
+            type: string
+        - name: timestamp
+          in: query
+          description: The timestamp of the video to play
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
 
 components:
   schemas:
