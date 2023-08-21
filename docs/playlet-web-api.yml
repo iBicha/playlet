@@ -1,0 +1,288 @@
+openapi: 3.0.0
+
+info:
+  title: Playlet Web API
+  version: 1.0.0
+  description:
+    Playlet Web API is a RESTful API for controlling the Playlet app on
+    Roku devices. The API is intended to be used by the Playlet web app, but can
+    also be used by other apps.
+  contact:
+    name: Brahim Hadriche
+    url: https://github.com/iBicha
+    email: brahim.hadriche@gmail.com
+
+servers:
+  - url: http://{ROKU_DEV_TARGET}:{PORT}
+    description: Playlet server server
+    variables:
+      ROKU_DEV_TARGET:
+        description: The IP address of the Roku device
+        default: 192.168.1.x
+      PORT:
+        description: The port number of the Playlet server
+        default: "8888"
+
+paths:
+  /api/rpc:
+    post:
+      summary: Execute a RPC
+      description: >
+        Execute a RPC on the Roku device. The `func` parameter is the name of
+        the RPC to execute. The `args` parameter is an object containing the
+        arguments to pass to the RPC. The `args` parameter is optional and can
+        be omitted if the RPC does not require any arguments.
+      operationId: executeRpc
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteRpcRequest"
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+  /api/state:
+    get:
+      summary: Get Playlet app state
+      description: >
+        Get the current state of the Playlet app. The `key` parameter is
+        optional and can be omitted to get the entire state. If the `key`
+        parameter is specified, only the specified key(s) will be returned.
+      operationId: getPlayletState
+      parameters:
+        - name: key
+          in: query
+          description: specific key(s) to get
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - app
+                - device
+                - invidious
+                - preferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayletAppState"
+  /api/preferences:
+    get:
+      summary: Get preferences
+      description: |
+        Get the current user preferences.
+      operationId: getPreferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesObject"
+    put:
+      summary: Set preferences
+      description: >
+        Set the current user preferences. The request body can contain some or
+        all of the preferences. Any preferences not specified in the request
+        body will be left unchanged.
+      operationId: setPreferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesObject"
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+    delete:
+      summary: Reset preferences
+      description: |
+        Reset the current user preferences to their default values.
+      operationId: resetPreferences
+      responses:
+        "204":
+          description: No Content
+  /api/search-history:
+    get:
+      summary: Get search history
+      description: |
+        Get the current search history.
+      operationId: getSearchHistory
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+    put:
+      summary: Add to search history
+      description: |
+        Add a query to the search history.
+      operationId: addToSearchHistory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+    delete:
+      summary: Clear search history
+      description: |
+        Clear the search history.
+      operationId: clearSearchHistory
+      responses:
+        "204":
+          description: No Content
+
+components:
+  schemas:
+    ExecuteRpcRequest:
+      type: object
+      required:
+        - func
+      properties:
+        func:
+          type: string
+          enum:
+            - InvidiousLogout
+            - PlayVideo
+            - SetPlayletLibUrls
+        args:
+          type: object
+          additionalProperties: true
+    PlayletAppState:
+      type: object
+      properties:
+        app:
+          type: object
+          properties:
+            id:
+              type: string
+            version:
+              type: string
+            git_commit_hash:
+              type: string
+            lib_version:
+              type: string
+            lib_git_commit_hash:
+              type: string
+            lib_version_latest:
+              type: string
+            lib_url_type:
+              type: string
+        device:
+          type: object
+          properties:
+            model:
+              type: string
+            model_display_name:
+              type: string
+            model_type:
+              type: string
+            model_details:
+              type: object
+              additionalProperties: true
+            os_version:
+              type: object
+              properties:
+                build:
+                  type: string
+                major:
+                  type: string
+                minor:
+                  type: string
+                revision:
+                  type: string
+            display_type:
+              type: string
+            display_mode:
+              type: string
+            display_aspect_ratio:
+              type: string
+            display_size:
+              type: object
+              properties:
+                w:
+                  type: integer
+                h:
+                  type: integer
+            video_mode:
+              type: string
+            ui_resolution:
+              type: object
+              properties:
+                height:
+                  type: integer
+                name:
+                  type: string
+                width:
+                  type: integer
+            graphics_platform:
+              type: string
+            internet_status:
+              type: boolean
+            user_country_code:
+              type: string
+            friendly_name:
+              type: string
+        invidious:
+          type: object
+          properties:
+            current_instance:
+              type: string
+            auth_url:
+              type: string
+            logged_in:
+              type: boolean
+            logged_in_instance:
+              type: string
+            logged_in_username:
+              type: string
+        preferences:
+          $ref: "#/components/schemas/PreferencesObject"
+    PreferencesObject:
+      type: object
+      properties:
+        invidious.instance:
+          type: string
+        invidious.proxy_videos:
+          type: string
+          enum:
+            - always
+            - if_needed
+            - never
+        playback.autoplay:
+          type: string
+          enum:
+            - auto
+            - 720p
+        playback.preferred_quality:
+          type: string
+        sponsorblock.enabled:
+          type: boolean
+        sponsorblock.show_notifications:
+          type: boolean

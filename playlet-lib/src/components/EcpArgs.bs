@@ -1,0 +1,37 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function InitEcpArgs()
+    LaunchArgumentsReceived()
+
+    m.scene.ObserveField("inputArgs", "InputArgumentsReceived")
+    if m.scene.inputArgs <> invalid
+        InputArgumentsReceived()
+    end if
+end function
+
+function LaunchArgumentsReceived() as void
+    launchArgs = m.scene.launchArgs
+    m.log.info("LaunchArgumentsReceived", launchArgs)
+    ProcessArguments(launchArgs)
+end function
+
+function InputArgumentsReceived() as void
+    inputArgs = m.scene.inputArgs
+    m.log.info("InputArgumentsReceived", inputArgs)
+    ProcessArguments(inputArgs)
+end function
+
+function ProcessArguments(args as object) as void
+    if args = invalid
+        return
+    end if
+
+    if IsString(args.rpc) and args.rpc = "true" and not StringUtils.IsNullOrEmpty(args.func)
+        rpcArgs = invalid
+        if not StringUtils.IsNullOrEmpty(args.args)
+            rpcArgs = ParseJson(args.args)
+        end if
+        m.webServer.callFunc(args.func, rpcArgs)
+    end if
+end function
