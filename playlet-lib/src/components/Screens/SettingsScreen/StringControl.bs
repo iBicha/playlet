@@ -1,0 +1,84 @@
+import "pkg:/source/utils/NodeSetFocus.bs"
+
+function Init()
+    m.top.focusable = true
+    m.top.itemSpacings = [8]
+
+    m.button = m.top.findNode("button")
+    AdjustButtonLabel(m.button)
+
+    m.top.ObserveField("focus", "OnFocusChange")
+    m.button.observeField("buttonSelected", "ShowEditKeyboard")
+end function
+
+function AdjustButtonLabel(button as object) as void
+    children = button.getChildren(-1, 0)
+    for each child in children
+        if child.isSubtype("Label") and child.hasField("horizAlign")
+            child.observeField("horizAlign", "OnButtonLabelHorizAlignChanged")
+            child.horizAlign = "left"
+            return
+        end if
+    end for
+end function
+
+function OnButtonLabelHorizAlignChanged(event as object)
+    label = event.getRoSGNode()
+    if label.horizAlign <> "left"
+        label.horizAlign = "left"
+    end if
+end function
+
+function BindPreference(preferences as object, key as string)
+    if m.preferences <> invalid and m.key <> invalid
+        m.preferences.unobserveFieldScoped(m.key)
+    end if
+
+    m.preferences = preferences
+    m.key = key
+
+    if preferences <> invalid and key <> invalid
+        preferences.observeFieldScoped(key, "OnPreferenceChange")
+        OnPreferenceChange()
+    end if
+end function
+
+function OnPreferenceChange()
+    m.top.value = m.preferences[m.key]
+end function
+
+function OnValueChange() as void
+    if m.preferences = invalid or m.key = invalid
+        return
+    end if
+
+    m.preferences[m.key] = m.top.value
+end function
+
+function OnFocusChange() as void
+    if m.top.focus <> true
+        return
+    end if
+
+    NodeSetFocus(m.button, true)
+end function
+
+function ShowEditKeyboard()
+    keyboardDialog = createObject("roSGNode", "StandardKeyboardDialog")
+    keyboardDialog.title = m.top.displayText
+    keyboardDialog.message = [m.top.description]
+    keyboardDialog.text = m.top.value
+    keyboardDialog.buttons = ["OK", "Cancel"]
+    keyboardDialog.observeField("buttonSelected", "OnKeyboardButton")
+
+    m.top.getScene().dialog = keyboardDialog
+end function
+
+function OnKeyboardButton(event as object)
+    keyboard = event.getRoSGNode()
+    buttonSelected = keyboard.buttonSelected
+    if buttonSelected = 0
+        m.top.value = keyboard.text
+    end if
+    keyboard.close = true
+end function

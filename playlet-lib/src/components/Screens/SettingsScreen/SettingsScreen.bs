@@ -1,6 +1,199 @@
-import "pkg:/source/utils/ColorUtils.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/components/Navigation/ScrollTo.bs"
+
 
 function Init()
-    rect = m.top.findNode("rect")
-    rect.color = ColorUtils.RandomSoftColorInt()
+    m.container = m.top.findNode("Container")
+    m.scrollAnimation = m.top.findNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.scrollAnimation.findNode("scrollAnimationInterpolator")
+    m.viewport = {
+        x: 150,
+        y: 96,
+        width: 1920,
+        height: 550
+    }
+end function
+
+function OnNodeReady()
+    m.top.ObserveField("focus", "OnFocusChange")
+
+    startX = 150
+    startY = 100
+
+    controlsX = 400
+
+    categorySpacing = 80
+    controlSpacing = 30
+
+    model = m.preferences.prefsModel
+    previousCategory = invalid
+    previousControl = invalid
+    for each item in model
+        container = m.container.createChild("Group")
+        category = CreateCategoryNode(item, container, startX, startY)
+        if m.firstCategory = invalid
+            m.firstCategory = category.node
+        end if
+        if previousCategory <> invalid
+            SetNavigation(previousCategory.node, "down", category.node)
+            SetNavigation(category.node, "up", previousCategory.node)
+        end if
+        controls = CreateControls(item, container, startX + controlsX, startY, controlSpacing)
+
+        if controls <> invalid
+            if controls.nodes.Count() > 0
+                SetNavigation(category.node, "right", controls.nodes[0])
+            end if
+
+            for each control in controls.nodes
+                SetNavigation(control, "left", category.node)
+
+                if previousControl <> invalid
+                    SetNavigation(previousControl, "down", control)
+                    SetNavigation(control, "up", previousControl)
+                end if
+
+                previousControl = control
+            end for
+        end if
+
+        categoryRect = category.rect
+        controlsRect = controls.rect
+
+        maxHeight = categoryRect.height > controlsRect.height ? categoryRect.height : controlsRect.height
+        startY += maxHeight + categorySpacing
+        previousCategory = category
+    end for
+
+    SetNavigation(invalid, "back", m.navBar)
+    SetNavigation(invalid, "left", m.navBar)
+end function
+
+function CreateCategoryNode(item as object, container as object, startX as integer, startY as integer) as object
+    node = container.createChild("SettingCategory")
+    node.translation = [startX, startY]
+    node.displayText = item.displayText
+    node.description = item.description
+    return {
+        node: node,
+        rect: node.boundingRect()
+    }
+end function
+
+function CreateControls(item as object, container as object, startX as integer, startY as integer, controlSpacing as integer) as object
+    if item.children = invalid
+        return invalid
+    end if
+    x = startX
+    y = startY
+    width = 0
+    height = 0
+
+    nodes = []
+    for each child in item.children
+        if child.visibility = "web"
+            continue for
+        end if
+        control = CreateControl(child, container, startX, startY)
+        if control <> invalid
+            nodes.push(control.node)
+            controlRect = control.rect
+            startY += controlRect.height + controlSpacing
+            if controlRect.width > width
+                width = controlRect.width
+            end if
+            height += controlRect.height + controlSpacing
+        end if
+    end for
+
+    return {
+        nodes: nodes,
+        rect: {
+            x: x,
+            y: y,
+            width: width,
+            height: height
+        }
+    }
+end function
+
+function CreateControl(item as object, container as object, startX as integer, startY as integer) as object
+    control = invalid
+
+    if item.type = "boolean"
+        control = CreateBooleanControl(item, container)
+    else if item.type = "radio"
+        control = CreateRadioControl(item, container)
+    else if item.type = "string"
+        control = CreateStringControl(item, container)
+    else if item.rokuComponent <> invalid
+        control = CreateRokuComponent(item, container)
+    end if
+
+    if control = invalid
+        return invalid
+    end if
+
+    control.id = `preference.${item.key}`
+    control.translation = [startX, startY]
+    control@.BindPreference(m.preferences, item.key)
+
+    return {
+        node: control,
+        rect: control.boundingRect()
+    }
+end function
+
+function CreateBooleanControl(item as object, container as object) as object
+    node = container.createChild("BooleanControl")
+    node.displayText = item.displayText
+    node.description = item.description
+    return node
+end function
+
+function CreateRadioControl(item as object, container as object) as object
+    node = container.createChild("RadioControl")
+    node.displayText = item.displayText
+    node.description = item.description
+    node.options = item.options
+    return node
+end function
+
+function CreateStringControl(item as object, container as object) as object
+    node = container.createChild("StringControl")
+    node.displayText = item.displayText
+    node.description = item.description
+    return node
+end function
+
+function CreateRokuComponent(item as object, container as object) as object
+    node = container.createChild(item.rokuComponent)
+    return node
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    navigation = NavigationKeyHandler(key, press)
+    if navigation.handled
+        target = navigation.node
+        if target.isSameNode(m.navBar)
+            target = m.firstCategory
+        end if
+        if target <> invalid
+            ScrollTo(m.viewport, m.container, target.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
+        end if
+        return true
+    end if
+    return false
+end function
+
+function OnFocusChange() as void
+    if m.top.focus <> true
+        return
+    end if
+
+    if m.firstCategory <> invalid
+        NodeSetFocus(m.firstCategory, true)
+        ScrollTo(m.viewport, m.container, m.firstCategory.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
+    end if
 end function

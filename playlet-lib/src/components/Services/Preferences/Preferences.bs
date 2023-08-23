@@ -9,12 +9,13 @@ function Init()
 end function
 
 function LoadPreferencesFile()
-    m.prefsModel = ParseJson(ReadAsciiFile("libpkg:/config/preferences.json5"))
+    m.top.prefsModel = ParseJson(ReadAsciiFile("libpkg:/config/preferences.json5"))
 end function
 
 function AddNodeFields()
     fields = {}
-    for each child in m.prefsModel
+    prefsModel = m.top.prefsModel
+    for each child in prefsModel
         AddNodeFieldsFromPreference(child, fields)
     end for
     ' We keep reference to fields specific to preferences, to avoid default fields like focusedChild
@@ -117,7 +118,8 @@ end function
 
 function ApplyDefaultsToUserPreferences(userPrefs as object) as boolean
     isDirty = false
-    for each child in m.prefsModel
+    prefsModel = m.top.prefsModel
+    for each child in prefsModel
         isDirty = ApplyToUserPreferences(userPrefs, child) or isDirty
     end for
     return isDirty
