@@ -7,10 +7,7 @@ function InitializeBindings()
         childProps: {
             "AppController": {
                 "root": "./AppRoot", 
-                "screensNode": "./Screens"
-            }, 
-            "AppRoot": {
-                "appController": ".."
+                "stack": "./Stack"
             }, 
             "NavBar": {
                 "appController": "/AppController"
