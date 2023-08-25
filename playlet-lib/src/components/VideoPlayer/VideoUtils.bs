@@ -1,0 +1,59 @@
+import "pkg:/source/utils/NodeSetFocus.bs"
+
+namespace VideoUtils
+    function PlayVideo(args as object) as void
+        CloseVideo(false)
+
+        container = GetVideoContainer()
+        videoPlayer = container.createChild("videoPlayer")
+        videoPlayer@.BindNode(invalid)
+
+        if args.content <> invalid
+            videoPlayer@.PlayWithContent(args.content)
+        else if not StringUtils.IsNullOrEmpty(args.videoId)
+            videoPlayer@.PlayWithVideoId(args.videoId, args.timestamp ?? 0)
+        else
+            return
+        end if
+
+        if args.sender <> invalid
+            container.sender = args.sender
+        end if
+
+        NodeSetFocus(videoPlayer, true)
+    end function
+
+    function CloseVideo(setFocus = true as boolean) as void
+        videoPlayer = GetVideoPlayer()
+        if videoPlayer = invalid
+            return
+        end if
+        videoPlayer@.Close(invalid)
+
+        if setFocus
+            container = GetVideoContainer()
+            if container.sender <> invalid
+                NodeSetFocus(container.sender, true)
+            else
+                ' TODO: handle sender with the app controller
+                appController = m.top.getScene().findNode("NavBar")
+                NodeSetFocus(appController, true)
+            end if
+            container.sender = invalid
+        end if
+    end function
+
+    function GetVideoPlayer() as object
+        container = GetVideoContainer()
+        if container = invalid or container.getChildCount() = 0
+            return invalid
+        end if
+        return container.getChild(0)
+    end function
+
+    function GetVideoContainer() as object
+        return m.top.getScene().findNode("VideoContainer")
+    end function
+
+end namespace
+

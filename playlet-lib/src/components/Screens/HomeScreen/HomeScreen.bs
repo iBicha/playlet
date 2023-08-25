@@ -4,14 +4,19 @@ import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/Screens/HomeScreen/HomeScreenContentTask.bs"
 import "pkg:/components/Screens/HomeScreen/HomeScreenRowContentTask.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 function Init()
     m.rowList = m.top.FindNode("rowList")
 end function
 
 function OnNodeReady()
+    m.log = new log.Logger("HomeScreen")
+
     m.top.ObserveField("visible", "OnVisibilityChange")
     m.rowList.ObserveField("itemFocused", "OnItemFocused")
+    m.rowList.ObserveField("rowItemSelected", "OnRowItemSelected")
 
     SetNavigation(invalid, "back", m.navBar)
     SetNavigation(invalid, "left", m.navBar)
@@ -126,4 +131,27 @@ end function
 
 function HomeScreenRowContentTaskResults(output as object)
     LoadItemsIfNeeded()
+end function
+
+function OnRowItemSelected(event as object)
+    grid = event.GetRoSGNode()
+
+    selectedPair = event.GetData()
+    selectedRow = selectedPair[0]
+    selectedRowItem = selectedPair[1]
+
+    rowContent = grid.content.GetChild(selectedRow)
+    itemContent = rowContent.GetChild(selectedRowItem)
+
+    if itemContent.type = "video"
+        videoId = itemContent.videoId
+        m.log.info("Play video: " + videoId)
+        VideoUtils.PlayVideo({ content: itemContent, sender: GetFocusedNode() })
+    else if itemContent.type = "playlist"
+        playlistId = itemContent.playlistId
+        m.log.info("Open playlist: " + playlistId)
+    else if itemContent.type = "channel"
+        authorId = itemContent.authorId
+        m.log.info("Open channel: " + authorId)
+    end if
 end function
