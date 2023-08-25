@@ -6,25 +6,25 @@ function Init()
 end function
 
 function OnNodeReady()
-    NodeSetFocus(m.top.findNode("NavBar"), true)
+    NodeSetFocus(m.top.root, true)
 end function
 
 function PushScreen(node as object)
-    m.root.appendChild(node)
-    FocusTopScreen()
+    m.stack.appendChild(node)
+    FocusTopScreen(invalid)
 end function
 
 function PopScreen(unused as dynamic)
-    childCount = m.root.getChildCount()
+    childCount = m.stack.getChildCount()
     if childCount > 1
-        m.root.removeChildIndex(childCount - 1)
-        FocusTopScreen()
+        m.stack.removeChildIndex(childCount - 1)
+        FocusTopScreen(invalid)
     end if
 end function
 
-function FocusTopScreen()
-    childCount = m.root.getChildCount()
-    topScreen = m.root.getChild(childCount - 1)
+function FocusTopScreen(unused as dynamic)
+    childCount = m.stack.getChildCount()
+    topScreen = m.stack.getChild(childCount - 1)
     NodeSetFocus(topScreen, true)
 end function
 
@@ -50,7 +50,8 @@ function ShowRootScreen(screenName as string) as void
         screen = CreateObject("roSGNode", screenName)
         screen.id = screenName
         m.screens[screenName] = screen
-        m.screensNode.appendChild(screen)
+        ' insert child at 0 to make sure it is behind the navbar
+        m.root.insertChild(screen, 0)
         if screen.hasField("binding_done")
             screen@.BindNode(invalid)
         end if

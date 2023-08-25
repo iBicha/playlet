@@ -1,15 +1,29 @@
+import "pkg:/source/utils/NodeSetFocus.bs"
+
 function Init()
+    m.lastFocusedChild = invalid
+    m.top.observeField("focusedChild", "OnFocusedChildChange")
 end function
 
-function onKeyEvent(key as string, press as boolean) as boolean
-    if not press
-        return false
-    end if
-    if key = "OK"
-        newScreen = CreateObject("roSGNode", "TestScreen")
-        m.appController@.PushScreen(newScreen)
-        return true
+function OnFocusChange() as void
+    if m.top.focus = false
+        return
     end if
 
-    return false
+    focusNode = invalid
+    if m.lastFocusedChild <> invalid
+        focusNode = m.lastFocusedChild
+    else if m.top.getChildCount() > 0
+        focusNode = m.top.getChild(0)
+    end if
+
+    if focusNode <> invalid
+        NodeSetFocus(focusNode, true)
+    end if
+end function
+
+function OnFocusedChildChange() as void
+    if m.top.focusedChild <> invalid
+        m.lastFocusedChild = m.top.focusedChild
+    end if
 end function

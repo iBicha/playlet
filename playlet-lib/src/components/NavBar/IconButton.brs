@@ -10,10 +10,9 @@ function init()
     m.top.observeField("height", "onHeightChanged")
     m.top.observeField("width", "onWidthChanged")
     m.top.observeField("padding", "onPaddingChanged")
-    m.top.observeField("focus", "onFocusChanged")
 end function
 
-function onFocusChanged()
+function OnFocusChange()
     if m.top.focus
         m.buttonBackground.blendColor = m.top.focusBackground
     else
@@ -21,7 +20,6 @@ function onFocusChanged()
     end if
     m.buttonBackground.visible = m.top.focus
     m.buttonText.visible = m.top.focus
-
 end function
 
 function onBackgroundChanged()
