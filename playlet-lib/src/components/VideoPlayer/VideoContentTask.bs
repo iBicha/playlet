@@ -1,0 +1,116 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function VideoContentTask(input as object) as object
+
+    contentNode = input.content
+    invidiousNode = input.invidious
+    preferencesNode = input.preferences
+
+    if StringUtils.IsNullOrEmpty(contentNode.videoId)
+        throw "Can't load video information: videoId is missing"
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    response = service.GetVideoMetadata(contentNode.videoId)
+
+    if not response.ok
+        return {
+            success: false,
+            response: response
+        }
+    end if
+
+    metadata = response.json
+
+    contentNode.title = metadata.title
+    contentNode.secondaryTitle = metadata.author
+
+    streamUrls = CreateStreamUrls(metadata, service, preferencesNode)
+    contentNode.url = streamUrls[0]
+
+    contentNode.addFields({
+        metadata: metadata,
+        ' StreamUrls is taken
+        playletStreamUrls: streamUrls,
+        playletStreamUrlIndex: 0
+    })
+
+    return {
+        success: true
+    }
+end function
+
+function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object) as object
+    proxyVideos = preferences["invidious.proxy_videos"]
+
+    streamUrls = []
+
+    if metadata.hlsUrl <> invalid
+        AddHlsUrls(streamUrls, metadata, proxyVideos)
+    else
+        preferredQuality = preferences["playback.preferred_quality"]
+
+        if preferredQuality = "720p"
+            AddStreamUrls(streamUrls, metadata, service, proxyVideos)
+            AddDashUrls(streamUrls, metadata, proxyVideos)
+        else
+            AddDashUrls(streamUrls, metadata, proxyVideos)
+            AddStreamUrls(streamUrls, metadata, service, proxyVideos)
+        end if
+    end if
+
+    return streamUrls
+end function
+
+function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as string)
+    hlsUrl = metadata.hlsUrl
+    hlsUrlLocal = AddLocalFlag(hlsUrl)
+
+    AddUrls(streamUrls, hlsUrl, hlsUrlLocal, proxyVideos)
+end function
+
+function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string) as void
+    if metadata.dashUrl = invalid
+        return
+    end if
+
+    dashUrl = metadata.dashUrl
+    dashUrlLocal = AddLocalFlag(dashUrl)
+
+    AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
+end function
+
+function AddStreamUrls(streamUrls as object, metadata as object, service as Invidious.InvidiousService, proxyVideos as string) as void
+    if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
+        return
+    end if
+
+    url = service.GetVideoStreamUrl(metadata.videoId)
+    localUrl = AddLocalFlag(url)
+
+    AddUrls(streamUrls, url, localUrl, proxyVideos)
+end function
+
+function AddLocalFlag(url as string) as string
+    if url.InStr("?") = -1
+        return url + "?local=true"
+    else
+        return url + "&local=true"
+    end if
+end function
+
+function AddUrls(streamUrls as object, url as string, localUrl as string, proxyVideos as string)
+    if proxyVideos = "if_needed"
+        streamUrls.push(url)
+        streamUrls.push(localUrl)
+    else if proxyVideos = "never"
+        streamUrls.push(url)
+    else if proxyVideos = "always"
+        streamUrls.push(localUrl)
+    else
+        streamUrls.push(url)
+        streamUrls.push(localUrl)
+    end if
+end function

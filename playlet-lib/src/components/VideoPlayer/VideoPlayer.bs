@@ -1,0 +1,86 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/VideoPlayer/VideoContentTask.bs"
+import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+function Init()
+    m.log = new log.Logger("VideoPlayer")
+    SetPlayerStyle()
+end function
+
+function PlayWithContent(contentNode as object)
+    videoContentNode = CreateObject("roSGNode", "ContentNode")
+
+    if not StringUtils.IsNullOrEmpty(contentNode.videoId)
+        videoContentNode.AddFields({ videoId: contentNode.videoId })
+    end if
+    if IsInt(contentNode.timestamp)
+        videoContentNode.AddFields({ timestamp: contentNode.timestamp })
+    end if
+    if not StringUtils.IsNullOrEmpty(contentNode.title)
+        videoContentNode.title = contentNode.title
+    end if
+    if not StringUtils.IsNullOrEmpty(contentNode.author)
+        videoContentNode.secondaryTitle = contentNode.author
+    end if
+
+    StartVideoContentTask(videoContentNode)
+end function
+
+function PlayWithVideoId(videoId as string, timestamp = 0 as integer)
+    videoContentNode = CreateObject("roSGNode", "ContentNode")
+    videoContentNode.AddFields({ videoId: videoId, timestamp: timestamp })
+
+    StartVideoContentTask(videoContentNode)
+end function
+
+function StartVideoContentTask(videoContentNode as object)
+    if m.videoContentTask <> invalid
+        m.videoContentTask.control = "stop"
+    end if
+
+    m.top.content = videoContentNode
+
+    m.videoContentTask = StartAsyncTask(VideoContentTask, {
+        content: videoContentNode,
+        invidious: m.top.invidious,
+        preferences: m.top.preferences
+    }, OnVideoContentTaskResults)
+end function
+
+function OnVideoContentTaskResults(output as object) as void
+    if not output.success
+        ' TODO: show error - unhandled error
+        return
+    end if
+
+    if not output.result.success
+        ' TODO: show error - request error
+        return
+    end if
+
+    m.top.control = "play"
+    if ValidInt(m.top.content.timestamp) > 0
+        m.top.seek = m.top.content.timestamp
+    end if
+end function
+
+function Close(unused as dynamic)
+    m.top.control = "stop"
+    parent = m.top.getParent()
+    if parent <> invalid
+        parent.RemoveChild(m.top)
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+    if key = "back"
+        VideoUtils.CloseVideo()
+        return true
+    end if
+    return false
+end function

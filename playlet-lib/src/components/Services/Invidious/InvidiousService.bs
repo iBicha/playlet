@@ -8,6 +8,8 @@ namespace Invidious
 
     const TOKEN_CALLBACK = "/invidious/token_callback"
 
+    const VIDEOS_ENDPOINT = "/api/v1/videos"
+
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
     const SEARCH_ENDPOINT = "/api/v1/search"
 
@@ -107,6 +109,23 @@ namespace Invidious
                 return response.json
             end if
             return invalid
+        end function
+
+        function GetVideoMetadata(videoId as string) as object
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+            args = m.DefaultArgs()
+            args.cacheSeconds = 60 * 60 * 6 ' 6 hours
+
+            response = Requests().get(url, args)
+
+            return response
+        end function
+
+        function GetVideoStreamUrl(videoId as string) as string
+            instance = m.GetInstance()
+            return `${instance}/latest_version?id=${videoId}`
         end function
 
         function MakeRequest(requestData as object) as object

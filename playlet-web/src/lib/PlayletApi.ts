@@ -49,6 +49,9 @@ export class PlayletApi {
         }
         const args = { videoId };
         if (timestamp !== undefined) {
+            if (typeof timestamp === "string") {
+                timestamp = parseInt(timestamp);
+            }
             args["timestamp"] = timestamp;
         }
 
