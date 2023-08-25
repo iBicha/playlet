@@ -1,11 +1,15 @@
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 function Init()
     m.screens = {}
 end function
 
 function OnNodeReady()
+    m.log = new log.Logger("AppController")
+
     NodeSetFocus(m.top.root, true)
 end function
 
@@ -71,4 +75,27 @@ function GetRootScreen(screenName as string) as object
         return invalid
     end if
     return m.screens[screenName]
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+    if key = "options"
+        ' ToggleVideoPictureInPicture
+    else if key = "back"
+        dialog = ShowDialogButtons("Do you want to exit Playlet?", "Exit", ["Exit", "Cancel"])
+        dialog.observeField("buttonSelected", "OnExitDialog", ["buttonSelected"])
+        return true
+    end if
+
+    return false
+end function
+
+function OnExitDialog(event as object)
+    buttonIndex = event.GetData()
+    if buttonIndex = 0 ' Exit
+        m.log.info("Exiting app")
+        m.top.getScene().exitChannel = true
+    end if
 end function
