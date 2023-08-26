@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 @asynctask
 function SearchTask(input as object) as object
@@ -11,7 +12,8 @@ function SearchTask(input as object) as object
 
     response = service.Search(q, { type: "video" }) 'video,playlist,channel
 
-    rowContent = GetCategoryContent(contentNode, `Search - ${q}`, response)
+    instance = service.GetInstance()
+    rowContent = GetCategoryContent(contentNode, `Search - ${q}`, response, instance)
     if rowContent <> invalid
         contentNode.appendChild(rowContent)
     end if
@@ -22,12 +24,12 @@ function SearchTask(input as object) as object
     }
 end function
 
-function GetCategoryContent(contentNode as object, category as string, json as object) as object
+function GetCategoryContent(contentNode as object, category as string, json as object, instance as string) as object
     if json <> invalid and json.Count() > 0
         row = contentNode.CreateChild("ContentNode")
         row.title = category
         for each item in json
-            itemData = GetItemData(item)
+            itemData = InvidiousToRowCellContentNode(item, instance)
             if itemData <> invalid
                 row.appendChild(itemData)
             end if
@@ -35,21 +37,4 @@ function GetCategoryContent(contentNode as object, category as string, json as o
         return row
     end if
     return invalid
-end function
-
-function GetItemData(video as object) as object
-    if video.type <> "video" and video.type <> "playlist" and video.type <> "channel"
-        return invalid
-    end if
-
-    videoItem = CreateObject("roSGNode", "ContentNode")
-    videoItem.addField("HDItemWidth", "float", false)
-    videoItem.append(video)
-
-    if video.type = "channel"
-        videoItem.HDItemWidth = "200"
-    else
-        videoItem.HDItemWidth = "350"
-    end if
-    return videoItem
 end function

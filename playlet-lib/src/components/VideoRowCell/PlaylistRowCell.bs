@@ -1,3 +1,5 @@
+import "pkg:/source/utils/Types.bs"
+
 function Init()
     m.titleLabel = m.top.FindNode("titleLabel")
     m.authorLabel = m.top.FindNode("authorLabel")
@@ -17,7 +19,7 @@ function OnContentSet() as void
     m.titleLabel.text = content.title
     m.authorLabel.text = content.author
 
-    m.thumbnail.uri = content.playlistThumbnail
+    m.thumbnail.uri = GetThumbnailUrl(content)
 
     SetVideoCount(content.videoCount)
 end function
@@ -40,4 +42,37 @@ function SetVideoCount(videoCount as integer)
 
     rect.width = size.width + 16
     rect.translation = [rectParent.width - rect.width, 162]
+end function
+
+function GetThumbnailUrl(content as object, quality = "medium" as string) as string
+    if IsString(content.playlistThumbnail)
+        thumbnailUrl = content.playlistThumbnail
+        if thumbnailUrl.startsWith("/")
+            thumbnailUrl = content.instance + thumbnailUrl
+        end if
+        return thumbnailUrl
+    else
+        if IsArray(content.videos) and content.videos.Count() > 0
+            videoThumbnails = content.videos[0].videoThumbnails
+            if IsArray(videoThumbnails) and videoThumbnails.Count() > 0
+                thumbnailUrl = ""
+                for each thumbnail in videoThumbnails
+                    if thumbnail.quality = quality
+                        thumbnailUrl = thumbnail.url
+                        exit for
+                    end if
+                end for
+
+                if thumbnailUrl = ""
+                    thumbnailUrl = videoThumbnails[0].url
+                end if
+                if thumbnailUrl.startsWith("/")
+                    thumbnailUrl = content.instance + thumbnailUrl
+                end if
+                return thumbnailUrl
+            end if
+        end if
+    end if
+
+    return ""
 end function

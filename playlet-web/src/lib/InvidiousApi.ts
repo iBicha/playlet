@@ -91,26 +91,12 @@ export class InvidiousApi {
     }
 
     private async DefaultHandler(requestData, response) {
-        const json = await response.json();
-        return [{ title: requestData.title, videos: json }]
+        return await response.json();
     }
 
     private async PlaylistHandler(requestData, response) {
         const playlist = await response.json();
-        return [this.ProcessPlaylist(requestData, playlist)]
-    }
-
-    private ProcessPlaylist(requestData, playlist) {
-        const title = this.ProcessTemplate(requestData.title, playlist)
-        return { title: title, videos: playlist.videos }
-    }
-
-    private ProcessTemplate(template: string, data) {
-        let result = template;
-        for (let key in data) {
-            result = result.replace(`%${key}%`, `${data[key]}`);
-        }
-        return result;
+        return playlist.videos
     }
 
     private makeUrl(url: string, params: any) {

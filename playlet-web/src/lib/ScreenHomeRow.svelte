@@ -4,7 +4,7 @@
   import VideoCell from "./VideoCell.svelte";
 
   export let requestData: any = undefined;
-  export let videoRowData = undefined;
+  export let videos = undefined;
 
   let carouselElement;
 
@@ -15,14 +15,8 @@
   const itemWidth = 320 + 16 * 2;
 
   $: {
-    if (videoRowData && !Array.isArray(videoRowData)) {
-      if (
-        carouselElement &&
-        videoRowData.videos &&
-        videoRowData.videos.length
-      ) {
-        recalculateVisibileCells();
-      }
+    if (carouselElement && videos && videos.length) {
+      recalculateVisibileCells();
     }
   }
 
@@ -43,7 +37,7 @@
   async function updateRow() {
     const result = await invidiousApi.makeRequest(requestData);
     if (result) {
-      videoRowData = result;
+      videos = result;
     }
   }
 
@@ -56,27 +50,21 @@
   }
 </script>
 
-{#if videoRowData}
-  {#if Array.isArray(videoRowData)}
-    {#each videoRowData as child}
-      <svelte:self videoRowData={child} />
+{#if videos}
+  <div class="text-lg font-semibold m-4">
+    {requestData.title}
+  </div>
+  <div
+    class="carousel carousel-center rounded-box w-full space-x-4"
+    bind:this={carouselElement}
+    on:scroll={recalculateVisibileCells}
+  >
+    {#each videos as video, i}
+      <div class="carousel-item w-80 p-2">
+        {#if i >= scrollStart && i <= scrollEnd}
+          <VideoCell {...video} />
+        {/if}
+      </div>
     {/each}
-  {:else if videoRowData.title && videoRowData.videos}
-    <div class="text-lg font-semibold m-4">
-      {videoRowData.title}
-    </div>
-    <div
-      class="carousel carousel-center rounded-box w-full space-x-4"
-      bind:this={carouselElement}
-      on:scroll={recalculateVisibileCells}
-    >
-      {#each videoRowData.videos as video, i}
-        <div class="carousel-item w-80 p-2">
-          {#if i >= scrollStart && i <= scrollEnd}
-            <VideoCell {...video} />
-          {/if}
-        </div>
-      {/each}
-    </div>
-  {/if}
+  </div>
 {/if}

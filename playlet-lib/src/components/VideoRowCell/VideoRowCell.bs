@@ -34,7 +34,7 @@ function OnContentSet() as void
         end if
     end if
 
-    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails)
+    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails, content.instance)
 
     if IsVideoLive(content)
         m.liveRect.visible = true
@@ -64,16 +64,24 @@ function SetDurationText(text as string)
     rect.translation = [rectParent.width - rect.width, 162]
 end function
 
-function GetThumbnailUrl(videoThumbnails as object, quality = "medium" as string) as string
+function GetThumbnailUrl(videoThumbnails as object, instance as string, quality = "medium" as string) as string
     if videoThumbnails.Count() = 0
         return ""
     end if
+    url = ""
     for each thumbnail in videoThumbnails
         if thumbnail.quality = quality
-            return thumbnail.url
+            url = thumbnail.url
+            exit for
         end if
     end for
-    return videoThumbnails[0].url
+    if url = ""
+        url = videoThumbnails[0].url
+    end if
+    if url.startsWith("/")
+        url = instance + url
+    end if
+    return url
 end function
 
 function IsVideoUpcoming(metadata as object) as boolean

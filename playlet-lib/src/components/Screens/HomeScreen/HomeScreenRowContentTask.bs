@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 @asynctask
 function HomeScreenRowContentTask(input as object) as boolean
@@ -8,15 +9,17 @@ function HomeScreenRowContentTask(input as object) as boolean
     service = new Invidious.InvidiousService(invidiousNode)
     response = service.MakeRequest(contentNode.feed)
 
+    ' TODO: handle unauthenticated requests
     if response = invalid
         contentNode.loadState = "failed"
         contentNode.title += " (Failed to load)"
         return false
     end if
 
+    instance = service.GetInstance()
     itemNodes = []
     for each item in response
-        itemNode = GetItemData(item)
+        itemNode = InvidiousToRowCellContentNode(item, instance)
         if itemNode <> invalid
             itemNodes.Push(itemNode)
         end if
@@ -28,23 +31,3 @@ function HomeScreenRowContentTask(input as object) as boolean
     return true
 end function
 
-function GetItemData(video as object) as object
-    if video.videoId <> invalid and video.type = invalid
-        video.type = "video"
-    end if
-
-    if video.type <> "video" and video.type <> "playlist" and video.type <> "channel"
-        return invalid
-    end if
-
-    videoItem = CreateObject("roSGNode", "ContentNode")
-    videoItem.addField("HDItemWidth", "float", false)
-    videoItem.append(video)
-
-    if video.type = "channel"
-        videoItem.HDItemWidth = "200"
-    else
-        videoItem.HDItemWidth = "350"
-    end if
-    return videoItem
-end function

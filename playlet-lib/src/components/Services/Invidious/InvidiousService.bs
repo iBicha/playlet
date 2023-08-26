@@ -2,6 +2,7 @@ import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
 
 namespace Invidious
     const DEFAULT_INSTANCE = "https://vid.puffyan.us"
@@ -35,19 +36,23 @@ namespace Invidious
             end for
 
             m.responseHanlders = {
-                DefaultHandler: m.DefaultHandler
+                DefaultHandler: m.DefaultHandler,
+                AuthFeedHandler: m.AuthFeedHandler
             }
         end function
 
         function DefaultArgs() as object
-            if m._defaultArgs = invalid
-                m._defaultArgs = {
-                    params: {
-                        region: m.node.applicationInfo@.GetUserCountryCode(invalid)
-                    }
+            return {
+                params: {
+                    region: m.node.applicationInfo@.GetUserCountryCode(invalid)
                 }
-            end if
-            return m._defaultArgs
+            }
+        end function
+
+        function GetAuthenticationHeaders(token as string) as object
+            return {
+                "Authorization": `Bearer ${token}`
+            }
         end function
 
         function GetInstance() as string
@@ -58,7 +63,6 @@ namespace Invidious
 
             return DEFAULT_INSTANCE
         end function
-
 
         function SearchSuggestions(q as string) as object
             instance = m.GetInstance()
@@ -140,6 +144,15 @@ namespace Invidious
 
             args = { params: {} }
 
+            if endpoint.authenticated = true
+                authToken = m.node.authToken
+                if authToken = invalid
+                    return invalid
+                end if
+                url = authToken.instance + endpoint.url
+                args.headers = m.GetAuthenticationHeaders(authToken.token)
+            end if
+
             if endpoint.queryParams <> invalid
                 for each queryParamKey in endpoint.queryParams
                     queryParam = endpoint.queryParams[queryParamKey]
@@ -167,13 +180,26 @@ namespace Invidious
                 end for
             end if
 
+            ' TODO: error handling
             response = Requests().get(url, args)
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
             result = responseHandler(m, requestData, response)
 
+            if result <> invalid and endpoint.authenticated = true
+                ' Cache response for use by web app
+                m.CacheResponse(requestData, result)
+            end if
+
             return result
+        end function
+
+        function CacheResponse(requestData as object, result as object)
+            cacheKey = FormatJson(requestData)
+            cacheKey = CryptoUtils.GetMd5(cacheKey)
+            value = FormatJson(result)
+            WriteAsciiFile(`tmp:/${cacheKey}.json`, value)
         end function
 
         function DefaultHandler(m as object, requestData as object, response as object) as object
@@ -181,6 +207,37 @@ namespace Invidious
                 return response.json
             end if
             return invalid
+        end function
+
+        function AuthFeedHandler(m as object, requestData as object, response as object) as object
+            m.DeleteExpiredToken(response)
+
+            if response.statuscode = 200
+                videos = []
+                videos.Append(response.json.notifications)
+                videos.Append(response.json.videos)
+                return videos
+            end if
+            return invalid
+        end function
+
+        function DeleteExpiredToken(response as object)
+            if response.statuscode = 403
+                m.DeleteAuthToken()
+            end if
+        end function
+
+        function GetAuthToken() as object
+            tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
+            if tokenPayload = invalid
+                return invalid
+            end if
+            authData = ParseJson(tokenPayload)
+            if authData = invalid or authData.instance = invalid or authData.token = invalid
+                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+                return invalid
+            end if
+            return authData
         end function
 
         function SetAuthToken(token as string, instance as string, username as dynamic, scopes as dynamic, expire as dynamic)
@@ -204,6 +261,39 @@ namespace Invidious
             m.node.authToken = obj
         end function
 
+        function DeleteAuthToken()
+            m.node.authToken = invalid
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+        end function
+
+        function Logout() as boolean
+            authToken = m.node.authToken
+            if authToken = invalid
+                return false
+            end if
+
+            m.UnregisterToken(authToken)
+            m.DeleteAuthToken()
+            return true
+        end function
+
+        function UnregisterToken(authToken as object) as boolean
+            headers = m.GetAuthenticationHeaders(authToken.token)
+
+            url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
+
+            ' authToken.token is already valid json that contains the "session" key needed by the unregister endpoint
+            headers["Content-Type"] = "application/json"
+            args = {
+                headers: headers,
+                data: authToken.token,
+                parseJson: false
+            }
+
+            response = Requests().post(url, args)
+            return response.ok
+        end function
+
         function GetAuthorizeTokenLink() as dynamic
             instance = m.GetInstance()
             ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
@@ -216,6 +306,7 @@ namespace Invidious
 
             expire = TimeUtils.Now().AsSeconds() + Invidious.TOKEN_TIMESPAN
 
+            'TODO: scope and expire in the callback
             callbackUrl = `${address}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
             scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
             return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`

@@ -43,6 +43,7 @@ function VideoContentTask(input as object) as object
 end function
 
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object) as object
+    instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
 
     streamUrls = []
@@ -60,6 +61,8 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
             AddStreamUrls(streamUrls, metadata, service, proxyVideos)
         end if
     end if
+
+    AddInstanceToUrlIfNeeded(streamUrls, instance)
 
     return streamUrls
 end function
@@ -113,4 +116,13 @@ function AddUrls(streamUrls as object, url as string, localUrl as string, proxyV
         streamUrls.push(url)
         streamUrls.push(localUrl)
     end if
+end function
+
+function AddInstanceToUrlIfNeeded(streamUrls as object, instance as string)
+    for i = 0 to streamUrls.Count() - 1
+        url = streamUrls[i]
+        if url.StartsWith("/")
+            streamUrls[i] = instance + url
+        end if
+    end for
 end function

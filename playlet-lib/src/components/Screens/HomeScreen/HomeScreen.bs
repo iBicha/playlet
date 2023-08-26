@@ -9,6 +9,7 @@ import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 function Init()
     m.rowList = m.top.FindNode("rowList")
+    m.pendingLoadTasks = {}
 end function
 
 function OnNodeReady()
@@ -21,6 +22,11 @@ function OnNodeReady()
     SetNavigation(invalid, "back", m.navBar)
     SetNavigation(invalid, "left", m.navBar)
 
+    m.invidious.ObserveField("authToken", "OnAuthTokenChange")
+    InitContent()
+end function
+
+function OnAuthTokenChange()
     InitContent()
 end function
 
@@ -45,14 +51,26 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 end function
 
 function InitContent()
+    CancelCurrentTasks()
+
+    m.contentTask = StartAsyncTask(HomeScreenContentTask, {
+        node: m.rowList,
+        contentFilePath: "libpkg:/config/default_home_layout.json5"
+    }, HomeScreenContentTaskResults)
+end function
+
+function CancelCurrentTasks()
     if m.contentTask <> invalid
         m.contentTask.control = "stop"
     end if
 
-    m.contentTask = StartAsyncTask(HomeScreenContentTask, {
-        node: m.rowList,
-        contentFilePath: "libpkg:/config/default_home_layout.json"
-    }, HomeScreenContentTaskResults)
+    pendingLoadTasks = m.pendingLoadTasks
+    for each id in pendingLoadTasks
+        task = pendingLoadTasks[id]
+        task.control = "stop"
+    end for
+
+    m.pendingLoadTasks = {}
 end function
 
 function HomeScreenContentTaskResults(output as object)
@@ -123,13 +141,15 @@ end function
 
 function LoadItemContent(contentNode as object)
     contentNode.loadState = "loading"
-    StartAsyncTask(HomeScreenRowContentTask, {
+    task = StartAsyncTask(HomeScreenRowContentTask, {
         node: contentNode,
         invidious: m.invidious
     }, HomeScreenRowContentTaskResults)
+    m.pendingLoadTasks[task.id] = task
 end function
 
 function HomeScreenRowContentTaskResults(output as object)
+    m.pendingLoadTasks.Delete(output.task.id)
     LoadItemsIfNeeded()
 end function
 
