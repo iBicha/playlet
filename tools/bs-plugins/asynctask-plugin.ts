@@ -179,6 +179,10 @@ function TaskMain()
             result: result
         })
     catch e
+        #if DEBUG
+            print "ERROR in ${functionName}: "
+            print FormatJson(e)
+        #end if
         m.top.setField("output", {
             success: false,
             task: m.top,

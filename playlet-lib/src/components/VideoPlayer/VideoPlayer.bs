@@ -3,6 +3,7 @@ import "pkg:/components/VideoPlayer/VideoContentTask.bs"
 import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
 
 function Init()
     m.log = new log.Logger("VideoPlayer")
@@ -62,6 +63,8 @@ function StartVideoContentTask(videoContentNode as object)
         m.videoContentTask.control = "stop"
     end if
 
+    MarkVideoWatched(videoContentNode.videoId)
+
     m.top.content = videoContentNode
 
     m.videoContentTask = StartAsyncTask(VideoContentTask, {
@@ -86,6 +89,15 @@ function OnVideoContentTaskResults(output as object) as void
     if ValidInt(m.top.content.timestamp) > 0
         ' TODO:P0 handle seeking in the case where the first stream url failed
         m.top.seek = m.top.content.timestamp
+    end if
+end function
+
+function MarkVideoWatched(videoId as string)
+    if m.top.invidious.authToken <> invalid
+        StartAsyncTask(MarkVideoWatchedTask, {
+            videoId: videoId,
+            invidious: m.top.invidious
+        })
     end if
 end function
 
