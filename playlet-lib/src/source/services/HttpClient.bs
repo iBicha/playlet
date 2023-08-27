@@ -38,7 +38,7 @@ namespace HttpClient
 
         function new()
             m.log = new log.Logger("HttpRequest")
-            m._timeoutMs = 30000
+            m._timeoutSeconds = 30
         end function
 
         function Method(method as string) as object
@@ -113,8 +113,8 @@ namespace HttpClient
             return m
         end function
 
-        function Timeout(timeoutMs as integer) as object
-            m._timeoutMs = timeoutMs
+        function TimeoutSeconds(timeoutSeconds as integer) as object
+            m._timeoutSeconds = timeoutSeconds
             return m
         end function
 
@@ -146,8 +146,7 @@ namespace HttpClient
                 command += ` -d '${m._body}'`
             end if
 
-            timeoutSeconds = m._timeoutMs / 1000
-            command += ` --max-time ${timeoutSeconds}`
+            command += ` --max-time ${m._timeoutSeconds}`
 
             command += ` "${m.BuildUrl()}"`
 
@@ -252,12 +251,12 @@ namespace HttpClient
                 end if
             end if
 
-            msg = wait(m._timeoutMs, messagePort)
+            msg = wait(m._timeoutSeconds * 1000, messagePort)
 
             if m._cancellation <> invalid
                 if m._cancellation.node <> invalid and m._cancellation.field <> invalid
-                    'TODO:P2 use a separate node as a cancellation token
-                    'This is to avoid removing observers other than our own
+                    ' TODO:P2 use a separate node as a cancellation token
+                    ' This is to avoid removing observers other than our own
                     m._cancellation.node.UnobserveFieldScoped(m._cancellation.field)
                 end if
             end if
@@ -448,14 +447,14 @@ namespace HttpClient
             if m.IsSuccess()
                 m._errorMessage = ""
             else
-                if m.request_sent <> true
+                if m.request._sent <> true
                     m._errorMessage = "Request not sent."
                 else if m.TimedOut()
                     m._errorMessage = "Request timed out."
                 else if m.IsCancelled()
                     m._errorMessage = "Request cancelled."
                 else if type(m.event) = "roUrlEvent"
-                    m._errorMessage = `${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nBody: ${m.event.GetString()}`
+                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nBody: ${m.event.GetString()}`
                 end if
             end if
 

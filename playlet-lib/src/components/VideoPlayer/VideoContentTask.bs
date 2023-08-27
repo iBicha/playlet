@@ -2,10 +2,13 @@ import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 @asynctask
 function VideoContentTask(input as object) as object
-
     contentNode = input.content
     invidiousNode = input.invidious
     preferencesNode = input.preferences
+
+    if m.top.cancel
+        return invalid
+    end if
 
     if StringUtils.IsNullOrEmpty(contentNode.videoId)
         throw "Can't load video information: videoId is missing"
@@ -14,6 +17,10 @@ function VideoContentTask(input as object) as object
     service = new Invidious.InvidiousService(invidiousNode)
 
     response = service.GetVideoMetadata(contentNode.videoId)
+
+    if m.top.cancel
+        return invalid
+    end if
 
     metadata = response.Json()
 
@@ -29,6 +36,8 @@ function VideoContentTask(input as object) as object
 
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode)
     contentNode.url = streamUrls[0]
+
+    SetCaptions(metadata, service, contentNode)
 
     contentNode.addFields({
         metadata: metadata,
@@ -126,3 +135,29 @@ function AddInstanceToUrlIfNeeded(streamUrls as object, instance as string)
         end if
     end for
 end function
+
+' TODO:P2
+' Captions are rate limited https://github.com/iv-org/invidious/issues/2567
+' It's possible to loop through a list of backup instances hoping to find working subtitles.
+' Caveat: searching for a working caption could cause a delay in the video player start.
+function SetCaptions(metadata as object, service as object, contentNode as object) as void
+    if metadata.captions.Count() = 0
+        return
+    end if
+    isoLanguageList = ParseJson(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json5"))
+    instance = service.GetInstance()
+
+    subtitleTracks = []
+
+    for each caption in metadata.captions
+        subtitleTracks.Push({
+            Description: caption.label,
+            Language: isoLanguageList[caption.language_code] ?? caption.language_code,
+            TrackName: instance + caption.url
+        })
+    end for
+
+    contentNode.ClosedCaptions = True
+    contentNode.SubtitleTracks = subtitleTracks
+end function
+

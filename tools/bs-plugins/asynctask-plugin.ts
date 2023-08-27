@@ -159,6 +159,7 @@ export class AsyncTaskPlugin implements CompilerPlugin {
     generateBsTask(functionName: string, hasInput: boolean, file: BscFile): string {
         return `
 import "pkg:/${file.pkgPath}"
+import "pkg:/source/utils/ErrorUtils.bs"
 
 function Init()
     m.top.functionName = "TaskMain"
@@ -181,7 +182,7 @@ function TaskMain()
     catch e
         #if DEBUG
             print "ERROR in ${functionName}: "
-            print FormatJson(e)
+            print ErrorUtils.Format(e)
         #end if
         m.top.setField("output", {
             success: false,

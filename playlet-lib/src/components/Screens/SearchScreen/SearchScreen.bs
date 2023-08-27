@@ -9,6 +9,8 @@ import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/NodeSetFocus.bs"
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 
 function Init()
     m.container = m.top.FindNode("container")
@@ -95,7 +97,7 @@ function OnSearchSuggestionsTaskResults(output as object) as void
     end if
 
     if not output.success
-        m.log.error(output.error)
+        m.log.error(ErrorUtils.Format(output.error))
         return
     end if
     ' In case this is an old request, discard suggestions
@@ -169,9 +171,10 @@ function OnSearchTaskResults(output as object) as void
         return
     end if
 
-    ' TODO:P0 Handle errors
     if not output.success
-        m.log.error(output.error)
+        error = ErrorUtils.Format(output.error)
+        m.log.error(error)
+        DialogUtils.ShowDialog(error, "Search failed", true)
         HideLoadingScreen()
         return
     end if

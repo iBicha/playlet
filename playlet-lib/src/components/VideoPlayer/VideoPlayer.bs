@@ -4,32 +4,37 @@ import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
 
 function Init()
     m.log = new log.Logger("VideoPlayer")
     SetPlayerStyle()
     SetupAnimation()
+
+    ' videoPlayingSuccess indicates if we started playing a video successfully
+    ' We use it to detect if we should try another link for a video, or if another error
+    ' occurred (such as a next work error)
+    m.videoPlayingSuccess = false
+    ' ignoreNextFinishedState indicates if we should ignore the next finished state
+    ' This is used to prevent the video from playing the next video when we are
+    ' still trying to find a working stream url
+    m.ignoreNextFinishedState = false
 end function
 
 function OnNodeReady()
-    width = 1280
-    height = 720
-    translation = [0.0, 0.0]
+    rect = m.container.fullscreen ? m.top.maxRect : m.top.minRect
 
-    if not m.container.fullscreen
-        width = 426
-        height = 240
-        translation = [834.0, 460.0]
-    end if
-
-    m.top.width = width
-    m.top.height = height
-    m.top.translation = translation
+    m.top.width = rect.width
+    m.top.height = rect.height
+    m.top.translation = [rect.x, rect.y]
 
     ' TODO:P2 show a loading spinner if video is loading minimized
     m.top.enableUI = m.container.fullscreen
 
     m.container.observeFieldScoped("fullscreen", "OnFullScreenChange")
+    m.top.ObserveField("state", "OnVideoPlayerStateChange")
+    m.top.observeField("control", "OnControlChange")
 end function
 
 function PlayWithContent(contentNode as object)
@@ -60,7 +65,7 @@ end function
 
 function StartVideoContentTask(videoContentNode as object)
     if m.videoContentTask <> invalid
-        m.videoContentTask.control = "stop"
+        m.videoContentTask.cancel = true
     end if
 
     MarkVideoWatched(videoContentNode.videoId)
@@ -75,13 +80,24 @@ function StartVideoContentTask(videoContentNode as object)
 end function
 
 function OnVideoContentTaskResults(output as object) as void
-    if not output.success
-        ' TODO:P0 show error - unhandled error
+    m.videoContentTask = invalid
+    if output.cancelled
         return
     end if
 
-    if not output.result.success
-        ' TODO:P0 show error - request error
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        videoId = output.task.input.content.videoId
+        message = `Failed to load video information for ${videoId}\n${error}`
+        DialogUtils.ShowDialog(message, "Video load fail", true)
+        VideoUtils.CloseVideo()
         return
     end if
 
@@ -110,6 +126,110 @@ function Close(unused as dynamic)
     end if
 end function
 
+function OnControlChange()
+    if m.top.control = "stop"
+        if m.videoContentTask <> invalid
+            m.videoContentTask.cancel = true
+        end if
+    end if
+end function
+
+function OnVideoPlayerStateChange() as void
+    state = m.top.state
+
+    ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
+    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
+    if state = "playing" and not m.videoPlayingSuccess
+        m.videoPlayingSuccess = true
+    end if
+
+    if state = "error"
+        errorInfo = m.top.errorInfo
+        m.log.error(`Error playing video ${m.top.videoId}`, errorInfo)
+        if m.videoPlayingSuccess <> true
+            ' http for stream format, mediaerror for DASH
+            if errorInfo.category = "http" or errorInfo.category = "mediaerror"
+                currentUrl = m.top.content.url
+                playletStreamUrls = m.top.content.playletStreamUrls
+                playletStreamUrlIndex = m.top.content.playletStreamUrlIndex
+                playletStreamUrlIndex++
+                m.top.content.playletStreamUrlIndex = playletStreamUrlIndex
+                if playletStreamUrlIndex < playletStreamUrls.Count()
+                    nextUrl = playletStreamUrls[playletStreamUrlIndex]
+                    m.log.error(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+
+                    m.top.content.url = nextUrl
+                    ' This video errored, and is about to finish, so don't close the video yet
+                    ' That's why we should ignore the next "finished" event
+                    m.ignoreNextFinishedState = true
+                    m.top.control = "play"
+                    return
+                end if
+            end if
+        end if
+    end if
+
+    if state = "finished" and m.ignoreNextFinishedState = true
+        m.ignoreNextFinishedState = false
+        return
+    end if
+
+    if state = "finished"
+        metadata = m.top.content?.metadata
+
+        ' TODO:P1 play next video in the queue
+
+        if not PlayNextRecommendedVideo(metadata?.recommendedVideos)
+            m.container@.watchedVideosClear(invalid)
+            VideoUtils.CloseVideo()
+        end if
+    end if
+
+    if state = "error"
+        messageLines = []
+        messageLines.push(`errorMsg: ${m.top.errorMsg}`)
+        messageLines.push(`errorCode: ${m.top.errorCode}`)
+        messageLines.push(`errorStr: ${m.top.errorStr}`)
+
+        errorInfo = m.top.errorInfo
+        for each info in errorInfo
+            messageLines.push(`${info}: ${errorInfo[info]}`)
+        end for
+        DialogUtils.ShowDialog(messageLines, `Error playing video ${m.top.videoId}`, true)
+        ' TODO:P1 play next video in the queue after showing the error dialog
+        VideoUtils.CloseVideo()
+    end if
+end function
+
+function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
+    if m.preferences["playback.autoplay"] <> true
+        return false
+    end if
+
+    if recommendedVideos = invalid or recommendedVideos.Count() = 0
+        return false
+    end if
+
+    for each metadata in recommendedVideos
+        videoId = metadata?.videoId
+        if videoId = invalid
+            continue for
+        end if
+        if not m.container@.watchedVideosContain(videoId)
+            contentNode = CreateObject("roSGNode", "ContentNode")
+            contentNode.title = metadata.title
+            contentNode.secondaryTitle = metadata.author
+            contentNode.addFields({ videoId: videoId })
+
+            m.log.info(`Playing next recommended video (${videoId})`)
+            VideoUtils.PlayVideo(contentNode)
+            return true
+        end if
+    end for
+
+    return false
+end function
+
 function OnkeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
@@ -124,6 +244,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     end if
 
     if key = "back"
+        m.container@.watchedVideosClear(invalid)
         VideoUtils.CloseVideo()
         return true
     end if
@@ -135,6 +256,16 @@ function SetupAnimation()
     m.widthInterpolator = m.top.findNode("widthInterpolator")
     m.heightInterpolator = m.top.findNode("heightInterpolator")
     m.translationInterpolator = m.top.findNode("translationInterpolator")
+
+    minRect = m.top.minRect
+    maxRect = m.top.maxRect
+
+    m.widthInterpolator.keyValue = [maxRect.width, (maxRect.width + minRect.width) / 2, minRect.width]
+    m.heightInterpolator.keyValue = [maxRect.height, (maxRect.height + minRect.height) / 2, minRect.height]
+    maxTranslation = [maxRect.x, maxRect.y]
+    minTranslation = [minRect.x, minRect.y]
+    midTranslation = [(maxRect.x + minRect.x) / 2, (maxRect.y + minRect.y) / 2]
+    m.translationInterpolator.keyValue = [maxTranslation, midTranslation, minTranslation]
 end function
 
 function OnFullScreenChange()
