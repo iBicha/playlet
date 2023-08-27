@@ -76,7 +76,7 @@ function OnTextChange() as void
     end if
 
     if m.searchSuggestionsTask <> invalid
-        m.searchSuggestionsTask.control = "stop"
+        m.searchSuggestionsTask.cancel = true
     end if
 
     m.searchSuggestionsTask = StartAsyncTask(SearchSuggestionsTask, {
@@ -86,6 +86,18 @@ function OnTextChange() as void
 end function
 
 function OnSearchSuggestionsTaskResults(output as object) as void
+    if m.searchSuggestionsTask <> invalid and m.searchSuggestionsTask.id = output.task.id
+        m.searchSuggestionsTask = invalid
+    end if
+
+    if output.cancelled
+        return
+    end if
+
+    if not output.success
+        m.log.error(output.error)
+        return
+    end if
     ' In case this is an old request, discard suggestions
     q = output.result.q
     if q <> m.keyboard.text
@@ -137,7 +149,7 @@ end function
 
 function Search(text as string)
     if m.searchTask <> invalid
-        m.searchTask.control = "stop"
+        m.searchTask.cancel = "true"
     end if
 
     ShowLoadingScreen()
@@ -147,7 +159,23 @@ function Search(text as string)
     }, OnSearchTaskResults)
 end function
 
-function OnSearchTaskResults(output as object)
+function OnSearchTaskResults(output as object) as void
+    if m.searchTask <> invalid and m.searchTask.id = output.task.id
+        m.searchTask = invalid
+    end if
+
+    if output.cancelled
+        HideLoadingScreen()
+        return
+    end if
+
+    ' TODO: Handle errors
+    if not output.success
+        m.log.error(output.error)
+        HideLoadingScreen()
+        return
+    end if
+
     m.rowList.content = output.result.content
     m.rowlist.focusable = true
     NodeSetFocus(m.rowlist, true)

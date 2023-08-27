@@ -1,4 +1,4 @@
-import "pkg:/source/roku_modules/rokurequests/Requests.brs"
+import "pkg:/source/services/HttpClient.bs"
 
 @asynctask
 function LatestLibVersionTask() as object
@@ -9,15 +9,13 @@ function LatestLibVersionTask() as object
 end function
 
 function GetLatestPlayletLibVersionFromGithubReleases() as string
-    args = {
-        parseJson: false
-    }
-    response = Requests().request("HEAD", "https://github.com/iBicha/playlet/releases/latest", args)
+    response = HttpClient.Head("https://github.com/iBicha/playlet/releases/latest").Await()
 
-    if response.statusCode = 200
-        if response.headers.location <> invalid
+    if response.StatusCode() = 200
+        headers = response.Headers()
+        if headers.location <> invalid
             regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
-            match = regex.match(response.headers.location)
+            match = regex.match(headers.location)
             if match.Count() = 2
                 return match[1]
             end if

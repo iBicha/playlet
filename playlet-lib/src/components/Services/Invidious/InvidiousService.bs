@@ -1,8 +1,8 @@
-import "pkg:/source/roku_modules/rokurequests/Requests.brs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/services/HttpClient.bs"
 
 namespace Invidious
     const DEFAULT_INSTANCE = "https://vid.puffyan.us"
@@ -41,11 +41,9 @@ namespace Invidious
             }
         end function
 
-        function DefaultArgs() as object
+        function DefaultQueryParams() as object
             return {
-                params: {
-                    region: m.node.applicationInfo@.GetUserCountryCode(invalid)
-                }
+                region: m.node.applicationInfo@.GetUserCountryCode(invalid)
             }
         end function
 
@@ -64,67 +62,50 @@ namespace Invidious
             return DEFAULT_INSTANCE
         end function
 
-        function SearchSuggestions(q as string) as object
+        function SearchSuggestions(q as string, cancellation = invalid as object) as object
             instance = m.GetInstance()
             url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
-            args = m.DefaultArgs()
-            args.params.q = q
-            args.cacheSeconds = 60 * 60 * 6 ' 6 hours
+            request = HttpClient.Get(url)
+            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("q", q)
+            request.CacheSeconds(60 * 60 * 6)' 6 hours
 
-            response = Requests().get(url, args)
+            request.Cancellation(cancellation)
 
-            if response.statuscode = 200
-                return response.json
-            end if
-            return invalid
+            response = request.Await()
+            ' TODO: return error if status code is not 200
+            return response.Json()
         end function
 
-        function Search(q as string, args = invalid as dynamic) as object
+        function Search(q as string, args = invalid as dynamic, cancellation = invalid as object) as object
             instance = m.GetInstance()
             url = `${instance}${Invidious.SEARCH_ENDPOINT}`
 
-            _args = m.DefaultArgs()
-            _args.params.q = q
+            request = HttpClient.Get(url)
+            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("q", q)
 
-            if args <> invalid
-                if args.page <> invalid
-                    _args.params.page = Str(args.page).Trim()
-                end if
-                if args.sort_by <> invalid
-                    _args.params.sort_by = args.sort_by
-                end if
-                if args.date <> invalid
-                    _args.params.date = args.date
-                end if
-                if args.duration <> invalid
-                    _args.params.duration = args.duration
-                end if
-                if args.type <> invalid
-                    _args.params.type = args.type
-                end if
-                if args.features <> invalid
-                    _args.params.features = args.features.join(",")
-                end if
+            if IsArray(args.features)
+                args.features = args.features.join(",")
             end if
-            response = Requests().get(url, _args)
+            request.QueryParams(args)
 
-            if response.statuscode = 200
-                return response.json
-            end if
-            return invalid
+            request.Cancellation(cancellation)
+
+            response = request.Await()
+            return response.Json()
         end function
 
         function GetVideoMetadata(videoId as string) as object
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
-            args = m.DefaultArgs()
-            args.cacheSeconds = 60 * 60 * 6 ' 6 hours
+            request = HttpClient.Get(url)
+            request.QueryParams(m.DefaultQueryParams())
+            request.CacheSeconds(60 * 60 * 6)' 6 hours
 
-            response = Requests().get(url, args)
-
-            return response
+            return request.Await()
         end function
 
         function GetVideoStreamUrl(videoId as string) as string
@@ -140,17 +121,15 @@ namespace Invidious
 
             instance = m.GetInstance()
 
-            url = instance + endpoint.url
-
-            args = { params: {} }
+            request = HttpClient.Get(instance + endpoint.url)
 
             if endpoint.authenticated = true
                 authToken = m.node.authToken
                 if authToken = invalid
                     return invalid
                 end if
-                url = authToken.instance + endpoint.url
-                args.headers = m.GetAuthenticationHeaders(authToken.token)
+                request.Url(authToken.instance + endpoint.url)
+                request.Headers(m.GetAuthenticationHeaders(authToken.token))
             end if
 
             if endpoint.queryParams <> invalid
@@ -158,12 +137,12 @@ namespace Invidious
                     queryParam = endpoint.queryParams[queryParamKey]
                     if queryParam.default <> invalid
                         if queryParam.type = "string"
-                            args.params[queryParamKey] = queryParam.default
+                            request.QueryParam(queryParamKey, queryParam.default)
                         else if queryParam.type = "#ISO3166"
                             if queryParam.default = "GetUserCountryCode"
-                                args.params[queryParamKey] = m.node.applicationInfo@.GetUserCountryCode(invalid)
+                                request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode(invalid))
                             else
-                                args.params[queryParamKey] = queryParam.default
+                                request.QueryParam(queryParamKey, queryParam.default)
                             end if
                         end if
                     end if
@@ -171,17 +150,15 @@ namespace Invidious
             end if
 
             if requestData.queryParams <> invalid
-                args.params.append(requestData.queryParams)
+                request.QueryParams(requestData.queryParams)
             end if
 
             if requestData.pathParams <> invalid
-                for each param in requestData.pathParams
-                    url = url.Replace(`:${param}`, requestData.pathParams[param])
-                end for
+                request.PathParams(requestData.pathParams)
             end if
 
             ' TODO: error handling
-            response = Requests().get(url, args)
+            response = request.Await()
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
@@ -203,26 +180,24 @@ namespace Invidious
         end function
 
         function DefaultHandler(m as object, requestData as object, response as object) as object
-            if response.statuscode = 200
-                return response.json
-            end if
-            return invalid
+            return response.Json()
         end function
 
         function AuthFeedHandler(m as object, requestData as object, response as object) as object
             m.DeleteExpiredToken(response)
 
-            if response.statuscode = 200
+            if response.StatusCode() = 200
+                json = response.Json()
                 videos = []
-                videos.Append(response.json.notifications)
-                videos.Append(response.json.videos)
+                videos.Append(json.notifications)
+                videos.Append(json.videos)
                 return videos
             end if
             return invalid
         end function
 
         function DeleteExpiredToken(response as object)
-            if response.statuscode = 403
+            if response.StatusCode() = 403
                 m.DeleteAuthToken()
             end if
         end function
@@ -277,21 +252,14 @@ namespace Invidious
             return true
         end function
 
-        function UnregisterToken(authToken as object) as boolean
-            headers = m.GetAuthenticationHeaders(authToken.token)
-
+        function UnregisterToken(authToken as object) as void
             url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
 
-            ' authToken.token is already valid json that contains the "session" key needed by the unregister endpoint
-            headers["Content-Type"] = "application/json"
-            args = {
-                headers: headers,
-                data: authToken.token,
-                parseJson: false
-            }
+            request = HttpClient.Post(url, authToken.token)
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Header("Content-Type", "application/json")
 
-            response = Requests().post(url, args)
-            return response.ok
+            request.SendAndForget()
         end function
 
         function GetAuthorizeTokenLink() as dynamic

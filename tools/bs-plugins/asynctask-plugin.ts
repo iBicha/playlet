@@ -162,6 +162,11 @@ import "pkg:/${file.pkgPath}"
 
 function Init()
     m.top.functionName = "TaskMain"
+    m.top.cancellation = {
+        node: m.top,
+        field: "cancel",
+        value: true
+    }
 end function
 
 function TaskMain()
@@ -169,11 +174,15 @@ function TaskMain()
         result = ${functionName}(${(hasInput ? "m.top.input" : "")})
         m.top.setField("output", {
             success: true,
+            task: m.top,
+            cancelled: m.top.cancel,
             result: result
         })
     catch e
         m.top.setField("output", {
             success: false,
+            task: m.top,
+            cancelled: m.top.cancel,
             error: e
         })
     end try
@@ -189,6 +198,8 @@ end function
   <interface>
     <field id="input" type="assocarray" />
     <field id="output" type="assocarray" />
+    <field id="cancel" type="boolean" alwaysNotify="true" />
+    <field id="cancellation" type="assocarray" />
   </interface>
   <script type="text/brightscript" uri="pkg:/${bsFile}" />
 </component>`
