@@ -7,6 +7,28 @@ import "pkg:/components/VideoPlayer/VideoUtils.bs"
 function Init()
     m.log = new log.Logger("VideoPlayer")
     SetPlayerStyle()
+    SetupAnimation()
+end function
+
+function OnNodeReady()
+    width = 1280
+    height = 720
+    translation = [0.0, 0.0]
+
+    if not m.container.fullscreen
+        width = 426
+        height = 240
+        translation = [834.0, 460.0]
+    end if
+
+    m.top.width = width
+    m.top.height = height
+    m.top.translation = translation
+
+    ' TODO:P2 show a loading spinner if video is loading minimized
+    m.top.enableUI = m.container.fullscreen
+
+    m.container.observeFieldScoped("fullscreen", "OnFullScreenChange")
 end function
 
 function PlayWithContent(contentNode as object)
@@ -80,9 +102,35 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
     end if
+    ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
+    ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
+    ' Because of that, the button "down" is used to shrink the video for picture in picture mode
+    if key = "down"
+        if VideoUtils.ToggleVideoPictureInPicture()
+            return true
+        end if
+    end if
+
     if key = "back"
         VideoUtils.CloseVideo()
         return true
     end if
     return false
+end function
+
+function SetupAnimation()
+    m.minimizeAnimation = m.top.findNode("minimizeAnimation")
+    m.widthInterpolator = m.top.findNode("widthInterpolator")
+    m.heightInterpolator = m.top.findNode("heightInterpolator")
+    m.translationInterpolator = m.top.findNode("translationInterpolator")
+end function
+
+function OnFullScreenChange()
+    m.widthInterpolator.reverse = m.container.fullscreen
+    m.heightInterpolator.reverse = m.container.fullscreen
+    m.translationInterpolator.reverse = m.container.fullscreen
+
+    m.minimizeAnimation.control = "start"
+
+    m.top.enableUI = m.container.fullscreen
 end function

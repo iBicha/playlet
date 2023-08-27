@@ -6,6 +6,7 @@ namespace VideoUtils
 
         container = GetVideoContainer()
         videoPlayer = container.createChild("videoPlayer")
+        videoPlayer.id = "VideoPlayer"
         videoPlayer@.BindNode(invalid)
 
         if args.content <> invalid
@@ -16,7 +17,9 @@ namespace VideoUtils
             return
         end if
 
-        NodeSetFocus(videoPlayer, true)
+        if container.fullscreen
+            NodeSetFocus(videoPlayer, true)
+        end if
     end function
 
     function CloseVideo(setFocus = true as boolean) as void
@@ -43,5 +46,21 @@ namespace VideoUtils
         return m.top.getScene().findNode("VideoContainer")
     end function
 
+    function ToggleVideoPictureInPicture() as boolean
+        videoPlayer = GetVideoPlayer()
+        if videoPlayer = invalid
+            return false
+        end if
+        videoContainer = GetVideoContainer()
+        videoContainer.fullscreen = not videoContainer.fullscreen
+        if videoContainer.fullscreen
+            NodeSetFocus(videoPlayer, true)
+        else
+            videoPlayer.appController@.FocusTopScreen(invalid)
+        end if
+        return true
+    end function
+
 end namespace
+
 
