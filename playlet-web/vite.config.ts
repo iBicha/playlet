@@ -15,7 +15,7 @@ const config: UserConfig = {
   }
 }
 
-// TODO: refactor this with the same code in tools/get-env-vars.js
+// TODO:P2 refactor this with the same code in tools/get-env-vars.js
 function getEnvVars() {
   const envFile = joinPath(__dirname, '../.env');
 

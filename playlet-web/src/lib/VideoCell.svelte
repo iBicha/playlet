@@ -220,7 +220,7 @@
     </div>
   </div>
 </button>
-<!-- TODO: a dialog for every video is very slow. Need to reuse the same one -->
+<!-- TODO:P2 a dialog for every video is very slow. Need to reuse the same one -->
 <dialog bind:this={modal} id="modal_{videoId}" class="modal">
   <form method="dialog" class="modal-box bg-base-100">
     <h3 class="text-lg m-5">{title}</h3>

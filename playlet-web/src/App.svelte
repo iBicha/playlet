@@ -2,7 +2,15 @@
   import { onMount } from "svelte";
   import NavBar from "./lib/NavBar.svelte";
   import { PlayletApi } from "./lib/PlayletApi";
-  import { appStateStore, homeLayoutFileStore, invidiousVideoApiStore, playletStateStore, preferencesModelStore, searchHistoryStore, userPreferencesStore } from "./lib/Stores";
+  import {
+    appStateStore,
+    homeLayoutFileStore,
+    invidiousVideoApiStore,
+    playletStateStore,
+    preferencesModelStore,
+    searchHistoryStore,
+    userPreferencesStore,
+  } from "./lib/Stores";
   import BottomNavigation from "./lib/BottomNavigation.svelte";
   import ScreenHome from "./lib/ScreenHome.svelte";
   import type { AppState } from "./lib/Types";
@@ -52,7 +60,7 @@
   <LinkDragDrop />
 
   <NavBar />
-  <!-- TODO: a better way to make the BottomNavigation not hide screens -->
+  <!-- TODO:P2 a better way to make the BottomNavigation not hide screens -->
   <div style="margin-bottom: 4rem">
     <ScreenSearch visibility={currentScreen == "search"} />
 
