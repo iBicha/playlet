@@ -167,33 +167,18 @@ paths:
           ROKU_DEV_TARGET:
             description: The IP address of the Roku device
             default: 192.168.1.x
+    parameters:
+      - $ref: "#/components/parameters/ecpAppId"
     post:
-      summary: Play video using ECP input
-      description: Play a video using the ECP input API. This enables the deep-linking functionality.
-      operationId: ecpInputPlayVideo
+      summary: Send input to Playlet through ECP
+      description: Send input to Playlet through Roku External Control Protocol (ECP). This enables the deep-linking functionality.
+      operationId: ecpInput
       parameters:
-        - name: appId
-          in: path
-          description: The app ID of the Playlet app
-          required: true
-          schema:
-            type: string
-            enum:
-              - "693751" # Playlet app id
-              - dev
-            default: "693751"
-        - name: contentId
-          in: query
-          description: The video ID of the video to play
-          required: true
-          schema:
-            type: string
-        - name: timestamp
-          in: query
-          description: The timestamp of the video to play
-          required: false
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpRpcFlag"
+        - $ref: "#/components/parameters/ecpRpcFunc"
+        - $ref: "#/components/parameters/ecpRpcArgs"
       responses:
         "200":
           description: OK
@@ -205,38 +190,85 @@ paths:
           ROKU_DEV_TARGET:
             description: The IP address of the Roku device
             default: 192.168.1.x
+    parameters:
+      - $ref: "#/components/parameters/ecpAppId"
     post:
-      summary: Play video using ECP launch arguments
-      description: Play a video using the ECP launch API. This enables the deep-linking functionality.
-      operationId: ecpLaunchPlayVideo
+      summary: Launch Playlet using ECP with arguments
+      description: Launch Playlet through Roku External Control Protocol (ECP) with arguments. This enables the deep-linking functionality.
+      operationId: ecpLaunch
       parameters:
-        - name: appId
-          in: path
-          description: The app ID of the Playlet app
-          required: true
-          schema:
-            type: string
-            enum:
-              - "693751" # Playlet app id
-              - dev
-            default: "693751"
-        - name: contentId
-          in: query
-          description: The video ID of the video to play
-          required: true
-          schema:
-            type: string
-        - name: timestamp
-          in: query
-          description: The timestamp of the video to play
-          required: false
-          schema:
-            type: string
+        - $ref: "#/components/parameters/ecpClearPlayletLibUrls"
+        - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpRpcFlag"
+        - $ref: "#/components/parameters/ecpRpcFunc"
+        - $ref: "#/components/parameters/ecpRpcArgs"
       responses:
         "200":
           description: OK
 
 components:
+  parameters:
+    ecpAppId:
+      name: appId
+      in: path
+      description: The app ID of the Playlet app
+      required: true
+      schema:
+        type: string
+        enum:
+          - "693751" # Playlet app id
+          - dev
+        default: "693751"
+    ecpContentId:
+      name: contentId
+      in: query
+      description: The video ID of the video to play. If specified, the video will be played.
+      required: false
+      schema:
+        type: string
+    ecpTimestamp:
+      name: timestamp
+      in: query
+      description: The timestamp of the video to play. To be used with the contentId argument.
+      required: false
+      schema:
+        type: string
+    ecpClearPlayletLibUrls:
+      name: clearPlayletLibUrls
+      in: query
+      description: If specified, the Playlet lib URLs will be cleared.
+      required: false
+      schema:
+        type: string
+    ecpRpcFlag:
+      name: rpc
+      in: query
+      description: If rpc is set to true, the 'func' function will be executed, with the options 'args' arguments.
+      required: false
+      schema:
+        type: string
+        enum:
+          - "true"
+    ecpRpcFunc:
+      name: func
+      in: query
+      description: The name of the RPC to execute. This flag must be used with the 'rpc' flag.
+      required: false
+      schema:
+        type: string
+        enum:
+          - InvidiousLogout
+          - PlayVideo
+          - SetPlayletLibUrls
+    ecpRpcArgs:
+      name: args
+      in: query
+      description: The arguments to pass to the RPC. This flag, if specified, must be a JSON formatted object.
+      required: false
+      schema:
+        type: string
+
   schemas:
     ExecuteRpcRequest:
       type: object
