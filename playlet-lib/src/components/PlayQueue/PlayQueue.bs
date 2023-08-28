@@ -1,0 +1,37 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+function Init()
+    m.top.queue = []
+end function
+
+function Enqueue(items as object) as void
+    if IsArray(items)
+        for each item in items
+            Enqueue(item)
+        end for
+    else
+        if not VideoUtils.IsVideoPlaying()
+            VideoUtils.PlayVideo(items)
+            return
+        end if
+        queue = m.top.queue
+        queue.push(items)
+        m.top.queue = queue
+    end if
+end function
+
+function Dequeue(unused as dynamic) as object
+    queue = m.top.queue
+    value = queue.Shift()
+    m.top.queue = queue
+    return value
+end function
+
+function Set(items as object)
+    m.top.queue = IsArray(items) ? items : [items]
+end function
+
+function Clear(unused as dynamic)
+    m.top.queue = []
+end function

@@ -157,6 +157,45 @@ paths:
       responses:
         "204":
           description: No Content
+  /api/queue:
+    get:
+      summary: Get play queue
+      description: Get the current videos in the queue.
+      operationId: getPlayQueue
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayQueueObject"
+    post:
+      summary: Add to play queue
+      description: Add a video to the queue. If no video is currently playing, the video plays instead of adding to the queue.
+      operationId: addToPlayQueue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayQueueObject"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlayQueueObject"
+    delete:
+      summary: Clear play queue
+      description: Clear the play queue.
+      operationId: clearPlayQueue
+      responses:
+        "204":
+          description: No Content
 
   # Roku External Control Protocol (ECP)
   /input/{appId}:
@@ -175,7 +214,11 @@ paths:
       operationId: ecpInput
       parameters:
         - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpMediaType"
+        - $ref: "#/components/parameters/ecpVideoId"
         - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpTitle"
+        - $ref: "#/components/parameters/ecpAuthor"
         - $ref: "#/components/parameters/ecpRpcFlag"
         - $ref: "#/components/parameters/ecpRpcFunc"
         - $ref: "#/components/parameters/ecpRpcArgs"
@@ -199,7 +242,11 @@ paths:
       parameters:
         - $ref: "#/components/parameters/ecpClearPlayletLibUrls"
         - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpMediaType"
+        - $ref: "#/components/parameters/ecpVideoId"
         - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpTitle"
+        - $ref: "#/components/parameters/ecpAuthor"
         - $ref: "#/components/parameters/ecpRpcFlag"
         - $ref: "#/components/parameters/ecpRpcFunc"
         - $ref: "#/components/parameters/ecpRpcArgs"
@@ -223,6 +270,22 @@ components:
     ecpContentId:
       name: contentId
       in: query
+      description: The ID of the content to play. If specified with mediaType=video, this is the videoId.
+      required: false
+      schema:
+        type: string
+    ecpMediaType:
+      name: mediaType
+      in: query
+      description: The type of the content of ContentId. To be used with the contentId argument.
+      required: false
+      schema:
+        type: string
+        enum:
+          - video
+    ecpVideoId:
+      name: videoId
+      in: query
       description: The video ID of the video to play. If specified, the video will be played.
       required: false
       schema:
@@ -231,6 +294,20 @@ components:
       name: timestamp
       in: query
       description: The timestamp of the video to play. To be used with the contentId argument.
+      required: false
+      schema:
+        type: string
+    ecpTitle:
+      name: title
+      in: query
+      description: The title of the video. This is optionally added so we can display the title while loading, or when displaying the "Added to queue" notification.
+      required: false
+      schema:
+        type: string
+    ecpAuthor:
+      name: author
+      in: query
+      description: The author of the video. This is optionally added so we can display the author while loading, or when displaying the "Added to queue" notification.
       required: false
       schema:
         type: string
@@ -396,3 +473,14 @@ components:
           type: boolean
         sponsorblock.show_notifications:
           type: boolean
+    PlayQueueObject:
+      type: object
+      properties:
+        videoId:
+          type: string
+        timestamp:
+          type: string
+        title:
+          type: string
+        author:
+          type: string

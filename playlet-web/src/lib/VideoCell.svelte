@@ -117,7 +117,11 @@
     const videoThumbnail =
       videoThumbnails.find((thumbnail) => thumbnail.quality === quality) ||
       videoThumbnails[0];
-    return videoThumbnail.url;
+    let url = videoThumbnail.url;
+    if (url.startsWith("/") && invidiousInstance) {
+      url = invidiousInstance + url;
+    }
+    return url;
   }
 
   function formatViewCount(viewCount) {
@@ -176,7 +180,11 @@
   }
 
   async function playVideoOnTv() {
-    await PlayletApi.playVideo(videoId, videoStartAtTimestamp);
+    await PlayletApi.playVideo(videoId, videoStartAtTimestamp, title, author);
+  }
+
+  async function queueVideoOnTv() {
+    await PlayletApi.queueVideo(videoId, videoStartAtTimestamp, title, author);
   }
 
   function openInvidiousInNewTab() {
@@ -231,6 +239,9 @@
         {lengthSeconds}
       />
       <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
+      <button class="btn m-2" on:click={queueVideoOnTv}
+        >Queue on {tvName}
+      </button>
       <button class="btn m-2" on:click={openInvidiousInNewTab}
         >Open in Invidious</button
       >

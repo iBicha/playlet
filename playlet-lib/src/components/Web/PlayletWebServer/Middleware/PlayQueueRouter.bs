@@ -1,0 +1,68 @@
+namespace Http
+
+    class PlayQueueRouter extends HttpRouter
+
+        function new()
+            super()
+
+            ' Get queue
+            m.Get("/api/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                queue = playQueue.queue
+                response.Json(queue)
+                return true
+            end function)
+
+            ' Add to queue
+            m.Post("/api/queue", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                playQueue@.Enqueue(payload)
+                queue = playQueue.queue
+                response.Json(queue)
+                return true
+            end function)
+
+            ' clear queue
+            m.Delete("/api/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                playQueue@.Clear(invalid)
+                response.Default(204, "OK")
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace

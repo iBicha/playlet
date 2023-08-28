@@ -146,7 +146,20 @@
   }
 
   async function playVideoOnTv() {
-    await PlayletApi.playVideo(videoMetadata?.videoId, videoStartAtTimestamp);
+    await PlayletApi.playVideo(
+      videoMetadata?.videoId,
+      videoStartAtTimestamp,
+      videoMetadata?.title,
+      videoMetadata?.author
+    );
+  }
+  async function queueVideoOnTv() {
+    await PlayletApi.queueVideo(
+      videoMetadata?.videoId,
+      videoStartAtTimestamp,
+      videoMetadata?.title,
+      videoMetadata?.author
+    );
   }
 
   function openInvidiousInNewTab() {
@@ -180,6 +193,9 @@
         lengthSeconds={videoMetadata?.lengthSeconds}
       />
       <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
+      <button class="btn m-2" on:click={queueVideoOnTv}
+        >Queue on {tvName}
+      </button>
       <button class="btn m-2" on:click={openInvidiousInNewTab}
         >Open in Invidious</button
       >

@@ -43,7 +43,7 @@ export class PlayletApi {
         await this.rpcCall("InvidiousLogout");
     }
 
-    static async playVideo(videoId, timestamp) {
+    static async playVideo(videoId, timestamp, title, author) {
         if (!videoId) {
             return;
         }
@@ -54,8 +54,35 @@ export class PlayletApi {
             }
             args["timestamp"] = timestamp;
         }
+        if (title !== undefined) {
+            args["title"] = title;
+        }
+        if (author !== undefined) {
+            args["author"] = author;
+        }
 
         await this.rpcCall("PlayVideo", args);
+    }
+
+    static async queueVideo(videoId, timestamp, title, author) {
+        if (!videoId) {
+            return;
+        }
+        const args = { videoId };
+        if (timestamp !== undefined) {
+            if (typeof timestamp === "string") {
+                timestamp = parseInt(timestamp);
+            }
+            args["timestamp"] = timestamp;
+        }
+        if (title !== undefined) {
+            args["title"] = title;
+        }
+        if (author !== undefined) {
+            args["author"] = author;
+        }
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
+        return await response.json();
     }
 
     static async getSearchHistory() {

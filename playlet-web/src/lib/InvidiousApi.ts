@@ -57,14 +57,14 @@ export class InvidiousApi {
             for (let queryParamKey in endpoint.queryParams) {
                 let queryParam = endpoint.queryParams[queryParamKey];
                 if (queryParam.default !== undefined) {
-                    if (queryParam.type === "string") {
-                        queryParams[queryParamKey] = queryParam.default;
-                    } else if (queryParam.type === "#ISO3166") {
+                    if (queryParam.type === "#ISO3166") {
                         if (queryParam.default === "GetUserCountryCode") {
                             queryParams[queryParamKey] = this.userCountryCode;
                         } else {
                             queryParams[queryParamKey] = queryParam.default;
                         }
+                    } else {
+                        queryParams[queryParamKey] = queryParam.default;
                     }
                 }
             }
@@ -76,7 +76,7 @@ export class InvidiousApi {
 
         if (requestData.pathParams !== undefined) {
             for (let param in requestData.pathParams) {
-                url = url.replace(`:${param}`, requestData.pathParams[param]);
+                url = url.replace(`{${param}}`, requestData.pathParams[param]);
             }
         }
 
