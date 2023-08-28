@@ -1,0 +1,22 @@
+import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+
+@asynctask
+function SponsorBlockTask(input as object) as object
+    videoId = input.metadata.videoId
+    lengthSeconds = input.metadata.lengthSeconds
+
+    service = new SponsorBlock.SponsorBlockService()
+    skipSegments = service.GetSkipSegmentsForVideo(videoId)
+    barPath = invalid
+
+    if skipSegments <> invalid
+        barPath = `tmp:/sponsorblock_bar_${videoId}.png`
+        service.GenerateProgressBarBackground(skipSegments, lengthSeconds, barPath)
+    end if
+
+    return {
+        videoId: videoId,
+        skipSegments: skipSegments,
+        barPath: barPath
+    }
+end function

@@ -6,6 +6,7 @@ import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/VideoPlayer/SponsorBlock.bs"
 
 function Init()
     m.log = new log.Logger("VideoPlayer")
@@ -101,6 +102,8 @@ function OnVideoContentTaskResults(output as object) as void
         return
     end if
 
+    SponsorBlock.FetchSponsorBlock(m.top.content.metadata)
+
     m.top.control = "play"
     if ValidInt(m.top.content.timestamp) > 0
         ' TODO:P0 handle seeking in the case where the first stream url failed
@@ -130,6 +133,11 @@ function OnControlChange()
     if m.top.control = "stop"
         if m.videoContentTask <> invalid
             m.videoContentTask.cancel = true
+            m.videoContentTask = invalid
+        end if
+        if m.sponsorBlockTask <> invalid
+            m.sponsorBlockTask.cancel = true
+            m.sponsorBlockTask = invalid
         end if
     end if
 end function

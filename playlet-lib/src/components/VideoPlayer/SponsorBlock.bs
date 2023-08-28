@@ -1,0 +1,94 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockTask.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockSegmentViewedTask.bs"
+
+namespace SponsorBlock
+
+    function FetchSponsorBlock(metadata as object) as void
+        if not m.preferences["sponsorblock.enabled"]
+            return
+        end if
+
+        if m.sponsorBlockTask <> invalid
+            m.sponsorBlockTask.cancel = true
+        end if
+
+        m.sponsorBlockTask = StartAsyncTask(SponsorBlockTask, { metadata: metadata }, OnSponsorBlockTaskResults)
+    end function
+
+    function OnSponsorBlockTaskResults(output as object) as void
+        m.sponsorBlockTask = invalid
+        if output.cancelled
+            return
+        end if
+
+        if not output.success
+            error = ErrorUtils.Format(output.error)
+            m.log.error(error)
+            return
+        end if
+
+        skipSegments = output.result.skipSegments
+        if skipSegments = invalid
+            return
+        end if
+
+        m.skipSegments = skipSegments
+        m.top.seekMode = "accurate"
+
+        barPath = output.result.barPath
+        if barPath <> invalid
+            m.top.trickPlayBar.trackImageUri = barPath
+            m.top.trickPlayBar.filledBarBlendColor = "0xFF000080"
+        end if
+
+        m.top.UnobserveFieldScoped("position")
+        m.top.ObserveFieldScoped("position", FuncName(OnPositionChangeSkipSponsorBlockSections))
+    end function
+
+    function OnPositionChangeSkipSponsorBlockSections() as void
+        segments = m.skipSegments
+        if segments = invalid
+            return
+        end if
+
+        for each segment in segments
+            segmentRange = segment["segment"]
+            segmentStart = segmentRange[0]
+            segmentEnd = segmentRange[1]
+            currentPosition = m.top.position
+            if (segmentStart < currentPosition) and ((segmentEnd - 1) > currentPosition)
+                action = GetActionForSegment(segment)
+                if m.preferences["sponsorblock.show_notifications"] = true
+                    ' ShowSponsorBlockNotifcation(segment, action)
+                end if
+
+                if action = "AutoSkip"
+                    m.top.seek = segmentEnd
+                    m.log.info("Skipping section:", segment["category"])
+                    SendSkippedSectionEvent(segment.UUID)
+                    return
+                end if
+            end if
+        end for
+    end function
+
+    function GetActionForSegment(segment as object) as dynamic
+        category = segment["category"]
+        if category = "sponsor"
+            return "AutoSkip"
+        else if category = "poi_highlight"
+            return "ManualSkip"
+        else if category = "exclusive_access"
+            return "ShowOverlay"
+        else if category = "chapter"
+            return "ShowOverlay"
+        end if
+        return ""
+    end function
+
+    function SendSkippedSectionEvent(segmentId as string)
+        StartAsyncTask(SponsorBlockSegmentViewedTask, { segmentId: segmentId })
+    end function
+
+end namespace
