@@ -3,6 +3,7 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 namespace Invidious
     const DEFAULT_INSTANCE = "https://vid.puffyan.us"
@@ -27,6 +28,8 @@ namespace Invidious
         public node as object
 
         function new(node as object)
+            m.log = new log.Logger("InvidiousService")
+
             m.node = node
             ' TODO:P2 api definitions are not needed everytime, move them to a separate function and lazy load
             apiDefinitions = node.apiDefinitions
@@ -216,6 +219,8 @@ namespace Invidious
 
         function DeleteExpiredToken(response as object)
             if response.StatusCode() = 403
+                m.log.warn(`Invidious instance responded with 403: ${response.Text()}`)
+                m.log.warn("Deleting Invidious token...")
                 m.DeleteAuthToken()
             end if
         end function
