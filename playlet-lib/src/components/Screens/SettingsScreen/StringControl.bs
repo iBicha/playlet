@@ -1,4 +1,5 @@
 import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/source/utils/Types.bs"
 
 function Init()
     m.top.focusable = true
@@ -7,14 +8,14 @@ function Init()
     m.button = m.top.findNode("button")
     AdjustButtonLabel(m.button)
 
-    m.button.observeField("buttonSelected", "ShowEditKeyboard")
+    m.button.observeField("buttonSelected", FuncName(ShowEditKeyboard))
 end function
 
 function AdjustButtonLabel(button as object) as void
     children = button.getChildren(-1, 0)
     for each child in children
         if child.isSubtype("Label") and child.hasField("horizAlign")
-            child.observeField("horizAlign", "OnButtonLabelHorizAlignChanged")
+            child.observeField("horizAlign", FuncName(OnButtonLabelHorizAlignChanged))
             child.horizAlign = "left"
             return
         end if
@@ -37,7 +38,7 @@ function BindPreference(preferences as object, key as string)
     m.key = key
 
     if preferences <> invalid and key <> invalid
-        preferences.observeFieldScoped(key, "OnPreferenceChange")
+        preferences.observeFieldScoped(key, FuncName(OnPreferenceChange))
         OnPreferenceChange()
     end if
 end function
@@ -68,7 +69,7 @@ function ShowEditKeyboard()
     keyboardDialog.message = [m.top.description]
     keyboardDialog.text = m.top.value
     keyboardDialog.buttons = ["OK", "Cancel"]
-    keyboardDialog.observeField("buttonSelected", "OnKeyboardButton")
+    keyboardDialog.observeField("buttonSelected", FuncName(OnKeyboardButton))
 
     m.top.getScene().dialog = keyboardDialog
 end function
