@@ -17,6 +17,7 @@ namespace Http
         private route = invalid
         private query = invalid
         private protocol = invalid
+        private encoder = invalid
         private buffer = invalid
         private buffer_index = 0
         private headers = invalid
@@ -36,12 +37,13 @@ namespace Http
             m.headers = CreateObject("roAssociativeArray")
         end function
 
-        function Add(incoming as string)
+        function Add(incoming as string, maybeUnicode as boolean)
             if IsString(m.buffer)
                 m.buffer = m.buffer + incoming
             else
                 m.buffer = incoming
             end if
+            m.maybe_unicode = maybeUnicode
         end function
 
         function ProcessNext(connection as HttpConnection) as boolean
@@ -163,6 +165,35 @@ namespace Http
                 end if
 
                 m.ready_for_response = m.body.len() = contentLength
+
+                if not m.ready_for_response and m.maybe_unicode = true
+                    ' If we have a body smaller than Content-Length, there are two possibliities:
+                    '   1. The body is not yet complete
+                    '   2. The body is complete, but the body has Unicode characters, causing the string length
+                    '      to be smaller than the byte length.
+                    '
+                    ' When that happens, unfortunately, we have to convert the string to a byte array just
+                    ' to get the byte length.
+                    '
+                    ' The alternative is to receive data as bytes in the first place (as we should) but this makes
+                    '   1. parsing method, url, and headers slightly worse
+                    '   2. requires us to convert most things to strings anyway
+                    '   3. there are bugs https://community.roku.com/t5/Roku-Developer-Program/Help-with-roStreamSocket-data/td-p/249286
+                    '
+                    ' Currently there's no indication that this has terrible performance (since it's rare that we upload unicode
+                    ' text, at least for Playlet) and payloads are usually so small that this encoding thing will either not happen,
+                    ' or will happen only once. The small payload size also means that the performance impact is minimal.
+                    '
+                    ' Finally, we use the flag `maybe_unicode` so we're less wasteful doing this encoding.
+                    if m.encoder = invalid
+                        m.encoder = CreateObject("roByteArray")
+                    end if
+                    m.encoder.FromAsciiString(m.body)
+                    if m.encoder.Count() = contentLength
+                        m.ready_for_response = true
+                    end if
+                end if
+
                 return m.ready_for_response
             end if
         end function

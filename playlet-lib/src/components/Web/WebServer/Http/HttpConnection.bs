@@ -72,8 +72,12 @@ namespace Http
                 m.log.error("illegal request state @" + m.client)
             end if
 
+            rcvStrByteLen = m.socket.GetCountRcvBuf()
             rcvStr = m.socket.receiveStr(Http.BUFSIZE)
             received = rcvStr.len()
+            rcvStrByteLen -= m.socket.GetCountRcvBuf()
+
+            maybeUnicode = rcvStrByteLen <> received
 
             if m.CheckResult(received, "receive request")
                 m.total_received = m.total_received + received
@@ -81,7 +85,7 @@ namespace Http
             end if
 
             ' append to connection request
-            m.request.Add(rcvStr)
+            m.request.Add(rcvStr, maybeUnicode)
 
             if m.request.ProcessNext(m)
                 if m.request.state = Http.HttpRequestState.DONE
