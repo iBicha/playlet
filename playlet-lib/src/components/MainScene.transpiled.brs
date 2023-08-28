@@ -12,7 +12,7 @@ function Init()
     ' At this point, the "MainScene" node is not yet added to the scene, and does not have a parent yet.
     ' Let's wait until it has one.
     m.MainSceneContainer = m.scene.findNode("MainSceneContainer")
-    m.MainSceneContainer.ObserveField("change", "MainSceneContainerChanged")
+    m.MainSceneContainer.ObserveField("change", FuncName(MainSceneContainerChanged))
 end function
 
 function MainSceneContainerChanged()
