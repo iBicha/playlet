@@ -12,18 +12,11 @@ namespace SponsorBlock
 
         m.sponsorBlockService = new SponsorBlock.SponsorBlockService()
 
-        ' TODO:P2 get rid of this by using a custom Video UI
-        ' The following code serves one purpose: show the segment name of sponsorblock (promo, intro, etc)
-        ' 1. Set the chapter label as a child of the trickplay bar
-        ' 2. Find the time label (0:00) on the trickplay bar
-        ' 3. When the trickplay bar is visible, start a timer
-        ' 4. With each tick, parse the time label (if it changed)
-        ' 5. If the time label is in a sponsorblock segment, set the chapter label to the segment name
         PositionChapterLabel()
-        m.timeLabel = FindTimeLabel()
         m.top.trickPlayBar.observeField("visible", FuncName(OnTrickPlayBarVisible))
         m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
         m.chapterLabelTimer.observeField("fire", FuncName(OnChapterLabelTimer))
+        m._sponsorBlockLastTime = 0.0#
 
         ' TODO:P1 more precision on when notifications should be visible
         ' Should notifcations be visible when the video is not fullscreen?
@@ -32,28 +25,11 @@ namespace SponsorBlock
 
     function PositionChapterLabel()
         m.chapterLabel = m.top.findNode("chapterLabel")
+        ' We move the chapter label under m.top.trickPlayBar
+        ' We could move it to m.top.pivotNode, but that is only available on Roku OS 11.5+
         m.chapterLabel.reparent(m.top.trickPlayBar, false)
         trickPlayBarWidth = m.top.trickPlayBar.boundingRect().width
         m.chapterLabel.translation = [trickPlayBarWidth / 4 - m.chapterLabel.width / 2, 25]
-    end function
-
-    function FindTimeLabel() as object
-        children = m.top.trickPlayBar.getChildren(m.top.trickPlayBar.getChildCount(), 0)
-        label = invalid
-        for each child in children
-            ' It's very unfortunate to have to find a label with 0:00 text,
-            ' and that's on the left side of the screen. This might need completely custom trickPlayBar
-            if child.isSubtype("Label") and child.text = "0:00"
-                if label = invalid
-                    label = child
-                else
-                    if child.translation[0] < label.translation[0]
-                        label = child
-                    end if
-                end if
-            end if
-        end for
-        return label
     end function
 
     function OnTrickPlayBarVisible()
@@ -66,20 +42,25 @@ namespace SponsorBlock
     end function
 
     function OnChapterLabelTimer() as void
-        if m.timeLabel = invalid or m.skipSegments = invalid
+        if m.skipSegments = invalid
             return
         end if
 
-        if m.sponsorBlockLastTime = m.timeLabel.text
+        ' trickPlayPosition is not documented on Roku website, this is why we're checking
+        if not IsDouble(m.top.trickPlayPosition)
             return
         end if
-        m.sponsorBlockLastTime = m.timeLabel.text
 
-        time = TimeUtils.ParseTime(m.timeLabel.text)
-        UpdateSponsorBlockChapter(time)
+        if m._sponsorBlockLastTime = m.top.trickPlayPosition
+            return
+        end if
+
+        m._sponsorBlockLastTime = m.top.trickPlayPosition
+
+        UpdateSponsorBlockChapter(m._sponsorBlockLastTime)
     end function
 
-    function UpdateSponsorBlockChapter(time as integer) as void
+    function UpdateSponsorBlockChapter(time as double) as void
         segments = m.skipSegments
         for each segment in segments
             segmentRange = segment["segment"]
