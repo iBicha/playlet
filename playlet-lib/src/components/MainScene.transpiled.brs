@@ -20,6 +20,7 @@ function MainSceneContainerChanged()
     StartWebServer()
     HideLoadingScreen()
     InitEcpArgs()
+    m.scene.signalBeacon("AppLaunchComplete")
 end function
 
 function StartWebServer()

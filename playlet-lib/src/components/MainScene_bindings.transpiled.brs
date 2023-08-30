@@ -20,7 +20,8 @@ function InitializeBindings()
             "WebServer": {
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "playQueue": "../PlayQueue"
             }
         }
     }
