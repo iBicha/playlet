@@ -37,6 +37,11 @@ export class ManifestEditPlugin implements CompilerPlugin {
         if (debug) {
             // Host IP address
             manifestContent = manifestContent.replace(/DEBUG_HOST_IP_ADDRESS/i, `${ip.address()}`)
+
+            // Run as process to use the Roku Resource Monitor
+            if (manifestContent.indexOf('run_as_process=1') < 0) {
+                manifestContent += '\nrun_as_process=1';
+            }
         }
 
         // Test flag

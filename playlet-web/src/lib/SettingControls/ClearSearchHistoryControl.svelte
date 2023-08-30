@@ -19,7 +19,7 @@
 
 <div class="m-5">
   <div class={textSizes[level]}>{displayText}</div>
-  <div class="text-xs text-gray-500">{description}</div>
+  <div class="text-xs text-gray-500">{@html description}</div>
   <button class="btn m-1" on:click={clearSeachHistory}
     >Clear search history</button
   >

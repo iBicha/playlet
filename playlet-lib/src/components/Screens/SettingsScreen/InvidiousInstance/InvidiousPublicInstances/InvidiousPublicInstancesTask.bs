@@ -1,0 +1,79 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function InvidiousPublicInstancesTask(input as object) as object
+    listNode = input.listNode
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    response = HttpClient.Get(Invidious.INSTANCES_API).Await()
+    instances = response.Json()
+
+    if not response.IsSuccess() or instances = invalid
+        return {
+            success: false,
+            error: response.ErrorMessage()
+        }
+    end if
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    instances = FilterInstances(instances)
+
+    content = CreateObject("roSGNode", "ContentNode")
+
+    for each instance in instances
+        item = CreateObject("roSGNode", "InvidiousPublicInstancesListItemContent")
+        item.setFields({
+            name: instance[0],
+            version: instance[1].stats.software.version,
+            users: instance[1].stats.usage.users.total,
+            signup: instance[1].stats.openRegistrations ? "Yes" : "No",
+            ' Leave 5 spaces for the flag, just to simplify the layout
+            location: `     ${instance[1].region}`,
+            flag: GetFlagUrl(instance[1].flag),
+            health: instance[1].monitor["30dRatio"].ratio,
+            uri: instance[1].uri
+        })
+        content.AppendChild(item)
+    end for
+
+    listNode.content = content
+
+    return {
+        success: true
+    }
+end function
+
+function FilterInstances(instances as object) as object
+    filtered = []
+
+    for each instance in instances
+        flags = instance[1]
+        if flags.type = "https" and flags.api = true and flags.cors = true
+            filtered.Push(instance)
+        end if
+    end for
+
+    return filtered
+end function
+
+function GetFlagUrl(flag as string) as string
+    codePoint = emojiToCodePoint(flag)
+    return `https://github.githubassets.com/images/icons/emoji/unicode/${codePoint}.png?v8`
+end function
+
+function emojiToCodePoint(emoji as string) as string
+    codes = []
+    chars = emoji.Split("")
+    for i = 0 to chars.count() - 1
+        c = Asc(chars[i])
+        codes.push(StrI(c, 16))
+    end for
+    return codes.join("-")
+end function

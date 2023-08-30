@@ -1,0 +1,77 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
+
+function Init()
+    m.top.focusable = true
+    m.top.itemSpacings = [8]
+
+    m.button = m.top.findNode("button")
+    AdjustButtonLabel(m.button)
+
+    m.button.observeField("buttonSelected", FuncName(OpenInvidiousInstanceSettings))
+end function
+
+function OnFocusChange() as void
+    if m.top.focus <> true
+        return
+    end if
+
+    NodeSetFocus(m.button, true)
+end function
+
+function AdjustButtonLabel(button as object) as void
+    children = button.getChildren(-1, 0)
+    for each child in children
+        if child.isSubtype("Label") and child.hasField("horizAlign")
+            child.observeField("horizAlign", FuncName(OnButtonLabelHorizAlignChanged))
+            child.horizAlign = "left"
+            return
+        end if
+    end for
+end function
+
+function OnButtonLabelHorizAlignChanged(event as object)
+    label = event.getRoSGNode()
+    if label.horizAlign <> "left"
+        label.horizAlign = "left"
+    end if
+end function
+
+function BindPreference(preferences as object, key as string)
+    if m.preferences <> invalid and m.key <> invalid
+        m.preferences.unobserveFieldScoped(m.key)
+    end if
+
+    m.preferences = preferences
+    m.key = key
+
+    if preferences <> invalid and key <> invalid
+        preferences.observeFieldScoped(key, FuncName(OnPreferenceChange))
+        OnPreferenceChange()
+    end if
+end function
+
+function OpenInvidiousInstanceSettings()
+    settings = CreateObject("roSGNode", "InvidiousInstanceSettings")
+    m.appController@.PushScreen(settings)
+    settings@.BindNode(invalid)
+    settings.text = m.top.value
+    settings.observeField("save", FuncName(OnSaveInvidiousInstance))
+end function
+
+function OnSaveInvidiousInstance(event as object)
+    settings = event.GetRoSGNode()
+    m.top.value = settings.text
+end function
+
+function OnPreferenceChange()
+    m.top.value = m.preferences[m.key]
+end function
+
+function OnValueChange() as void
+    if m.preferences = invalid or m.key = invalid
+        return
+    end if
+
+    m.preferences[m.key] = m.top.value
+end function

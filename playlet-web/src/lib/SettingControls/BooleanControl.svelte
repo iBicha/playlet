@@ -32,5 +32,5 @@
       class="checkbox"
     />
   </label>
-  <div class="text-xs text-gray-500">{description}</div>
+  <div class="text-xs text-gray-500">{@html description}</div>
 </div>

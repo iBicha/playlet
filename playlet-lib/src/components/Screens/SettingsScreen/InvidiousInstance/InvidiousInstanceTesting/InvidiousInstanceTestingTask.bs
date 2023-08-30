@@ -1,0 +1,194 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+
+@asynctask
+function InvidiousInstanceTestingTask(input as object) as object
+    instance = input.instance
+    listNode = input.listNode
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    content = PrepareTests()
+    listNode.content = content
+
+    RunTests(instance, content)
+
+    return invalid
+end function
+
+function PrepareTests() as object
+    content = CreateObject("roSGNode", "ContentNode")
+    content.AppendChild(CreateTestNode("Valid url", IsValidUrl))
+    content.AppendChild(CreateTestNode("Instance reachable", IsReachable))
+    content.AppendChild(CreateTestNode("Fetch video details", CanFetchVideoDetails))
+    content.AppendChild(CreateTestNode("Fetch video comments", CanFetchVideoComments))
+    return content
+end function
+
+function CreateTestNode(title as string, func as function) as object
+    testNode = CreateObject("roSGNode", "ContentNode")
+    testNode.title = title
+    testNode.AddFields({
+        func: FuncName(func),
+        state: "loading",
+        details: "",
+        duration: 0
+    })
+    m[testNode.func] = func
+    return testNode
+end function
+
+function RunTests(instance as string, content as object) as void
+    testNodes = content.getChildren(-1, 0)
+
+    timer = CreateObject("roTimespan")
+
+    for each testNode in testNodes
+        timer.Mark()
+        m[testNode.func](instance, testNode)
+        testNode.duration = timer.TotalMilliseconds()
+
+        if m.top.cancel
+            return
+        end if
+    end for
+end function
+
+function IsValidUrl(instance as string, testNode as object) as void
+    try
+        if not instance.StartsWith("http://") and not instance.StartsWith("https://")
+            testNode.state = "failed"
+            testNode.details = "Url must start with http:// or https://"
+            return
+        end if
+        if instance.EndsWith("/")
+            testNode.state = "failed"
+            testNode.details = "Url must not end with /"
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = "The url seems to be of a valid format"
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function IsReachable(instance as string, testNode as object) as void
+    try
+        url = `${instance}${Invidious.STATS_ENDPOINT}`
+        response = HttpClient.Get(url).NoCache().Await()
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url}`
+            return
+        end if
+
+        name = json.software?.name
+        if not IsString(name)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read software.name)`
+            return
+        end if
+
+        version = json.software?.version
+        if not IsString(version)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read software.version)`
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = `The instance is reachable and running ${name} version ${version}`
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+
+end function
+
+function CanFetchVideoDetails(instance as string, testNode as object) as void
+    try
+        videoId = "jNQXAC9IVRw"
+        url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+        response = HttpClient.Get(url).NoCache().Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url}`
+            return
+        end if
+
+        title = json.title
+        if not IsString(title)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read title)`
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = `The instance can fetch video details for id "${videoId}" (${title})`
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function CanFetchVideoComments(instance as string, testNode as object) as void
+    try
+        videoId = "jNQXAC9IVRw"
+        url = `${instance}/api/v1/comments/${videoId}`
+        response = HttpClient.Get(url).NoCache().Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url}`
+            return
+        end if
+
+        commentCount = json.commentCount
+        if not IsInt(commentCount)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read commentCount)`
+            return
+        end if
+
+        comments = json.comments
+        if not IsArray(comments)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read comments)`
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = `The instance can fetch video comments for id "${videoId}" (${commentCount} comments)`
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function

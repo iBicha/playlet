@@ -1,0 +1,99 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/Screens/SettingsScreen/InvidiousInstance/InvidiousPublicInstances/InvidiousPublicInstancesTask.bs"
+import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+
+function Init()
+    m.log = new log.Logger("InvidiousPublicInstances")
+
+    m.failedLabel = m.top.findNode("failedLabel")
+    m.refreshButton = m.top.findNode("refreshButton")
+    m.instances = m.top.findNode("instances")
+    m.instancesHeader = m.top.findNode("instancesHeader")
+
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busyspinner.poster.width = 100
+    m.busyspinner.poster.height = 100
+    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+
+    m.instances.ObserveField("itemSelected", FuncName(OnInstanceSelected))
+    m.refreshButton.ObserveField("buttonSelected", FuncName(Refresh))
+    Refresh()
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    if m.refreshButton.visible
+        NodeSetFocus(m.refreshButton, true)
+    else
+        NodeSetFocus(m.instances, true)
+    end if
+end function
+
+function Refresh()
+    m.top.focusable = false
+    m.instances.visible = false
+    m.instancesHeader.visible = false
+    m.failedLabel.visible = false
+    m.refreshButton.visible = false
+    if m.invidiousPublicInstancesTask <> invalid
+        m.invidiousPublicInstancesTask.cancel = true
+    end if
+
+    m.invidiousPublicInstancesTask = StartAsyncTask(InvidiousPublicInstancesTask, {
+        listNode: m.instances
+    }, OnInvidiousPublicInstancesTaskResults)
+
+    m.busySpinner.visible = true
+    m.busySpinner.control = "start"
+end function
+
+function OnInvidiousPublicInstancesTaskResults(output as object) as void
+    m.top.focusable = true
+    m.busySpinner.visible = false
+    m.busySpinner.control = "stop"
+
+    m.invidiousPublicInstancesTask = invalid
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(output.error)
+
+        message = `Failed to load Invidious public instances\n${error}`
+        DialogUtils.ShowDialog(message, "Invidious public instances load error", true)
+
+        m.failedLabel.visible = true
+        m.refreshButton.visible = true
+        if m.top.IsInFocusChain()
+            NodeSetFocus(m.top, true)
+        end if
+        return
+    end if
+
+    m.instances.visible = true
+    m.instancesHeader.visible = true
+
+    if m.top.IsInFocusChain()
+        NodeSetFocus(m.top, true)
+    end if
+end function
+
+function OnInstanceSelected(event as object) as void
+    selected = m.instances.itemSelected
+    itemContent = m.instances.content.GetChild(selected)
+    m.top.instance = itemContent.uri
+end function
