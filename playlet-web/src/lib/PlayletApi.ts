@@ -40,7 +40,7 @@ export class PlayletApi {
     }
 
     static async logout() {
-        await this.rpcCall("InvidiousLogout");
+        await fetch(`${PlayletApi.host()}/invidious/logout`);
     }
 
     static async playVideo(videoId, timestamp, title, author) {
@@ -61,7 +61,7 @@ export class PlayletApi {
             args["author"] = author;
         }
 
-        await this.rpcCall("PlayVideo", args);
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/player/play`, args);
     }
 
     static async queueVideo(videoId, timestamp, title, author) {
@@ -81,7 +81,7 @@ export class PlayletApi {
         if (author !== undefined) {
             args["author"] = author;
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/player/queue`, args);
         return await response.json();
     }
 
@@ -104,20 +104,15 @@ export class PlayletApi {
     }
 
     static async setPlayletLibVersion(tag) {
-        let content = null
-
         if (tag !== "") {
-            content = JSON.stringify([{
+            const urls = [{
                 link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
                 type: 'custom'
-            }]);
+            }]
+            await PlayletApi.postJson(`${PlayletApi.host()}/api/playlet-lib-urls`, urls);
+        } else {
+            return await fetch(`${PlayletApi.host()}/api/playlet-lib-urls`, { method: "DELETE" });
         }
-
-        await this.rpcCall("SetPlayletLibUrls", { content });
-    }
-
-    private static async rpcCall(func, args = undefined) {
-        await this.postJson(`${PlayletApi.host()}/api/rpc`, { func, args });
     }
 
     private static postJson(url, payload) {

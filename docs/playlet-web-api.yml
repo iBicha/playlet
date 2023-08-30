@@ -24,25 +24,6 @@ servers:
         default: "8888"
 
 paths:
-  /api/rpc:
-    post:
-      summary: Execute a RPC
-      description: >
-        Execute a RPC on the Roku device. The `func` parameter is the name of
-        the RPC to execute. The `args` parameter is an object containing the
-        arguments to pass to the RPC. The `args` parameter is optional and can
-        be omitted if the RPC does not require any arguments.
-      operationId: executeRpc
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ExecuteRpcRequest"
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
   /api/state:
     get:
       summary: Get Playlet app state
@@ -157,7 +138,36 @@ paths:
       responses:
         "204":
           description: No Content
-  /api/queue:
+  /api/player/play:
+    post:
+      summary: Play video
+      description: Play a video. If a video is already playing, it will be stopped and the new video will be played.
+      operationId: playVideo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayVideoObject"
+      responses:
+        "204":
+          description: No Content
+  /api/player/pause:
+    post:
+      summary: Pause video
+      description: Pause the currently playing video.
+      operationId: pauseVideo
+      responses:
+        "204":
+          description: No Content
+  /api/player/resume:
+    post:
+      summary: Resume video
+      description: Resume the currently paused video.
+      operationId: resumeVideo
+      responses:
+        "204":
+          description: No Content
+  /api/player/queue:
     get:
       summary: Get play queue
       description: Get the current videos in the queue.
@@ -170,7 +180,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PlayQueueObject"
+                  $ref: "#/components/schemas/PlayVideoObject"
     post:
       summary: Add to play queue
       description: Add a video to the queue. If no video is currently playing, the video plays instead of adding to the queue.
@@ -179,7 +189,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PlayQueueObject"
+              $ref: "#/components/schemas/PlayVideoObject"
       responses:
         "200":
           description: OK
@@ -188,11 +198,92 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/PlayQueueObject"
+                  $ref: "#/components/schemas/PlayVideoObject"
     delete:
       summary: Clear play queue
       description: Clear the play queue.
       operationId: clearPlayQueue
+      responses:
+        "204":
+          description: No Content
+  /api/playlet-lib-urls:
+    get:
+      summary: Get Playlet lib URLs
+      description: Get the currently loaded Playlet lib url, and the saved ones to be loaded on next start.
+      operationId: getPlayletLibUrls
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loaded:
+                    type: object
+                    properties:
+                      link:
+                        type: string
+                      type:
+                        type: string
+                  saved:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        link:
+                          type: string
+                        type:
+                          type: string
+    post:
+      summary: Set Playlet lib URLs
+      description: >
+        Set a list of Playlet lib URLs to be loaded on next start. Playlet will try to load them one after the other
+        until one succeeds.
+      operationId: setPlayletLibUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  link:
+                    type: string
+                  type:
+                    type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+    delete:
+      summary: Clear Playlet lib URLs
+      description: Clear the Playlet lib URLs. This affects the saved links in the registry, and will take effect on next start.
+      operationId: clearPlayletLibUrls
+      responses:
+        "204":
+          description: No Content
+
+  /invidious/login:
+    get:
+      summary: Redirect to the Invidious auth URL
+      description: Redirect to the Invidious auth URL, to allow authorizing an access token. Redirects to the Invidious auth URL.
+      operationId: invidiousLoginUrl
+      responses:
+        "302":
+          description: Found
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+  /invidious/logout:
+    get:
+      summary: Logout from Invidious
+      description: Logout from Invidious, and invalidate the token if any.
+      operationId: invidiousLogout
       responses:
         "204":
           description: No Content
@@ -219,9 +310,6 @@ paths:
         - $ref: "#/components/parameters/ecpTimestamp"
         - $ref: "#/components/parameters/ecpTitle"
         - $ref: "#/components/parameters/ecpAuthor"
-        - $ref: "#/components/parameters/ecpRpcFlag"
-        - $ref: "#/components/parameters/ecpRpcFunc"
-        - $ref: "#/components/parameters/ecpRpcArgs"
       responses:
         "200":
           description: OK
@@ -247,9 +335,6 @@ paths:
         - $ref: "#/components/parameters/ecpTimestamp"
         - $ref: "#/components/parameters/ecpTitle"
         - $ref: "#/components/parameters/ecpAuthor"
-        - $ref: "#/components/parameters/ecpRpcFlag"
-        - $ref: "#/components/parameters/ecpRpcFunc"
-        - $ref: "#/components/parameters/ecpRpcArgs"
       responses:
         "200":
           description: OK
@@ -318,49 +403,8 @@ components:
       required: false
       schema:
         type: string
-    ecpRpcFlag:
-      name: rpc
-      in: query
-      description: If rpc is set to true, the 'func' function will be executed, with the options 'args' arguments.
-      required: false
-      schema:
-        type: string
-        enum:
-          - "true"
-    ecpRpcFunc:
-      name: func
-      in: query
-      description: The name of the RPC to execute. This flag must be used with the 'rpc' flag.
-      required: false
-      schema:
-        type: string
-        enum:
-          - InvidiousLogout
-          - PlayVideo
-          - SetPlayletLibUrls
-    ecpRpcArgs:
-      name: args
-      in: query
-      description: The arguments to pass to the RPC. This flag, if specified, must be a JSON formatted object.
-      required: false
-      schema:
-        type: string
 
   schemas:
-    ExecuteRpcRequest:
-      type: object
-      required:
-        - func
-      properties:
-        func:
-          type: string
-          enum:
-            - InvidiousLogout
-            - PlayVideo
-            - SetPlayletLibUrls
-        args:
-          type: object
-          additionalProperties: true
     PlayletAppState:
       type: object
       properties:
@@ -473,7 +517,7 @@ components:
           type: boolean
         sponsorblock.show_notifications:
           type: boolean
-    PlayQueueObject:
+    PlayVideoObject:
       type: object
       properties:
         videoId:

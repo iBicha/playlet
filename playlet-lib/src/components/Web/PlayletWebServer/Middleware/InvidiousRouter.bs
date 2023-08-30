@@ -7,7 +7,27 @@ namespace Http
 
         function new()
             super()
-            'TODO:P0 add /invidious/login and /invidious/logout endpoints
+
+            m.Get("/invidious/login", function(context as object) as boolean
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                authLink = invidiousNode@.GetAuthorizeTokenLink(invalid)
+                response.Redirect(authLink)
+                return true
+            end function)
+
+            m.Get("/invidious/logout", function(context as object) as boolean
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                service = new Invidious.InvidiousService(invidiousNode)
+                service.Logout()
+
+                response.Default(204, "OK")
+                return true
+            end function)
+
             m.Get(Invidious.TOKEN_CALLBACK, function(context as object) as boolean
                 request = context.request
                 response = context.response

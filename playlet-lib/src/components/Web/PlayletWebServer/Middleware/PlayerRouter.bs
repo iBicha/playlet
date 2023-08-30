@@ -1,0 +1,112 @@
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+namespace Http
+
+    class PlayerRouter extends HttpRouter
+
+        function new()
+            super()
+
+            ' Play a video
+            m.Post("/api/player/play", function(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                videoId = payload.videoId
+                if StringUtils.IsNullOrEmpty(videoId)
+                    response.Default(400, `Missing "videoId" in payload`)
+                    return true
+                end if
+
+                if IsString(payload.timestamp)
+                    payload.timestamp = payload.timestamp.toInt()
+                end if
+
+                VideoUtils.PlayVideo(payload)
+                response.Default(204, "OK")
+                return true
+            end function)
+
+            ' Pause current video
+            m.Post("/api/player/pause", function(context as object) as boolean
+                response = context.response
+                VideoUtils.PauseVideo()
+                response.Default(204, "OK")
+                return true
+            end function)
+
+            ' Resume current video
+            m.Post("/api/player/resume", function(context as object) as boolean
+                response = context.response
+                VideoUtils.ResumeVideo()
+                response.Default(204, "OK")
+                return true
+            end function)
+
+            ' Get queue
+            m.Get("/api/player/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                queue = playQueue.queue
+                response.Json(queue)
+                return true
+            end function)
+
+            ' Add to queue
+            m.Post("/api/player/queue", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                playQueue@.Enqueue(payload)
+                queue = playQueue.queue
+                response.Json(queue)
+                return true
+            end function)
+
+            ' clear queue
+            m.Delete("/api/player/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                playQueue@.Clear(invalid)
+                response.Default(204, "OK")
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace
