@@ -1,6 +1,7 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 @asynctask
 function InvidiousInstanceTestingTask(input as object) as object
@@ -25,6 +26,7 @@ function PrepareTests() as object
     content.AppendChild(CreateTestNode("Instance reachable", IsReachable))
     content.AppendChild(CreateTestNode("Fetch video details", CanFetchVideoDetails))
     content.AppendChild(CreateTestNode("Fetch video comments", CanFetchVideoComments))
+    content.AppendChild(CreateTestNode("Fetch video captions", CanFetchVideoCaptions))
     return content
 end function
 
@@ -187,6 +189,48 @@ function CanFetchVideoComments(instance as string, testNode as object) as void
 
         testNode.state = "passed"
         testNode.details = `The instance can fetch video comments for id "${videoId}" (${commentCount} comments)`
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function CanFetchVideoCaptions(instance as string, testNode as object) as void
+    try
+        videoId = "jNQXAC9IVRw"
+        label = "English"
+        url = `${instance}/api/v1/captions/${videoId}?label=${label}`
+        response = HttpClient.Get(url).NoCache().Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        headers = response.Headers()
+        contentType = headers["Content-Type"]
+        if StringUtils.IsNullOrEmpty(contentType) or not contentType.StartsWith("text/vtt")
+            testNode.state = "failed"
+            testNode.details = `Invalid caption data ${url} (Content-Type is not text/vtt)`
+            return
+        end if
+
+        text = response.Text()
+        if StringUtils.IsNullOrEmpty(text) or not text.StartsWith("WEBVTT")
+            testNode.state = "failed"
+            testNode.details = `Invalid caption data from ${url} (response is not a valid vtt file)`
+            return
+        end if
+
+        if text.InStr(`All right, so here we are, in front of the\nelephants`) = -1
+            testNode.state = "failed"
+            testNode.details = `Did not find expected text in caption data from ${url}`
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = `The instance can fetch video ${label} captions for id "${videoId}"`
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
