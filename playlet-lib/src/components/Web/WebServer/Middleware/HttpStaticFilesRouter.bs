@@ -25,6 +25,7 @@ namespace Http
                 router = context.router
                 request = context.request
                 response = context.response
+                server = context.server
 
                 if not request.route.StartsWith(router.route)
                     return false
@@ -39,7 +40,7 @@ namespace Http
                     ' libpkg:/ does not work with roFilesystem...
                     buffer = createObject("roByteArray")
                     if buffer.ReadFile(full_path) and buffer.count() > 0
-                        mimetype = WebUtils.MimeType(decoded_path)
+                        mimetype = server.utils.MimeType(decoded_path)
                         response.SetBodyDataBuffer(buffer)
                         response.ContentType(mimetype)
                         response.http_code = 200
@@ -74,7 +75,7 @@ namespace Http
                     router.GenerateDirectoryListing(path, router, request, response)
                     return true
                 else if stat.type = "file"
-                    mimetype = WebUtils.MimeType(decoded_path)
+                    mimetype = server.utils.MimeType(decoded_path)
                     response.ContentType(mimetype)
                     response.fileLength = stat.size
                     router.log.info(`uri=${request.uri}, target=${path}, content-type=${mimetype}, content-length=${response.fileLength}`)

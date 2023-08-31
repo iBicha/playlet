@@ -34,21 +34,12 @@ namespace Http
                 invidiousNode = context.server.task.invidious
 
                 if request.query["token"] <> invalid and request.query["ref"] <> invalid
-                    ' Token is encoded twice for some reason
-                    token = request.query["token"].DecodeUri().DecodeUriComponent()
-                    referer = request.query["ref"].DecodeUri()
-                    username = request.query["username"]
-                    scopes = request.query["scopes"]
-                    expire = request.query["expire"]
+                    ' Invidious encodes token and username twice
+                    token = request.query["token"].DecodeUriComponent().DecodeUriComponent()
+                    username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
+                    referer = request.query["ref"].DecodeUriComponent()
 
-                    if username <> invalid
-                        username = username.DecodeUriComponent().DecodeUriComponent()
-                    end if
-                    if scopes <> invalid
-                        scopes = scopes.DecodeUriComponent()
-                    end if
-
-                    invidiousNode@.SetAuthToken(token, referer, username, scopes, expire)
+                    invidiousNode@.SetAuthToken(token, referer, username)
                 end if
                 response.Redirect("/")
                 return true

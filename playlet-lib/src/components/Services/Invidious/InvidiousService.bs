@@ -99,7 +99,6 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
-            ' TODO:P0 return error if status code is not 200
             return response.Json()
         end function
 
@@ -242,20 +241,12 @@ namespace Invidious
             return authData
         end function
 
-        function SetAuthToken(token as string, instance as string, username as dynamic, scopes as dynamic, expire as dynamic)
+        function SetAuthToken(token as string, instance as string, username as dynamic)
             obj = {
                 token: token,
-                instance: instance
+                instance: instance,
+                username: username
             }
-            if username <> invalid
-                obj.username = username
-            end if
-            if scopes <> invalid
-                obj.scopes = scopes
-            end if
-            if expire <> invalid
-                obj.expire = expire
-            end if
 
             json = FormatJson(obj)
             RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
@@ -301,7 +292,6 @@ namespace Invidious
 
             expire = TimeUtils.Now().AsSeconds() + Invidious.TOKEN_TIMESPAN
 
-            'TODO:P0 scope and expire in the callback
             callbackUrl = `${address}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
             scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
             return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`

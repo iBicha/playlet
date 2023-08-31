@@ -26,7 +26,7 @@ function StopServer(unused as dynamic) as void
     m.top.shouldQuit = true
 end function
 
-function WebServerLoop()
+function WebServerLoop() as void
     msgPort = CreateObject("roMessagePort")
 
     settings = new Http.HttpSettings(msgPort)
@@ -38,6 +38,11 @@ function WebServerLoop()
     settings.TimeoutInMs = m.top.timeoutInMs
 
     server = new Http.HttpServer(settings, m.top)
+    if not server.success
+        m.top.isRunning = false
+        m.log.error("Failed to start server")
+        return
+    end if
 
     SetupRoutes(server)
     server.UseRouter(new Http.HttpDefaultRouter())

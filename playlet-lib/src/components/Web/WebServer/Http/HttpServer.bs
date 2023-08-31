@@ -1,16 +1,10 @@
-import "pkg:/source/utils/WebUtils.bs"
+import "HttpUtils.bs"
 import "HttpSettings.bs"
 import "HttpRouter.bs"
 import "HttpConnectionState.bs"
 import "HttpConnection.bs"
 
 namespace Http
-
-    ' TODO:P0 these need a better home
-    function InitGlobals()
-        WebUtils.MimeType()
-        WebUtils.HttpTitle()
-    end function
 
     class HttpServer
         private log as log.Logger
@@ -27,6 +21,7 @@ namespace Http
 
         private routers
 
+        public success as boolean
         public settings as Http.HttpSettings
         public task as object
 
@@ -35,23 +30,26 @@ namespace Http
             m.settings = settings
             m.task = task
             m.routers = []
-            Http.InitGlobals()
-            m.Init()
+            m.utils = new Utils()
+            m.success = m.Init()
         end function
 
-        ' TODO:P0 this needs error handling for when the server fails to start
-        function Init()
+        function Init() as boolean
             m.uptime = CreateObject("roTimespan")
             m.connections = CreateObject("roAssociativeArray")
+
+            success = true
 
             ' create incoming socket
             sockin = CreateObject("roStreamSocket")
             if sockin = invalid
+                success = false
                 m.log.error("socket()")
             end if
 
             ' reuse address
             if not sockin.setReuseAddr(true)
+                success = false
                 m.log.error("setsockopt(SO_REUSEADDR)", sockin.status())
             end if
 
@@ -59,10 +57,12 @@ namespace Http
             addrin = CreateObject("roSocketAddress")
             addrin.setPort(m.settings.Port)
             if not sockin.setAddress(addrin)
+                success = false
                 m.log.error("bind(port" + Stri(m.settings.Port) + ")", sockin.status())
             end if
             ' listen on socket
             if not sockin.listen(m.settings.MaxConnections)
+                success = false
                 m.log.error("listen()", sockin.status())
             end if
             ' monitor socket
@@ -72,6 +72,7 @@ namespace Http
             m.sockin = sockin
 
             m.log.info("listening on " + addrin.getAddress())
+            return success
         end function
 
         function UseRouter(router as HttpRouter)

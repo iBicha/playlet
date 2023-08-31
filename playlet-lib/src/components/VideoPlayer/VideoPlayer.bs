@@ -120,7 +120,6 @@ function OnVideoContentTaskResults(output as object) as void
 
     m.top.control = "play"
     if ValidInt(m.top.content.timestamp) > 0
-        ' TODO:P0 handle seeking in the case where the first stream url failed
         m.top.seek = m.top.content.timestamp
     end if
 end function
@@ -168,7 +167,7 @@ function OnVideoPlayerStateChange() as void
 
     if state = "error"
         errorInfo = m.top.errorInfo
-        m.log.error(`Error playing video ${m.top.videoId}`, errorInfo)
+        m.log.error(`Error playing video ${m.top.content.videoId}`, errorInfo)
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
@@ -186,6 +185,10 @@ function OnVideoPlayerStateChange() as void
                     ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
+
+                    if ValidInt(m.top.content.timestamp) > 0
+                        m.top.seek = m.top.content.timestamp
+                    end if
                     return
                 end if
             end if
@@ -215,7 +218,7 @@ function OnVideoPlayerStateChange() as void
         for each info in errorInfo
             messageLines.push(`${info}: ${errorInfo[info]}`)
         end for
-        DialogUtils.ShowDialog(messageLines, `Error playing video ${m.top.videoId}`, true)
+        DialogUtils.ShowDialog(messageLines, `Error playing video ${m.top.content.videoId}`, true)
         ' TODO:P1 play next video in the queue after showing the error dialog
         VideoUtils.CloseVideo()
     end if
