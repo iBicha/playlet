@@ -1,5 +1,5 @@
 import "pkg:/components/Navigation/Navigation.bs"
-import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/components/Navigation/ScrollTo.bs"
 
 function Init()
@@ -31,6 +31,7 @@ function OnNodeReady()
         category = CreateCategoryNode(item, container, startX, startY)
         if m.firstCategory = invalid
             m.firstCategory = category.node
+            m.currentNavigtionNode = m.firstCategory
         end if
         if previousCategory <> invalid
             SetNavigation(previousCategory.node, "down", category.node)
@@ -181,13 +182,11 @@ end function
 function OnkeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
-        target = navigation.node
-        if target.isSameNode(m.navBar)
-            target = m.firstCategory
+        m.currentNavigtionNode = navigation.node
+        if m.currentNavigtionNode.isSameNode(m.navBar)
+            m.currentNavigtionNode = m.firstCategory
         end if
-        if target <> invalid
-            ScrollTo(m.viewport, m.container, target.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
-        end if
+        ScrollTo(m.viewport, m.container, m.currentNavigtionNode.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
         return true
     end if
     return false
@@ -198,8 +197,6 @@ function OnFocusChange() as void
         return
     end if
 
-    if m.firstCategory <> invalid
-        NodeSetFocus(m.firstCategory, true)
-        ScrollTo(m.viewport, m.container, m.firstCategory.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
-    end if
+    NodeSetFocus(m.currentNavigtionNode, true)
+    ScrollTo(m.viewport, m.container, m.currentNavigtionNode.getParent(), m.scrollAnimation, m.scrollAnimationInterpolator)
 end function

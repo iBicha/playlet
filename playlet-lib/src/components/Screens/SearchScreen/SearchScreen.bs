@@ -6,7 +6,7 @@ import "pkg:/source/services/SearchHistory.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/ColorUtils.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
-import "pkg:/source/utils/NodeSetFocus.bs"
+import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
@@ -47,6 +47,7 @@ function OnNodeReady()
         ScrollUp()
     end function)
 
+    m.currentNavigtionNode = m.suggestions
     ' Trigger suggestions
     OnTextChange()
 end function
@@ -56,20 +57,13 @@ function OnFocusChange() as void
         return
     end if
 
-    if m.rowlist.focusable
-        NodeSetFocus(m.rowlist, true)
-        ScrollDown()
-        return
+    if m.currentNavigtionNode.isSameNode(m.suggestions) and not m.suggestions.focusable
+        m.currentNavigtionNode = m.keyboard
     end if
-    if m.suggestions.focusable
-        if m.suggestions.buttonFocused >= m.suggestions.buttons.Count()
-            m.suggestions.focusButton = 0
-        end if
-        NodeSetFocus(m.suggestions, true)
+    NodeSetFocus(m.currentNavigtionNode, true)
+    if m.currentNavigtionNode.isSameNode(m.suggestions)
         OnSearchButtonFocused()
-        return
     end if
-    NodeSetFocus(m.keyboard, true)
 end function
 
 function OnTextChange() as void
@@ -246,7 +240,12 @@ function OnSearchVideoSelected(event as object)
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
-    if NavigationKeyHandler(key, press).handled
+    navigation = NavigationKeyHandler(key, press)
+    if navigation.handled
+        m.currentNavigtionNode = navigation.node
+        if m.currentNavigtionNode.isSameNode(m.navBar)
+            m.currentNavigtionNode = m.suggestions
+        end if
         return true
     end if
     return false
