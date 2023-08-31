@@ -5,6 +5,8 @@ import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/Screens/HomeScreen/HomeScreenContentTask.bs"
 import "pkg:/components/Screens/HomeScreen/HomeScreenRowContentTask.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 function Init()
@@ -61,19 +63,27 @@ end function
 
 function CancelCurrentTasks()
     if m.contentTask <> invalid
-        m.contentTask.control = "stop"
+        m.contentTask.cancel = true
     end if
 
     pendingLoadTasks = m.pendingLoadTasks
     for each id in pendingLoadTasks
         task = pendingLoadTasks[id]
-        task.control = "stop"
+        task.cancel = true
     end for
 
     m.pendingLoadTasks = {}
 end function
 
-function HomeScreenContentTaskResults(output as object)
+function HomeScreenContentTaskResults(output as object) as void
+    if m.contentTask <> invalid and m.contentTask.id = output.task.id
+        m.contentTask = invalid
+    end if
+
+    if output.cancelled
+        return
+    end if
+
     LoadItemsIfNeeded()
 end function
 
@@ -148,8 +158,25 @@ function LoadItemContent(contentNode as object)
     m.pendingLoadTasks[task.id] = task
 end function
 
-function HomeScreenRowContentTaskResults(output as object)
+function HomeScreenRowContentTaskResults(output as object) as void
     m.pendingLoadTasks.Delete(output.task.id)
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        message = `Failed to load feed\n${error}`
+        DialogUtils.ShowDialog(message, "Feed load fail", true)
+    end if
+
     LoadItemsIfNeeded()
 end function
 

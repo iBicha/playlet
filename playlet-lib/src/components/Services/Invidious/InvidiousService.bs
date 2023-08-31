@@ -140,7 +140,10 @@ namespace Invidious
         function MakeRequest(requestData as object) as object
             endpoint = m.endpoints[requestData.endpoint]
             if endpoint = invalid
-                return invalid
+                return {
+                    success: false,
+                    error: `Endpoint ${requestData.endpoint} not found`
+                }
             end if
 
             instance = m.GetInstance()
@@ -150,7 +153,10 @@ namespace Invidious
             if endpoint.authenticated = true
                 authToken = m.node.authToken
                 if authToken = invalid
-                    return invalid
+                    return {
+                        success: false,
+                        error: "Not authenticated"
+                    }
                 end if
                 request.Url(authToken.instance + endpoint.url)
                 request.Headers(m.GetAuthenticationHeaders(authToken.token))
@@ -181,26 +187,23 @@ namespace Invidious
                 request.PathParams(requestData.pathParams)
             end if
 
-            ' TODO:P0 error handling
             response = request.Await()
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
             result = responseHandler(m, requestData, response)
 
-            if result <> invalid and endpoint.authenticated = true
-                ' Cache response for use by web app
-                m.CacheResponse(requestData, result)
+            if response.IsSuccess() and result <> invalid
+                return {
+                    success: true,
+                    result: result
+                }
+            else
+                return {
+                    success: false,
+                    error: response.ErrorMessage()
+                }
             end if
-
-            return result
-        end function
-
-        function CacheResponse(requestData as object, result as object)
-            cacheKey = FormatJson(requestData)
-            cacheKey = CryptoUtils.GetMd5(cacheKey)
-            value = FormatJson(result)
-            WriteAsciiFile(`tmp:/${cacheKey}.json`, value)
         end function
 
         function DefaultHandler(m as object, requestData as object, response as object) as object

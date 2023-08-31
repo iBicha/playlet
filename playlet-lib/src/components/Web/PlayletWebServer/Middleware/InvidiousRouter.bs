@@ -65,28 +65,14 @@ namespace Http
                 end if
 
                 requestData = ParseJson(requestData)
-                ' Format object again because FormatJson formats in a specific way (sorts keys, etc.)
-                ' so we want an exact string for the md5 hash to match
-                requestDataJson = FormatJson(requestData)
-                cacheKey = CryptoUtils.GetMd5(requestDataJson)
-                path = `tmp:/${cacheKey}.json`
-
-                fs = CreateObject("roFilesystem")
-                if fs.exists(path)
-                    cacheData = ReadAsciiFile(path)
-                    response.SetBodyDataString(cacheData)
-                    response.ContentType("application/json")
-                    response.source = Http.HttpResponseSource.GENERATED
-                    return true
-                end if
 
                 invService = new Invidious.InvidiousService(invidiousNode)
-                result = invService.MakeRequest(requestData)
-                if result = invalid
-                    response.Default(500, "Failed to make request")
+                invResponse = invService.MakeRequest(requestData)
+                if not invResponse.success
+                    response.Default(500, `Failed to make request: ${invResponse.error}`)
                     return true
                 end if
-                response.Json(result)
+                response.Json(invResponse.result)
                 return true
             end function)
 
