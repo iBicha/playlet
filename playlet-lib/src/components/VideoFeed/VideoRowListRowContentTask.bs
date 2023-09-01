@@ -2,8 +2,9 @@ import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 @asynctask
-function HomeScreenRowContentTask(input as object) as object
-    contentNode = input.node
+function VideoRowListRowContentTask(input as object) as object
+    rowList = input.node
+    contentNode = input.contentNode
     invidiousNode = input.invidious
 
     if m.top.cancel
@@ -13,7 +14,7 @@ function HomeScreenRowContentTask(input as object) as object
     service = new Invidious.InvidiousService(invidiousNode)
 
     contentNode.feed = service.MarkPagination(contentNode.feed)
-    response = service.MakeRequest(contentNode.feed)
+    response = service.MakeRequest(contentNode.feed, m.top.cancellation)
 
     if m.top.cancel
         return invalid
@@ -35,15 +36,7 @@ function HomeScreenRowContentTask(input as object) as object
         end if
     end for
 
-    isPlaceHolder = true
-    while isPlaceHolder and contentNode.getChildCount() > 0
-        lastIndex = contentNode.getChildCount() - 1
-        isPlaceHolder = contentNode.getChild(lastIndex).isPlaceHolder = true
-        if isPlaceHolder = true
-            contentNode.removeChildIndex(lastIndex)
-        end if
-    end while
-
+    RemovePlaceHolderItems(contentNode)
     contentNode.appendChildren(itemNodes)
 
     if contentNode.feed.pagination = true and response.result.Count() > 0
@@ -52,5 +45,20 @@ function HomeScreenRowContentTask(input as object) as object
         contentNode.loadState = FeedLoadState.Loaded
     end if
 
+    if itemNodes.Count() > 0
+        rowList.someContentReady = true
+    end if
+
     return response
+end function
+
+function RemovePlaceHolderItems(contentNode as object)
+    isPlaceHolder = true
+    while isPlaceHolder and contentNode.getChildCount() > 0
+        lastIndex = contentNode.getChildCount() - 1
+        isPlaceHolder = contentNode.getChild(lastIndex).isPlaceHolder = true
+        if isPlaceHolder = true
+            contentNode.removeChildIndex(lastIndex)
+        end if
+    end while
 end function

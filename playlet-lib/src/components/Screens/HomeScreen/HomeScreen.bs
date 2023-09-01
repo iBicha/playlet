@@ -1,13 +1,5 @@
-import "pkg:/source/utils/ColorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/components/Navigation/Navigation.bs"
-import "pkg:/source/asyncTask/asyncTask.bs"
-import "pkg:/components/Screens/HomeScreen/HomeScreenContentTask.bs"
-import "pkg:/components/Screens/HomeScreen/HomeScreenRowContentTask.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
-import "pkg:/source/utils/ErrorUtils.bs"
-import "pkg:/components/Dialog/DialogUtils.bs"
-import "pkg:/source/roku_modules/log/LogMixin.brs"
 
 function Init()
     m.rowList = m.top.FindNode("rowList")
@@ -15,35 +7,18 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.log = new log.Logger("HomeScreen")
-
-    m.top.ObserveField("visible", FuncName(OnVisibilityChange))
-    m.rowList.ObserveField("itemFocused", FuncName(OnItemFocused))
-    m.rowList.ObserveField("rowItemFocused", FuncName(OnRowItemFocused))
-    m.rowList.ObserveField("rowItemSelected", FuncName(OnRowItemSelected))
-
     SetNavigation(invalid, "back", m.navBar)
     SetNavigation(invalid, "left", m.navBar)
 
-    m.invidious.ObserveField("authToken", FuncName(OnAuthTokenChange))
-    InitContent()
+    m.rowList@.BindNode(invalid)
+    m.rowList.contentData = ParseJson(ReadAsciiFile(m.top.feedFile))
 end function
 
-function OnAuthTokenChange()
-    InitContent()
-end function
-
-function OnFocusChange()
-    if m.top.focus = true
-        LoadItemsIfNeeded()
-        NodeSetFocus(m.rowList, true)
+function OnFocusChange() as void
+    if not m.top.focus
+        return
     end if
-end function
-
-function OnVisibilityChange()
-    if m.top.visible = true
-        LoadItemsIfNeeded(true)
-    end if
+    NodeSetFocus(m.rowList, true)
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -51,172 +26,4 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     return false
-end function
-
-function InitContent()
-    CancelCurrentTasks()
-
-    m.contentTask = StartAsyncTask(HomeScreenContentTask, {
-        node: m.rowList,
-        contentFilePath: "libpkg:/config/default_home_layout.json5"
-    }, HomeScreenContentTaskResults)
-end function
-
-function CancelCurrentTasks()
-    if m.contentTask <> invalid
-        m.contentTask.cancel = true
-    end if
-
-    pendingLoadTasks = m.pendingLoadTasks
-    for each id in pendingLoadTasks
-        task = pendingLoadTasks[id]
-        task.cancel = true
-    end for
-
-    m.pendingLoadTasks = {}
-end function
-
-function HomeScreenContentTaskResults(output as object) as void
-    if m.contentTask <> invalid and m.contentTask.id = output.task.id
-        m.contentTask = invalid
-    end if
-
-    if output.cancelled
-        return
-    end if
-
-    LoadItemsIfNeeded()
-end function
-
-function OnItemFocused()
-    LoadItemsIfNeeded()
-end function
-
-function LoadItemsIfNeeded(visibleOnly = false as boolean) as void
-    if m.rowList.content = invalid
-        return
-    end if
-
-    itemsToLoad = GetItemsToLoad(visibleOnly)
-    for each item in itemsToLoad
-        LoadItemContent(item)
-    end for
-end function
-
-function GetItemsToLoad(visibleOnly = false as boolean) as object
-    focus = m.rowList.itemFocused
-    if focus = -1
-        focus = 0
-    end if
-
-    contentNode = m.rowList.content
-    rowCount = contentNode.getChildCount()
-    if rowCount = 0
-        return []
-    end if
-
-    subContentNodes = []
-    range = m.rowList.numRows
-    for i = -range to range
-        index = focus + i
-        if index < 0
-            continue for
-        end if
-        if index >= rowCount
-            continue for
-        end if
-        subContentNode = contentNode.getChild(index)
-        if subContentNode.loadState <> FeedLoadState.None
-            continue for
-        end if
-        subContentNodes.push(subContentNode)
-    end for
-
-    if not visibleOnly
-        if subContentNodes.count() = 0 and m.top.visible
-            for i = 0 to rowCount - 1
-                subContentNode = contentNode.getChild(i)
-                if subContentNode.loadState <> FeedLoadState.None
-                    continue for
-                end if
-                subContentNodes.push(subContentNode)
-                if subContentNodes.count() >= 5
-                    exit for
-                end if
-            end for
-        end if
-    end if
-
-    return subContentNodes
-end function
-
-function LoadItemContent(contentNode as object)
-    contentNode.loadState = FeedLoadState.Loading
-    task = StartAsyncTask(HomeScreenRowContentTask, {
-        node: contentNode,
-        invidious: m.invidious
-    }, HomeScreenRowContentTaskResults)
-    m.pendingLoadTasks[task.id] = task
-end function
-
-function HomeScreenRowContentTaskResults(output as object) as void
-    m.pendingLoadTasks.Delete(output.task.id)
-    if output.cancelled
-        return
-    end if
-
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        m.log.error(error)
-        message = `Failed to load feed\n${error}`
-        DialogUtils.ShowDialog(message, "Feed load fail", true)
-    end if
-
-    LoadItemsIfNeeded()
-end function
-
-function OnRowItemFocused(event as object) as void
-    grid = event.GetRoSGNode()
-
-    selectedPair = event.GetData()
-    selectedRow = selectedPair[0]
-    selectedRowItem = selectedPair[1]
-
-    rowContent = grid.content.GetChild(selectedRow)
-    if not rowContent.loadState = FeedLoadState.LoadedPage
-        return
-    end if
-
-    if selectedRowItem > rowContent.getChildCount() - 4
-        LoadItemContent(rowContent)
-    end if
-end function
-
-function OnRowItemSelected(event as object)
-    grid = event.GetRoSGNode()
-
-    selectedPair = event.GetData()
-    selectedRow = selectedPair[0]
-    selectedRowItem = selectedPair[1]
-
-    rowContent = grid.content.GetChild(selectedRow)
-    itemContent = rowContent.GetChild(selectedRowItem)
-
-    if itemContent.type = "video"
-        videoId = itemContent.videoId
-        m.log.info("Play video: " + videoId)
-        VideoUtils.PlayVideo({ content: itemContent })
-    else if itemContent.type = "playlist"
-        playlistId = itemContent.playlistId
-        m.log.info("Open playlist: " + playlistId)
-    else if itemContent.type = "channel"
-        authorId = itemContent.authorId
-        m.log.info("Open channel: " + authorId)
-    end if
 end function

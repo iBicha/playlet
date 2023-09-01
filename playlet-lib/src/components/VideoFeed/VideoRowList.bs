@@ -1,0 +1,197 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/VideoFeed/VideoRowListContentTask.bs"
+import "pkg:/components/VideoFeed/VideoRowListRowContentTask.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+function Init()
+    m.pendingLoadTasks = {}
+end function
+
+function OnNodeReady()
+    m.log = new log.Logger("VideoRowList")
+
+    m.top.ObserveField("itemFocused", FuncName(OnItemFocused))
+    m.top.ObserveField("rowItemFocused", FuncName(OnRowItemFocused))
+    m.top.ObserveField("rowItemSelected", FuncName(OnRowItemSelected))
+    m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
+    m.top.ObserveField("visible", FuncName(OnVisibilityChange))
+
+    m.invidious.ObserveFieldScoped("authToken", FuncName(OnAuthTokenChange))
+end function
+
+function OnFocusedChildChange() as void
+    if m.top.hasFocus()
+        LoadRowsIfNeeded()
+    end if
+end function
+
+function OnVisibilityChange()
+    if m.top.visible = true
+        LoadRowsIfNeeded()
+    end if
+end function
+
+function OnContentData() as void
+    InitContent()
+end function
+
+function OnItemFocused()
+    LoadRowsIfNeeded()
+end function
+
+function OnRowItemFocused(event as object) as void
+    index = event.GetData()
+    rowIndex = index[0]
+    rowItemIndex = index[1]
+
+    row = m.top.content.GetChild(rowIndex)
+    if not row.loadState = FeedLoadState.LoadedPage
+        return
+    end if
+    ' As we get close to the end of the row, load more content
+    if rowItemIndex > row.getChildCount() - 5
+        LoadRowContent(row)
+    end if
+end function
+
+function OnRowItemSelected(event as object)
+    index = event.GetData()
+    rowIndex = index[0]
+    rowItemIndex = index[1]
+
+    row = m.top.content.GetChild(rowIndex)
+    rowItem = row.GetChild(rowItemIndex)
+
+    if rowItem.type = "video"
+        videoId = rowItem.videoId
+        m.log.info("Play video: " + videoId)
+        VideoUtils.PlayVideo({ content: rowItem })
+    else if rowItem.type = "playlist"
+        playlistId = rowItem.playlistId
+        m.log.info("Open playlist: " + playlistId)
+    else if rowItem.type = "channel"
+        authorId = rowItem.authorId
+        m.log.info("Open channel: " + authorId)
+    end if
+end function
+
+function OnAuthTokenChange()
+    ' TODO:P1: Reload only content that is authenticated
+    ' Should not reload if the page is not visible. Instead, capture state and reload when the page becomes visible
+    InitContent()
+end function
+
+function InitContent() as void
+    CancelCurrentTasks()
+    m.top.someContentReady = false
+
+    if m.top.contentData = invalid
+        m.top.content = invalid
+        return
+    end if
+
+    task = StartAsyncTask(VideoRowListContentTask, {
+        node: m.top,
+        contentData: m.top.contentData
+    }, OnVideoRowListContentTaskResult)
+    m.pendingLoadTasks[task.id] = task
+end function
+
+function CancelCurrentTasks()
+    pendingLoadTasks = m.pendingLoadTasks
+    for each id in pendingLoadTasks
+        task = pendingLoadTasks[id]
+        task.cancel = true
+    end for
+    m.pendingLoadTasks = {}
+end function
+
+function OnVideoRowListContentTaskResult(output as object) as void
+    m.pendingLoadTasks.Delete(output.task.id)
+
+    if output.cancelled
+        return
+    end if
+
+    LoadRowsIfNeeded()
+end function
+
+function LoadRowsIfNeeded() as void
+    if m.top.content = invalid or not m.top.visible
+        return
+    end if
+
+    itemsToLoad = GetRowsToLoad()
+    for each item in itemsToLoad
+        LoadRowContent(item)
+    end for
+end function
+
+function GetRowsToLoad() as object
+    focus = m.top.itemFocused
+    if focus = -1
+        focus = 0
+    end if
+
+    contentNode = m.top.content
+    rowCount = contentNode.getChildCount()
+    if rowCount = 0
+        return []
+    end if
+
+    subContentNodes = []
+    range = m.top.numRows + 2
+    for i = -range to range
+        index = focus + i
+        if index < 0
+            continue for
+        end if
+        if index >= rowCount
+            continue for
+        end if
+        subContentNode = contentNode.getChild(index)
+        if subContentNode.loadState <> FeedLoadState.None
+            continue for
+        end if
+        subContentNodes.push(subContentNode)
+    end for
+
+    return subContentNodes
+end function
+
+function LoadRowContent(contentNode as object)
+    contentNode.loadState = FeedLoadState.Loading
+    task = StartAsyncTask(VideoRowListRowContentTask, {
+        node: m.top,
+        contentNode: contentNode,
+        invidious: m.invidious
+    }, OnVideoRowListRowContentTaskResult)
+    m.pendingLoadTasks[task.id] = task
+end function
+
+function OnVideoRowListRowContentTaskResult(output as object) as void
+    m.pendingLoadTasks.Delete(output.task.id)
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        m.top.onError = error
+        message = `Failed to load feed\n${error}`
+        DialogUtils.ShowDialog(message, "Feed load fail", true)
+    end if
+
+    LoadRowsIfNeeded()
+end function

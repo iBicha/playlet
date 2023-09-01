@@ -18,11 +18,8 @@ namespace Invidious
     const HISTORY_ENDPOINT = "/api/v1/auth/history"
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
-    const SEARCH_ENDPOINT = "/api/v1/search"
 
     const AUTH_SCOPES = "GET:feed,GET:playlists,POST:tokens/register,POST:tokens/unregister,POST:history*"
-    const AUTH_FEED = "/api/v1/auth/feed"
-    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
     const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
 
@@ -102,25 +99,6 @@ namespace Invidious
             return response.Json()
         end function
 
-        function Search(q as string, args = invalid as dynamic, cancellation = invalid as object) as object
-            instance = m.GetInstance()
-            url = `${instance}${Invidious.SEARCH_ENDPOINT}`
-
-            request = HttpClient.Get(url)
-            request.QueryParams(m.DefaultQueryParams())
-            request.QueryParam("q", q)
-
-            if IsArray(args.features)
-                args.features = args.features.join(",")
-            end if
-            request.QueryParams(args)
-
-            request.Cancellation(cancellation)
-
-            response = request.Await()
-            return response.Json()
-        end function
-
         function GetVideoMetadata(videoId as string) as object
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
@@ -157,7 +135,7 @@ namespace Invidious
             return requestData
         end function
 
-        function MakeRequest(requestData as object) as object
+        function MakeRequest(requestData as object, cancellation = invalid as object) as object
             endpoint = m.endpoints[requestData.endpoint]
             if endpoint = invalid
                 return {
@@ -206,6 +184,8 @@ namespace Invidious
             if requestData.pathParams <> invalid
                 request.PathParams(requestData.pathParams)
             end if
+
+            request.Cancellation(cancellation)
 
             response = request.Await()
 
