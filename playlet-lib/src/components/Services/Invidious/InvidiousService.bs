@@ -137,6 +137,26 @@ namespace Invidious
             return `${instance}/latest_version?id=${videoId}`
         end function
 
+        function MarkPagination(requestData as object) as object
+            endpoint = m.endpoints[requestData.endpoint]
+            if endpoint = invalid or endpoint.pagination <> true
+                return requestData
+            end if
+
+            if not requestData.DoesExist("queryParams")
+                requestData.queryParams = {}
+            end if
+
+            if not requestData.queryParams.DoesExist("page")
+                requestData.queryParams.page = 0
+            end if
+
+            requestData.pagination = true
+            requestData.queryParams.page += 1
+
+            return requestData
+        end function
+
         function MakeRequest(requestData as object) as object
             endpoint = m.endpoints[requestData.endpoint]
             if endpoint = invalid

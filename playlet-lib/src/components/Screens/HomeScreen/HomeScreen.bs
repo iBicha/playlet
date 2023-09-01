@@ -19,6 +19,7 @@ function OnNodeReady()
 
     m.top.ObserveField("visible", FuncName(OnVisibilityChange))
     m.rowList.ObserveField("itemFocused", FuncName(OnItemFocused))
+    m.rowList.ObserveField("rowItemFocused", FuncName(OnRowItemFocused))
     m.rowList.ObserveField("rowItemSelected", FuncName(OnRowItemSelected))
 
     SetNavigation(invalid, "back", m.navBar)
@@ -125,7 +126,7 @@ function GetItemsToLoad(visibleOnly = false as boolean) as object
             continue for
         end if
         subContentNode = contentNode.getChild(index)
-        if subContentNode.loadState <> "notLoaded"
+        if subContentNode.loadState <> FeedLoadState.None
             continue for
         end if
         subContentNodes.push(subContentNode)
@@ -135,7 +136,7 @@ function GetItemsToLoad(visibleOnly = false as boolean) as object
         if subContentNodes.count() = 0 and m.top.visible
             for i = 0 to rowCount - 1
                 subContentNode = contentNode.getChild(i)
-                if subContentNode.loadState <> "notLoaded"
+                if subContentNode.loadState <> FeedLoadState.None
                     continue for
                 end if
                 subContentNodes.push(subContentNode)
@@ -150,7 +151,7 @@ function GetItemsToLoad(visibleOnly = false as boolean) as object
 end function
 
 function LoadItemContent(contentNode as object)
-    contentNode.loadState = "loading"
+    contentNode.loadState = FeedLoadState.Loading
     task = StartAsyncTask(HomeScreenRowContentTask, {
         node: contentNode,
         invidious: m.invidious
@@ -178,6 +179,23 @@ function HomeScreenRowContentTaskResults(output as object) as void
     end if
 
     LoadItemsIfNeeded()
+end function
+
+function OnRowItemFocused(event as object) as void
+    grid = event.GetRoSGNode()
+
+    selectedPair = event.GetData()
+    selectedRow = selectedPair[0]
+    selectedRowItem = selectedPair[1]
+
+    rowContent = grid.content.GetChild(selectedRow)
+    if not rowContent.loadState = FeedLoadState.LoadedPage
+        return
+    end if
+
+    if selectedRowItem > rowContent.getChildCount() - 4
+        LoadItemContent(rowContent)
+    end if
 end function
 
 function OnRowItemSelected(event as object)

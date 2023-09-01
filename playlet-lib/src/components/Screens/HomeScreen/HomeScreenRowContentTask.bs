@@ -11,6 +11,8 @@ function HomeScreenRowContentTask(input as object) as object
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
+
+    contentNode.feed = service.MarkPagination(contentNode.feed)
     response = service.MakeRequest(contentNode.feed)
 
     if m.top.cancel
@@ -19,7 +21,7 @@ function HomeScreenRowContentTask(input as object) as object
 
     ' TODO:P0 handle unauthenticated requests
     if not response.success
-        contentNode.loadState = "failed"
+        contentNode.loadState = FeedLoadState.Error
         contentNode.title += " (Failed to load)"
         return response
     end if
@@ -33,9 +35,22 @@ function HomeScreenRowContentTask(input as object) as object
         end if
     end for
 
-    contentNode.removeChildrenIndex(contentNode.getChildCount(), 0)
+    isPlaceHolder = true
+    while isPlaceHolder and contentNode.getChildCount() > 0
+        lastIndex = contentNode.getChildCount() - 1
+        isPlaceHolder = contentNode.getChild(lastIndex).isPlaceHolder = true
+        if isPlaceHolder = true
+            contentNode.removeChildIndex(lastIndex)
+        end if
+    end while
+
     contentNode.appendChildren(itemNodes)
-    contentNode.loadState = "loaded"
+
+    if contentNode.feed.pagination = true and response.result.Count() > 0
+        contentNode.loadState = FeedLoadState.LoadedPage
+    else
+        contentNode.loadState = FeedLoadState.Loaded
+    end if
+
     return response
 end function
-
