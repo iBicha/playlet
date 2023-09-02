@@ -126,6 +126,9 @@ namespace HttpClient
 
         function CacheSeconds(expireSeconds as integer) as object
             m._expireSeconds = expireSeconds
+            if expireSeconds < 0
+                m.NoCache()
+            end if
             return m
         end function
 
@@ -522,26 +525,7 @@ namespace HttpClientCache
         expireSeconds = request._expireSeconds
 
         if expireSeconds = invalid and cacheObject.headers <> invalid
-            cacheControl = cacheObject.headers["cache-control"]
-            if cacheControl <> invalid
-                cacheControlDirectives = cacheControl.split(",")
-                for each cacheControlDirective in cacheControlDirectives
-                    keyValue = cacheControlDirective.Trim().split("=")
-                    name = keyValue[0].Trim()
-                    if keyValue.Count() > 1
-                        value = keyValue[1].Trim()
-                    else
-                        value = invalid
-                    end if
-
-                    if name = "no-store" or name = "no-cache"
-                        return invalid
-                    else if name = "max-age"
-                        expireSeconds = val(value)
-                        exit for
-                    end if
-                end for
-            end if
+            expireSeconds = ParseHeadersForCacheControl(cacheObject.headers)
         end if
 
         if expireSeconds = invalid
@@ -559,16 +543,22 @@ namespace HttpClientCache
     end function
 
     function Set(response as HttpClient.HttpResponse) as void
-        if response.request._noCache = true
-            return
-        end if
-
-        if response.request._method <> "GET"
+        if response.request._noCache = true or response.request._method <> "GET"
             return
         end if
 
         if not response.IsSuccess()
             return
+        end if
+
+        if response.request._expireSeconds = invalid
+            headers = response.Headers()
+            if headers = invalid
+                return
+            end if
+            if ParseHeadersForCacheControl(headers) = invalid
+                return
+            end if
         end if
 
         fileSystem = GetFileSystem(response.request)
@@ -601,4 +591,29 @@ namespace HttpClientCache
         return fileSystem.Delete(cacheLocation)
     end function
 
+    function ParseHeadersForCacheControl(headers as object) as dynamic
+        cacheControl = headers["cache-control"]
+        if cacheControl = invalid
+            return invalid
+        end if
+
+        cacheControlDirectives = cacheControl.split(",")
+        for each cacheControlDirective in cacheControlDirectives
+            keyValue = cacheControlDirective.Trim().split("=")
+            name = keyValue[0].Trim()
+            if keyValue.Count() > 1
+                value = keyValue[1].Trim()
+            else
+                value = invalid
+            end if
+
+            if name = "no-store" or name = "no-cache"
+                return invalid
+            else if name = "max-age"
+                return val(value)
+            end if
+        end for
+
+        return invalid
+    end function
 end namespace
