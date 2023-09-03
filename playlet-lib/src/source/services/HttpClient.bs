@@ -138,21 +138,19 @@ namespace HttpClient
         end function
 
         function ToCurlCommand() as string
-            command = `curl -X ${m._method}`
+            command = `curl "${m.BuildUrl()}"`
+            command += ` \\\n  -X ${m._method}`
+            command += ` \\\n  --max-time ${m._timeoutSeconds}`
 
             if m._headers <> invalid
                 for each key in m._headers
-                    command += ` -H '${key}: ${m._headers[key]}'`
+                    command += ` \\\n  -H '${key}: ${m._headers[key]}'`
                 end for
             end if
 
             if not StringUtils.IsNullOrEmpty(m._body)
-                command += ` -d '${m._body}'`
+                command += ` \\\n  -d '${m._body}'`
             end if
-
-            command += ` --max-time ${m._timeoutSeconds}`
-
-            command += ` "${m.BuildUrl()}"`
 
             return command
         end function
@@ -189,12 +187,10 @@ namespace HttpClient
                 m.urlTransfer.SetMessagePort(CreateObject("roMessagePort"))
             end if
 
-            m.log.info("ID:", m.urlTransfer.GetIdentity(), "Sending", m._method, m.urlTransfer.GetURL())
+            m.log.info("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
 
             #if DEBUG
-                ? "---- curl command ----"
-                ? m.ToCurlCommand()
-                ? "----------------------"
+                ? `════════ curl command ════════\n${m.ToCurlCommand()}\n══════════════════════════════`
             #end if
 
             if m._method = "POST"
@@ -267,19 +263,19 @@ namespace HttpClient
 
             if msg = invalid
                 ' timeout
-                m.log.info("ID:", m.urlTransfer.GetIdentity(), "Timeout")
+                m.log.info("Timeout", "ID:", m.urlTransfer.GetIdentity())
                 m.urlTransfer.AsyncCancel()
             else
                 eventType = type(msg)
                 if eventType = "roUrlEvent"
-                    m.log.info("ID:", m.urlTransfer.GetIdentity(), "Finished")
+                    m.log.info("Finished", "ID:", m.urlTransfer.GetIdentity())
                 else if eventType = "roSGNodeEvent"
                     node = msg.getRoSGNode()
                     field = msg.getField()
                     value = msg.getData()
                     ' cancellation
                     if node.isSameNode(m._cancellation.node) and field = m._cancellation.field and value = m._cancellation.value
-                        m.log.info("ID:", m.urlTransfer.GetIdentity(), "Cancelled")
+                        m.log.info("Cancelled", "ID:", m.urlTransfer.GetIdentity())
                         m._cancelled = true
                         m.urlTransfer.AsyncCancel()
                     end if
@@ -469,6 +465,9 @@ namespace HttpClient
 
 end namespace
 
+' TODO:P2 introduce the concept of "loose" cache
+' For playlists that show in a feed or in a search, we don't want to make a request to get the playlist details
+' But if we have that information in the cache already, it can be used
 namespace HttpClientCache
     function GetLocation(request as HttpClient.HttpRequest) as dynamic
         if request._cacheLocation <> invalid
@@ -577,6 +576,7 @@ namespace HttpClientCache
         }
 
         cacheLocation = GetLocation(response.request)
+        ' TODO:P2 use a diferent format other than json for better performance
         cacheText = FormatJson(cacheObject)
         WriteAsciiFile(cacheLocation, cacheText)
     end function

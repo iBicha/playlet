@@ -1,0 +1,128 @@
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+
+' TODO:P0 play video on select
+' TODO:P0 load more videos on scroll
+' TODO:P0 "Liked videos" has no background
+' TODO:P0 "sbou3i 2008" has no videos - if playlistid does not start with IV, then it's a youtube playlist and need to be loaded
+' TODO:P0 Refresh playlist info on open
+' TODO:P2 use already loaded thumbnail, and crossfade to highres version
+' TODO:P0 Add playlist to the queue, and record index
+function Init()
+    m.log = new log.Logger("PlaylistView")
+
+    m.background = m.top.findNode("background")
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.subtitleLabel = m.top.findNode("subtitleLabel")
+    m.list = m.top.findNode("list")
+end function
+
+function OnNodeReady()
+    m.list.observeField("itemSelected", FuncName(OnItemSelected))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.list, true)
+end function
+
+function OnContentSet() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    subtitle = `${content.author} • ${content.videoCount} videos`
+    if content.viewCount <> invalid
+        subtitle += ` • ${content.viewCount} views`
+    end if
+    m.subtitleLabel.text = subtitle
+    m.background.uri = GetThumbnailUrl(content)
+
+    m.list.content = CreateListContentNode(content)
+end function
+
+function CreateListContentNode(content as object) as object
+    itemNodes = []
+    for each video in content.videos
+        videoItem = CreateObject("roSGNode", "ContentNode")
+
+        videoItem.append(video)
+        videoItem.addField("instance", "string", false)
+        videoItem.instance = content.instance
+        itemNodes.push(videoItem)
+    end for
+
+    listContent = CreateObject("roSGNode", "ContentNode")
+    listContent.appendChildren(itemNodes)
+    return listContent
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+
+    if key = "back"
+        Close()
+        return true
+    end if
+    return false
+end function
+
+function Close()
+    m.appController@.PopScreen(invalid)
+end function
+
+' TODO:P1 this should be done at the stage of creating the ContentNode
+function GetThumbnailUrl(content as object, quality = "maxresdefault" as string) as string
+    if IsString(content.playlistThumbnail)
+        thumbnailUrl = content.playlistThumbnail
+        if thumbnailUrl.startsWith("/")
+            thumbnailUrl = content.instance + thumbnailUrl
+        end if
+        return thumbnailUrl
+    else
+        if IsArray(content.videos) and content.videos.Count() > 0
+            videoThumbnails = content.videos[0].videoThumbnails
+            if IsArray(videoThumbnails) and videoThumbnails.Count() > 0
+                thumbnailUrl = ""
+                for each thumbnail in videoThumbnails
+                    if thumbnail.quality = quality
+                        thumbnailUrl = thumbnail.url
+                        exit for
+                    end if
+                end for
+
+                if thumbnailUrl = ""
+                    thumbnailUrl = videoThumbnails[0].url
+                end if
+                if thumbnailUrl.startsWith("/")
+                    thumbnailUrl = content.instance + thumbnailUrl
+                end if
+                return thumbnailUrl
+            end if
+        end if
+    end if
+
+    return ""
+end function
+
+function OnItemSelected(event as object)
+    index = event.getData()
+    video = m.list.content.getChild(index)
+    videoId = video.videoId
+    if not StringUtils.IsNullOrEmpty(videoId)
+        m.log.info("Play video: " + videoId)
+        ' TODO:P0 only close the playlist if we're in fullscreen
+        Close()
+        VideoUtils.PlayVideo({ content: video })
+    end if
+end function

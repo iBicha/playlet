@@ -1,0 +1,64 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+function Init()
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.authorLabel = m.top.findNode("authorLabel")
+    m.thumbnail = m.top.findNode("thumbnail")
+    m.durationRect = m.top.FindNode("durationRect")
+    m.durationLabel = m.top.FindNode("durationLabel")
+
+    m.thumbnail.failedBitmapUri = "pkg:/images/thumbnail-missing.jpg"
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    m.authorLabel.text = content.author
+
+    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails, content.instance)
+    if ValidInt(content.lengthSeconds) <> 0
+        SetDurationText(TimeUtils.GetFormattedTime(content.lengthSeconds))
+        m.durationRect.visible = true
+    else
+        m.durationRect.visible = false
+    end if
+end function
+
+function GetThumbnailUrl(videoThumbnails as object, instance as string, quality = "medium" as string) as string
+    if videoThumbnails.Count() = 0
+        return ""
+    end if
+    url = ""
+    for each thumbnail in videoThumbnails
+        if thumbnail.quality = quality
+            url = thumbnail.url
+            exit for
+        end if
+    end for
+    if url = ""
+        url = videoThumbnails[0].url
+    end if
+    if url.startsWith("/")
+        url = instance + url
+    end if
+    return url
+end function
+
+function SetDurationText(text as string)
+    label = m.durationLabel
+    rect = m.durationRect
+
+    rectParent = rect.getParent()
+
+    label.text = text
+    size = label.localBoundingRect()
+
+    rect.width = size.width + 16
+    rect.translation = [rectParent.width - rect.width, 72]
+end function
