@@ -6,6 +6,7 @@ function Init()
     m.authorLabel = m.top.FindNode("authorLabel")
     m.viewCountDateLabel = m.top.FindNode("viewCountDateLabel")
     m.liveRect = m.top.FindNode("liveRect")
+    m.upcomingRect = m.top.FindNode("upcomingRect")
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
     m.thumbnail = m.top.FindNode("thumbnail")
@@ -22,33 +23,38 @@ function OnContentSet() as void
     m.titleLabel.text = content.title
     m.authorLabel.text = content.author
 
-    if IsVideoUpcoming(content)
-        m.viewCountDateLabel.text = `Premeres in ${TimeUtils.GetFormattedTimeLeft(content.premiereTimestamp)}`
+    if content.isUpcoming = true
+        m.viewCountDateLabel.text = content.premiereTimestampText
     else
         publishedText = ValidString(content.publishedText)
-        viewCount = FormatViewCount(content.viewCount)
-        if publishedText = "" and viewCount = ""
+        viewCountText = ValidString(content.viewCountText)
+        if publishedText = "" and viewCountText = ""
             m.viewCountDateLabel.text = ""
         else
-            m.viewCountDateLabel.text = `${publishedText} • ${viewCount}`
+            m.viewCountDateLabel.text = `${publishedText} • ${viewCountText}`
         end if
     end if
 
-    m.thumbnail.uri = GetThumbnailUrl(content.videoThumbnails, content.instance)
+    m.thumbnail.uri = content.thumbnail
 
-    if IsVideoLive(content)
+    if content.isUpcoming = true
+        m.upcomingRect.visible = true
+        m.liveRect.visible = false
+        m.durationRect.visible = false
+    else if content.liveNow
+        m.upcomingRect.visible = false
         m.liveRect.visible = true
         m.durationRect.visible = false
     else
+        m.upcomingRect.visible = false
         m.liveRect.visible = false
         if ValidInt(content.lengthSeconds) <> 0
-            SetDurationText(TimeUtils.GetFormattedTime(content.lengthSeconds))
+            SetDurationText(content.lengthText)
             m.durationRect.visible = true
         else
             m.durationRect.visible = false
         end if
     end if
-
 end function
 
 function SetDurationText(text as string)
@@ -64,64 +70,3 @@ function SetDurationText(text as string)
     rect.translation = [rectParent.width - rect.width, 162]
 end function
 
-function GetThumbnailUrl(videoThumbnails as object, instance as string, quality = "medium" as string) as string
-    if videoThumbnails.Count() = 0
-        return ""
-    end if
-    url = ""
-    for each thumbnail in videoThumbnails
-        if thumbnail.quality = quality
-            url = thumbnail.url
-            exit for
-        end if
-    end for
-    if url = ""
-        url = videoThumbnails[0].url
-    end if
-    if url.startsWith("/")
-        url = instance + url
-    end if
-    return url
-end function
-
-function IsVideoUpcoming(metadata as object) as boolean
-    return metadata.isUpcoming = true
-end function
-
-function IsVideoLive(metadata as object) as boolean
-    if metadata.liveNow = true
-        return true
-    end if
-    ' TODO:P2 metadata.liveNow is returning false for live videos...
-    return metadata.lengthSeconds = 0 and metadata.viewCount = 0
-end function
-
-function FormatViewCount(viewCount as dynamic) as string
-    if viewCount = invalid
-        return ""
-    end if
-    if viewCount < 1000
-        return `${FormatFloat(viewCount)} views`
-    end if
-
-    viewCount = viewCount / 1000
-    if viewCount < 1000
-        return `${FormatFloat(viewCount)}K views`
-    end if
-
-    viewCount = viewCount / 1000
-    if viewCount < 1000
-        return `${FormatFloat(viewCount)}M views`
-    end if
-
-    viewCount = viewCount / 1000
-    return `${FormatFloat(viewCount)}B views`
-end function
-
-function FormatFloat(X as integer) as integer
-    X = X * 10
-    X = X + 0.5
-    X = Fix(X)
-    X = X / 10
-    return X
-end function

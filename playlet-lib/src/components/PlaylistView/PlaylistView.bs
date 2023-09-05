@@ -3,24 +3,28 @@ import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 
 ' TODO:P0 play video on select
-' TODO:P0 load more videos on scroll
-' TODO:P0 "Liked videos" has no background
-' TODO:P0 "sbou3i 2008" has no videos - if playlistid does not start with IV, then it's a youtube playlist and need to be loaded
-' TODO:P0 Refresh playlist info on open
-' TODO:P2 use already loaded thumbnail, and crossfade to highres version
+' TODO:P2 use already loaded thumbnail, and crossfade to highres version (using same Poster)
 ' TODO:P0 Add playlist to the queue, and record index
 function Init()
     m.log = new log.Logger("PlaylistView")
 
     m.background = m.top.findNode("background")
+    m.backgroundSmall = m.top.findNode("backgroundSmall")
     m.titleLabel = m.top.findNode("titleLabel")
     m.subtitleLabel = m.top.findNode("subtitleLabel")
+    m.descriptionLabel = m.top.findNode("descriptionLabel")
     m.list = m.top.findNode("list")
 end function
 
 function OnNodeReady()
+    m.list.ObserveField("itemFocused", FuncName(OnItemFocused))
     m.list.observeField("itemSelected", FuncName(OnItemSelected))
 end function
 
@@ -39,30 +43,20 @@ function OnContentSet() as void
     end if
 
     m.titleLabel.text = content.title
-    subtitle = `${content.author} • ${content.videoCount} videos`
-    if content.viewCount <> invalid
-        subtitle += ` • ${content.viewCount} views`
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    m.subtitleLabel.text = `${content._author} • ${content.videoCountText} • ${content.viewCountText}`
+    m.descriptionLabel.text = content.description
+
+    ' TODO:P2 cross fade
+    m.backgroundSmall.uri = content.thumbnail
+    m.background.uri = content.thumbnailBackground
+
+    itemFocused = m.list.itemFocused
+    m.list.content = content
+    if itemFocused > -1 and content.getChildCount() > itemFocused
+        m.list.jumpToItem = itemFocused
     end if
-    m.subtitleLabel.text = subtitle
-    m.background.uri = GetThumbnailUrl(content)
-
-    m.list.content = CreateListContentNode(content)
-end function
-
-function CreateListContentNode(content as object) as object
-    itemNodes = []
-    for each video in content.videos
-        videoItem = CreateObject("roSGNode", "ContentNode")
-
-        videoItem.append(video)
-        videoItem.addField("instance", "string", false)
-        videoItem.instance = content.instance
-        itemNodes.push(videoItem)
-    end for
-
-    listContent = CreateObject("roSGNode", "ContentNode")
-    listContent.appendChildren(itemNodes)
-    return listContent
+    LoadPlaylistIfNeeded()
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -78,41 +72,15 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 end function
 
 function Close()
+    if m.playlistLoadTask <> invalid
+        m.playlistLoadTask.cancel = true
+    end if
+
     m.appController@.PopScreen(invalid)
 end function
 
-' TODO:P1 this should be done at the stage of creating the ContentNode
-function GetThumbnailUrl(content as object, quality = "maxresdefault" as string) as string
-    if IsString(content.playlistThumbnail)
-        thumbnailUrl = content.playlistThumbnail
-        if thumbnailUrl.startsWith("/")
-            thumbnailUrl = content.instance + thumbnailUrl
-        end if
-        return thumbnailUrl
-    else
-        if IsArray(content.videos) and content.videos.Count() > 0
-            videoThumbnails = content.videos[0].videoThumbnails
-            if IsArray(videoThumbnails) and videoThumbnails.Count() > 0
-                thumbnailUrl = ""
-                for each thumbnail in videoThumbnails
-                    if thumbnail.quality = quality
-                        thumbnailUrl = thumbnail.url
-                        exit for
-                    end if
-                end for
-
-                if thumbnailUrl = ""
-                    thumbnailUrl = videoThumbnails[0].url
-                end if
-                if thumbnailUrl.startsWith("/")
-                    thumbnailUrl = content.instance + thumbnailUrl
-                end if
-                return thumbnailUrl
-            end if
-        end if
-    end if
-
-    return ""
+function OnItemFocused()
+    LoadPlaylistIfNeeded()
 end function
 
 function OnItemSelected(event as object)
@@ -121,8 +89,70 @@ function OnItemSelected(event as object)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
         m.log.info("Play video: " + videoId)
-        ' TODO:P0 only close the playlist if we're in fullscreen
-        Close()
+        if not VideoUtils.IsVideoPlayerOpen()
+            Close()
+        end if
         VideoUtils.PlayVideo({ content: video })
     end if
+end function
+
+function LoadPlaylistIfNeeded() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    if not content.loadState = FeedLoadState.LoadedPage and not content.loadState = FeedLoadState.None
+        return
+    end if
+
+    videoCount = content.videoCount
+    currentVideosCount = content.getChildCount()
+    if videoCount = currentVideosCount
+        return
+    end if
+
+    itemFocused = m.list.itemFocused
+    if itemFocused < currentVideosCount - 5
+        return
+    end if
+
+    LoadPlaylist()
+end function
+
+function LoadPlaylist() as void
+    if m.playlistLoadTask <> invalid
+        m.playlistLoadTask.cancel = true
+    end if
+
+    m.top.content.loadState = FeedLoadState.Loading
+    m.playlistLoadTask = StartAsyncTask(PlaylistContentTask, {
+        content: m.top.content,
+        invidious: m.top.invidious
+    }, OnPlaylistContentTaskResult)
+end function
+
+function OnPlaylistContentTaskResult(output as object) as void
+    m.playlistLoadTask = invalid
+
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        videoId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${videoId}\n${error}`
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
+        return
+    end if
+
+    LoadPlaylistIfNeeded()
 end function

@@ -1,3 +1,5 @@
+#const DISABLE_CACHE = false
+
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -5,31 +7,36 @@ import "pkg:/source/utils/Types.bs"
 
 namespace HttpClient
 
-    function Get(url as string) as object
+    enum QueryParamArrayType
+        CommaSeparated
+        Repeated
+    end enum
+
+    function Get(url as string) as HttpRequest
         return (new HttpRequest()).Method("GET").Url(url)
     end function
 
-    function Post(url as string, data as string) as object
+    function Post(url as string, data as string) as HttpRequest
         return (new HttpRequest()).Method("POST").Url(url).Body(data)
     end function
 
-    function PostJson(url as string, data as object) as object
+    function PostJson(url as string, data as object) as HttpRequest
         return (new HttpRequest()).Method("POST").Url(url).Json(data)
     end function
 
-    function Put(url as string, data as string) as object
+    function Put(url as string, data as string) as HttpRequest
         return (new HttpRequest()).Method("PUT").Url(url).Body(data)
     end function
 
-    function PutJson(url as string, data as object) as object
+    function PutJson(url as string, data as object) as HttpRequest
         return (new HttpRequest()).Method("PUT").Url(url).Json(data)
     end function
 
-    function Delete(url as string) as object
+    function Delete(url as string) as HttpRequest
         return (new HttpRequest()).Method("DELETE").Url(url)
     end function
 
-    function Head(url as string) as object
+    function Head(url as string) as HttpRequest
         return (new HttpRequest()).Method("HEAD").Url(url)
     end function
 
@@ -42,17 +49,17 @@ namespace HttpClient
             m._timeoutSeconds = 30
         end function
 
-        function Method(method as string) as object
+        function Method(method as string) as HttpRequest
             m._method = Ucase(method)
             return m
         end function
 
-        function Url(url as string) as object
+        function Url(url as string) as HttpRequest
             m._url = url
             return m
         end function
 
-        function QueryParam(key as string, value as dynamic) as object
+        function QueryParam(key as string, value as dynamic) as HttpRequest
             if value = invalid
                 return m
             end if
@@ -63,7 +70,23 @@ namespace HttpClient
             return m
         end function
 
-        function QueryParams(queryParams as object) as object
+        function QueryParamArray(key as string, valueArray as dynamic, arrayType as HttpClient.QueryParamArrayType) as HttpRequest
+            if valueArray = invalid
+                return m
+            end if
+            if m._queryParams = invalid
+                m._queryParams = {}
+            end if
+
+            m._queryParams[key] = {
+                value: valueArray,
+                __arrayType: arrayType
+            }
+
+            return m
+        end function
+
+        function QueryParams(queryParams as object) as HttpRequest
             if m._queryParams = invalid
                 m._queryParams = {}
             end if
@@ -71,7 +94,7 @@ namespace HttpClient
             return m
         end function
 
-        function PathParam(key as string, value as string) as object
+        function PathParam(key as string, value as string) as HttpRequest
             if m._pathParams = invalid
                 m._pathParams = {}
             end if
@@ -79,7 +102,7 @@ namespace HttpClient
             return m
         end function
 
-        function PathParams(pathParams as object) as object
+        function PathParams(pathParams as object) as HttpRequest
             if m._pathParams = invalid
                 m._pathParams = {}
             end if
@@ -87,7 +110,7 @@ namespace HttpClient
             return m
         end function
 
-        function Header(key as string, value as string) as object
+        function Header(key as string, value as string) as HttpRequest
             if m._headers = invalid
                 m._headers = {}
             end if
@@ -95,7 +118,7 @@ namespace HttpClient
             return m
         end function
 
-        function Headers(headers as object) as object
+        function Headers(headers as object) as HttpRequest
             if m._headers = invalid
                 m._headers = {}
             end if
@@ -103,28 +126,28 @@ namespace HttpClient
             return m
         end function
 
-        function Body(body as dynamic) as object
+        function Body(body as dynamic) as HttpRequest
             m._body = ValidString(body)
             return m
         end function
 
-        function Json(body as object) as object
+        function Json(body as object) as HttpRequest
             m.Body(FormatJson(body))
             m.Header("Content-Type", "application/json")
             return m
         end function
 
-        function TimeoutSeconds(timeoutSeconds as integer) as object
+        function TimeoutSeconds(timeoutSeconds as integer) as HttpRequest
             m._timeoutSeconds = timeoutSeconds
             return m
         end function
 
-        function NoCache() as object
+        function NoCache() as HttpRequest
             m._noCache = true
             return m
         end function
 
-        function CacheSeconds(expireSeconds as integer) as object
+        function CacheSeconds(expireSeconds as integer) as HttpRequest
             m._expireSeconds = expireSeconds
             if expireSeconds < 0
                 m.NoCache()
@@ -132,7 +155,7 @@ namespace HttpClient
             return m
         end function
 
-        function Cancellation(cancellation as object) as object
+        function Cancellation(cancellation as object) as HttpRequest
             m._cancellation = cancellation
             return m
         end function
@@ -155,18 +178,22 @@ namespace HttpClient
             return command
         end function
 
-        function Send() as object
+        function Send() as HttpRequest
             return m.DoSend(false)
         end function
 
-        function SendAndForget() as object
+        function SendAndForget() as HttpRequest
             return m.DoSend(true)
         end function
 
-        private function DoSend(forget as boolean) as object
+        private function DoSend(forget as boolean) as HttpRequest
             if m.urlTransfer <> invalid or m._cache <> invalid
                 return m
             end if
+
+            #if DISABLE_CACHE
+                m._noCache = true
+            #end if
 
             if m._noCache <> true
                 cache = HttpClientCache.Get(m)
@@ -227,7 +254,7 @@ namespace HttpClient
             return m._cancelled = true
         end function
 
-        function Await() as object
+        function Await() as HttpResponse
             if m.urlTransfer = invalid and m._cache = invalid
                 m.Send()
             end if
@@ -303,6 +330,7 @@ namespace HttpClient
             return urlTransfer
         end function
 
+        ' TODO:P2 refactor this monstrosity of a function
         function BuildUrl() as string
             if m._fullUrl <> invalid
                 return m._fullUrl
@@ -329,14 +357,57 @@ namespace HttpClient
                     if value = invalid
                         continue for
                     end if
+
                     if not IsString(value)
-                        value = `${value}`
-                    end if
-                    if hasQueryParams
-                        url += "&" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+                        if IsAssociativeArray(value) and IsArray(value.value)
+                            if value.__arrayType = HttpClient.QueryParamArrayType.Repeated
+                                valueArray = value.value
+                                for each item in valueArray
+                                    itemString = item
+                                    if not IsString(itemString)
+                                        itemString = `${itemString}`
+                                    end if
+                                    if hasQueryParams
+                                        url += "&" + key.EncodeUriComponent() + "=" + itemString.EncodeUriComponent()
+                                    else
+                                        url += "?" + key.EncodeUriComponent() + "=" + itemString.EncodeUriComponent()
+                                        hasQueryParams = true
+                                    end if
+                                end for
+                            else if value.__arrayType = HttpClient.QueryParamArrayType.CommaSeparated
+                                valueArray = value.value
+                                for i = 0 to valueArray.Count() - 1
+                                    itemString = valueArray[i]
+                                    if not IsString(itemString)
+                                        itemString = `${itemString}`
+                                    end if
+                                    itemString = itemString.EncodeUriComponent()
+                                    valueArray[i] = itemString
+                                end for
+                                joined = valueArray.join(",")
+                                if hasQueryParams
+                                    url += "&" + key.EncodeUriComponent() + "=" + joined
+                                else
+                                    url += "?" + key.EncodeUriComponent() + "=" + joined
+                                    hasQueryParams = true
+                                end if
+                            end if
+                        else
+                            value = `${value}`
+                            if hasQueryParams
+                                url += "&" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+                            else
+                                url += "?" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+                                hasQueryParams = true
+                            end if
+                        end if
                     else
-                        url += "?" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-                        hasQueryParams = true
+                        if hasQueryParams
+                            url += "&" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+                        else
+                            url += "?" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+                            hasQueryParams = true
+                        end if
                     end if
                 end for
             end if

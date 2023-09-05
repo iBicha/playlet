@@ -15,11 +15,13 @@ namespace Invidious
     const STATS_ENDPOINT = "/api/v1/stats"
 
     const VIDEOS_ENDPOINT = "/api/v1/videos"
+    const PLAYLISTS_ENDPOINT = "/api/v1/playlists"
     const HISTORY_ENDPOINT = "/api/v1/auth/history"
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
 
-    const AUTH_SCOPES = "GET:feed,GET:playlists,POST:tokens/register,POST:tokens/unregister,POST:history*"
+    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/register,POST:tokens/unregister,POST:history*"
+    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
     const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
 
@@ -99,13 +101,33 @@ namespace Invidious
             return response.Json()
         end function
 
-        function GetVideoMetadata(videoId as string) as object
+        function GetVideoMetadata(videoId as string, cancellation = invalid as object) as object
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
             request = HttpClient.Get(url)
             request.QueryParams(m.DefaultQueryParams())
             request.CacheSeconds(60 * 60 * 6)' 6 hours
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
+
+        function GetPlaylist(playlistId as string, index = 0 as integer, cancellation = invalid as object) as object
+            authToken = m.node.authToken
+            if authToken = invalid
+                instance = m.GetInstance()
+                url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
+                request = HttpClient.Get(url)
+            else
+                url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}/${playlistId}`
+                request = HttpClient.Get(url)
+                request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            end if
+
+            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("index", index)
+            request.Cancellation(cancellation)
 
             return request.Await()
         end function
@@ -115,24 +137,23 @@ namespace Invidious
             return `${instance}/latest_version?id=${videoId}`
         end function
 
-        function MarkPagination(requestData as object) as object
+        function MarkFeedPagination(contentNode as object) as void
+            requestData = contentNode.feed
+
             endpoint = m.endpoints[requestData.endpoint]
             if endpoint = invalid or endpoint.pagination <> true
-                return requestData
+                return
             end if
+
+            contentNode.pagination = true
+            contentNode.page += 1
 
             if not requestData.DoesExist("queryParams")
                 requestData.queryParams = {}
             end if
 
-            if not requestData.queryParams.DoesExist("page")
-                requestData.queryParams.page = 0
-            end if
-
-            requestData.pagination = true
-            requestData.queryParams.page += 1
-
-            return requestData
+            requestData.queryParams.page = contentNode.page
+            contentNode.feed = requestData
         end function
 
         function MakeRequest(requestData as object, cancellation = invalid as object) as object
@@ -169,6 +190,12 @@ namespace Invidious
                                 request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode(invalid))
                             else
                                 request.QueryParam(queryParamKey, queryParam.default)
+                            end if
+                        else if IsArray(queryParam.default)
+                            if queryParam.arrayType = "repeat"
+                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.Repeated)
+                            else if queryParam.arrayType = "comma-separated"
+                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.CommaSeparated)
                             end if
                         else
                             request.QueryParam(queryParamKey, queryParam.default)

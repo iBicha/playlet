@@ -10,7 +10,6 @@ function Init()
 end function
 
 function OnContentSet() as void
-    ' TODO:P1 check if we already have a cache for this content
     content = m.top.itemContent
 
     if content = invalid
@@ -18,21 +17,15 @@ function OnContentSet() as void
     end if
 
     m.titleLabel.text = content.title
-    m.authorLabel.text = content.author
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    m.authorLabel.text = content._author
 
-    m.thumbnail.uri = GetThumbnailUrl(content)
+    m.thumbnail.uri = content.thumbnail
 
-    SetVideoCount(content.videoCount)
+    SetVideoCount(content.videoCountText)
 end function
 
-function SetVideoCount(videoCount as integer)
-    videoCountText = ""
-    if videoCount = 1
-        videoCountText = "1 video"
-    else
-        videoCountText = `${videoCount} videos`
-    end if
-
+function SetVideoCount(videoCountText as string)
     label = m.videoCountLabel
     rect = m.videoCountRect
 
@@ -43,37 +36,4 @@ function SetVideoCount(videoCount as integer)
 
     rect.width = size.width + 16
     rect.translation = [rectParent.width - rect.width, 162]
-end function
-
-function GetThumbnailUrl(content as object, quality = "medium" as string) as string
-    if IsString(content.playlistThumbnail)
-        thumbnailUrl = content.playlistThumbnail
-        if thumbnailUrl.startsWith("/")
-            thumbnailUrl = content.instance + thumbnailUrl
-        end if
-        return thumbnailUrl
-    else
-        if IsArray(content.videos) and content.videos.Count() > 0
-            videoThumbnails = content.videos[0].videoThumbnails
-            if IsArray(videoThumbnails) and videoThumbnails.Count() > 0
-                thumbnailUrl = ""
-                for each thumbnail in videoThumbnails
-                    if thumbnail.quality = quality
-                        thumbnailUrl = thumbnail.url
-                        exit for
-                    end if
-                end for
-
-                if thumbnailUrl = ""
-                    thumbnailUrl = videoThumbnails[0].url
-                end if
-                if thumbnailUrl.startsWith("/")
-                    thumbnailUrl = content.instance + thumbnailUrl
-                end if
-                return thumbnailUrl
-            end if
-        end if
-    end if
-
-    return ""
 end function
