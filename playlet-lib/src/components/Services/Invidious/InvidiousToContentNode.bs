@@ -1,3 +1,6 @@
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+
 namespace InvidiousContent
 
     function ToRowCellContentNode(item as object, instance as string) as object
@@ -29,7 +32,7 @@ namespace InvidiousContent
         end if
     end function
 
-    function ToVideoContentNode(node as object, item as object, instance as string) as object
+    function ToVideoContentNode(node as object, item as object, instance as dynamic) as object
         if node = invalid
             node = CreateObject("roSGNode", "VideoContentNode")
         end if
@@ -43,13 +46,15 @@ namespace InvidiousContent
         node.liveNow = VideoIsLive(item)
         VideoSetPremiereTimestampText(node, item)
         SetIfExists(node, "publishedText", item, "publishedText")
-        node.thumbnail = VideoGetThumbnail(item, instance) ?? "pkg:/images/thumbnail-missing.jpg"
+        if not StringUtils.IsNullOrEmpty(instance)
+            node.thumbnail = VideoGetThumbnail(item, instance) ?? "pkg:/images/thumbnail-missing.jpg"
+        end if
         SetIfExists(node, "title", item, "title")
+        SetIfExists(node, "timestamp", item, "timestamp")
         SetIfExists(node, "videoId", item, "videoId")
         node.viewCountText = VideoGetViewCountText(item)
         SetIfExists(node, "index", item, "index")
 
-        node.HDItemWidth = "350"
         return node
     end function
 
@@ -93,7 +98,6 @@ namespace InvidiousContent
         PlaylistSetThumbnail(node, "thumbnail", item, instance)
         PlaylistSetThumbnail(node, "thumbnailBackground", item, instance, "maxres")
 
-        node.HDItemWidth = "350"
         return node
     end function
 
@@ -101,7 +105,6 @@ namespace InvidiousContent
         node = CreateObject("roSGNode", "ChannelContentNode")
         node.type = "channel"
 
-        node.HDItemWidth = "200"
         return node
     end function
 

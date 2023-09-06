@@ -20,8 +20,20 @@ function VideoRowListRowContentTask(input as object) as object
         return invalid
     end if
 
-    ' TODO:P0 handle unauthenticated requests
     if not response.success
+        if response.error = Invidious.ERROR_NOT_AUTHENTICATED
+            RemovePlaceHolderItems(contentNode)
+            actionNode = CreateObject("roSGNode", "ActionContentNode")
+            actionNode.title = `Login to view ${contentNode.title}`
+            actionNode.action = "LoginDialog"
+
+            contentNode.appendChild(actionNode)
+            contentNode.loadState = FeedLoadState.Loaded
+
+            return {
+                success: true
+            }
+        end if
         contentNode.loadState = FeedLoadState.Error
         contentNode.title += " (Failed to load)"
         return response
@@ -53,11 +65,12 @@ function VideoRowListRowContentTask(input as object) as object
 end function
 
 function RemovePlaceHolderItems(contentNode as object)
-    isPlaceHolder = true
-    while isPlaceHolder and contentNode.getChildCount() > 0
+    isLoading = true
+    while isLoading and contentNode.getChildCount() > 0
         lastIndex = contentNode.getChildCount() - 1
-        isPlaceHolder = contentNode.getChild(lastIndex).isPlaceHolder = true
-        if isPlaceHolder = true
+        child = contentNode.getChild(lastIndex)
+        isLoading = IsString(child.type) and child.type = "loading"
+        if isLoading = true
             contentNode.removeChildIndex(lastIndex)
         end if
     end while

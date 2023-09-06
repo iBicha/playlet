@@ -7,6 +7,7 @@ import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 function Init()
     m.log = new log.Logger("VideoPlayer")
@@ -54,25 +55,6 @@ function PlayWithContent(contentNode as object)
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.author)
         videoContentNode.secondaryTitle = contentNode.author
-    end if
-
-    StartVideoContentTask(videoContentNode)
-end function
-
-function PlayWithArgs(args as object)
-    videoContentNode = CreateObject("roSGNode", "ContentNode")
-
-    if not StringUtils.IsNullOrEmpty(args.videoId)
-        videoContentNode.AddFields({ videoId: args.videoId })
-    end if
-    if IsInt(args.timestamp)
-        videoContentNode.AddFields({ timestamp: args.timestamp })
-    end if
-    if not StringUtils.IsNullOrEmpty(args.title)
-        videoContentNode.title = args.title
-    end if
-    if not StringUtils.IsNullOrEmpty(args.author)
-        videoContentNode.secondaryTitle = args.author
     end if
 
     StartVideoContentTask(videoContentNode)
@@ -226,9 +208,11 @@ function OnVideoPlayerStateChange() as void
 end function
 
 function PlayNext(recommendedVideos as object) as boolean
+    ' TODO:P0 playQueue should return content node
     videoArgs = m.playQueue@.Dequeue(invalid)
     if videoArgs <> invalid and not StringUtils.IsNullOrEmpty(videoArgs.videoId)
-        VideoUtils.PlayVideo(videoArgs)
+        node = InvidiousContent.ToVideoContentNode(invalid, videoArgs, invalid)
+        VideoUtils.PlayVideo(node)
         return true
     end if
 
@@ -251,7 +235,8 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
         end if
         if not m.container@.watchedVideosContain(videoId)
             m.log.info(`Playing next recommended video (${videoId})`)
-            VideoUtils.PlayVideo(metadata)
+            node = InvidiousContent.ToVideoContentNode(invalid, metadata, invalid)
+            VideoUtils.PlayVideo(node)
             return true
         end if
     end for

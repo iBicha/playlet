@@ -1,0 +1,39 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/Screens/WebAppScreen/GenerateQrCodeTask.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+function Init()
+    m.urlLabel = m.top.findNode("urlLabel")
+    m.qrCode = m.top.findNode("QrCodePoster")
+
+    m.top.width = "920"
+    m.top.observeFieldScoped("buttonSelected", FuncName(Close))
+end function
+
+function OnNodeReady()
+    address = m.webserver@.GetServerAddress(invalid)
+    isValidIp = not StringUtils.IsNullOrEmpty(address)
+    if isValidIp
+        m.top.url = `${address}/invidious/login`
+    else
+        m.urlLabel.text = "No IP address found"
+    end if
+
+    m.invidious.observeFieldScoped("authToken", FuncName(OnAuthTokenChange))
+end function
+
+function Close()
+    m.top.close = true
+end function
+
+function OnUrlSet()
+    url = m.top.url
+
+    m.urlLabel.text = url
+    StartAsyncTask(GenerateQrCodeTask, { qrPoster: m.qrCode, text: url })
+end function
+
+function OnAuthTokenChange()
+    Close()
+end function

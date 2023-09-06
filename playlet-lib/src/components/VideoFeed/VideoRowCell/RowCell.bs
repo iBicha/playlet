@@ -3,44 +3,38 @@ function Init()
     m.playlistRowCell = m.top.findNode("PlaylistRowCell")
     m.channelRowCell = m.top.findNode("ChannelRowCell")
     m.loadingRowCell = m.top.findNode("LoadingRowCell")
+    m.actionRowCell = m.top.findNode("ActionRowCell")
+    m.cells = [m.videoRowCell, m.playlistRowCell, m.channelRowCell, m.loadingRowCell, m.actionRowCell]
 end function
 
 function OnContentSet() as void
     content = m.top.itemContent
 
     if content = invalid
-        m.videoRowCell.visible = false
-        m.playlistRowCell.visible = false
-        m.channelRowCell.visible = false
+        for each cell in m.cells
+            cell.visible = false
+        end for
         m.loadingRowCell.visible = true
         return
     end if
 
     m.top.type = content.type
 
-    if content.type = "video"
-        m.videoRowCell.itemContent = content
-        m.videoRowCell.visible = true
-        m.playlistRowCell.visible = false
-        m.channelRowCell.visible = false
-        m.loadingRowCell.visible = false
-    else if content.type = "playlist"
-        m.playlistRowCell.itemContent = content
-        m.videoRowCell.visible = false
-        m.playlistRowCell.visible = true
-        m.channelRowCell.visible = false
-        m.loadingRowCell.visible = false
-    else if content.type = "channel"
-        m.channelRowCell.itemContent = content
-        m.videoRowCell.visible = false
-        m.playlistRowCell.visible = false
-        m.channelRowCell.visible = true
-        m.loadingRowCell.visible = false
-    else
-        m.videoRowCell.visible = false
-        m.playlistRowCell.visible = false
-        m.channelRowCell.visible = false
+    visibleSet = false
+    for each cell in m.cells
+        shouldBeVisible = content.type = cell.type
+        cell.visible = shouldBeVisible
+        if shouldBeVisible
+            cell.itemContent = content
+            visibleSet = true
+        end if
+    end for
+
+    if not visibleSet
         m.loadingRowCell.visible = true
+    end if
+
+    if m.loadingRowCell.visible
         m.loadingRowCell.index = m.top.index
     end if
 end function
