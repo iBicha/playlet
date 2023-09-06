@@ -94,6 +94,7 @@ function OnVideoContentTaskResults(output as object) as void
         videoId = output.task.input.content.videoId
         message = `Failed to load video information for ${videoId}\n${error}`
         DialogUtils.ShowDialog(message, "Video load fail", true)
+        ' TODO:P1 play next video in the queue after showing the error dialog
         VideoUtils.CloseVideo()
         return
     end if
@@ -208,11 +209,7 @@ function OnVideoPlayerStateChange() as void
 end function
 
 function PlayNext(recommendedVideos as object) as boolean
-    ' TODO:P0 playQueue should return content node
-    videoArgs = m.playQueue@.Dequeue(invalid)
-    if videoArgs <> invalid and not StringUtils.IsNullOrEmpty(videoArgs.videoId)
-        node = InvidiousContent.ToVideoContentNode(invalid, videoArgs, invalid)
-        VideoUtils.PlayVideo(node)
+    if m.playQueue@.PlayNextItem(invalid)
         return true
     end if
 
@@ -259,7 +256,6 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 
     if key = "back"
         m.container@.watchedVideosClear(invalid)
-        m.playQueue@.Clear(invalid)
         VideoUtils.CloseVideo()
         return true
     end if

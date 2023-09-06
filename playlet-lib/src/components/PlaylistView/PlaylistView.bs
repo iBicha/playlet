@@ -9,9 +9,7 @@ import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 
-' TODO:P0 play video on select
 ' TODO:P2 use already loaded thumbnail, and crossfade to highres version (using same Poster)
-' TODO:P0 Add playlist to the queue, and record index
 function Init()
     m.log = new log.Logger("PlaylistView")
 
@@ -85,14 +83,13 @@ end function
 
 function OnItemSelected(event as object)
     index = event.getData()
-    video = m.list.content.getChild(index)
+    playlist = m.list.content
+    playlistId = playlist.playlistId
+    video = playlist.getChild(index)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
-        m.log.info("Play video: " + videoId)
-        if not VideoUtils.IsVideoPlayerOpen()
-            Close()
-        end if
-        VideoUtils.PlayVideo(video)
+        m.log.info("Play playlist: " + playlistId + " video: " + videoId)
+        m.playQueue@.Play(playlist, index)
     end if
 end function
 
@@ -148,8 +145,8 @@ function OnPlaylistContentTaskResult(output as object) as void
         end if
         error = ErrorUtils.Format(error)
         m.log.error(error)
-        videoId = output.task.input.content.playlistId
-        message = `Failed to load playlist ${videoId}\n${error}`
+        playlistId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
         DialogUtils.ShowDialog(message, "Playlist load fail", true)
         return
     end if

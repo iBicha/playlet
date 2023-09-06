@@ -1,41 +1,171 @@
 import "pkg:/source/utils/Types.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/ArrayUtils.bs"
 
-' TODO:P0 support content nodes
-' TODO:P0 support playlists
-' TODO:P0 support queing without playing
-' TODO:P0 support playing by inserting into the current index
 function Init()
-    m.top.queue = []
+    m.log = new log.Logger("PlayQueue")
+    m.pendingLoadTasks = {}
+    ' TODO:P1 prevent adding duplicates of the same video/playlist
+    m.queue = CreateObject("roArray", 0, true)
 end function
 
-function Enqueue(items as object) as void
-    if IsArray(items)
-        for each item in items
-            Enqueue(item)
-        end for
+function Play(node as object, playlistIndex as integer)
+    m.top.index += 1
+    m.top.playlistIndex = playlistIndex
+
+    if m.top.index >= m.queue.Count()
+        m.queue.push(node)
+        m.top.index = m.queue.Count() - 1
     else
-        if not VideoUtils.IsVideoPlayerOpen()
-            VideoUtils.PlayVideo(items)
-            return
-        end if
-        queue = m.top.queue
-        queue.push(items)
-        m.top.queue = queue
+        ArrayUtils.Insert(m.queue, m.top.index, node)
     end if
+
+    PlayItemAtCurrentIndex()
 end function
 
-function Dequeue(unused as dynamic) as object
-    queue = m.top.queue
-    value = queue.Shift()
-    m.top.queue = queue
-    return value
+function AddToQueue(node as object)
+    m.queue.push(node)
 end function
 
-function Set(items as object)
-    m.top.queue = IsArray(items) ? items : [items]
+' TODO:P1 better model of the queue (Now playing, etc)
+function GetQueue(unused as dynamic) as object
+    items = []
+    for each item in m.queue
+        if item.type = "video"
+            items.push({
+                type: item.type,
+                videoId: item.videoId,
+                title: item.title,
+                author: item.author,
+                thumbnail: item.thumbnail
+            })
+        else if item.type = "playlist"
+            items.push({
+                type: item.type,
+                playlistId: item.playlistId,
+                title: item.title,
+                thumbnail: item.thumbnail,
+                videoCountText: item.videoCountText
+            })
+        end if
+    end for
+
+    return {
+        index: m.top.index,
+        playlistIndex: m.top.playlistIndex,
+        items: items
+    }
 end function
 
 function Clear(unused as dynamic)
-    m.top.queue = []
+    m.queue.Clear()
+    m.top.index = -1
+    m.top.playlistIndex = -1
+end function
+
+function PlayNextItem(unused as dynamic) as boolean
+    if m.queue.Count() = 0
+        return false
+    end if
+
+    if m.top.index <> -1
+        if m.top.index >= m.queue.Count()
+            return false
+        end if
+        node = m.queue[m.top.index]
+        if node.type = "playlist"
+            m.top.playlistIndex += 1
+            if PlayPlaylistAtIndex(node, m.top.playlistIndex)
+                return true
+            end if
+        end if
+    end if
+
+    m.top.index += 1
+    m.top.playlistIndex = -1
+    if m.top.index >= m.queue.Count()
+        return false
+    end if
+
+    return PlayItemAtCurrentIndex()
+end function
+
+function PlayItemAtCurrentIndex() as boolean
+    node = m.queue[m.top.index]
+    if node = invalid
+        return false
+    end if
+    if node.type = "video"
+        VideoUtils.PlayVideo(node)
+        return true
+    else if node.type = "playlist"
+        if m.top.playlistIndex = -1
+            m.top.playlistIndex = 0
+        end if
+        return PlayPlaylistAtIndex(node, m.top.playlistIndex)
+    end if
+    return false
+end function
+
+function PlayPlaylistAtIndex(playlist as object, index as integer) as boolean
+    ' TODO:P0 if we only have the playlistId, videoCount would be zero, and we'd fail to load the playlist
+    if index < 0 or index >= playlist.videoCount
+        return false
+    end if
+
+    if index < playlist.getChildCount()
+        child = playlist.getChild(index)
+        VideoUtils.PlayVideo(child)
+        return true
+    end if
+
+    LoadPlaylist(playlist)
+    return true
+end function
+
+function LoadPlaylist(playlist as object) as void
+    if playlist.loadState = FeedLoadState.Loading
+        return
+    end if
+
+    playlist.loadState = FeedLoadState.Loading
+
+    task = StartAsyncTask(PlaylistContentTask, {
+        content: playlist,
+        invidious: m.top.invidious
+    }, OnPlaylistContentTaskResult)
+    m.pendingLoadTasks[task.id] = task
+end function
+
+function OnPlaylistContentTaskResult(output as object) as void
+    m.pendingLoadTasks.Delete(output.task.id)
+
+    if output.cancelled
+        return
+    end if
+
+    playlist = output.task.input.content
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        playlistId = playlist.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
+        ' TODO:P1 play next upon closing the dialog
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
+        return
+    end if
+
+    PlayPlaylistAtIndex(playlist, m.top.playlistIndex)
 end function

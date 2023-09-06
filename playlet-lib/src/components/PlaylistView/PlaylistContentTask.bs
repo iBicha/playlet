@@ -1,12 +1,14 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
+' TODO:P1 this should only be called from PlaylistContentNode.bs
 @asynctask
 function PlaylistContentTask(input as object) as object
     contentNode = input.content
     invidiousNode = input.invidious
 
     if m.top.cancel
+        contentNode.loadState = FeedLoadState.None
         return invalid
     end if
 
@@ -16,6 +18,7 @@ function PlaylistContentTask(input as object) as object
     response = service.GetPlaylist(contentNode.playlistId, index, m.top.cancellation)
 
     if m.top.cancel
+        contentNode.loadState = FeedLoadState.None
         return invalid
     end if
 
