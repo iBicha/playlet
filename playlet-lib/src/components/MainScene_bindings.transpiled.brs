@@ -12,6 +12,9 @@ function InitializeBindings()
             "NavBar": {
                 "appController": "/AppController"
             }, 
+            "PlayQueue": {
+                "invidious": "../Invidious"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
