@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { PlayletApi } from "../PlayletApi";
-  import { userPreferencesStore } from "../Stores";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 

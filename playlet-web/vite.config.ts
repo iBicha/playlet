@@ -1,14 +1,15 @@
 import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import tsconfigPaths from 'vite-tsconfig-paths'
 import ip from 'ip';
 import { existsSync, readFileSync } from 'fs'
-import { join as joinPath } from 'path'
+import { join as joinPath, resolve as resolvePath } from 'path'
 import { parse as dotEnvParse } from 'dotenv'
 
 const PORT = 5173
 
 const config: UserConfig = {
-  plugins: [svelte()],
+  plugins: [tsconfigPaths(), svelte()],
   build: {
     outDir: "../playlet-lib/src/www",
     emptyOutDir: true

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import BooleanControl from "./SettingControls/BooleanControl.svelte";
-  import ClearSearchHistoryControl from "./SettingControls/ClearSearchHistoryControl.svelte";
-  import RadioControl from "./SettingControls/RadioControl.svelte";
-  import StringControl from "./SettingControls/StringControl.svelte";
+  import BooleanControl from "lib/Screens/Settings/SettingControls/BooleanControl.svelte";
+  import ClearSearchHistoryControl from "lib/Screens/Settings/SettingControls/ClearSearchHistoryControl.svelte";
+  import RadioControl from "lib/Screens/Settings/SettingControls/RadioControl.svelte";
+  import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -15,15 +15,15 @@
   export let visibility: string | undefined = undefined;
   export let children: any[] | undefined = [];
   export let level: number = 0;
-  
+
   // svelte-ignore unused-export-let
   export let defaultValue: any = undefined;
   // svelte-ignore unused-export-let
   export let rokuComponent: any = undefined;
 
   const customComponents = {
-    ClearSearchHistoryControl
-  }
+    ClearSearchHistoryControl,
+  };
 </script>
 
 {#if visibility !== "tv"}
@@ -34,7 +34,13 @@
   {:else if type === "string"}
     <StringControl {displayText} {key} {description} {level} />
   {:else if svelteComponent}
-    <svelte:component this={customComponents[svelteComponent]} {displayText} {key} {description} {level} />
+    <svelte:component
+      this={customComponents[svelteComponent]}
+      {displayText}
+      {key}
+      {description}
+      {level}
+    />
   {:else}
     <div class="m-5">
       <div class={textSizes[level]}>{displayText}</div>

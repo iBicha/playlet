@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { playletStateStore } from "./Stores";
+  import { playletStateStore } from "lib/Stores";
 
   export let visibility: boolean;
 

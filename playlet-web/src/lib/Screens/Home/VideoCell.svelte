@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { PlayletApi } from "./PlayletApi";
-  import { playletStateStore } from "./Stores";
-  import VideoStartAt from "./VideoStartAt.svelte";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { playletStateStore } from "lib/Stores";
+  import VideoStartAt from "lib/VideoStartAt.svelte";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import NavBar from "./lib/NavBar.svelte";
-  import { PlayletApi } from "./lib/PlayletApi";
+  import NavBar from "lib/NavBar.svelte";
+  import { PlayletApi } from "lib/Api/PlayletApi";
   import {
     appStateStore,
     homeLayoutFileStore,
@@ -10,14 +10,14 @@
     preferencesModelStore,
     searchHistoryStore,
     userPreferencesStore,
-  } from "./lib/Stores";
-  import BottomNavigation from "./lib/BottomNavigation.svelte";
-  import ScreenHome from "./lib/ScreenHome.svelte";
-  import type { AppState } from "./lib/Types";
-  import ScreenSearch from "./lib/ScreenSearch.svelte";
-  import ScreenSettings from "./lib/ScreenSettings.svelte";
-  import ScreenInfo from "./lib/ScreenInfo.svelte";
-  import LinkDragDrop from "./lib/LinkDragDrop.svelte";
+  } from "lib/Stores";
+  import BottomNavigation from "lib/BottomNavigation.svelte";
+  import HomeScreen from "lib/Screens/HomeScreen.svelte";
+  import type { AppState } from "lib/Types";
+  import SearchScreen from "lib/Screens/SearchScreen.svelte";
+  import SettingsScreen from "lib/Screens/SettingsScreen.svelte";
+  import InfoScreen from "lib/Screens/InfoScreen.svelte";
+  import LinkDragDrop from "lib/LinkDragDrop.svelte";
 
   onMount(async () => {
     PlayletApi.getState().then((value) => {
@@ -62,13 +62,13 @@
   <NavBar />
   <!-- TODO:P2 a better way to make the BottomNavigation not hide screens -->
   <div style="margin-bottom: 4rem">
-    <ScreenSearch visibility={currentScreen == "search"} />
+    <SearchScreen visibility={currentScreen == "search"} />
 
-    <ScreenHome visibility={currentScreen == "home"} />
+    <HomeScreen visibility={currentScreen == "home"} />
 
-    <ScreenSettings visibility={currentScreen == "settings"} />
+    <SettingsScreen visibility={currentScreen == "settings"} />
 
-    <ScreenInfo visibility={currentScreen == "info"} />
+    <InfoScreen visibility={currentScreen == "info"} />
   </div>
   <BottomNavigation />
 </main>
