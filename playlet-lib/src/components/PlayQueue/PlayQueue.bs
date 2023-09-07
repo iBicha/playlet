@@ -81,7 +81,7 @@ function PlayNextItem(unused as dynamic) as boolean
         node = m.queue[m.top.index]
         if node.type = "playlist"
             m.top.playlistIndex += 1
-            if PlayPlaylistAtIndex(node, m.top.playlistIndex)
+            if PlayPlaylistAtCurrentIndex(node)
                 return true
             end if
         end if
@@ -108,13 +108,17 @@ function PlayItemAtCurrentIndex() as boolean
         if m.top.playlistIndex = -1
             m.top.playlistIndex = 0
         end if
-        return PlayPlaylistAtIndex(node, m.top.playlistIndex)
+        return PlayPlaylistAtCurrentIndex(node)
     end if
     return false
 end function
 
-function PlayPlaylistAtIndex(playlist as object, index as integer) as boolean
-    ' TODO:P0 if we only have the playlistId, videoCount would be zero, and we'd fail to load the playlist
+function PlayPlaylistAtCurrentIndex(playlist as object) as boolean
+    if playlist.videoCount < 0
+        LoadPlaylist(playlist)
+        return true
+    end if
+    index = m.top.playlistIndex
     if index < 0 or index >= playlist.videoCount
         return false
     end if
@@ -167,5 +171,5 @@ function OnPlaylistContentTaskResult(output as object) as void
         return
     end if
 
-    PlayPlaylistAtIndex(playlist, m.top.playlistIndex)
+    PlayPlaylistAtCurrentIndex(playlist)
 end function
