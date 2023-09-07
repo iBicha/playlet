@@ -149,27 +149,41 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PlayVideoObject"
+                type: object
+                properties:
+                  index:
+                    type: integer
+                  playlistIndex
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlayQueueObject"
     post:
       summary: Add to play queue
-      description: Add a video to the queue. If no video is currently playing, the video plays instead of adding to the queue.
+      description: Add a video or a playlist to the queue.
       operationId: addToPlayQueue
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PlayVideoObject"
+              $ref: "#/components/schemas/PlayQueueObject"
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PlayVideoObject"
+                type: object
+                properties:
+                  index:
+                    type: integer
+                  playlistIndex
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlayQueueObject"
     delete:
       summary: Clear play queue
       description: Clear the play queue.
@@ -179,14 +193,14 @@ paths:
           description: No Content
   /api/queue/play:
     post:
-      summary: Play video
-      description: Play a video. If a video is already playing, it will be stopped and the new video will be played.
-      operationId: playVideo
+      summary: Play video or playlist
+      description: Play a video or playlist. This adds the video or playlist to the current position in the queue and plays it.
+      operationId: playPlayQueue
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PlayVideoObject"
+              $ref: "#/components/schemas/PlayQueueObject"
       responses:
         "204":
           description: No Content
@@ -501,11 +515,15 @@ components:
           type: boolean
         sponsorblock.show_notifications:
           type: boolean
-    PlayVideoObject:
+    PlayQueueObject:
       type: object
       properties:
         videoId:
           type: string
+        playlistId:
+          type: string
+        playlistIndex:
+          type: integer
         timestamp:
           type: integer
         title:
