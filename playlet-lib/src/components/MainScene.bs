@@ -1,153 +1,27 @@
-import "pkg:/source/roku_modules/log/LogMixin.brs"
-import "pkg:/components/VideoPlayer/Video.bs"
-import "pkg:/components/Invidious/InvidiousPublicInstancesTask.bs"
+import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
+import "pkg:/source/utils/LoadingScreen.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/components/EcpArgs.bs"
 
 function Init()
-    log.initializeLogManager(["log_PrintTransport"], 2)
-
-    m.videoContainer = m.top.findNode("VideoContainer")
-    m.global.addFields({
-        videoContainer: m.videoContainer
-    })
-
-    m.homeGridScreen = m.top.findNode("HomeGridScreen")
-    m.homeGridScreen.ObserveField("escape", "OnHomeGridScreenEscape")
-    m.homeGridScreen.SetFocus(true)
-    m.currentFocued = m.homeGridScreen
-
-    m.settingsScreen = m.top.findNode("SettingsScreen")
-    m.settingsScreen.ObserveField("escape", "OnSettingsScreenEscape")
-
-    m.appInfoScreen = m.top.findNode("AppInfoScreen")
-
-    m.webAppScreen = m.top.findNode("WebAppScreen")
-
-    m.searchScreen = m.top.findNode("SearchScreen")
-    m.searchScreen.ObserveField("escape", "OnSearchScreenEscape")
-
-    m.navBar = m.top.findNode("NavBar")
-    m.navBarScreens = [{
-        node: m.searchScreen,
-        canEscape: true
-    }, {
-        node: m.homeGridScreen,
-        canEscape: true
-    }, {
-        node: m.settingsScreen,
-        canEscape: true
-    }, {
-        node: m.webAppScreen,
-        canEscape: false
-    }, {
-        node: m.appInfoScreen,
-        canEscape: false
-    }]
-    m.navBar.ObserveField("escapeIndex", "OnNavBarEscape")
-    m.navBar.ObserveField("focusIndex", "OnNavIndexChange")
-
-    InitWebServer()
-
-    StartAsyncTask(InvidiousPublicInstancesTask, {}, OnInvidiousPublicInstancesTaskResults)
+    InitializeLogging()
+    m.log = new log.Logger("MainScene")
+    m.scene = m.top.getScene()
+    ' At this point, the "MainScene" node is not yet added to the scene, and does not have a parent yet.
+    ' Let's wait until it has one.
+    m.MainSceneContainer = m.scene.findNode("MainSceneContainer")
+    m.MainSceneContainer.ObserveField("change", FuncName(MainSceneContainerChanged))
 end function
 
-function OnInvidiousPublicInstancesTaskResults(output as object)
-    backupInstances = output.result.backupInstances
-    m.global.addFields({
-        invidiousBackupInstances: backupInstances
-    })
-
-    m.homeGridScreen.refresh = true
-
-    LaunchArgumentsReceived()
-
-    scene = m.top.getScene()
-    scene.ObserveField("inputArgs", "InputArgumentsReceived")
-    scene.signalBeacon("AppLaunchComplete")
+function MainSceneContainerChanged()
+    AutoBindSceneGraph()
+    StartWebServer()
+    HideLoadingScreen()
+    InitEcpArgs()
+    m.scene.signalBeacon("AppLaunchComplete")
 end function
 
-function InitWebServer()
-    m.serverTask = createObject("roSGNode", "WebServerTask")
-    m.serverTask.id = "WebServerTask"
-    m.serverTask.ObserveField("login", "OnWebServerLogin")
-    m.serverTask.ObserveField("command", "OnWebServerCommand")
-    m.serverTask.control = "RUN"
-end function
-
-function OnSearchScreenEscape()
-    m.navBar.SetFocus(true)
-    m.navBar.focusIndex = 0
-    m.currentFocued = m.navBar
-end function
-
-function OnSettingsScreenEscape()
-    m.navBar.SetFocus(true)
-    m.navBar.focusIndex = 2
-    m.currentFocued = m.navBar
-end function
-
-function OnHomeGridScreenEscape()
-    m.navBar.SetFocus(true)
-    m.navBar.focusIndex = 1
-    m.currentFocued = m.navBar
-end function
-
-function OnNavBarEscape()
-    index = m.navBar.escapeIndex
-    m.navBarScreens[index].node.focus = true
-    if m.navBarScreens[index].canEscape
-        m.currentFocued = m.navBarScreens[index].node
-    end if
-end function
-
-function OnNavIndexChange() as void
-    index = m.navBar.focusIndex
-    if index = -1
-        return
-    end if
-    for i = 0 to m.navBarScreens.count() - 1
-        m.navBarScreens[i].node.visible = i = index
-    end for
-end function
-
-function OnWebServerLogin()
-    m.homeGridScreen.refresh = true
-end function
-
-function OnWebServerCommand() as void
-    if m.serverTask.command = invalid or m.serverTask.command.command = invalid
-        return
-    end if
-    if m.serverTask.command.command = "play"
-        sender = m.videoContainer.sender ?? m.currentFocued
-        if m.videoContainer.fullscreen
-            dialog = m.top.getScene().dialog
-            if dialog <> invalid
-                dialog.close = true
-            end if
-        end if
-        PlayVideo(m.serverTask.command.videoId, { sender: sender, timestamp: m.serverTask.command.timestamp })
-    end if
-end function
-
-function LaunchArgumentsReceived() as void
-    scene = m.top.getScene()
-    launchArgs = scene.launchArgs
-    ? "LaunchArgumentsReceived " launchArgs
-    PlayVideoFromArgs(launchArgs)
-end function
-
-function InputArgumentsReceived() as void
-    scene = m.top.getScene()
-    inputArgs = scene.inputArgs
-    ? "InputArgumentsReceived " inputArgs
-    PlayVideoFromArgs(inputArgs)
-end function
-
-function PlayVideoFromArgs(args as object) as void
-    if args = invalid or args.contentId = invalid
-        return
-    end if
-
-    sender = m.videoContainer.sender ?? m.currentFocued
-    PlayVideo(args.contentId, { sender: sender, timestamp: args.timestamp })
+function StartWebServer()
+    m.webServer = m.top.findNode("WebServer")
+    m.webServer@.StartServer(invalid)
 end function

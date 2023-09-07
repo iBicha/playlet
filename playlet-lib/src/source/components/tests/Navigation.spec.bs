@@ -1,0 +1,55 @@
+namespace Tests
+
+    @SGNode("NavigationTestNode")
+    @suite
+    class NavigationTests extends Rooibos.BaseTestSuite
+
+        @describe("Navigation")
+
+        @afterEach
+        function _()
+            m.node._navigation = invalid
+        end function
+
+        @it("save data of the navigation")
+        function _()
+            node1 = CreateObject("roSGNode", "Node")
+            node2 = CreateObject("roSGNode", "Node")
+
+            m.top@.SetNavigation(node1, "right", node2)
+
+            m.assertAAHasKey(m.node._navigation, "right")
+        end function
+
+        @it("navigates to the right node")
+        function _()
+            node1 = CreateObject("roSGNode", "Node")
+            node2 = CreateObject("roSGNode", "Node")
+
+            m.top@.SetNavigation(node1, "right", node2)
+
+            NodeSetFocus(node1, true)
+            node2.focusable = true
+
+            m.top@.NavigationKeyHandler("right", true)
+
+            m.assertFalse(node1.hasFocus())
+            m.assertTrue(node2.hasFocus())
+        end function
+
+        @it("navigates to the right node from anywhere")
+        function _()
+            node2 = CreateObject("roSGNode", "Node")
+
+            m.top@.SetNavigation(invalid, "right", node2)
+
+            node2.focusable = true
+
+            m.top@.NavigationKeyHandler("right", true)
+
+            m.assertTrue(node2.hasFocus())
+        end function
+
+    end class
+
+end namespace

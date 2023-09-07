@@ -1,0 +1,107 @@
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+
+namespace Http
+
+    class PlayQueueRouter extends HttpRouter
+
+        function new()
+            super()
+
+            ' Get queue
+            m.Get("/api/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                queue = playQueue@.GetQueue(invalid)
+                response.Json(queue)
+                return true
+            end function)
+
+            ' Add to queue
+            m.Post("/api/queue", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                videoId = payload.videoId
+                playlistId = payload.playlistId
+                if StringUtils.IsNullOrEmpty(videoId) and StringUtils.IsNullOrEmpty(playlistId)
+                    response.Default(400, `Missing "videoId" or "playlistId" in payload`)
+                    return true
+                end if
+
+                contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
+                playQueue@.AddToQueue(contentNode)
+
+                queue = playQueue@.GetQueue(invalid)
+                response.Json(queue)
+                return true
+            end function)
+
+            ' Play a video
+            m.Post("/api/queue/play", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, `Invalid JSON payload`)
+                    return true
+                end if
+
+                videoId = payload.videoId
+                playlistId = payload.playlistId
+                if StringUtils.IsNullOrEmpty(videoId) and StringUtils.IsNullOrEmpty(playlistId)
+                    response.Default(400, `Missing "videoId" or "playlistId" in payload`)
+                    return true
+                end if
+
+                if IsString(payload.timestamp)
+                    payload.timestamp = payload.timestamp.toInt()
+                end if
+
+                contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
+                playlistIndex = IsInt(payload.playlistIndex) ? payload.playlistIndex : -1
+                if contentNode.type = "playlist" and playlistIndex = -1
+                    playlistIndex = 0
+                end if
+
+                'TODO:P1 play existing item by index instead of new item inserted
+                playQueue@.Play(contentNode, playlistIndex)
+
+                response.Default(204, "OK")
+                return true
+            end function)
+
+            ' clear queue
+            m.Delete("/api/queue", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                playQueue = task.playQueue
+
+                if playQueue = invalid
+                    response.Default(500, `Reference to "playQueue" object was invalid`)
+                    return true
+                end if
+
+                playQueue@.Clear(invalid)
+                response.Default(204, "OK")
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace

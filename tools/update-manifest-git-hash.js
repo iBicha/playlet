@@ -18,7 +18,7 @@ if (gitStatus.stdout !== '') {
 
 const gitCommitHash =  shell.exec('git rev-parse HEAD').stdout.trim();
 
-["playlet/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
+["playlet-app/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
     let appManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' });
 
     const gitHashPattern = /git_commit_sha=(\w+)/;

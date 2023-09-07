@@ -1,0 +1,73 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace Http
+
+    class StateApiRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/api/state", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                applicationInfoNode = task.applicationInfo
+                preferencesNode = task.preferences
+                invidiousNode = task.invidious
+
+                keys = ["app", "device", "invidious", "preferences"]
+
+                if request.query.DoesExist("key")
+                    keys = request.query["key"]
+                    if not IsArray(keys)
+                        keys = [keys]
+                    end if
+                end if
+
+                state = {}
+
+                if ArrayUtils.IndexOfString(keys, "app") <> -1
+                    appInfo = applicationInfoNode@.GetAppInfo(invalid)
+
+                    if appInfo.lib_version_latest = "N/A"
+                        ' If the lib_version_latest field is not available, we can give it a few seconds
+                        ' To make a request to Github to get the latest version.
+                        msgPort = CreateObject("roMessagePort")
+                        applicationInfoNode.observeFieldScoped("lib_version_latest", msgPort)
+                        wait(5000, msgPort)
+                        applicationInfoNode.unobserveFieldScoped("lib_version_latest")
+
+                        appInfo.lib_version_latest = applicationInfoNode.lib_version_latest
+                    end if
+
+                    state["app"] = appInfo
+                end if
+
+                if ArrayUtils.IndexOfString(keys, "device") <> -1
+                    state["device"] = applicationInfoNode@.GetDeviceInfo(invalid)
+                end if
+
+                if ArrayUtils.IndexOfString(keys, "invidious") <> -1
+                    authToken = invidiousNode.authToken
+                    state["invidious"] = {
+                        current_instance: invidiousNode@.GetCurrentInstance(invalid),
+                        ' backup_instances: InvidiousSettings.GetBackupInstances(),
+                        auth_url: invidiousNode@.GetAuthorizeTokenLink(invalid),
+                        logged_in: authToken <> invalid,
+                        logged_in_instance: authToken <> invalid ? authToken.instance : invalid,
+                        logged_in_username: authToken <> invalid ? authToken.username : invalid
+                    }
+                end if
+
+                if ArrayUtils.IndexOfString(keys, "preferences") <> -1
+                    state["preferences"] = preferencesNode@.GetUserPreferences(invalid)
+                end if
+
+                response.Json(state)
+                return true
+            end function)
+        end function
+
+    end class
+
+end namespace

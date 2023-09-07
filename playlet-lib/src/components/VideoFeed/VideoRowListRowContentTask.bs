@@ -1,0 +1,79 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+
+@asynctask
+function VideoRowListRowContentTask(input as object) as object
+    rowList = input.node
+    contentNode = input.contentNode
+    invidiousNode = input.invidious
+
+    if m.top.cancel
+        contentNode.loadState = FeedLoadState.None
+        return invalid
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    service.MarkFeedPagination(contentNode)
+    response = service.MakeRequest(contentNode.feed, m.top.cancellation)
+
+    if m.top.cancel
+        contentNode.loadState = FeedLoadState.None
+        return invalid
+    end if
+
+    if not response.success
+        if response.error = Invidious.ERROR_NOT_AUTHENTICATED
+            RemovePlaceHolderItems(contentNode)
+            actionNode = CreateObject("roSGNode", "ActionContentNode")
+            actionNode.title = `Login to view ${contentNode.title}`
+            actionNode.action = "LoginDialog"
+
+            contentNode.appendChild(actionNode)
+            contentNode.loadState = FeedLoadState.Loaded
+
+            return {
+                success: true
+            }
+        end if
+        contentNode.loadState = FeedLoadState.Error
+        contentNode.title += " (Failed to load)"
+        return response
+    end if
+
+    instance = service.GetInstance()
+    itemNodes = []
+    for each item in response.result
+        itemNode = InvidiousContent.ToRowCellContentNode(item, instance)
+        if itemNode <> invalid
+            itemNodes.Push(itemNode)
+        end if
+    end for
+
+    RemovePlaceHolderItems(contentNode)
+    contentNode.appendChildren(itemNodes)
+
+    if contentNode.pagination = true and response.result.Count() > 0
+        contentNode.loadState = FeedLoadState.LoadedPage
+    else
+        contentNode.loadState = FeedLoadState.Loaded
+    end if
+
+    if itemNodes.Count() > 0
+        rowList.someContentReady = true
+    end if
+
+    return response
+end function
+
+function RemovePlaceHolderItems(contentNode as object)
+    isLoading = true
+    while isLoading and contentNode.getChildCount() > 0
+        lastIndex = contentNode.getChildCount() - 1
+        child = contentNode.getChild(lastIndex)
+        isLoading = IsString(child.type) and child.type = "loading"
+        if isLoading = true
+            contentNode.removeChildIndex(lastIndex)
+        end if
+    end while
+end function

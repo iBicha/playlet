@@ -1,0 +1,43 @@
+namespace Tests
+
+    @suite
+    class LoadingScreenTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.hasLoadingIndicator = m.global.hasField("loadingIndicator")
+            if m.hasLoadingIndicator
+                m.currentLoadingIndicator = m.global.loadingIndicator
+            else
+                m.global.addField("loadingIndicator", "node", false)
+            end if
+
+            if m.global.loadingIndicator = invalid
+                m.global.loadingIndicator = CreateObject("roSGNode", "Group")
+            end if
+        end function
+
+        protected override function tearDown()
+            if m.hasLoadingIndicator
+                m.global.loadingIndicator = m.currentLoadingIndicator
+            else
+                m.global.removeField("loadingIndicator")
+            end if
+        end function
+
+        @describe("LoadingScreen")
+
+        @it("Shows loading screen")
+        function _()
+            ShowLoadingScreen()
+            m.assertEqual(m.global.loadingIndicator.visible, true)
+        end function
+
+        @it("Hides loading screen")
+        function _()
+            HideLoadingScreen()
+            m.assertEqual(m.global.loadingIndicator.visible, false)
+        end function
+
+    end class
+
+end namespace

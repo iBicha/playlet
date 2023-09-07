@@ -1,0 +1,85 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+
+namespace Http
+
+    class InvidiousRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/invidious/login", function(context as object) as boolean
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                authLink = invidiousNode@.GetAuthorizeTokenLink(invalid)
+                response.Redirect(authLink)
+                return true
+            end function)
+
+            m.Get("/invidious/logout", function(context as object) as boolean
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                service = new Invidious.InvidiousService(invidiousNode)
+                service.Logout()
+
+                response.Default(204, "OK")
+                return true
+            end function)
+
+            m.Get(Invidious.TOKEN_CALLBACK, function(context as object) as boolean
+                request = context.request
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                if request.query["token"] <> invalid and request.query["ref"] <> invalid
+                    ' Invidious encodes token and username twice
+                    token = request.query["token"].DecodeUriComponent().DecodeUriComponent()
+                    username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
+                    referer = request.query["ref"].DecodeUriComponent()
+
+                    invidiousNode@.SetAuthToken(token, referer, username)
+                end if
+                response.Redirect("/")
+                return true
+            end function)
+
+            ' This is an endpoint allowing the web app to make an authenticated request
+            ' without needing the Invidious token
+            m.Get("/invidious/authenticated-request", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                invidiousNode = context.server.task.invidious
+
+                requestData = request.query["request-data"]
+                if requestData = invalid
+                    response.Default(400, "Expected request-data")
+                    return true
+                end if
+
+                token = invidiousNode.authToken
+                if token = invalid
+                    response.Default(403, "No token, not logged in")
+                    return true
+                end if
+
+                requestData = ParseJson(requestData)
+
+                ' TODO:P1 handle pagination
+                ' Perhaps the page arg can be added to queryParam of requestData directly
+                invService = new Invidious.InvidiousService(invidiousNode)
+                invResponse = invService.MakeRequest(requestData)
+                if not invResponse.success
+                    response.Default(500, `Failed to make request: ${invResponse.error}`)
+                    return true
+                end if
+                response.Json(invResponse.result)
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace

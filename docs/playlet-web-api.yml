@@ -1,0 +1,532 @@
+openapi: 3.0.0
+
+info:
+  title: Playlet Web API
+  version: 1.0.0
+  description:
+    Playlet Web API is a RESTful API for controlling the Playlet app on
+    Roku devices. The API is intended to be used by the Playlet web app, but can
+    also be used by other apps.
+  contact:
+    name: Brahim Hadriche
+    url: https://github.com/iBicha
+    email: brahim.hadriche@gmail.com
+
+servers:
+  - url: http://{ROKU_DEV_TARGET}:{PORT}
+    description: Playlet server
+    variables:
+      ROKU_DEV_TARGET:
+        description: The IP address of the Roku device
+        default: 192.168.1.x
+      PORT:
+        description: The port number of the Playlet server
+        default: "8888"
+
+paths:
+  /api/state:
+    get:
+      summary: Get Playlet app state
+      description: >
+        Get the current state of the Playlet app. The `key` parameter is
+        optional and can be omitted to get the entire state. If the `key`
+        parameter is specified, only the specified key(s) will be returned.
+      operationId: getPlayletState
+      parameters:
+        - name: key
+          in: query
+          description: specific key(s) to get
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+              enum:
+                - app
+                - device
+                - invidious
+                - preferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayletAppState"
+  /api/preferences:
+    get:
+      summary: Get preferences
+      description: |
+        Get the current user preferences.
+      operationId: getPreferences
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreferencesObject"
+    put:
+      summary: Set preferences
+      description: >
+        Set the current user preferences. The request body can contain some or
+        all of the preferences. Any preferences not specified in the request
+        body will be left unchanged.
+      operationId: setPreferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreferencesObject"
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+    delete:
+      summary: Reset preferences
+      description: |
+        Reset the current user preferences to their default values.
+      operationId: resetPreferences
+      responses:
+        "204":
+          description: No Content
+  /api/search-history:
+    get:
+      summary: Get search history
+      description: |
+        Get the current search history.
+      operationId: getSearchHistory
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+    put:
+      summary: Add to search history
+      description: |
+        Add a query to the search history.
+      operationId: addToSearchHistory
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Bad Request
+    delete:
+      summary: Clear search history
+      description: |
+        Clear the search history.
+      operationId: clearSearchHistory
+      responses:
+        "204":
+          description: No Content
+  /api/queue:
+    get:
+      summary: Get play queue
+      description: Get the current videos in the queue.
+      operationId: getPlayQueue
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  index:
+                    type: integer
+                  playlistIndex
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlayQueueObject"
+    post:
+      summary: Add to play queue
+      description: Add a video or a playlist to the queue.
+      operationId: addToPlayQueue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayQueueObject"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  index:
+                    type: integer
+                  playlistIndex
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlayQueueObject"
+    delete:
+      summary: Clear play queue
+      description: Clear the play queue.
+      operationId: clearPlayQueue
+      responses:
+        "204":
+          description: No Content
+  /api/queue/play:
+    post:
+      summary: Play video or playlist
+      description: Play a video or playlist. This adds the video or playlist to the current position in the queue and plays it.
+      operationId: playPlayQueue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayQueueObject"
+      responses:
+        "204":
+          description: No Content
+  /api/playlet-lib-urls:
+    get:
+      summary: Get Playlet lib URLs
+      description: Get the currently loaded Playlet lib url, and the saved ones to be loaded on next start.
+      operationId: getPlayletLibUrls
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  loaded:
+                    type: object
+                    properties:
+                      link:
+                        type: string
+                      type:
+                        type: string
+                  saved:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        link:
+                          type: string
+                        type:
+                          type: string
+    post:
+      summary: Set Playlet lib URLs
+      description: >
+        Set a list of Playlet lib URLs to be loaded on next start. Playlet will try to load them one after the other
+        until one succeeds.
+      operationId: setPlayletLibUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  link:
+                    type: string
+                  type:
+                    type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+    delete:
+      summary: Clear Playlet lib URLs
+      description: Clear the Playlet lib URLs. This affects the saved links in the registry, and will take effect on next start.
+      operationId: clearPlayletLibUrls
+      responses:
+        "204":
+          description: No Content
+
+  /invidious/login:
+    get:
+      summary: Redirect to the Invidious auth URL
+      description: Redirect to the Invidious auth URL, to allow authorizing an access token. Redirects to the Invidious auth URL.
+      operationId: invidiousLoginUrl
+      responses:
+        "302":
+          description: Found
+          headers:
+            Location:
+              schema:
+                type: string
+                format: uri
+  /invidious/logout:
+    get:
+      summary: Logout from Invidious
+      description: Logout from Invidious, and invalidate the token if any.
+      operationId: invidiousLogout
+      responses:
+        "204":
+          description: No Content
+
+  # Roku External Control Protocol (ECP)
+  /input/{appId}:
+    servers:
+      - url: http://{ROKU_DEV_TARGET}:8060
+        description: Roku ECP endpoint
+        variables:
+          ROKU_DEV_TARGET:
+            description: The IP address of the Roku device
+            default: 192.168.1.x
+    parameters:
+      - $ref: "#/components/parameters/ecpAppId"
+    post:
+      summary: Send input to Playlet through ECP
+      description: Send input to Playlet through Roku External Control Protocol (ECP). This enables the deep-linking functionality.
+      operationId: ecpInput
+      parameters:
+        - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpMediaType"
+        - $ref: "#/components/parameters/ecpVideoId"
+        - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpTitle"
+        - $ref: "#/components/parameters/ecpAuthor"
+      responses:
+        "200":
+          description: OK
+  /launch/{appId}:
+    servers:
+      - url: http://{ROKU_DEV_TARGET}:8060
+        description: Roku ECP endpoint
+        variables:
+          ROKU_DEV_TARGET:
+            description: The IP address of the Roku device
+            default: 192.168.1.x
+    parameters:
+      - $ref: "#/components/parameters/ecpAppId"
+    post:
+      summary: Launch Playlet using ECP with arguments
+      description: Launch Playlet through Roku External Control Protocol (ECP) with arguments. This enables the deep-linking functionality.
+      operationId: ecpLaunch
+      parameters:
+        - $ref: "#/components/parameters/ecpClearPlayletLibUrls"
+        - $ref: "#/components/parameters/ecpContentId"
+        - $ref: "#/components/parameters/ecpMediaType"
+        - $ref: "#/components/parameters/ecpVideoId"
+        - $ref: "#/components/parameters/ecpTimestamp"
+        - $ref: "#/components/parameters/ecpTitle"
+        - $ref: "#/components/parameters/ecpAuthor"
+      responses:
+        "200":
+          description: OK
+
+components:
+  parameters:
+    ecpAppId:
+      name: appId
+      in: path
+      description: The app ID of the Playlet app
+      required: true
+      schema:
+        type: string
+        enum:
+          - "693751" # Playlet app id
+          - dev
+        default: "693751"
+    ecpContentId:
+      name: contentId
+      in: query
+      description: The ID of the content to play. If specified with mediaType=video, this is the videoId.
+      required: false
+      schema:
+        type: string
+    ecpMediaType:
+      name: mediaType
+      in: query
+      description: The type of the content of ContentId. To be used with the contentId argument.
+      required: false
+      schema:
+        type: string
+        enum:
+          - video
+    ecpVideoId:
+      name: videoId
+      in: query
+      description: The video ID of the video to play. If specified, the video will be played.
+      required: false
+      schema:
+        type: string
+    ecpTimestamp:
+      name: timestamp
+      in: query
+      description: The timestamp of the video to play. To be used with the contentId argument.
+      required: false
+      schema:
+        type: integer
+    ecpTitle:
+      name: title
+      in: query
+      description: The title of the video. This is optionally added so we can display the title while loading, or when displaying the "Added to queue" notification.
+      required: false
+      schema:
+        type: string
+    ecpAuthor:
+      name: author
+      in: query
+      description: The author of the video. This is optionally added so we can display the author while loading, or when displaying the "Added to queue" notification.
+      required: false
+      schema:
+        type: string
+    ecpClearPlayletLibUrls:
+      name: clearPlayletLibUrls
+      in: query
+      description: If specified, the Playlet lib URLs will be cleared.
+      required: false
+      schema:
+        type: string
+
+  schemas:
+    PlayletAppState:
+      type: object
+      properties:
+        app:
+          type: object
+          properties:
+            id:
+              type: string
+            version:
+              type: string
+            git_commit_hash:
+              type: string
+            lib_version:
+              type: string
+            lib_git_commit_hash:
+              type: string
+            lib_version_latest:
+              type: string
+            lib_url_type:
+              type: string
+        device:
+          type: object
+          properties:
+            model:
+              type: string
+            model_display_name:
+              type: string
+            model_type:
+              type: string
+            model_details:
+              type: object
+              additionalProperties: true
+            os_version:
+              type: object
+              properties:
+                build:
+                  type: string
+                major:
+                  type: string
+                minor:
+                  type: string
+                revision:
+                  type: string
+            display_type:
+              type: string
+            display_mode:
+              type: string
+            display_aspect_ratio:
+              type: string
+            display_size:
+              type: object
+              properties:
+                w:
+                  type: integer
+                h:
+                  type: integer
+            video_mode:
+              type: string
+            ui_resolution:
+              type: object
+              properties:
+                height:
+                  type: integer
+                name:
+                  type: string
+                width:
+                  type: integer
+            graphics_platform:
+              type: string
+            internet_status:
+              type: boolean
+            user_country_code:
+              type: string
+            friendly_name:
+              type: string
+        invidious:
+          type: object
+          properties:
+            current_instance:
+              type: string
+            auth_url:
+              type: string
+            logged_in:
+              type: boolean
+            logged_in_instance:
+              type: string
+            logged_in_username:
+              type: string
+        preferences:
+          $ref: "#/components/schemas/PreferencesObject"
+    PreferencesObject:
+      type: object
+      properties:
+        invidious.instance:
+          type: string
+        invidious.proxy_videos:
+          type: string
+          enum:
+            - always
+            - if_needed
+            - never
+        playback.autoplay:
+          type: string
+          enum:
+            - auto
+            - 720p
+        playback.preferred_quality:
+          type: string
+        sponsorblock.enabled:
+          type: boolean
+        sponsorblock.show_notifications:
+          type: boolean
+    PlayQueueObject:
+      type: object
+      properties:
+        videoId:
+          type: string
+        playlistId:
+          type: string
+        playlistIndex:
+          type: integer
+        timestamp:
+          type: integer
+        title:
+          type: string
+        author:
+          type: string

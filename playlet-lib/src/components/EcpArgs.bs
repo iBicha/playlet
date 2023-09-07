@@ -1,0 +1,50 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function InitEcpArgs()
+    m.playQueue = m.top.findNode("PlayQueue")
+    LaunchArgumentsReceived()
+
+    m.scene.ObserveField("inputArgs", FuncName(InputArgumentsReceived))
+    if m.scene.inputArgs <> invalid
+        InputArgumentsReceived()
+    end if
+end function
+
+function LaunchArgumentsReceived() as void
+    launchArgs = m.scene.launchArgs
+    m.log.info("LaunchArgumentsReceived", launchArgs)
+    ProcessArguments(launchArgs)
+end function
+
+function InputArgumentsReceived() as void
+    inputArgs = m.scene.inputArgs
+    m.log.info("InputArgumentsReceived", inputArgs)
+    ProcessArguments(inputArgs)
+end function
+
+function ProcessArguments(args as object) as void
+    if args = invalid
+        return
+    end if
+
+    if not StringUtils.IsNullOrEmpty(args.contentId) and args.mediaType = "video"
+        if StringUtils.IsNullOrEmpty(args.videoId)
+            args.videoId = args.contentId
+        end if
+    end if
+
+    if args.timestamp <> invalid
+        args.timestamp = args.timestamp.ToInt()
+    end if
+
+    if not StringUtils.IsNullOrEmpty(args.videoId)
+        node = CreateObject("roSGNode", "VideoContentNode")
+        node.videoId = args.videoId
+        if args.timestamp <> invalid
+            node.timestamp = args.timestamp
+        end if
+        m.playQueue@.Play(node, -1)
+    end if
+end function

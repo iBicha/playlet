@@ -10,10 +10,9 @@ function init()
     m.top.observeField("height", "onHeightChanged")
     m.top.observeField("width", "onWidthChanged")
     m.top.observeField("padding", "onPaddingChanged")
-    m.top.observeField("focus", "onFocusChanged")
 end function
 
-function onFocusChanged()
+function OnFocusChange()
     if m.top.focus
         m.buttonBackground.blendColor = m.top.focusBackground
     else
@@ -21,12 +20,10 @@ function onFocusChanged()
     end if
     m.buttonBackground.visible = m.top.focus
     m.buttonText.visible = m.top.focus
-
 end function
 
 function onBackgroundChanged()
     m.buttonBackground.blendColor = m.top.background
-    m.top.unobserveField("background")
 end function
 
 function onIconChanged()
@@ -69,19 +66,4 @@ end function
 
 function onPaddingChanged()
     setIconSize()
-end function
-
-function onKeyEvent(key as string, press as boolean) as boolean
-    if not press
-        return false
-    end if
-    if key = "right" and m.top.focus
-        m.top.escape = "right"
-    end if
-
-    if key = "left" and m.top.focus
-        m.top.escape = "left"
-    end if
-
-    return false
 end function

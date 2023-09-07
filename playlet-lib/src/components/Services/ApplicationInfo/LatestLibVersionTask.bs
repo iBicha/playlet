@@ -1,0 +1,25 @@
+import "pkg:/source/services/HttpClient.bs"
+
+@asynctask
+function LatestLibVersionTask() as object
+    latest = GetLatestPlayletLibVersionFromGithubReleases()
+    return {
+        latest: latest
+    }
+end function
+
+function GetLatestPlayletLibVersionFromGithubReleases() as string
+    response = HttpClient.Head("https://github.com/iBicha/playlet/releases/latest").Await()
+
+    if response.StatusCode() = 200
+        headers = response.Headers()
+        if headers.location <> invalid
+            regex = CreateObject("roRegex", "/v?(\d+\.\d+\.\d+)", "")
+            match = regex.match(headers.location)
+            if match.Count() = 2
+                return match[1]
+            end if
+        end if
+    end if
+    return "N/A"
+end function

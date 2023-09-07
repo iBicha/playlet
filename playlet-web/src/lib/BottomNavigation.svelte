@@ -3,8 +3,8 @@
   import InfoIcon from "../assets/info-icon.svg.svelte";
   import SearchIcon from "../assets/search-icon.svg.svelte";
   import SettingsIcon from "../assets/settings-icon.svg.svelte";
-  import { appStateStore } from "./Stores";
-  import type { AppState } from "./Types";
+  import { appStateStore } from "lib/Stores";
+  import type { AppState } from "lib/Types";
 
   function setScreen(screen: AppState["screen"]) {
     appStateStore.update((state) => {

@@ -1,0 +1,86 @@
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace VideoUtils
+    function PlayVideo(contentNode as object) as void
+        CloseVideo(false)
+
+        container = GetVideoContainer()
+        videoPlayer = container.createChild("videoPlayer")
+        videoPlayer.id = "VideoPlayer"
+        videoPlayer@.BindNode(invalid)
+
+        videoPlayer@.PlayWithContent(contentNode)
+
+        if container.fullscreen
+            NodeSetFocus(videoPlayer, true)
+
+            dialog = m.top.getScene().dialog
+            if dialog <> invalid
+                dialog.close = true
+            end if
+        end if
+    end function
+
+    function CloseVideo(setFocus = true as boolean) as void
+        videoPlayer = GetVideoPlayer()
+        if videoPlayer = invalid
+            return
+        end if
+        videoPlayer@.Close(invalid)
+
+        if setFocus
+            videoPlayer.appController@.FocusTopScreen(invalid)
+        end if
+    end function
+
+    function GetVideoPlayer() as object
+        container = GetVideoContainer()
+        if container = invalid or container.getChildCount() = 0
+            return invalid
+        end if
+        return container.getChild(0)
+    end function
+
+    function GetVideoContainer() as object
+        return m.top.getScene().findNode("VideoContainer")
+    end function
+
+    function ToggleVideoPictureInPicture() as boolean
+        videoPlayer = GetVideoPlayer()
+        if videoPlayer = invalid
+            return false
+        end if
+        videoContainer = GetVideoContainer()
+        videoContainer.fullscreen = not videoContainer.fullscreen
+        if videoContainer.fullscreen
+            NodeSetFocus(videoPlayer, true)
+        else
+            videoPlayer.appController@.FocusTopScreen(invalid)
+        end if
+        return true
+    end function
+
+    function IsVideoPlayerOpen() as boolean
+        return GetVideoPlayer() <> invalid
+    end function
+
+    function PauseVideo() as void
+        player = GetVideoPlayer()
+        if player = invalid
+            return
+        end if
+        player.control = "pause"
+    end function
+
+    function ResumeVideo() as void
+        player = GetVideoPlayer()
+        if player = invalid
+            return
+        end if
+        player.control = "resume"
+    end function
+
+end namespace
+
+

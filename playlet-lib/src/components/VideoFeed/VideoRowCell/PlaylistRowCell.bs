@@ -1,0 +1,39 @@
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
+    m.videoCountRect = m.top.FindNode("videoCountRect")
+    m.videoCountLabel = m.top.FindNode("videoCountLabel")
+    m.thumbnail = m.top.FindNode("thumbnail")
+    m.thumbnail.failedBitmapUri = "pkg:/images/thumbnail-missing.jpg"
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    m.authorLabel.text = content._author
+
+    m.thumbnail.uri = content.thumbnail
+
+    SetVideoCount(content.videoCountText)
+end function
+
+function SetVideoCount(videoCountText as string)
+    label = m.videoCountLabel
+    rect = m.videoCountRect
+
+    rectParent = rect.getParent()
+
+    label.text = videoCountText
+    size = label.localBoundingRect()
+
+    rect.width = size.width + 16
+    rect.translation = [rectParent.width - rect.width, 162]
+end function

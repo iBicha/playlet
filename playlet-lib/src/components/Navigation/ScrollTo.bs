@@ -1,0 +1,42 @@
+' TODO:P2 refactor this into a ScrollView component
+' TODO:P2 use this in settings and search screans
+function ScrollTo(viewPort as object, containerToMove as object, focusNode as object, animation as object, interpolator as object) as void
+    if viewPort = invalid or containerToMove = invalid or focusNode = invalid
+        return
+    end if
+
+    rect = focusNode.boundingRect()
+    translation = containerToMove.translation
+    rect.x = rect.x + translation[0]
+    rect.y = rect.y + translation[1]
+
+    xInBounds = rect.x >= viewPort.x and rect.x + rect.width <= viewPort.x + viewPort.width
+    yInBounds = rect.y >= viewPort.y and rect.y + rect.height <= viewPort.y + viewPort.height
+
+    if xInBounds and yInBounds
+        return
+    end if
+
+    translateX = 0
+    translateY = 0
+
+    if rect.x < viewPort.x
+        translateX = viewPort.x - rect.x
+    else if rect.x + rect.width > viewPort.x + viewPort.width
+        translateX = viewPort.x + viewPort.width - rect.x - rect.width
+    end if
+
+    if rect.y < viewPort.y
+        translateY = viewPort.y - rect.y
+    else if rect.y + rect.height > viewPort.y + viewPort.height
+        translateY = viewPort.y + viewPort.height - rect.y - rect.height
+    end if
+
+
+    animStart = translation
+    animEnd = [translateX + translation[0], translateY + translation[1]]
+    animMid = [(animStart[0] + animEnd[0]) / 2, (animStart[1] + animEnd[1]) / 2]
+    interpolator.keyValue = [animStart, animMid, animEnd]
+
+    animation.control = "start"
+end function

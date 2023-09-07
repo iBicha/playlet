@@ -1,0 +1,358 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+
+namespace Invidious
+    const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
+
+    const DEFAULT_INSTANCE = "https://vid.puffyan.us"
+
+    const TOKEN_CALLBACK = "/invidious/token_callback"
+
+    const STATS_ENDPOINT = "/api/v1/stats"
+
+    const VIDEOS_ENDPOINT = "/api/v1/videos"
+    const PLAYLISTS_ENDPOINT = "/api/v1/playlists"
+    const HISTORY_ENDPOINT = "/api/v1/auth/history"
+
+    const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
+
+    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/register,POST:tokens/unregister,POST:history*"
+    const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
+    const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
+    const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
+
+    const TOKEN_TIMESPAN = 60 * 60 * 24 * 365 * 2 '2 years
+
+    const ERROR_NOT_AUTHENTICATED = "Not authenticated"
+
+    class InvidiousService
+        public node as object
+
+        function new(node as object)
+            m.log = new log.Logger("InvidiousService")
+
+            m.node = node
+            ' TODO:P2 api definitions are not needed everytime, move them to a separate function and lazy load
+            apiDefinitions = node.apiDefinitions
+
+            m.endpoints = {}
+
+            for each apiDefinition in apiDefinitions.endpoints
+                m.endpoints[apiDefinition.name] = apiDefinition
+            end for
+
+            m.responseHanlders = {
+                DefaultHandler: m.DefaultHandler,
+                AuthFeedHandler: m.AuthFeedHandler,
+                PlaylistHandler: m.PlaylistHandler,
+                ChannelHandler: m.ChannelHandler
+            }
+        end function
+
+        function DefaultQueryParams() as object
+            return {
+                region: m.node.applicationInfo@.GetUserCountryCode(invalid)
+            }
+        end function
+
+        function GetAuthenticationHeaders(token as string) as object
+            return {
+                "Authorization": `Bearer ${token}`
+            }
+        end function
+
+        function GetInstance() as string
+            instance = m.node.preferences["invidious.instance"]
+            if not StringUtils.IsNullOrEmpty(instance)
+                return instance
+            end if
+
+            return DEFAULT_INSTANCE
+        end function
+
+        function MarkVideoWatched(videoId as dynamic) as void
+            if StringUtils.IsNullOrEmpty(videoId)
+                return
+            end if
+
+            authToken = m.node.authToken
+            if authToken = invalid
+                return
+            end if
+
+            url = `${authToken.instance}${Invidious.HISTORY_ENDPOINT}/${videoId}`
+            request = HttpClient.Post(url, "")
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.SendAndForget()
+        end function
+
+        function SearchSuggestions(q as string, cancellation = invalid as object) as object
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
+
+            request = HttpClient.Get(url)
+            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("q", q)
+            request.CacheSeconds(60 * 60 * 6)' 6 hours
+
+            request.Cancellation(cancellation)
+
+            response = request.Await()
+            return response.Json()
+        end function
+
+        function GetVideoMetadata(videoId as string, cancellation = invalid as object) as object
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+            request = HttpClient.Get(url)
+            request.QueryParams(m.DefaultQueryParams())
+            request.CacheSeconds(60 * 60 * 6)' 6 hours
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
+
+        function GetPlaylist(playlistId as string, index = 0 as integer, cancellation = invalid as object) as object
+            authToken = m.node.authToken
+            if authToken = invalid
+                instance = m.GetInstance()
+                url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
+                request = HttpClient.Get(url)
+            else
+                url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}/${playlistId}`
+                request = HttpClient.Get(url)
+                request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            end if
+
+            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("index", index)
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
+
+        function GetVideoStreamUrl(videoId as string) as string
+            instance = m.GetInstance()
+            return `${instance}/latest_version?id=${videoId}`
+        end function
+
+        function MarkFeedPagination(contentNode as object) as void
+            requestData = contentNode.feed
+
+            endpoint = m.endpoints[requestData.endpoint]
+            if endpoint = invalid or endpoint.pagination <> true
+                return
+            end if
+
+            contentNode.pagination = true
+            contentNode.page += 1
+
+            if not requestData.DoesExist("queryParams")
+                requestData.queryParams = {}
+            end if
+
+            requestData.queryParams.page = contentNode.page
+            contentNode.feed = requestData
+        end function
+
+        function MakeRequest(requestData as object, cancellation = invalid as object) as object
+            endpoint = m.endpoints[requestData.endpoint]
+            if endpoint = invalid
+                return {
+                    success: false,
+                    error: `Endpoint ${requestData.endpoint} not found`
+                }
+            end if
+
+            instance = m.GetInstance()
+
+            request = HttpClient.Get(instance + endpoint.url)
+
+            if endpoint.authenticated = true
+                authToken = m.node.authToken
+                if authToken = invalid
+                    return {
+                        success: false,
+                        error: ERROR_NOT_AUTHENTICATED
+                    }
+                end if
+                request.Url(authToken.instance + endpoint.url)
+                request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            end if
+
+            if endpoint.queryParams <> invalid
+                for each queryParamKey in endpoint.queryParams
+                    queryParam = endpoint.queryParams[queryParamKey]
+                    if queryParam.default <> invalid
+                        if IsString(queryParam.type) and queryParam.type = "#ISO3166"
+                            if queryParam.default = "GetUserCountryCode"
+                                request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode(invalid))
+                            else
+                                request.QueryParam(queryParamKey, queryParam.default)
+                            end if
+                        else if IsArray(queryParam.default)
+                            if queryParam.arrayType = "repeat"
+                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.Repeated)
+                            else if queryParam.arrayType = "comma-separated"
+                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.CommaSeparated)
+                            end if
+                        else
+                            request.QueryParam(queryParamKey, queryParam.default)
+                        end if
+                    end if
+                end for
+            end if
+
+            if requestData.cacheSeconds <> invalid
+                request.CacheSeconds(requestData.cacheSeconds)
+            else if endpoint.cacheSeconds <> invalid
+                request.CacheSeconds(endpoint.cacheSeconds)
+            end if
+
+            if requestData.queryParams <> invalid
+                request.QueryParams(requestData.queryParams)
+            end if
+
+            if requestData.pathParams <> invalid
+                request.PathParams(requestData.pathParams)
+            end if
+
+            request.Cancellation(cancellation)
+
+            response = request.Await()
+
+            responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+
+            result = responseHandler(m, requestData, response)
+
+            if response.IsSuccess() and result <> invalid
+                return {
+                    success: true,
+                    result: result
+                }
+            else
+                return {
+                    success: false,
+                    error: response.ErrorMessage()
+                }
+            end if
+        end function
+
+        function DefaultHandler(m as object, requestData as object, response as object) as object
+            return response.Json()
+        end function
+
+        function PlaylistHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                return json.videos
+            end if
+            return invalid
+        end function
+
+        function ChannelHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                return json.videos
+            end if
+            return invalid
+        end function
+
+        function AuthFeedHandler(m as object, requestData as object, response as object) as object
+            m.DeleteExpiredToken(response)
+
+            if response.StatusCode() = 200
+                json = response.Json()
+                videos = []
+                videos.Append(json.notifications)
+                videos.Append(json.videos)
+                return videos
+            end if
+            return invalid
+        end function
+
+        function DeleteExpiredToken(response as object)
+            if response.StatusCode() = 403
+                m.log.warn(`Invidious instance responded with 403: ${response.Text()}`)
+                m.log.warn("Deleting Invidious token...")
+                m.DeleteAuthToken()
+            end if
+        end function
+
+        function GetAuthToken() as object
+            tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
+            if tokenPayload = invalid
+                return invalid
+            end if
+            authData = ParseJson(tokenPayload)
+            if authData = invalid or authData.instance = invalid or authData.token = invalid
+                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+                return invalid
+            end if
+            return authData
+        end function
+
+        function SetAuthToken(token as string, instance as string, username as dynamic)
+            obj = {
+                token: token,
+                instance: instance,
+                username: username
+            }
+
+            json = FormatJson(obj)
+            RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
+
+            m.node.authToken = obj
+        end function
+
+        function DeleteAuthToken()
+            m.node.authToken = invalid
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+        end function
+
+        function Logout() as boolean
+            authToken = m.node.authToken
+            if authToken = invalid
+                return false
+            end if
+
+            m.UnregisterToken(authToken)
+            m.DeleteAuthToken()
+            return true
+        end function
+
+        function UnregisterToken(authToken as object) as void
+            url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
+
+            request = HttpClient.Post(url, authToken.token)
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Header("Content-Type", "application/json")
+
+            request.SendAndForget()
+        end function
+
+        function GetAuthorizeTokenLink() as dynamic
+            instance = m.GetInstance()
+            ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
+            invidiousHost = instance.Replace("https://", "http://")
+
+            address = m.node.webServer@.GetServerAddress()
+            if address = invalid
+                return invalid
+            end if
+
+            expire = TimeUtils.Now().AsSeconds() + Invidious.TOKEN_TIMESPAN
+
+            callbackUrl = `${address}${Invidious.TOKEN_CALLBACK}?ref=${instance}`.EncodeUriComponent()
+            scope = `${Invidious.AUTH_SCOPES}`.EncodeUriComponent()
+            return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
+        end function
+
+    end class
+
+end namespace

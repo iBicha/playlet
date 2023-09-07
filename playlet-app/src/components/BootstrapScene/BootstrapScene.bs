@@ -1,0 +1,102 @@
+function Init() as void
+    m.top.backgroundColor = "0x242424FF"
+    m.top.backgroundURI = ""
+
+    m.loadingIndicator = m.top.findNode("LoadingIndicator")
+    m.loadingIndicator.visible = true
+    m.global.addFields({
+        loadingIndicator: m.loadingIndicator
+    })
+
+    m.playletLibUrls = GetPlayletLibUrls()
+    m.playletLibUrlIndex = 0
+
+    LoadPlayletLib()
+end function
+
+function GetPlayletLibUrls() as object
+    savedUrls = GetPlayletLibUrlsFromRegistry()
+    if savedUrls <> invalid
+        m.shouldClearRegistryOnLoadFail = true
+        return savedUrls
+    end if
+
+    #if DEBUG
+        debug = { type: "debug", link: ReadManifestValue("playlet_lib_debug_url") }
+        return [debug]
+    #else
+        github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
+        embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
+        return [github, embedded]
+    #end if
+end function
+
+function LoadPlayletLib() as void
+    if m.playletLibUrlIndex >= m.playletLibUrls.Count()
+        m.loadingIndicator.visible = false
+        if m.shouldClearRegistryOnLoadFail = true
+            DeleteRegistryKey("playlet_lib_urls", "Playlet")
+        end if
+        ShowPlayletLibLoadErrorDialog()
+        return
+    end if
+
+    RemoveComponentLibrary()
+    m.lib = m.top.getScene().createChild("ComponentLibrary")
+    m.lib.observeField("loadStatus", "OnLoadStatusChanged")
+
+    uri = m.playletLibUrls[m.playletLibUrlIndex].link
+    ' bs:disable-next-line LINT3012
+    ?"Loading Playlet lib from " uri
+    m.lib.uri = uri
+end function
+
+function OnLoadStatusChanged() as void
+    libUrl = m.playletLibUrls[m.playletLibUrlIndex]
+    if m.lib.loadStatus = "ready"
+        RemoveComponentLibrary()
+        ' bs:disable-next-line LINT3012
+        ?"Playlet lib loaded from " libUrl.link
+        scene = m.top.getScene()
+        scene.playletLibLoadedUrl = libUrl
+        container = scene.findNode("MainSceneContainer")
+        container.createChild("PlayletLib:MainScene")
+        return
+    end if
+
+    if m.lib.loadStatus = "failed"
+        ' bs:disable-next-line LINT3012
+        ?"Playlet lib failed to load from " libUrl.link
+        ' Try next url
+        m.playletLibUrlIndex += 1
+        LoadPlayletLib()
+    end if
+end function
+
+function RemoveComponentLibrary() as void
+    if m.lib = invalid
+        return
+    end if
+
+    scene = m.top.getScene()
+    scene.removeChild(m.lib)
+    m.lib = invalid
+end function
+
+function ShowPlayletLibLoadErrorDialog()
+    message = [
+        "Could not load Playlet component library from any of the following urls:",
+    ]
+
+    bulletText = []
+    for each url in m.playletLibUrls
+        bulletText.push("[" + url.type + "] " + url.link)
+    end for
+
+    bottomText = [
+        "Please restart Playlet.",
+        "If the problem persist, contact Playlet authors."
+    ]
+
+    ShowErrorDialog(message, bulletText, bottomText)
+end function

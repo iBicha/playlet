@@ -1,0 +1,211 @@
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+
+namespace InvidiousContent
+
+    function ToRowCellContentNode(item as object, instance as dynamic) as object
+        if item.videoId <> invalid and (item.type = invalid or item.type = "shortVideo")
+            item.type = "video"
+        end if
+
+        if item.playlistId <> invalid and (item.type = invalid or item.type = "invidiousPlaylist")
+            item.type = "playlist"
+        end if
+
+        if item.type <> "video" and item.type <> "playlist" and item.type <> "channel"
+            return invalid
+        end if
+
+        if item.type = "video"
+            return ToVideoContentNode(invalid, item, instance)
+        else if item.type = "playlist"
+            return ToPlaylistContentNode(invalid, item, instance)
+        else if item.type = "channel"
+            return invalid
+            ' return ToChannelContentNode(item, instance)
+        else
+            return invalid
+        end if
+    end function
+
+    function ToVideoContentNode(node as object, item as object, instance as dynamic) as object
+        if node = invalid
+            node = CreateObject("roSGNode", "VideoContentNode")
+        end if
+        node.type = "video"
+
+        SetIfExists(node, "author", item, "author")
+        SetIfExists(node, "hlsUrl", item, "hlsUrl")
+        SetIfExists(node, "isUpcoming", item, "isUpcoming")
+        SetIfExists(node, "lengthSeconds", item, "lengthSeconds")
+        node.lengthText = TimeUtils.GetFormattedTime(item.lengthSeconds)
+        node.liveNow = VideoIsLive(item)
+        VideoSetPremiereTimestampText(node, item)
+        SetIfExists(node, "publishedText", item, "publishedText")
+        if not StringUtils.IsNullOrEmpty(instance)
+            node.thumbnail = VideoGetThumbnail(item, instance) ?? "pkg:/images/thumbnail-missing.jpg"
+        end if
+        SetIfExists(node, "title", item, "title")
+        SetIfExists(node, "timestamp", item, "timestamp")
+        SetIfExists(node, "videoId", item, "videoId")
+        node.viewCountText = VideoGetViewCountText(item)
+        SetIfExists(node, "index", item, "index")
+
+        return node
+    end function
+
+    function ToPlaylistContentNode(node as object, item as object, instance as dynamic) as object
+        if node = invalid
+            node = CreateObject("roSGNode", "PlaylistContentNode")
+            node.loadState = FeedLoadState.None
+        end if
+        node.type = "playlist"
+
+        ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+        SetIfExists(node, "_author", item, "author")
+        SetIfExists(node, "description", item, "description")
+        SetIfExists(node, "playlistId", item, "playlistId")
+        SetIfExists(node, "title", item, "title")
+        SetIfExists(node, "videoCount", item, "videoCount")
+        node.videoCountText = PlaylistGetVideoCountText(item)
+        SetIfExists(node, "viewCount", item, "viewCount")
+        node.viewCountText = PlaylistGetViewCountText(item)
+
+        if item.videos <> invalid
+            childCount = node.getChildCount()
+            newNodes = []
+            for each video in item.videos
+                video.type = "video"
+                videoNode = ToVideoContentNode(invalid, video, instance)
+                if videoNode <> invalid
+                    index = video.index
+                    if index <> invalid and index > -1 and index < childCount
+                        node.replaceChild(videoNode, index)
+                    else
+                        newNodes.push(videoNode)
+                    end if
+                end if
+            end for
+            if newNodes.Count() > 0
+                node.appendChildren(newNodes)
+            end if
+        end if
+
+        PlaylistSetThumbnail(node, "thumbnail", item, instance)
+        PlaylistSetThumbnail(node, "thumbnailBackground", item, instance, "maxres")
+
+        return node
+    end function
+
+    function ToChannelContentNode(item as object, instance as dynamic) as object
+        node = CreateObject("roSGNode", "ChannelContentNode")
+        node.type = "channel"
+
+        return node
+    end function
+
+    function SetIfExists(dst as object, dstField as string, src as object, srcField as string)
+        if src.DoesExist(srcField)
+            dst[dstField] = src[srcField]
+        end if
+    end function
+
+    function VideoGetThumbnail(videoItem as object, instance as dynamic, quality = "medium" as string) as dynamic
+        videoThumbnails = videoItem.videoThumbnails
+        if videoThumbnails = invalid or videoThumbnails.Count() = 0
+            return invalid
+        end if
+        url = invalid
+        for each thumbnail in videoThumbnails
+            if thumbnail.quality = quality
+                url = thumbnail.url
+                exit for
+            end if
+        end for
+        if url = invalid
+            url = videoThumbnails[0].url
+        end if
+        if url.startsWith("/") and not StringUtils.IsNullOrEmpty(instance)
+            url = instance + url
+        end if
+        return url
+    end function
+
+    function VideoIsLive(videoItem as object) as boolean
+        if videoItem.liveNow = true
+            return true
+        end if
+        ' TODO:P2 metadata.liveNow is returning false for live videos...
+        return videoItem.lengthSeconds = 0 and videoItem.viewCount = 0
+    end function
+
+    function VideoIsUpcoming(videoItem as object) as boolean
+        return videoItem.isUpcoming = true
+    end function
+
+    function VideoSetPremiereTimestampText(node as object, videoItem as object)
+        if VideoIsUpcoming(videoItem) and videoItem.premiereTimestamp <> invalid
+            node.premiereTimestampText = `Premeres in ${TimeUtils.GetFormattedTimeLeft(videoItem.premiereTimestamp)}`
+        end if
+    end function
+
+    function VideoGetViewCountText(videoItem as object) as string
+        viewCount = videoItem.viewCount
+        if viewCount = invalid
+            return ""
+        end if
+        if viewCount < 1000
+            return `${FormatFloat(viewCount)} views`
+        end if
+
+        viewCount = viewCount / 1000
+        if viewCount < 1000
+            return `${FormatFloat(viewCount)}K views`
+        end if
+
+        viewCount = viewCount / 1000
+        if viewCount < 1000
+            return `${FormatFloat(viewCount)}M views`
+        end if
+
+        viewCount = viewCount / 1000
+        return `${FormatFloat(viewCount)}B views`
+    end function
+
+    function FormatFloat(X as float) as float
+        X = X * 10
+        X = X + 0.5
+        X = Fix(X)
+        X = X / 10
+        return X
+    end function
+
+    function PlaylistSetThumbnail(node as object, nodeField as string, playlistItem as object, instance as dynamic, quality = "medium" as string) as void
+        thumbnail = ""
+        if IsString(playlistItem.playlistThumbnail)
+            thumbnailUrl = playlistItem.playlistThumbnail
+            if thumbnailUrl.startsWith("/") and not StringUtils.IsNullOrEmpty(playlistItem.instance)
+                thumbnailUrl = playlistItem.instance + thumbnailUrl
+            end if
+            thumbnail = thumbnailUrl
+        else if playlistItem.videos <> invalid and playlistItem.videos.Count() > 0 and playlistItem.videos[0].index = 0
+            thumbnail = VideoGetThumbnail(playlistItem.videos[0], instance, quality)
+        else if node.getChildCount() > 0
+            thumbnail = node.getChild(0).thumbnail
+        end if
+        if StringUtils.IsNullOrEmpty(thumbnail)
+            thumbnail = "pkg:/images/thumbnail-missing.jpg"
+        end if
+        node[nodeField] = thumbnail
+    end function
+
+    function PlaylistGetVideoCountText(playlistItem as object) as string
+        videoCount = ValidInt(playlistItem.videoCount)
+        return videoCount = 1 ? "1 video" : `${videoCount} videos`
+    end function
+
+    function PlaylistGetViewCountText(playlistItem as object) as string
+        return VideoGetViewCountText(playlistItem)
+    end function
+
+end namespace
