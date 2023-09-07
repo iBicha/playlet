@@ -1,0 +1,84 @@
+import "pkg:/components/Web/WebServer/Http/HttpServer.bs"
+import "pkg:/components/Web/WebServer/Middleware/HttpDefaultRouter.bs"
+import "pkg:/source/utils/Logging.bs"
+
+function Init()
+    InitializeLogging()
+    m.log = new log.Logger("WebServer")
+
+    m.top.functionName = "WebServerLoop"
+end function
+
+function StartServer(unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopServer(unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
+end function
+
+function WebServerLoop() as void
+    msgPort = CreateObject("roMessagePort")
+
+    settings = new Http.HttpSettings(msgPort)
+    settings.MaxConnections = m.top.maxConnections
+    settings.MaxRequestLength = m.top.maxRequestLength
+    settings.PackageName = m.top.packageName
+    settings.Port = m.top.port
+    settings.ServerName = m.top.serverName
+    settings.TimeoutInMs = m.top.timeoutInMs
+
+    server = new Http.HttpServer(settings, m.top)
+    if not server.success
+        m.top.isRunning = false
+        m.log.error("Failed to start server")
+        return
+    end if
+
+    SetupRoutes(server)
+    server.UseRouter(new Http.HttpDefaultRouter())
+
+    m.top.shouldQuit = false
+    m.top.observeField("shouldQuit", msgPort, ["shouldQuit"])
+    m.top.isRunning = true
+
+    ' TODO:P1 large timeout still causes server to hang - must investigate or lower the value until solved
+    ' It seems that some requests do not fire the roSocketEvent for some reason.
+    ' timeoutInMs = settings.TimeoutInMs
+    timeoutInMs = 1000
+    msgPort = settings.MessagePort
+
+    while true
+        server.PreWait()
+
+        msg = wait(timeoutInMs, msgPort)
+        msgType = type(msg)
+
+        if msgType = "roSocketEvent" or msg = invalid
+            server.PostWait()
+        else if msgType = "roSGNodeEvent"
+            info = msg.getInfo()
+            if info.shouldQuit = true
+                exit while
+            end if
+        end if
+    end while
+
+    m.log.info("closing server")
+    server.Close()
+    m.top.isRunning = false
+    m.top.unobserveField("shouldQuit")
+end function
+
+function SetupRoutes(server as object)
+    m.log.warn("No routes configured")
+end function

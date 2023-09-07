@@ -1,0 +1,30 @@
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.lastFocusedChild = invalid
+    m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    focusNode = invalid
+    if m.lastFocusedChild <> invalid
+        focusNode = m.lastFocusedChild
+    else if m.top.getChildCount() > 0
+        focusNode = m.top.getChild(0)
+    end if
+
+    if focusNode <> invalid
+        NodeSetFocus(focusNode, true)
+    end if
+end function
+
+function OnFocusedChildChange() as void
+    if m.top.focusedChild <> invalid
+        m.lastFocusedChild = m.top.focusedChild
+    end if
+end function

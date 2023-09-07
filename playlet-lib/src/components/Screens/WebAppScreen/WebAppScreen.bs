@@ -1,0 +1,26 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/Screens/WebAppScreen/GenerateQrCodeTask.bs"
+
+function Init()
+end function
+
+function OnNodeReady()
+    address = m.webserver@.GetServerAddress(invalid)
+    isValidIp = not StringUtils.IsNullOrEmpty(address)
+    if isValidIp
+        m.top.url = address
+    end if
+    m.top.findNode("noInternet").visible = not isValidIp
+    m.top.findNode("yesInternet").visible = isValidIp
+end function
+
+function OnUrlSet()
+    url = m.top.url
+
+    urlLabel = m.top.findNode("urlLabel")
+    urlLabel.text = url
+
+    qrCode = m.top.findNode("QrCodePoster")
+    StartAsyncTask(GenerateQrCodeTask, { qrPoster: qrCode, text: url })
+end function

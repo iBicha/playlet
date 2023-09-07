@@ -1,0 +1,44 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+function Init()
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.authorLabel = m.top.findNode("authorLabel")
+    m.thumbnail = m.top.findNode("thumbnail")
+    m.durationRect = m.top.FindNode("durationRect")
+    m.durationLabel = m.top.FindNode("durationLabel")
+
+    m.thumbnail.failedBitmapUri = "pkg:/images/thumbnail-missing.jpg"
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    m.authorLabel.text = content.author
+
+    m.thumbnail.uri = content.thumbnail
+    if ValidInt(content.lengthSeconds) <> 0
+        SetDurationText(content.lengthText)
+        m.durationRect.visible = true
+    else
+        m.durationRect.visible = false
+    end if
+end function
+
+function SetDurationText(text as string)
+    label = m.durationLabel
+    rect = m.durationRect
+
+    rectParent = rect.getParent()
+
+    label.text = text
+    size = label.localBoundingRect()
+
+    rect.width = size.width + 16
+    rect.translation = [rectParent.width - rect.width, 72]
+end function

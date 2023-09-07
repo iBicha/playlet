@@ -1,0 +1,43 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "LatestLibVersionTask.bs"
+
+import "pkg:/source/services/ApplicationInfo.bs"
+
+function Init()
+    m.service = new ApplicationInfo(m.top)
+end function
+
+function GetAppInfo(unused as dynamic) as object
+    return m.service.GetAppInfo()
+end function
+
+function GetDeviceInfo(unused as dynamic) as object
+    return m.service.GetDeviceInfo()
+end function
+
+function GetUserCountryCode(unused as dynamic) as string
+    return m.service.GetUserCountryCode()
+end function
+
+function GetLocalIpAddress(unused as dynamic) as dynamic
+    return m.service.GetLocalIpAddress()
+end function
+
+function GetLatestPlayletLibVersion(unused as dynamic) as dynamic
+    if not StringUtils.IsNullOrEmpty(m.top.lib_version_latest)
+        return m.top.lib_version_latest
+    end if
+
+    if m.latestLibVersionTask <> invalid and m.latestLibVersionTask.state = "run"
+        return invalid
+    end if
+
+    m.latestLibVersionTask = StartAsyncTask(LatestLibVersionTask, {}, function(output as object) as void
+        m.latestLibVersionTask = invalid
+        if output.success and output.result.latest <> invalid
+            m.top.lib_version_latest = output.result.latest
+        end if
+    end function)
+
+    return invalid
+end function

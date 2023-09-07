@@ -8,22 +8,22 @@ end function
 
 function CreateAsyncTask(taskFunc as object, input as object, callback = invalid as object) as object
     id = StrI(rnd(2147483647), 36)
-    task = createObject("roSGNode", GetFunctionName(taskFunc))
+    task = createObject("roSGNode", GetComponentName(taskFunc))
     task.id = id
     task.input = input
 
     m[`asynctask_${id}`] = task
     m[`asynctask_${id}_callback`] = callback
-    task.ObserveField("state", "OnTaskState")
+    task.ObserveField("state", FuncName(OnTaskState))
 
     return task
 end function
 
-function GetFunctionName(taskFunc as object) as string
-    if IsStr(taskFunc)
-        return LCase(`${taskFunc}_asynctask`)
+function GetComponentName(taskFunc as object) as string
+    if IsString(taskFunc)
+        return `${taskFunc}_asynctask`
     end if
-    return (LCase(`${taskFunc}_asynctask`)).replace("function:", "").trim()
+    return `${FuncName(taskFunc)}_asynctask`
 end function
 
 function OnTaskState(e as object) as void
@@ -38,7 +38,6 @@ function OnTaskState(e as object) as void
     if output <> invalid
         callback = m[`asynctask_${id}_callback`]
         if callback <> invalid
-            output = task.output
             callback(output)
         end if
     end if

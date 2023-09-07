@@ -1,289 +1,142 @@
-import "pkg:/source/utils/TimeUtils.bs"
-import "pkg:/source/services/SponsorBlock.bs"
-import "pkg:/components/VideoPlayer/Video.bs"
-import "pkg:/components/VideoPlayer/VideoDetailsTask.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/VideoPlayer/VideoContentTask.bs"
+import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/VideoPlayer/SponsorBlock.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 function Init()
-    m.videoContainer = GetVideoContainer()
-
-    SetupSponsorBlock()
+    m.log = new log.Logger("VideoPlayer")
+    SetPlayerStyle()
     SetupAnimation()
-    SetupBusySpinner()
 
-    m.top.trickPlayBar.filledBarBlendColor = "0xFF0000FF"
-    m.top.bufferingBar.filledBarBlendColor = "0xFF0000FF"
-    m.top.retrievingBar.filledBarBlendColor = "0xFF0000FF"
-
-    m.top.enableUI = m.videoContainer.fullscreen
-    m.videoContainer.observeFieldScoped("fullscreen", "OnFullScreenChange")
-
+    ' videoPlayingSuccess indicates if we started playing a video successfully
+    ' We use it to detect if we should try another link for a video, or if another error
+    ' occurred (such as a next work error)
     m.videoPlayingSuccess = false
+    ' ignoreNextFinishedState indicates if we should ignore the next finished state
+    ' This is used to prevent the video from playing the next video when we are
+    ' still trying to find a working stream url
     m.ignoreNextFinishedState = false
-
-    m.top.observeField("control", "OnControlChange")
-    m.top.observeField("videoId", "StartVideoDetailsTask")
-
-    m.top.ObserveField("state", "OnVideoPlayerStateChange")
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
-    if press = false
-        return false
+function OnNodeReady()
+    rect = m.container.fullscreen ? m.top.maxRect : m.top.minRect
+
+    m.top.width = rect.width
+    m.top.height = rect.height
+    m.top.translation = [rect.x, rect.y]
+
+    ' TODO:P2 show a loading spinner if video is loading minimized
+    m.top.enableUI = m.container.fullscreen
+
+    m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
+    m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
+    m.top.observeField("control", FuncName(OnControlChange))
+
+    SponsorBlock.SetupSponsorBlock()
+end function
+
+function PlayWithContent(contentNode as object)
+    videoContentNode = CreateObject("roSGNode", "ContentNode")
+
+    if not StringUtils.IsNullOrEmpty(contentNode.videoId)
+        videoContentNode.AddFields({ videoId: contentNode.videoId })
     end if
-    ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
-    ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
-    ' Because of that, the button "down" is used to shrink the video for picture in picture mode
-    if key = "down"
-        if ToggleVideoPictureInPicture()
-            return true
+    if IsInt(contentNode.timestamp)
+        videoContentNode.AddFields({ timestamp: contentNode.timestamp })
+    end if
+    if not StringUtils.IsNullOrEmpty(contentNode.title)
+        videoContentNode.title = contentNode.title
+    end if
+    if not StringUtils.IsNullOrEmpty(contentNode.author)
+        videoContentNode.secondaryTitle = contentNode.author
+    end if
+
+    StartVideoContentTask(videoContentNode)
+end function
+
+function StartVideoContentTask(videoContentNode as object)
+    if m.videoContentTask <> invalid
+        m.videoContentTask.cancel = true
+    end if
+
+    MarkVideoWatched(videoContentNode.videoId)
+
+    m.top.content = videoContentNode
+
+    m.videoContentTask = StartAsyncTask(VideoContentTask, {
+        content: videoContentNode,
+        invidious: m.top.invidious,
+        preferences: m.top.preferences
+    }, OnVideoContentTaskResults)
+end function
+
+function OnVideoContentTaskResults(output as object) as void
+    m.videoContentTask = invalid
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
         end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        videoId = output.task.input.content.videoId
+        message = `Failed to load video information for ${videoId}\n${error}`
+        DialogUtils.ShowDialog(message, "Video load fail", true)
+        ' TODO:P1 play next video in the queue after showing the error dialog
+        VideoUtils.CloseVideo()
+        return
     end if
-    if key = "back"
-        m.videoContainer@.watchedVideosClear()
-        CloseVideo()
-        return true
+
+    SponsorBlock.FetchSponsorBlock(m.top.content.metadata)
+
+    m.top.control = "play"
+    if ValidInt(m.top.content.timestamp) > 0
+        m.top.seek = m.top.content.timestamp
     end if
-    return false
+end function
+
+function MarkVideoWatched(videoId as string)
+    if m.top.invidious.authToken <> invalid
+        StartAsyncTask(MarkVideoWatchedTask, {
+            videoId: videoId,
+            invidious: m.top.invidious
+        })
+    end if
+end function
+
+function Close(unused as dynamic)
+    m.top.control = "stop"
+    m.top.content = invalid
+    parent = m.top.getParent()
+    if parent <> invalid
+        parent.RemoveChild(m.top)
+    end if
+    SponsorBlock.RemoveNotifcation(m.notifications)
 end function
 
 function OnControlChange()
     if m.top.control = "stop"
-        if m.videoDetailsTask <> invalid
-            m.videoDetailsTask.control = "stop"
+        if m.videoContentTask <> invalid
+            m.videoContentTask.cancel = true
+            m.videoContentTask = invalid
         end if
         if m.sponsorBlockTask <> invalid
-            m.sponsorBlockTask.control = "stop"
+            m.sponsorBlockTask.cancel = true
+            m.sponsorBlockTask = invalid
         end if
     end if
-end function
-
-function SetMetadata() as void
-    if m.top.metadata = invalid
-        return
-    end if
-
-    metadata = m.top.metadata
-    contentNode = CreateObject("roSGNode", "ContentNode")
-    contentNode.addFields({ metadata: metadata })
-
-    contentNode.title = metadata.title
-    contentNode.secondaryTitle = metadata.author
-
-    m.top.content = contentNode
-end function
-
-function StartVideoDetailsTask()
-    if m.videoDetailsTask <> invalid
-        m.videoDetailsTask.control = "stop"
-    end if
-
-    SetMetadata()
-    m.videoDetailsTask = StartAsyncTask(VideoDetailsTask, { videoId: m.top.videoId }, OnVideoDetailsTaskResults)
-end function
-
-function OnVideoDetailsTaskResults(output as object) as void
-    videoId = output.result.videoId
-    metadata = output.result.metadata
-    if videoId <> m.top.videoId
-        return
-    end if
-    if (not metadata.success) or (metadata.data = invalid)
-        m.busySpinner.visible = false
-        m.busySpinner.control = "stop"
-        message = `Failed to load video information for ${videoId}`
-        message += `\nStatus Code: ${metadata.statusCode}`
-        if isstr(metadata.data)
-            message += `\nError: ${metadata.data}`
-        else if isAssocArray(metadata.data)
-            message += `\nError: ${FormatJson(metadata.data)}`
-        end if
-        if isstr(metadata.failureReason)
-            message += `\nError: ${metadata.failureReason}`
-        end if
-        ShowDialog(message, "Video load fail")
-        CloseVideo()
-        return
-    end if
-
-    metadata = metadata.data
-
-    playletStreamUrls = []
-
-    if metadata.hlsUrl <> invalid
-        hlsUrl = metadata.hlsUrl
-        playletStreamUrls.push(hlsUrl)
-
-        if hlsUrl.InStr("?") = -1
-            hlsUrlLocal = hlsUrl + "?local=true"
-        else
-            hlsUrlLocal = hlsUrl + "&local=true"
-        end if
-        playletStreamUrls.push(hlsUrlLocal)
-    else
-        settings = FindAndGetPreferenceValues(["playback.preferred_quality", "invidious.proxy_videos"])
-        if settings = invalid
-            settings = {
-                "playback.preferred_quality": "auto",
-                "invidious.proxy_videos": "if_needed"
-            }
-        end if
-
-        if settings["playback.preferred_quality"] = "720p"
-            AddStreamUrls(playletStreamUrls, metadata, settings)
-            AddDashUrls(playletStreamUrls, metadata, settings)
-        else
-            AddDashUrls(playletStreamUrls, metadata, settings)
-            AddStreamUrls(playletStreamUrls, metadata, settings)
-        end if
-    end if
-
-    metadata.playletStreamUrls = playletStreamUrls
-    metadata.playletStreamUrlIndex = 0
-
-    contentNode = CreateObject("roSGNode", "ContentNode")
-    contentNode.addFields({ metadata: metadata })
-
-    contentNode.title = metadata.title
-    contentNode.secondaryTitle = metadata.author
-    SetCaptions(metadata, m.top, contentNode)
-    contentNode.url = metadata.playletStreamUrls[metadata.playletStreamUrlIndex]
-    m.busySpinner.visible = false
-    m.busySpinner.control = "stop"
-    m.top.content = contentNode
-    m.top.control = "play"
-
-    m.videoContainer@.watchedVideosAdd(videoId)
-
-    StartSponsorBlockTask()
-end function
-
-function AddDashUrls(playletStreamUrls as object, metadata as object, settings as object) as void
-    if metadata.dashUrl = invalid
-        return
-    end if
-
-    #if DASH_THUMBNAILS
-        ' Redirect to our server so we can inject thumbnails (storyboards) into the DASH manifest
-        dashUrl = `http://${GetLocalIpAddress()}:8888/dash?v=${videoId}`
-    #else
-        dashUrl = metadata.dashUrl
-    #end if
-
-    if dashUrl.InStr("?") = -1
-        dashUrlLocal = dashUrl + "?local=true"
-    else
-        dashUrlLocal = dashUrl + "&local=true"
-    end if
-
-    proxyVideos = settings["invidious.proxy_videos"]
-    if proxyVideos = "if_needed"
-        playletStreamUrls.push(dashUrl)
-        playletStreamUrls.push(dashUrlLocal)
-    else if proxyVideos = "never"
-        playletStreamUrls.push(dashUrl)
-    else if proxyVideos = "always"
-        playletStreamUrls.push(dashUrlLocal)
-    else
-        playletStreamUrls.push(dashUrl)
-        playletStreamUrls.push(dashUrlLocal)
-    end if
-end function
-
-function AddStreamUrls(playletStreamUrls as object, metadata as object, settings as object) as void
-    if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
-        return
-    end if
-
-    proxyVideos = settings["invidious.proxy_videos"]
-    if proxyVideos = "if_needed"
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
-    else if proxyVideos = "never"
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
-    else if proxyVideos = "always"
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
-    else
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, false))
-        playletStreamUrls.push(Invidious.GetVideoStreamUrl(metadata.videoId, true))
-    end if
-end function
-
-function FindChildNodeOfType(node as object, nodeType as string) as object
-    if node.subtype() = nodeType
-        return node
-    end if
-
-    childCount = node.getChildCount()
-    children = node.getChildren(childCount, 0)
-    for i = 0 to childCount - 1
-        child = FindChildNodeOfType(children[i], nodeType)
-        if child <> invalid
-            return child
-        end if
-    end for
-
-    return invalid
-end function
-
-function SetupBusySpinner()
-    ' busySpinner is our spinner, shown when loading the video details (like links, title, etc)
-    m.busySpinner = m.top.findNode("BusySpinner")
-    ' Once the Content is ready, the rokuBusySpinner shows up, which is loading the video feed
-    m.rokuBusySpinner = FindChildNodeOfType(m.top, "BusySpinner")
-    ' The label that shows the buffering percentage
-    m.rokuBusySpinnerLabel = FindChildNodeOfType(m.rokuBusySpinner, "Label")
-
-    m.rokuBusySpinner.poster.width = 150
-    m.rokuBusySpinner.poster.height = 150
-    m.rokuBusySpinner.poster.uri = "pkg:/images/spinner.png"
-    m.rokuBusySpinner.observeField("translation", "OnRokuSpinnerMoved")
-    m.top.observeField("width", "OnRokuSpinnerMoved")
-    m.top.observeField("height", "OnRokuSpinnerMoved")
-    m.top.observeField("translation", "OnRokuSpinnerMoved")
-
-    m.rokuBusySpinnerLabel.width = 150
-    m.rokuBusySpinnerLabel.height = 150
-    m.rokuBusySpinnerLabel.translation = [0, 0]
-    m.rokuBusySpinnerLabel.observeField("translation", "OnRokuSpinnerLabelMoved")
-    m.top.observeField("width", "OnRokuSpinnerLabelMoved")
-    m.top.observeField("height", "OnRokuSpinnerLabelMoved")
-    m.top.observeField("translation", "OnRokuSpinnerLabelMoved")
-
-    m.busySpinner.poster.width = 150
-    m.busySpinner.poster.height = 150
-    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
-    m.top.observeField("width", "PositionSpinner")
-    m.top.observeField("height", "PositionSpinner")
-    m.top.observeField("translation", "PositionSpinner")
-
-    PositionSpinner()
-
-    m.busySpinner.visible = true
-    m.busySpinner.control = "start"
-end function
-
-function OnRokuSpinnerMoved()
-    currentTranslation = m.rokuBusySpinner.translation
-    parentRect = m.top.boundingRect()
-    centerx = (parentRect.width - m.rokuBusySpinner.poster.width) / 2
-    centery = (parentRect.height - m.rokuBusySpinner.poster.height) / 2
-
-    if currentTranslation[0] <> centerx or currentTranslation[1] <> centery
-        m.rokuBusySpinner.translation = [centerx, centery]
-    end if
-end function
-
-function OnRokuSpinnerLabelMoved()
-    currentTranslation = m.rokuBusySpinnerLabel.translation
-    if currentTranslation[0] <> 0 or currentTranslation[1] <> 0
-        m.rokuBusySpinnerLabel.translation = [0, 0]
-    end if
-end function
-
-function PositionSpinner()
-    centerx = (m.top.width - m.busySpinner.poster.width) / 2
-    centery = (m.top.height - m.busySpinner.poster.height) / 2
-    m.busySpinner.translation = [centerx, centery]
 end function
 
 function OnVideoPlayerStateChange() as void
@@ -292,31 +145,34 @@ function OnVideoPlayerStateChange() as void
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
     ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
     if state = "playing" and not m.videoPlayingSuccess
+        m.log.info(`Now playing video ${m.top.content.url}`)
         m.videoPlayingSuccess = true
-        if m.top.timestamp <> 0
-            m.top.seek = m.top.timestamp
-        end if
     end if
 
     if state = "error"
-        ' A hack to see if we could use the proxy here
+        errorInfo = m.top.errorInfo
+        m.log.error(`Error playing video ${m.top.content.videoId}`, errorInfo)
         if m.videoPlayingSuccess <> true
-            errorInfo = m.top.errorInfo
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
                 currentUrl = m.top.content.url
-                metadata = m.top.content.metadata
-                metadata.playletStreamUrlIndex++
-                m.top.content.metadata = metadata
-                if m.top.content.metadata.playletStreamUrlIndex < m.top.content.metadata.playletStreamUrls.Count()
-                    nextUrl = m.top.content.metadata.playletStreamUrls[m.top.content.metadata.playletStreamUrlIndex]
-                    print(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+                playletStreamUrls = m.top.content.playletStreamUrls
+                playletStreamUrlIndex = m.top.content.playletStreamUrlIndex
+                playletStreamUrlIndex++
+                m.top.content.playletStreamUrlIndex = playletStreamUrlIndex
+                if playletStreamUrlIndex < playletStreamUrls.Count()
+                    nextUrl = playletStreamUrls[playletStreamUrlIndex]
+                    m.log.error(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
                     m.top.content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
-                    ' TODO: perhaps creating a second player is better?
+                    ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
+
+                    if ValidInt(m.top.content.timestamp) > 0
+                        m.top.seek = m.top.content.timestamp
+                    end if
                     return
                 end if
             end if
@@ -330,9 +186,9 @@ function OnVideoPlayerStateChange() as void
 
     if state = "finished"
         metadata = m.top.content?.metadata
-
-        if not PlayNextRecommendedVideo(metadata?.recommendedVideos)
-            CloseVideo()
+        if not PlayNext(metadata?.recommendedVideos)
+            m.container@.watchedVideosClear(invalid)
+            VideoUtils.CloseVideo()
         end if
     end if
 
@@ -346,14 +202,22 @@ function OnVideoPlayerStateChange() as void
         for each info in errorInfo
             messageLines.push(`${info}: ${errorInfo[info]}`)
         end for
-        ShowDialog(messageLines, `Error playing video ${m.top.videoId}`, true)
-        CloseVideo()
+        DialogUtils.ShowDialog(messageLines, `Error playing video ${m.top.content.videoId}`, true)
+        ' TODO:P1 play next video in the queue after showing the error dialog
+        VideoUtils.CloseVideo()
     end if
 end function
 
+function PlayNext(recommendedVideos as object) as boolean
+    if m.playQueue@.PlayNextItem(invalid)
+        return true
+    end if
+
+    return PlayNextRecommendedVideo(recommendedVideos)
+end function
+
 function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
-    settings = FindAndGetPreferenceValues(["playback.autoplay"])
-    if settings = invalid or settings["playback.autoplay"] <> true
+    if m.preferences["playback.autoplay"] <> true
         return false
     end if
 
@@ -366,8 +230,10 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
         if videoId = invalid
             continue for
         end if
-        if not m.videoContainer@.watchedVideosContain(videoId)
-            PlayVideo(videoId, { metadata: metadata })
+        if not m.container@.watchedVideosContain(videoId)
+            m.log.info(`Playing next recommended video (${videoId})`)
+            node = InvidiousContent.ToVideoContentNode(invalid, metadata, invalid)
+            VideoUtils.PlayVideo(node)
             return true
         end if
     end for
@@ -375,24 +241,52 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
     return false
 end function
 
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+    ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
+    ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
+    ' Because of that, the button "down" is used to shrink the video for picture in picture mode
+    if key = "down"
+        if VideoUtils.ToggleVideoPictureInPicture()
+            return true
+        end if
+    end if
+
+    if key = "back"
+        m.container@.watchedVideosClear(invalid)
+        VideoUtils.CloseVideo()
+        return true
+    end if
+    return false
+end function
+
 function SetupAnimation()
-    m.widthAnimation = m.top.findNode("widthAnimation")
-    m.widthAnimationInterpolator = m.top.findNode("widthAnimationInterpolator")
-    m.heightAnimation = m.top.findNode("heightAnimation")
-    m.heightAnimationInterpolator = m.top.findNode("heightAnimationInterpolator")
-    m.translationAnimation = m.top.findNode("translationAnimation")
-    m.translationAnimationInterpolator = m.top.findNode("translationAnimationInterpolator")
+    m.minimizeAnimation = m.top.findNode("minimizeAnimation")
+    m.widthInterpolator = m.top.findNode("widthInterpolator")
+    m.heightInterpolator = m.top.findNode("heightInterpolator")
+    m.translationInterpolator = m.top.findNode("translationInterpolator")
+
+    minRect = m.top.minRect
+    maxRect = m.top.maxRect
+
+    m.widthInterpolator.keyValue = [maxRect.width, (maxRect.width + minRect.width) / 2, minRect.width]
+    m.heightInterpolator.keyValue = [maxRect.height, (maxRect.height + minRect.height) / 2, minRect.height]
+    maxTranslation = [maxRect.x, maxRect.y]
+    minTranslation = [minRect.x, minRect.y]
+    midTranslation = [(maxRect.x + minRect.x) / 2, (maxRect.y + minRect.y) / 2]
+    m.translationInterpolator.keyValue = [maxTranslation, midTranslation, minTranslation]
 end function
 
 function OnFullScreenChange()
-    m.widthAnimationInterpolator.reverse = m.videoContainer.fullscreen
-    m.heightAnimationInterpolator.reverse = m.videoContainer.fullscreen
-    m.translationAnimationInterpolator.reverse = m.videoContainer.fullscreen
+    m.widthInterpolator.reverse = m.container.fullscreen
+    m.heightInterpolator.reverse = m.container.fullscreen
+    m.translationInterpolator.reverse = m.container.fullscreen
 
-    m.widthAnimation.control = "start"
-    m.heightAnimation.control = "start"
-    m.translationAnimation.control = "start"
+    m.minimizeAnimation.control = "start"
 
-    m.top.enableUI = m.videoContainer.fullscreen
-    SponsorBlockNotifcationSetVisible(m.videoContainer.fullscreen)
+    m.top.enableUI = m.container.fullscreen
+
+    SponsorBlock.SetVisible(m.notifications, m.container.fullscreen)
 end function

@@ -1,0 +1,24 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace ErrorUtils
+    function Format(error as dynamic) as string
+        if error = invalid
+            return "<invalid>"
+        end if
+
+        if IsString(error)
+            return error
+        end if
+
+        if IsAssociativeArray(error) and error.DoesExist("message") and error.DoesExist("number") and error.DoesExist("backtrace")
+            result = `${error.message} (0x${StrI(error.number, 16)}). backtrace:`
+            for i = error.backtrace.count() - 1 to 0 step -1
+                backtrace = error.backtrace[i]
+                result += `\n  ${backtrace.function} @ ${backtrace.filename}:${backtrace.line_number}\n`
+            end for
+            return result
+        end if
+
+        return `${error}`
+    end function
+end namespace

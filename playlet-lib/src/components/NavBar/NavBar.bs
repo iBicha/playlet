@@ -1,18 +1,57 @@
-import "pkg:/components/VideoPlayer/Video.bs"
+import "pkg:/source/utils/ColorUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Types.bs"
 
 function Init()
-    m.buttonGroup = m.top.findNode("NavBarButtonGroup")
-    m.top.observeField("focusIndex", "OnFocusIndexChange")
+end function
+
+function OnNodeReady()
+    PopulateButtons()
+    m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
+    m.top.observeField("items", FuncName(PopulateButtons))
+end function
+
+function OnFocusedChildChange()
+    m.top.focusIndex = m.top.focusIndex
+end function
+
+function PopulateButtons() as void
+    buttonCount = m.buttonGroup.getChildCount()
+    if buttonCount > 0
+        m.buttonGroup.removeChildrenIndex(buttonCount, 0)
+    end if
+
+    if m.top.items = invalid
+        m.top.focusable = false
+        return
+    end if
+
+    navBarItems = m.top.items.getChildren(-1, 0)
+
+    buttons = []
+    for each item in navBarItems
+        button = CreateObject("roSGNode", "IconButton")
+        button.background = ColorUtils.HexToInt("242424")
+        button.focusBackground = ColorUtils.HexToInt("ff1c30")
+        button.padding = 20
+        button.height = 50
+        button.width = 90
+
+        button.icon = item.icon
+        button.text = item.text
+
+        buttons.push(button)
+    end for
+    m.buttonGroup.appendChildren(buttons)
+
+    m.top.focusable = buttons.Count() > 0
+
+    m.top.focusIndex = m.top.focusIndex
 end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
     if not press
         return false
-    end if
-    if key = "options"
-        if ToggleVideoPictureInPicture(m.top)
-            return true
-        end if
     end if
     if key = "down"
         i = m.top.focusIndex
@@ -31,39 +70,54 @@ function onKeyEvent(key as string, press as boolean) as boolean
         m.top.focusIndex = target
         return true
     else if key = "right"
-        ' Can only escape to search screen or home screen
-        allowedEscapes = { "0": true, "1": true, "2": true }
-        if allowedEscapes[StrI(m.top.focusIndex).Trim()] = true
-            m.top.escapeIndex = m.top.focusIndex
-            m.top.focusIndex = -1
-            return true
+        if m.top.items = invalid or m.top.focusIndex = -1 or m.top.focusIndex >= m.top.items.getChildCount()
+            return false
         end if
-    else if key = "back"
-        dialog = ShowDialogButtons("Do you want to exit Playlet?", "Exit", ["Exit", "Cancel"])
-        dialog.observeField("buttonSelected", "OnExitDialog", ["buttonSelected"])
+        navBarItem = m.top.items.getChild(m.top.focusIndex)
+        if navBarItem.canFocus <> true
+            return false
+        end if
+        screen = m.appController@.GetRootScreen(navBarItem.screen)
+        if screen = invalid
+            return false
+        end if
+        NodeSetFocus(screen, true)
         return true
     end if
 
     return false
 end function
 
-function OnExitDialog(event as object)
-    buttonIndex = event.GetData()
-    if buttonIndex = 0 ' Exit
-        ? "EXITING APP"
-        m.top.getScene().exitChannel = true
+function OnFocusIndexChange() as void
+    if m.top.items = invalid
+        return
     end if
-end function
 
-function OnFocusIndexChange()
+    buttonCount = m.buttonGroup.getChildCount()
+    if buttonCount = 0
+        return
+    end if
     focusIndex = m.top.focusIndex
-    childCount = m.buttonGroup.getChildCount()
-    for i = 0 to childCount - 1
+    if focusIndex < 0
+        m.top.focusIndex = 0
+        return
+    end if
+    if focusIndex >= buttonCount
+        m.top.focusIndex = buttonCount - 1
+        return
+    end if
+
+    navBarItems = m.top.items.getChildren(-1, 0)
+
+    buttons = m.buttonGroup.getChildren(-1, 0)
+    for i = 0 to buttonCount - 1
         if i <> focusIndex
-            m.buttonGroup.getChild(i).focus = false
+            buttons[i].focus = false
+            m.appController@.HideRootScreen(navBarItems[i].screen)
         end if
     end for
     if focusIndex <> -1
-        m.buttonGroup.getChild(focusIndex).focus = true
+        m.buttonGroup.getChild(focusIndex).focus = m.top.hasFocus()
+        m.appController@.ShowRootScreen(navBarItems[focusIndex].screen)
     end if
 end function

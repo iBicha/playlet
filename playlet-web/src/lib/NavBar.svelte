@@ -1,10 +1,10 @@
 <script lang="ts">
-  import playletLogoDark from "../assets/logo-dark.svg";
-  import playletLogoLight from "../assets/logo-light.svg";
-  import UserIcon from "../assets/user.svg.svelte";
-  import { PlayletApi } from "./PlayletApi";
-  import { appThemeStore, playletStateStore } from "./Stores";
-  import ThemeSelect from "./ThemeToggle.svelte";
+  import playletLogoDark from "assets/logo-dark.svg";
+  import playletLogoLight from "assets/logo-light.svg";
+  import UserIcon from "assets/user.svg.svelte";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { appThemeStore, playletStateStore } from "lib/Stores";
+  import ThemeSelect from "lib/ThemeToggle.svelte";
 
   let version;
   let loggedIn = false;

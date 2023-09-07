@@ -1,9 +1,14 @@
-import "pkg:/source/utils/Types.bs"
+import "Types.bs"
 
 namespace TimeUtils
+
     ' Helper function convert seconds to [hh:]mm:ss format
-    ' getTime(138) returns 2:18
-    function GetFormattedTime(length as integer) as string
+    ' GetFormattedTime(138) returns 2:18
+    function GetFormattedTime(length as dynamic) as string
+        if length = invalid or length < 0
+            return "0:00"
+        end if
+
         hours = length \ 3600
         minutes = (length \ 60) mod 60
         seconds = length mod 60
@@ -29,7 +34,7 @@ namespace TimeUtils
         return formattedTime
     end function
 
-    function GetFormattedTimeLeft(unixTimestamp as integer) as string
+    function GetFormattedTimeLeft(unixTimestamp as dynamic) as string
         if unixTimestamp = invalid
             return "N/A"
         end if
@@ -89,13 +94,13 @@ namespace TimeUtils
 
     function RFC1123_Date(when as object) as string
         wd = when.getWeekday().left(3)
-        dom = Stri(when.getDayOfMonth()).trim()
+        dom = when.getDayOfMonth()
         mon = Ucase(TimeUtils.MonthStr(when.getMonth()).left(3))
-        yr = Stri(when.getYear()).trim()
-        hr = Stri(when.getHours()).trim()
-        mn = Stri(when.getMinutes()).trim()
-        sc = Stri(when.getSeconds()).trim()
-        date = wd + ", " + dom + " " + mon + " " + yr + " " + hr + ":" + mn + ":" + sc + " GMT"
+        yr = when.getYear()
+        hr = when.getHours()
+        mn = when.getMinutes()
+        sc = when.getSeconds()
+        date = `${wd}, ${dom} ${mon} ${yr} ${hr}:${mn}:${sc} GMT"`
         return date
     end function
 
@@ -105,23 +110,7 @@ namespace TimeUtils
             ma = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
             m.Num2Month = ma
         end if
-        return validstr(ma[mNum - 1])
-    end function
-
-    function ParseTime(time as string) as integer
-        hours = 0
-        minutes = 0
-        seconds = 0
-        tokens = time.Tokenize(":")
-        if tokens.Count() = 3
-            hours = tokens[0].ToInt()
-            minutes = tokens[1].ToInt()
-            seconds = tokens[2].ToInt()
-        else if tokens.Count() = 2
-            minutes = tokens[0].ToInt()
-            seconds = tokens[1].ToInt()
-        end if
-        return hours * 3600 + minutes * 60 + seconds
+        return ValidString(ma[mNum - 1])
     end function
 
 end namespace

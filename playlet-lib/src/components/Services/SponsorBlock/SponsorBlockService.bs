@@ -1,0 +1,122 @@
+import "pkg:/source/utils/ColorUtils.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/services/HttpClient.bs"
+
+namespace SponsorBlock
+    const SKIP_SEGMENT_ENDPOINT = "/api/skipSegments"
+    const VIEWED_SEGMENT_ENDPOINT = "/api/viewedVideoSponsorTime"
+
+
+    class SponsorBlockService
+        function new()
+            m.sponsorBlockConfig = ParseJson(ReadAsciiFile("libpkg:/config/sponsorblock_config.json5"))
+        end function
+
+        function SegmentColor(category as string) as integer
+            if m.sponsorBlockConfig = invalid
+                return 0
+            end if
+
+            if not m.sponsorBlockConfig.categories.doesexist(category)
+                return 0
+            end if
+
+            color = m.sponsorBlockConfig.categories[category].color
+            return ColorUtils.HexToInt(color)
+        end function
+
+        function SegmentTitle(category as string) as string
+            if m.sponsorBlockConfig = invalid
+                return category
+            end if
+
+            if not m.sponsorBlockConfig.categories.doesexist(category)
+                return category
+            end if
+
+            return m.sponsorBlockConfig.categories[category].title
+        end function
+
+        function SegmentShortTitle(category as string) as string
+            if m.sponsorBlockConfig = invalid
+                return category
+            end if
+
+            if not m.sponsorBlockConfig.categories.doesexist(category)
+                return category
+            end if
+
+            return m.sponsorBlockConfig.categories[category].short_title
+        end function
+
+        function GetSkipSegmentsForVideo(videoId as string) as object
+            if m.sponsorBlockConfig = invalid or StringUtils.IsNullOrEmpty(m.sponsorBlockConfig.serverAddress)
+                return invalid
+            end if
+
+            categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "chapter", "filler", "exclusive_access"]
+            actionTypes = ["skip", "mute", "chapter", "full", "poi"]
+
+            categoriesJson = FormatJson(categories).EncodeUriComponent()
+            actionTypesJson = FormatJson(actionTypes).EncodeUriComponent()
+
+            ' From SponsorBlock docs: It should be the first 4 - 32 characters (4 is recommended).
+            hashPrefix = CryptoUtils.GetSha256(videoId).Left(4)
+            url = `${m.sponsorBlockConfig.serverAddress}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}/${hashPrefix}?categories=${categoriesJson}&actionTypes=${actionTypesJson}`
+            response = HttpClient.Get(url).Await()
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            for each item in json
+                if item.videoId = videoId
+                    return item.segments
+                end if
+            end for
+
+            return invalid
+        end function
+
+        function PostSegmentViewed(segmentId as string) as void
+            if m.sponsorBlockConfig = invalid or StringUtils.IsNullOrEmpty(m.sponsorBlockConfig.serverAddress)
+                return
+            end if
+
+            url = `${m.sponsorBlockConfig.serverAddress}${SponsorBlock.VIEWED_SEGMENT_ENDPOINT}?UUID=${segmentId}`
+            HttpClient.Post(url, "").SendAndForget()
+        end function
+
+        function GenerateProgressBarBackground(segments as object, lengthSeconds as integer, path as string)
+            bar = CreateObject("roBitmap", { width: 1000, height: 20, AlphaEnable: true })
+            bar.Clear(&hFFFFFF80)
+            width = bar.GetWidth()
+            height = bar.GetHeight()
+            for each segment in segments
+                videoDuration = lengthSeconds
+                if videoDuration = 0 or videoDuration = invalid
+                    ' We should ignore segment.videoDuration https://github.com/iBicha/playlet/pull/23#issuecomment-1431520676
+                    ' But in case where we don't have lengthSeconds from Invidious, it's better than nothing
+                    videoDuration = segment.videoDuration
+                end if
+                if videoDuration = 0 or videoDuration = invalid
+                    continue for
+                end if
+
+                pixelStart = (segment.segment[0] / videoDuration) * width
+                pixelEnd = (segment.segment[1] / videoDuration) * width
+                color = m.SegmentColor(segment.category)
+                ' highlight's duration is zero, so it is not visble on the bar.
+                ' Add a couple of pixels to see it
+                if pixelStart = pixelEnd
+                    pixelEnd += 2
+                end if
+                bar.DrawRect(pixelStart, 0, pixelEnd - pixelStart, height, color)
+            end for
+            bar.Finish()
+            buffer = bar.GetPng(0, 0, width, height)
+            buffer.WriteFile(path)
+        end function
+
+    end class
+end namespace

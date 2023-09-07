@@ -1,0 +1,43 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+
+function Init()
+    m.displayNames = {
+        "version": "Playlet Version",
+        "lib_version": "Playlet Library Version",
+        "lib_version_latest": "Playlet Library Latest Version",
+        "lib_url": "Playlet Library URL",
+        "lib_url_type": "Playlet Library URL Type",
+        "git_commit_hash": "Playlet Git Commit Hash",
+        "lib_git_commit_hash": "Playlet Library Git Commit Hash",
+        "id": "App ID"
+    }
+
+    m.keyValueList = m.top.findNode("KeyValueListContent")
+end function
+
+function OnNodeReady()
+    m.appInfo = m.applicationInfo@.GetAppInfo(invalid)
+
+    UpdateKeyValueList()
+
+    if m.appInfo.lib_version_latest = "N/A"
+        m.applicationInfo.ObserveFieldScoped("lib_version_latest", FuncName(OnAppInfoChanged))
+    end if
+end function
+
+function OnAppInfoChanged()
+    m.appInfo["lib_version_latest"] = m.applicationInfo.lib_version_latest
+    UpdateKeyValueList()
+end function
+
+function UpdateKeyValueList()
+    while m.keyValueList.getChildCount() > 0
+        m.keyValueList.removeChildIndex(0)
+    end while
+
+    for each item in m.appInfo
+        value = `${m.displayNames[item]}: ${m.appInfo[item]}`
+        contentNode = m.keyValueList.createChild("ContentNode")
+        contentNode.title = value
+    end for
+end function

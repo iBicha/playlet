@@ -1,0 +1,103 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+function Init()
+    m.screens = {}
+end function
+
+function OnNodeReady()
+    m.log = new log.Logger("AppController")
+
+    NodeSetFocus(m.top.root, true)
+end function
+
+function PushScreen(node as object)
+    m.stack.appendChild(node)
+    FocusTopScreen(invalid)
+end function
+
+function PopScreen(unused as dynamic)
+    childCount = m.stack.getChildCount()
+    if childCount > 1
+        m.stack.removeChildIndex(childCount - 1)
+        FocusTopScreen(invalid)
+    end if
+end function
+
+function FocusTopScreen(unused as dynamic)
+    childCount = m.stack.getChildCount()
+    topScreen = m.stack.getChild(childCount - 1)
+    NodeSetFocus(topScreen, true)
+end function
+
+function HideRootScreen(screenName as string) as void
+    if StringUtils.IsNullOrEmpty(screenName)
+        return
+    end if
+    if not m.screens.DoesExist(screenName)
+        return
+    end if
+    screen = m.screens[screenName]
+    if screen = invalid
+        return
+    end if
+    screen.visible = false
+end function
+
+function ShowRootScreen(screenName as string) as void
+    if StringUtils.IsNullOrEmpty(screenName)
+        return
+    end if
+    if not m.screens.DoesExist(screenName)
+        screen = CreateObject("roSGNode", screenName)
+        screen.id = screenName
+        m.screens[screenName] = screen
+        ' insert child at 0 to make sure it is behind the navbar
+        m.root.insertChild(screen, 0)
+        if screen.hasField("binding_done")
+            screen@.BindNode(invalid)
+        end if
+    end if
+    screen = m.screens[screenName]
+    if screen = invalid
+        return
+    end if
+    screen.visible = true
+end function
+
+function GetRootScreen(screenName as string) as object
+    if StringUtils.IsNullOrEmpty(screenName)
+        return invalid
+    end if
+    if not m.screens.DoesExist(screenName)
+        return invalid
+    end if
+    return m.screens[screenName]
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+    if key = "options"
+        VideoUtils.ToggleVideoPictureInPicture()
+    else if key = "back"
+        dialog = DialogUtils.ShowDialogButtons("Do you want to exit Playlet?", "Exit", ["Exit", "Cancel"])
+        dialog.observeField("buttonSelected", FuncName(OnExitDialog), ["buttonSelected"])
+        return true
+    end if
+
+    return false
+end function
+
+function OnExitDialog(event as object)
+    buttonIndex = event.GetData()
+    if buttonIndex = 0 ' Exit
+        m.log.info("Exiting app")
+        m.top.getScene().exitChannel = true
+    end if
+end function

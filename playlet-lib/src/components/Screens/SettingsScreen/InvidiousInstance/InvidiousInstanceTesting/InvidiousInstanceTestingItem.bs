@@ -1,0 +1,48 @@
+import "pkg:/source/utils/StringUtils.bs"
+
+function Init()
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busyspinner.poster.width = 40
+    m.busyspinner.poster.height = 40
+
+    m.nameLabel = m.top.findNode("nameLabel")
+    m.detailsLabel = m.top.findNode("detailsLabel")
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+
+    m.nameLabel.text = content.title
+    m.top.state = content.state
+end function
+
+function OnStateChange()
+    if m.top.state = "loading"
+        m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+        m.busySpinner.control = "start"
+    else if m.top.state = "failed"
+        m.busySpinner.poster.uri = "pkg:/images/icons/test-failed.png"
+        m.busySpinner.control = "stop"
+        m.busySpinner.poster.rotation = 0
+    else if m.top.state = "passed"
+        m.busySpinner.poster.uri = "pkg:/images/icons/test-passed.png"
+        m.busySpinner.control = "stop"
+        m.busySpinner.poster.rotation = 0
+    end if
+end function
+
+function OnItemHasFocusChange() as void
+    if m.top.itemContent = invalid
+        m.detailsLabel.visible = false
+        return
+    end if
+    m.detailsLabel.visible = m.top.itemHasFocus and not StringUtils.IsNullOrEmpty(m.top.itemContent.details)
+end function
+
+function OnFocusPercentChange() as void
+    if m.top.itemContent = invalid or not m.top.gridHasFocus
+        m.detailsLabel.visible = false
+        return
+    end if
+    m.detailsLabel.visible = m.top.focusPercent > 0.5 and not StringUtils.IsNullOrEmpty(m.top.itemContent.details)
+end function

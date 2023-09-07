@@ -1,0 +1,155 @@
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+
+' TODO:P2 use already loaded thumbnail, and crossfade to highres version (using same Poster)
+function Init()
+    m.log = new log.Logger("PlaylistView")
+
+    m.background = m.top.findNode("background")
+    m.backgroundSmall = m.top.findNode("backgroundSmall")
+    m.titleLabel = m.top.findNode("titleLabel")
+    m.subtitleLabel = m.top.findNode("subtitleLabel")
+    m.descriptionLabel = m.top.findNode("descriptionLabel")
+    m.list = m.top.findNode("list")
+end function
+
+function OnNodeReady()
+    m.list.ObserveField("itemFocused", FuncName(OnItemFocused))
+    m.list.observeField("itemSelected", FuncName(OnItemSelected))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.list, true)
+end function
+
+function OnContentSet() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = content.title
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    m.subtitleLabel.text = `${content._author} • ${content.videoCountText} • ${content.viewCountText}`
+    m.descriptionLabel.text = content.description
+
+    ' TODO:P2 cross fade
+    m.backgroundSmall.uri = content.thumbnail
+    m.background.uri = content.thumbnailBackground
+
+    itemFocused = m.list.itemFocused
+    m.list.content = content
+    if itemFocused > -1 and content.getChildCount() > itemFocused
+        m.list.jumpToItem = itemFocused
+    end if
+    LoadPlaylistIfNeeded()
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+
+    if key = "back"
+        Close()
+        return true
+    end if
+    return false
+end function
+
+function Close()
+    if m.playlistLoadTask <> invalid
+        m.playlistLoadTask.cancel = true
+    end if
+
+    m.appController@.PopScreen(invalid)
+end function
+
+function OnItemFocused()
+    LoadPlaylistIfNeeded()
+end function
+
+function OnItemSelected(event as object)
+    index = event.getData()
+    playlist = m.list.content
+    playlistId = playlist.playlistId
+    video = playlist.getChild(index)
+    videoId = video.videoId
+    if not StringUtils.IsNullOrEmpty(videoId)
+        m.log.info("Play playlist: " + playlistId + " video: " + videoId)
+        m.playQueue@.Play(playlist, index)
+    end if
+end function
+
+function LoadPlaylistIfNeeded() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    if not content.loadState = FeedLoadState.LoadedPage and not content.loadState = FeedLoadState.None
+        return
+    end if
+
+    videoCount = content.videoCount
+    currentVideosCount = content.getChildCount()
+    if videoCount = currentVideosCount
+        return
+    end if
+
+    itemFocused = m.list.itemFocused
+    if itemFocused < currentVideosCount - 5
+        return
+    end if
+
+    LoadPlaylist()
+end function
+
+function LoadPlaylist() as void
+    if m.playlistLoadTask <> invalid
+        m.playlistLoadTask.cancel = true
+    end if
+
+    m.top.content.loadState = FeedLoadState.Loading
+    m.playlistLoadTask = StartAsyncTask(PlaylistContentTask, {
+        content: m.top.content,
+        invidious: m.top.invidious
+    }, OnPlaylistContentTaskResult)
+end function
+
+function OnPlaylistContentTaskResult(output as object) as void
+    m.playlistLoadTask = invalid
+
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        playlistId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
+        return
+    end if
+
+    LoadPlaylistIfNeeded()
+end function

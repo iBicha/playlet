@@ -1,0 +1,41 @@
+import "pkg:/source/services/SearchHistory.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function SearchSuggestionsTask(input as object) as object
+    q = input.q
+    invidiousNode = input.invidious
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : service.SearchSuggestions(q, m.top.cancellation)
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    history = SearchHistory.GetSaved(q)
+
+    if searchSuggestsions <> invalid
+        history = MergeSearchSuggestions(history, searchSuggestsions.suggestions)
+    end if
+
+    return {
+        q: q,
+        response: history
+    }
+end function
+
+function MergeSearchSuggestions(history as object, queryResults as object, maxItems = 10 as integer) as object
+    if queryResults = invalid
+        return history
+    end if
+    while history.Count() < maxItems and queryResults.Count() > 0
+        history.push(queryResults.shift())
+    end while
+    return history
+end function

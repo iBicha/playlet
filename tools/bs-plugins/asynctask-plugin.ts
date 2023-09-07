@@ -1,3 +1,5 @@
+// This plugin generates a task component for each function annotated with @asynctask
+
 import {
     CompilerPlugin,
     BscFile,
@@ -17,7 +19,7 @@ declare type FunctionInFile = {
 }
 
 export class AsyncTaskPlugin implements CompilerPlugin {
-    public name = 'asyncTaskPlugin';
+    public name = 'AsyncTaskPlugin';
 
     private asyncTaskFunctions: FunctionInFile[] = []
     private duplicatesReporeted: FunctionInFile[] = []
@@ -157,9 +159,15 @@ export class AsyncTaskPlugin implements CompilerPlugin {
     generateBsTask(functionName: string, hasInput: boolean, file: BscFile): string {
         return `
 import "pkg:/${file.pkgPath}"
+import "pkg:/source/utils/ErrorUtils.bs"
 
 function Init()
     m.top.functionName = "TaskMain"
+    m.top.cancellation = {
+        node: m.top,
+        field: "cancel",
+        value: true
+    }
 end function
 
 function TaskMain()
@@ -167,11 +175,19 @@ function TaskMain()
         result = ${functionName}(${(hasInput ? "m.top.input" : "")})
         m.top.setField("output", {
             success: true,
+            task: m.top,
+            cancelled: m.top.cancel,
             result: result
         })
     catch e
+        #if DEBUG
+            print "ERROR in ${functionName}: "
+            print ErrorUtils.Format(e)
+        #end if
         m.top.setField("output", {
             success: false,
+            task: m.top,
+            cancelled: m.top.cancel,
             error: e
         })
     end try
@@ -187,6 +203,8 @@ end function
   <interface>
     <field id="input" type="assocarray" />
     <field id="output" type="assocarray" />
+    <field id="cancel" type="boolean" alwaysNotify="true" />
+    <field id="cancellation" type="assocarray" />
   </interface>
   <script type="text/brightscript" uri="pkg:/${bsFile}" />
 </component>`
