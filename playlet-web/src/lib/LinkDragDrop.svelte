@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { PlayletApi } from "./PlayletApi";
-  import { playletStateStore } from "./Stores";
-  import { InvidiousApi } from "./InvidiousApi";
-  import VideoStartAt from "./VideoStartAt.svelte";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { playletStateStore } from "lib/Stores";
+  import { InvidiousApi } from "lib/Api/InvidiousApi";
+  import VideoStartAt from "lib/VideoStartAt.svelte";
 
   let modal;
   let isDragging;

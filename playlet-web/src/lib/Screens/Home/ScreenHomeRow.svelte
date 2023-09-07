@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { InvidiousApi } from "./InvidiousApi";
-  import { invidiousVideoApiStore, playletStateStore } from "./Stores";
-  import VideoCell from "./VideoCell.svelte";
+  import { InvidiousApi } from "lib/Api/InvidiousApi";
+  import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
+  import VideoCell from "lib/Screens/Home/VideoCell.svelte";
 
   export let requestData: any = undefined;
   export let videos = undefined;

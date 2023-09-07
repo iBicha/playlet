@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { InvidiousApi } from "./InvidiousApi";
-  import { PlayletApi } from "./PlayletApi";
-  import { playletStateStore, searchHistoryStore } from "./Stores";
-  import VideoCell from "./VideoCell.svelte";
-  import SearchThinIcon from "../assets/search-thin-icon.svg.svelte";
+  import { InvidiousApi } from "lib/Api/InvidiousApi";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { playletStateStore, searchHistoryStore } from "lib/Stores";
+  import VideoCell from "lib/Screens/Home/VideoCell.svelte";
+  import SearchThinIcon from "assets/search-thin-icon.svg.svelte";
 
   export let visibility: boolean;
 

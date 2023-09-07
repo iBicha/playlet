@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { PlayletApi } from "./PlayletApi";
-  import { playletStateStore } from "./Stores";
+  import { PlayletApi } from "lib/Api/PlayletApi";
+  import { playletStateStore } from "lib/Stores";
 
   let selectedRelease = "";
   let releases = [];

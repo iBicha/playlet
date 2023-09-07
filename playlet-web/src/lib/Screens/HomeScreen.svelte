@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ScreenHomeRow from "./ScreenHomeRow.svelte";
-  import { homeLayoutFileStore } from "./Stores";
+  import ScreenHomeRow from "lib/Screens/Home/ScreenHomeRow.svelte";
+  import { homeLayoutFileStore } from "lib/Stores";
 
   export let visibility: boolean;
 </script>

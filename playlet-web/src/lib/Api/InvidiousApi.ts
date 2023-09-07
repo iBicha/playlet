@@ -1,4 +1,4 @@
-import { PlayletApi } from "./PlayletApi";
+import { PlayletApi } from "lib/Api/PlayletApi";
 
 export class InvidiousApi {
     public instance: string;
@@ -9,7 +9,7 @@ export class InvidiousApi {
     responseHandlers: any;
 
     constructor() {
-        // Note: AuthFeedHandler and AuthPlaylistsHandler are not needed, since it is handled server side
+        // Note: handlers for authenticated requests are not needed, since they are handled server side
         this.responseHandlers = {
             "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
             "PlaylistHandler": (requestData, response) => this.PlaylistHandler(requestData, response),

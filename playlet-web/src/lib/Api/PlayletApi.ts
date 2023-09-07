@@ -1,4 +1,4 @@
-import { getHost } from "./Host";
+import { getHost } from "lib/Api/Host";
 
 export class PlayletApi {
     static host = () => `http://${getHost()}`
