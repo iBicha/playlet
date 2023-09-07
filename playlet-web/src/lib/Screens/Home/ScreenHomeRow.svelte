@@ -2,6 +2,7 @@
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
   import VideoCell from "lib/Screens/Home/VideoCell.svelte";
+  import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
 
   export let requestData: any = undefined;
   export let videos = undefined;
@@ -37,7 +38,16 @@
   async function updateRow() {
     const result = await invidiousApi.makeRequest(requestData);
     if (result) {
-      videos = result;
+      result.forEach((item) => {
+        if (item.videoId) {
+          item.type = "video";
+        } else if (item.playlistId) {
+          item.type = "playlist";
+        }
+      });
+      videos = result.filter(
+        (video) => video.type === "video" || video.type === "playlist"
+      );
     }
   }
 
@@ -62,7 +72,11 @@
     {#each videos as video, i}
       <div class="carousel-item w-80 p-2">
         {#if i >= scrollStart && i <= scrollEnd}
-          <VideoCell {...video} />
+          {#if video.type === "video"}
+            <VideoCell {...video} />
+          {:else if video.type === "playlist"}
+            <PlaylistCell {...video} />
+          {/if}
         {/if}
       </div>
     {/each}

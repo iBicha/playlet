@@ -61,7 +61,21 @@ export class PlayletApi {
             args["author"] = author;
         }
 
-        await PlayletApi.postJson(`${PlayletApi.host()}/api/player/play`, args);
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue/play`, args);
+    }
+
+    static async playPlaylist(playlistId, title, videoCount) {
+        if (!playlistId) {
+            return;
+        }
+        const args = { playlistId };
+        if (title !== undefined) {
+            args["title"] = title;
+        }
+        if (videoCount !== undefined) {
+            args["author"] = videoCount;
+        }
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue/play`, args);
     }
 
     static async queueVideo(videoId, timestamp, title, author) {
@@ -81,7 +95,22 @@ export class PlayletApi {
         if (author !== undefined) {
             args["author"] = author;
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/player/queue`, args);
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
+        return await response.json();
+    }
+
+    static async queuePlaylist(playlistId, title, videoCount) {
+        if (!playlistId) {
+            return;
+        }
+        const args = { playlistId };
+        if (title !== undefined) {
+            args["title"] = title;
+        }
+        if (videoCount !== undefined) {
+            args["author"] = videoCount;
+        }
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
         return await response.json();
     }
 

@@ -3,6 +3,7 @@
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore, searchHistoryStore } from "lib/Stores";
   import VideoCell from "lib/Screens/Home/VideoCell.svelte";
+  import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
   import SearchThinIcon from "assets/search-thin-icon.svg.svelte";
 
   export let visibility: boolean;
@@ -153,6 +154,8 @@
       {#each videos as video}
         {#if video.type === "video"}
           <VideoCell {...video} />
+        {:else if video.type === "playlist"}
+          <PlaylistCell {...video} />
         {/if}
       {/each}
     </div>
