@@ -1,0 +1,50 @@
+namespace QrCode
+    class QRBitBuffer
+        function new()
+            m.buffer = []
+            m.numberOfBits = 0
+        end function
+
+        private function getBufferIndex(bitIndex as integer) as integer
+            return int(bitIndex / 8)
+        end function
+
+        public function getBuffer() as object
+            return m.buffer
+        end function
+
+        public function getBit(index as integer) as integer
+            if ((m.buffer[m.getBufferIndex(index)] >> (7 - index mod 8)) and 1) = 1
+                return 1
+            else
+                return 0
+            end if
+        end function
+
+        public function getLengthInBits() as integer
+            return m.numberOfBits
+        end function
+
+        public function put(num as integer, length as integer)
+            for i = 0 to length - 1 step 1
+                m.pushBit(((num >> (length - i - 1)) and 1) = 1)
+            end for
+        end function
+
+        public function pushBit(isSet as boolean)
+            bufIndex = m.getBufferIndex(m.numberOfBits)
+
+            if m.buffer.count() <= bufIndex
+                m.buffer.push(0)
+            end if
+
+            if isSet = true
+                m.buffer[bufIndex] = m.buffer[bufIndex] or (&H80 >> (m.numberOfBits mod 8))
+            end if
+
+            m.numberOfBits += 1
+        end function
+
+    end class
+
+end namespace

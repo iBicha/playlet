@@ -1,0 +1,49 @@
+namespace QrCode
+
+    class QRMath
+
+        function new()
+            EXP_TABLE = createObject("roArray", 256, false)
+            LOG_TABLE = createObject("roArray", 256, false)
+
+            ' initialize tables
+            for i = 0 to 7 step 1
+                EXP_TABLE[i] = 1 << i
+            end for
+
+            for i = 8 to 255 step 1
+                EXP_TABLE[i] = qrXOR(qrXOR(qrXOR(EXP_TABLE[i - 4], EXP_TABLE[i - 5]), EXP_TABLE[i - 6]), EXP_TABLE[i - 8])
+            end for
+
+            for i = 0 to 254 step 1
+                LOG_TABLE[EXP_TABLE[i]] = i
+            end for
+
+
+            m.EXP_TABLE = EXP_TABLE
+            m.LOG_TABLE = LOG_TABLE
+        end function
+
+        function glog(n as integer) as dynamic
+            if n < 1
+                ' print "ERROR: invalid n passed to glog", n
+                return invalid
+            end if
+
+            return m.LOG_TABLE[n]
+        end function
+
+        function gexp(n as integer) as integer
+            while n < 0
+                n += 255
+            end while
+
+            while n >= 256
+                n -= 255
+            end while
+
+            return m.EXP_TABLE[n]
+        end function
+    end class
+
+end namespace
