@@ -1,0 +1,79 @@
+import "pkg:/source/utils/CryptoUtils.bs"
+import "QRCode.bs"
+
+namespace QrCode
+
+    class QRImage
+        function Generate(text as string, size as integer, padding as integer, mode = QrCode.QrMode.BYTE as QrCode.QrMode) as string
+            fileName = m.GetFileName(text, mode, size, padding)
+            fs = CreateObject("roFileSystem")
+            if fs.exists(fileName)
+                return fileName
+            end if
+
+            qr = new QrCode.QRCode()
+            qr.addData(text, mode)
+            qr.make()
+
+            if qr.status = "ready"
+                return m.toPNG(qr, size, padding, fileName)
+            end if
+
+            return ""
+        end function
+
+        function GetFileName(text as string, mode as QrCode.QrMode, size as integer, padding as integer) as string
+            key = `v1-${text}-${mode}-${size}-${padding}`
+            key = CryptoUtils.GetMd5(key)
+            return "cachefs:/" + key + ".png"
+        end function
+
+        private function toPNG(qr as object, qrSize as integer, padding as integer, fileName as string) as string
+            ' Calculate sizes and coords
+            moduleCount = qr.moduleCount
+            maxSize = fix(qrSize - padding - padding)
+
+            if maxSize < moduleCount
+                return ""
+            end if
+
+            cellSize = maxSize \ moduleCount
+            size = cellSize * moduleCount
+            center = size \ 2
+            left = (fix(qrSize - padding - padding) \ 2) - center + padding
+            top = left
+
+            ' Prepare colors
+            white = &Hffffffff
+            black = &H000000ff
+
+            bitmap = createObject("roBitmap", {
+                width: qrSize,
+                height: qrSize,
+                AlphaEnable: false
+            })
+            bitmap.clear(white)
+
+            ' Render QRCode to bitmap
+            y = top
+            for row = 0 to moduleCount - 1 step 1
+                x = left
+                for col = 0 to moduleCount - 1 step 1
+                    if qr.isDark(row, col)
+                        bitmap.drawRect(x, y, cellSize, cellSize, black)
+                    end if
+                    x += cellSize
+                end for
+
+                y += cellSize
+            end for
+            bitmap.finish()
+
+            ' Save bitmap to file
+            pngData = bitmap.getPNG(0, 0, qrSize, qrSize)
+            pngData.writeFile(fileName)
+
+            return fileName
+        end function
+    end class
+end namespace

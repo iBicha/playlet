@@ -1,0 +1,76 @@
+namespace QrCode
+
+    class QRPolynomial
+        function new(math as QRMath, num as object, shift as integer)
+            if type(num) <> "roArray"
+                throw `Invalid num ${num}/${shift}`
+            end if
+
+            offset = 0
+            while offset < num.count() and num[offset] = 0
+                offset += 1
+            end while
+
+            _numSize = num.count() - offset + shift
+            _num = createObject("roArray", _numSize, false)
+            for i = 0 to num.count() - offset - 1 step 1
+                _num[i] = num[i + offset]
+            end for
+
+            ' brs implementation does not seem to support roArray's size param
+            if _num.count() < _numSize
+                for i = _num.count() to _numSize - 1 step 1
+                    _num[i] = invalid
+                end for
+            end if
+
+            m._num = _num
+            m.math = math
+        end function
+
+        function getAt(index as integer) as integer
+            return m._num[index] ?? 0
+        end function
+
+        function getLength() as integer
+            return m._num.count()
+        end function
+
+        function multiply(e as QRPolynomial) as object
+            num = createObject("roArray", m.getLength() + e.getLength() - 1, false)
+
+            for i = 0 to m.getLength() - 1 step 1
+                for j = 0 to e.getLength() - 1 step 1
+                    if num[i + j] = invalid
+                        num[i + j] = 0
+                    end if
+                    num[i + j] = qrXOR(num[i + j], m.math.gexp(m.math.glog(m.getAt(i)) + m.math.glog(e.getAt(j))))
+                end for
+            end for
+
+            return new QRPolynomial(m.math, num, 0)
+        end function
+
+        function modulo(e as QRPolynomial) as object
+            if m.getLength() - e.getLength() < 0
+                return m
+            end if
+
+            ratio = m.math.glog(m.getAt(0)) - m.math.glog(e.getAt(0))
+
+            num = createObject("roArray", m.getLength(), false)
+            for i = 0 to m.getLength() - 1 step 1
+                num[i] = m.getAt(i)
+            end for
+
+            for i = 0 to e.getLength() - 1 step 1
+                num[i] = qrXOR(num[i], m.math.gexp(m.math.glog(e.getAt(i)) + ratio))
+            end for
+
+            ' recursive call
+            return (new QRPolynomial(m.math, num, 0)).modulo(e)
+        end function
+
+    end class
+
+end namespace

@@ -1,8 +1,30 @@
+import "pkg:/source/QrCode/QrImage.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
 @asynctask
 function GenerateQrCodeTask(input as object)
-    ' TODO:P1 QR Code generation is happening on UI thread and is hanging for a second
-    ' Needs to be properly decoupled from Node logic
-    qrPoster = input.qrPoster
+    poster = input.poster
+    mode = input.mode
     text = input.text
-    qrPoster.text = text
+    size = input.size
+    padding = input.padding
+
+    if mode = invalid
+        mode = QrCode.QRMode.BYTE
+    end if
+
+    if size = invalid
+        size = 200
+    end if
+
+    if padding = invalid
+        padding = 0
+    end if
+
+    qr = new QrCode.QRImage()
+    imagePath = qr.Generate(text, size, padding, mode)
+
+    if not StringUtils.IsNullOrEmpty(imagePath)
+        poster.uri = imagePath
+    end if
 end function

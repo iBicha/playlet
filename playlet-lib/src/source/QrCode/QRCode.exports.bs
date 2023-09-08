@@ -1,0 +1,69 @@
+namespace QrCode
+    ' BrightScript does not provide bitwise `not`, so we need own implementation
+    ' "namespaced" to avoid potential conflicts
+    function qrNOT(a as integer) as integer
+        return &HFFFFFFFF - a
+    end function
+
+    ' BrightScript does not provide bitwise `xor`, so we need own implementation
+    ' "namespaced" to avoid potential conflicts
+    function qrXOR(a as integer, b as integer) as integer
+        return (qrNOT(a and b) and (a or b))
+    end function
+
+    function qrMax(a as dynamic, b as dynamic) as dynamic
+        return a >= b ? a : b
+    end function
+
+    function QRErrorCorrectionLevel() as object
+        return {
+            L: 1,
+            M: 0,
+            Q: 3,
+            H: 2
+        }
+    end function
+
+    function QRMaskFunctions() as object
+        result = {}
+
+        result.PATTERN000 = function(i as dynamic, j as dynamic) as boolean
+            return (i + j) mod 2 = 0
+        end function
+
+        result.PATTERN001 = function(i as dynamic, _j as dynamic) as boolean
+            return i mod 2 = 0
+        end function
+
+        result.PATTERN010 = function(_i as dynamic, j as dynamic) as boolean
+            return j mod 3 = 0
+        end function
+
+        result.PATTERN011 = function(i as dynamic, j as dynamic) as boolean
+            return (i + j) mod 3 = 0
+        end function
+
+        result.PATTERN100 = function(i as dynamic, j as dynamic) as boolean
+            return ((i \ 2) + (j \ 3)) mod 2 = 0
+        end function
+
+        result.PATTERN101 = function(i as dynamic, j as dynamic) as boolean
+            return ((i * j) mod 2) + ((i * j) mod 3) = 0
+        end function
+
+        result.PATTERN110 = function(i as dynamic, j as dynamic) as boolean
+            return (((i * j) mod 2) + ((i * j) mod 3)) mod 2 = 0
+        end function
+
+        result.PATTERN111 = function(i as dynamic, j as dynamic) as boolean
+            return (((i * j) mod 3) + ((i + j) mod 2)) mod 2 = 0
+        end function
+
+        return result
+    end function
+
+    function QRMaskPatterns() as object
+        return QRMaskFunctions().keys()
+    end function
+
+end namespace
