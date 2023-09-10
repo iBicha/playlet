@@ -98,7 +98,7 @@ Consider a "behaviour" that we want in multiple components. For example:
 <!-- Beep.xml -->
 <component name="Beep" extends="Node">
     <interface>
-        <field id="beep" type="boolean" alwaysNotify="true" onChange="OnBeepSet" />
+        <field id="beepNow" type="boolean" alwaysNotify="true" onChange="OnBeepSet" />
     </interface>
     <script type="text/brightscript" uri="pkg:/path/to/Beep.bs" />
 </component>
