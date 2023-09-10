@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.11.0] - 2023-09-10
 
 This version went through a major refactor, which resulted in a different arcitecture of the app to support new features, the rewrite of many pieces, as well as new features.
 
