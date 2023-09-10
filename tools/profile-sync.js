@@ -43,7 +43,7 @@ async function importInvidiousProfile(invidiousInstance, token, profile) {
             },
             method: "POST",
             body: JSON.stringify(piece.profile)
-        })    
+        })
     }
 }
 
@@ -298,7 +298,7 @@ async function deleteAccessToken(invidiousInstance, token) {
                 const playlist = playlists[i];
                 try {
                     profile.playlists.push(await generatePlaylist(playlist.url, playlist.title, browser, playlistLimit))
-                    playlistsToDelete.push(playlist.title)    
+                    playlistsToDelete.push(playlist.title)
                 } catch (error) {
                     console.log(error)
                 }
@@ -316,11 +316,11 @@ async function deleteAccessToken(invidiousInstance, token) {
                     throw new Error(`Could not connect to Playlet at ${PLAYLEY_SERVER}\n${error}`)
                 }
             }
-    
+
             token = await getAccessToken(invidiousInstance)
-    
+
             await deletePlaylists(invidiousInstance, token, playlistsToDelete)
-            await importInvidiousProfile(invidiousInstance, token, profile);    
+            await importInvidiousProfile(invidiousInstance, token, profile);
         }
 
     }
