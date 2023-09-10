@@ -48,6 +48,7 @@ This version went through a major refactor, which resulted in a different arcite
 - The developer settings are now always visible in the web app
 - The web server is now decoupled from Playlet specific logic
 - When not logged in, authenticated feed (like user Subscriptions and Playlists) show a "Login to view X" message, with a QR Code that redirects to the login screen
+- [Breaking change] web apis changed a bit (for example the `/api/command` endpoint is removed) refer to the [Open API spec](docs/playlet-web-api.yml)
 
 ### Removed
 
