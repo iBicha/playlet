@@ -289,13 +289,21 @@ namespace Invidious
             if tokenPayload = invalid
                 return invalid
             end if
-            authData = ParseJson(tokenPayload)
-            ' TODO:P0 delete token if we're missing scope
-            if authData = invalid or authData.instance = invalid or authData.token = invalid
+            authToken = ParseJson(tokenPayload)
+            if authToken = invalid or authToken.instance = invalid or authToken.token = invalid
                 RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
                 return invalid
             end if
-            return authData
+            if not m.VerifyTokenScope(authToken.token)
+                ' TODO:P1 automatically logging out the user is not a good experience
+                ' We can at least show a message to the user on why they are logged out
+                ' TODO:P2 right now we're probably in a UI thread, and we can't unregister the token
+                ' So we're just going to ignore it for now
+                ' m.UnregisterToken(authToken)
+                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+                return invalid
+            end if
+            return authToken
         end function
 
         function SetAuthToken(token as string, instance as string, username as dynamic)
@@ -309,6 +317,19 @@ namespace Invidious
             RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
 
             m.node.authToken = obj
+        end function
+
+        function VerifyTokenScope(token as string) as boolean
+            tokenObject = ParseJson(token)
+            if tokenObject = invalid
+                return false
+            end if
+            if not IsArray(tokenObject.scopes)
+                return false
+            end if
+
+            scopes = tokenObject.scopes.join(",")
+            return scopes = Invidious.AUTH_SCOPES
         end function
 
         function DeleteAuthToken()
