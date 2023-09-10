@@ -6,6 +6,8 @@ Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommuni
 
 ## Json5/Yaml support
 
+**[Source](tools/bs-plugins/json-yaml-plugin.ts)**
+
 This plugin allows us to include `jsonc`, `json5` and `yaml` files into the app as static assets. They are an alternative to plain `json`, which for instance, does not support comments. Additionally, this plugin minifies the `json` files.
 
 ### Why
@@ -17,6 +19,8 @@ Brightscript can only parse json natively using [ParseJson](https://developer.ro
 At the end of the build, the plugin scans for certain files (`jsonc`, `json`, `json5` and `yaml`), and converts them to plain json, while keeping the original file name. That way they are all parsable by the [ParseJson](https://developer.roku.com/en-ca/docs/references/brightscript/language/global-utility-functions.md#parsejsonjsonstring-as-string-flags---as-string-as-object) function, even though their original format is not compatible.
 
 ## Manifest editing
+
+**[Source](tools/bs-plugins/manifest-edit-plugin.ts)**
 
 This plugin allows us to make modifications to the app manifest dynamically, mostly based on compiler flags.
 
@@ -33,6 +37,8 @@ A few reasons. For example:
 We simply read the content of the original manifest, and modify it before the compilation starts. When the build is finished, we restore the source file of the manifest.
 
 ## Validation
+
+**[Source](tools/bs-plugins/validation-plugin.ts)**
 
 This plugin allows us to add custom diagnostic errors messages to source code, to prevent using certain patterns of functions.
 
@@ -79,6 +85,8 @@ node.ObserveField("someField", "OnSomeFieldChanged")
 ```
 
 ## Includes
+
+**[Source](tools/bs-plugins/component-includes-plugin.ts)**
 
 This plugin allows us "include" different pieces of a component, enabling [Composition over inheritance](https://en.wikipedia.org/wiki/Composition_over_inheritance)
 
@@ -153,6 +161,8 @@ A couple of more details:
 
 ## @oninit
 
+**[Source](tools/bs-plugins/oninit-plugin.ts)**
+
 `@oninit` is an annotation that can be added to functions, and then these functions will be called in the `Init()` function of the component it is in.
 
 ### Why
@@ -203,6 +213,8 @@ Important implementation details:
 - functions with `@oninit` must have no arguments.
 
 ## Bindings
+
+**[Source](tools/bs-plugins/bindings-plugin.ts)**
 
 This plugin allows us to "bind" different node references together. It's a simple form of dependency injection to manage dependencies between nodes.
 
@@ -397,6 +409,8 @@ calling `BindNode` will trigger all the binding steps just for this node. But it
 
 ## Async Task Generator
 
+**[Source](tools/bs-plugins/asynctask-plugin.ts)**
+
 This plugin generates `Task` components a scripts that makes it simpler to call a function in a background thread, and get the result in a callback function.
 
 ### Why
@@ -441,6 +455,8 @@ The rest will be taken care of by the plugin, which will generate an `xml` file 
 Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `StartAsyncTask` create a new instance of the task every time.
 
 ## Tracking transpilied files
+
+**[Source](tools/bs-plugins/track-transpiled-plugin.ts)**
 
 By now, you realize we make a lot of transformations to the source code through many plugins. As a sanity check, this plugin allows us to keep track of the transpiled files, so we can be sure that the output is what we expect.
 
