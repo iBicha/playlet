@@ -7,9 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This version went through a major refactor, which resulted in a different arcitecture of the app to support new features, the rewrite of many pieces, as well as new features.
+
 ### Added
 
-- Slightly more information in the error dialog when videos fail to play
+- The concept of a `Queue`. Videos can now be queued to play one after another.
+  - Currently the queue is funcitonal, but no proper UI to support it, such as seeing the queue, clearing it, and so on.
+  - UI for the `Queue` will be introduced in a future version.
+  - Videos and playlists can be queued from the web app
+- Support for Playlists
+  - Home screen now shows both created and saved playlists
+  - Playlists have their own view to scroll through their videos
+  - Playlist videos play one after the other
+  - Playlists show up in search results
+- Continious scrolling of feed where supported (pagination)
+  - Subscriptions, Search, Playlists and Search based feeds (like `Funny` and `News` in the home screen)
+  - Not yet supported in the web app
+- Home screen placeholder items while items are loading
+- Settings screen has been rewritten with a better design
+- Access to public instances
+  - New UI to list public instances, or to specify a custom instance
+  - Testing system to make sure the instance is properly setup and usable
+- Playlet now tolerate certain missing configurations in Invidious (such as not configuring the domain)
+- Better error handling, error dialogs, with more information on what went wrong
+- Multiple Brighterscript plugins to support different functionalities of the app
+- Testing framework, and some tests
+- Performance imporvements
+  - Lazy loading where applicable
+  - Screens do not load until opened for the first time
+  - Not all feeds are loaded at once, feeds are loaded on demand while scrolling
+  - App profiled, some bottlenecks identified and fixed
+  - QR Code generation happens on background thread
+- More consistent logging, and the ability to retreive a log file of current run and the previous run
+- New `HttpClient` for making web requests, which supports `SendAndForget` and Cancellation, with a reduced `rendezvous`
+- Open API spec file describing available APIs in the Playlet Web Server
+
+### Changed
+
+- Lots of refactors and rewrites in general
+- The developer settings are now always visible in the web app
+- The web server is now decoupled from Playlet specific logic
+- When not logged in, authenticated feed (like user Subscriptions and Playlists) show a "Login to view X" message, with a QR Code that redirects to the login screen
+- [Breaking change] web apis changed a bit (for example the `/api/command` endpoint is removed) refer to the [Open API spec](docs/playlet-web-api.yml)
+
+### Removed
+
+- `roku-requests` package. A new HttpClient has been written to fit the need of Playlet instead. Some of the reasons to do this:
+  - It was causing a lot of `rendezvous`
+  - It has no real way to send a request without waiting for it to finish (send and forget)
+  - Some of the API was quirky (need to specify `parseJson: false` to ask it NOT to parse the response)
+  - It reads the response data, headers, error codes and etc even if they are not needed
+  - Excessive logging without a way to toggle it, or redirect it to a file
+- Some unused parts of the code (Like basic auth in the server, WebSockets, RegistryRouter, Kanji QR Code)
+  - These were unsued and/or feature flagged features. Things can be restored as needed.
+- The video player loading spinner when the video is minimized: this added too much hacky code with minimum value.
+
+### Fixed
+
+- Different issues caused by background tasks in the home screen
+- An issue caused by manipulating the loading spinner on the video player
+- An issue where the web server hangs if the payload contains unicode characters
 
 ## [0.10.3] - 2023-07-24
 

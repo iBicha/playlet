@@ -11,6 +11,7 @@ This document contains various kinds of information related to Playlet developme
   - [RALE (Roku Advanced Layout Editor)](#rale-roku-advanced-layout-editor)
   - [BrighterScript](#brighterscript)
   - [BrighterScript Linter/Formatter](#brighterscript-linterformatter)
+  - [BrighterScript Plugins](#brighterscript-plugins)
 - [Playlet App](#playlet-app)
   - [Why separate between Playlet and Playlet Lib?](#why-separate-between-playlet-and-playlet-lib)
 - [Playlet Lib](#playlet-lib)
@@ -23,6 +24,7 @@ This document contains various kinds of information related to Playlet developme
   - [User preferences](#user-preferences)
   - [Home page layout](#home-page-layout)
 - [Playlet Web App](#playlet-web-app)
+- [Testing](#testing)
   - [Svelte development](#svelte-development)
   - [Tailwind/Daisy UI](#tailwinddaisy-ui)
   - [API calls (proxy authenticated)](#api-calls-proxy-authenticated)
@@ -97,7 +99,7 @@ Well, if you do happen to use it, Playlet is configured to connect to RALE.
 
 ### BrighterScript
 
-[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language that compiles to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a couple of BrighterScript plugins (More on that later).
+[BrighterScript](https://github.com/rokucommunity/brighterscript) is a community driven programming language that compiles to BrightScript and has [useful features](https://github.com/rokucommunity/BrighterScript/blob/master/docs/readme.md). Playlet uses BrighterScript features a lot across the code base, and even implements a few of BrighterScript plugins.
 
 ### BrighterScript Linter/Formatter
 
@@ -112,17 +114,21 @@ npm run lint
 npm run lint:fix
 ```
 
+### BrighterScript Plugins
+
+See [Playlet Brighterscript Plugins](./plugins.md)
+
 ## Playlet App
 
-Playlet is split into two parts: `Playlet (the app)` and `Playlet Lib`.
+Playlet is split into two parts: `Playlet App` and `Playlet Lib`.
 
-Playlet (the app) is a regular Roku app, that uses a [ComponentLibrary](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/componentlibrary.md) to load the rest of the app from [Playlet Lib](#playlet-lib).
+`Playlet App` is a regular Roku app, that uses a [ComponentLibrary](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/componentlibrary.md) to load the rest of the app from [Playlet Lib](#playlet-lib).
 
-In a way, Playlet (the app) is a thin loader, while most of the logic lives in [Playlet Lib](#playlet-lib).
+In a way, `Playlet App` is a thin loader, while most of the logic lives in [Playlet Lib](#playlet-lib).
 
-Playlet app is responsible for a few things:
+`Playlet App` is responsible for a few things:
 
-- Load Playlet lib
+- Load `Playlet lib`
   - By default, it tries to load the latest version from Github
   - If that fails (for example, if Github was down), it fallsback to loading an embedded copy of Playlet Lib
     - `if Github was down` -> yes, this has happened in the past, and it did not stop Playlet for working.
@@ -142,11 +148,12 @@ There are a few reasons we made this separation:
 - It is simply easier to release: Releasing Playlet Lib on Github, and everyone receives the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
   - I've had instances where I was trying to pass the certfication for Playlet to publish it. One of the criterias is to pass a some automated tests. But the tests were failing because their system could not connect to their Roku test devices (connection keeps timing out). My only option was to keep trying over and over until it worked.
   - It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
+- Canary builds: The latest version of Playlet can be tested as soon as it lands in the main branch. This is a great way to test newer features in production, without affecting the stability of the released version. Roku has the concept of "beta" channels, but they are more cumbersome.
 - Enable forks. If for some reason someone wanted to use a fork of Playlet (for example, another folk had other features or bug fixes that this repo doesn't), they don't need to publish a complete new app. The url to load playlet is configurable, and can be changed through a simple web api. Allowing and enabling forks is what makes FOSS thrive.
 
 ## Playlet Lib
 
-Playlet Lib is a [ComponentLibrary](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/componentlibrary.md) that gets loaded by [Playlet App](#playlet-app). It containes pretty much all the logic needed to run the app.
+`Playlet Lib` is a [ComponentLibrary](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/componentlibrary.md) that gets loaded by [Playlet App](#playlet-app). It containes pretty much all the logic needed to run the app.
 
 ### WebServer
 
@@ -158,6 +165,10 @@ Playlet lib comes equipped with a web server that runs on port 8888 when the app
 - Authentication using Invidious
 
 The web server runs on a continiously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serve static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more.
+
+The server's API enpoints are described through the Open API spec file [playlet-web-api.yml](./playlet-web-api.yml)
+
+Please note: while we would like to keep the API stable as much as possible, Playlet can't reasonbly maintain multiple versions of the API like traditional web apis, because it adds complexity and maintainablity burden on an app the runs in constrained environment. In short, we'll try not to break the API, but we might from time to time.
 
 #### Debug endpoints
 
@@ -176,46 +187,12 @@ Since Component Libraries are simply zip files hosted at some https endpoint, Gi
 ### Dev library hosted by VS Code Extension
 
 When in debug mode, Playlet lib is packaged and served locally on port 8080, and Playlet app would use it instead of the Playlet lib from Github. This is an important detail, because once you stop debugging in VS Code, the dev app on your Roku TV won't function anymore, with an error:
+
 > Could not load Playlet component library from any of the following urls:
 >
 > - \[debug\] http://192.168.1.x:8080/playlet-lib.zip <!-- markdownlint-disable-line -->
-> Please restart Playlet.
-> If the problem persist, contact Playlet authors.
-
-### AsyncAwait Task Generator
-
-To implement functionality that runs in background threads, [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md)s must be used.
-
-Setting up a task involves lots of boilerplate: setting up the task in an xml file, defining inputs and outputs, code to listen for a task to finish, and so on.
-
-That's why there's a BrighterScript plugin that generates a task for a function with the attribute `@asynctask`.
-
-In a separate file, define the task function:
-
-```brighterscript
-@asynctask
-function MyBackgroundTask(input as object) as object
-    myVar = input.myVar
-
-    value = DoWork(myVar)
-
-    return {
-        value: value
-    }
-end function
-```
-
-And use the function like so
-
-```brighterscript
-StartAsyncTask(MyBackgroundTask, {myVar: "some input"}, function(output as object) as void
-    if output.success
-      print(output.result.value)
-    end if
-end function)
-```
-
-Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `StartAsyncTask` create a new instance of the task every time.
+>   Please restart Playlet.
+>   If the problem persist, contact Playlet authors.
 
 ### Feature flags
 
@@ -223,7 +200,7 @@ Playlet uses [bs_const](https://developer.roku.com/en-ca/docs/references/brights
 
 ### User preferences
 
-Playlet uses a json file that lists user preferences. It should be under [playlet-lib/src/config/preferences.json](/playlet-lib/src/config/preferences.json)
+Playlet uses a json file that lists user preferences. It should be under [playlet-lib/src/config/preferences.json5](/playlet-lib/src/config/preferences.json5)
 This file defines the kind of preferences that users can change, such as autoplay, preferred quality, and so on.
 
 This file is parsed at runtime and UI for the settings is generated. The same mechanism is used for Playlet and the Web App.
@@ -232,17 +209,34 @@ Additionally, the web server exposes the settings under `/api/preferences`, whic
 
 ### Home page layout
 
-When Playlet starts, it shows a video feed in the screen. Subscription, Trending videos, and so on.
+When Playlet starts, it shows a video feed on the screen. Subscription, Trending videos, and so on.
 
-The layout is defined under [playlet-lib/src/config/default_home_layout.json](/playlet-lib/src/config/default_home_layout.json).
+The layout is defined under [playlet-lib/src/config/default_home_layout.json5](/playlet-lib/src/config/default_home_layout.json5).
 
 This could allow users to define custom layouts, so they can see what they find relevant in the home page. This can include Subscription, Trending, Popular videos, Search per keywords, or Playlists.
 
 Additionally each feed has information on how it is fetched. For now, only Invidious can be data source, but other systems should be configured in the same way.
 
-Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json](/playlet-lib/src/config/invidious_video_api.json), and Playlet parses these at runtime and make the right API calls to fetch the data.
+Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json5](/playlet-lib/src/config/invidious_video_api.json5), and Playlet parses these at runtime and make the right API calls to fetch the data.
 
 Finally, this layout system is what allows both the BrightScript app and the Web app to display the same homepage.
+
+## Testing
+
+Playlet uses [Rooibos](https://github.com/georgejecook/rooibos) for testing.
+
+Files following the pattern `*.spec.bs` are considered test files and are only included in test builds.
+Additionally, sometimes tests require additional setup (creating test components with multiple files). In this case, they can all be placed in a folder named `tests`. Any `tests` folder will only be included in test builds.
+
+Running the tests for both `playlet-app` and `playlet-lib` can be done with a single command:
+
+```bash
+npm run test
+```
+
+Which will build the test app, deploy, run tests and parse the output for results.
+
+Tests do not cover a lot right now, but at least there's a testing setup in place.
 
 ## Playlet Web App
 
@@ -293,15 +287,11 @@ For API calls that don't require authentication, the web app fetches data from I
 
 ### Developer settings
 
-To access developer settings, open the web app, and append the parameter `dev=1` to the url. Example:
+The developer settings are only visible through the web app. They are found at the buttom of the settings page.
 
-```bash
-http://192.168.1.107:8888/index.html?dev=1
-```
+For now, it allows you to point to a different Github release other than the default `latest`.
 
-This reveals an additional settings section in preferences. For now, it allows you to point to a different Github release other than the default `latest`.
-
-This is mostly useful to QA the `unstable` release in a "production" setting before making it available to all users as the official "latest" version.
+This is mostly useful to QA the `unstable` release in a "production" setting before making it available to all users as the official "latest" version. Consider the `unstable` version a [Canary release](https://en.wikipedia.org/wiki/Feature_toggle#Canary_release)
 
 #### In case of a softlock
 

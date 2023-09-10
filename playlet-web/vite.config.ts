@@ -3,7 +3,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte'
 import tsconfigPaths from 'vite-tsconfig-paths'
 import ip from 'ip';
 import { existsSync, readFileSync } from 'fs'
-import { join as joinPath, resolve as resolvePath } from 'path'
+import { join as joinPath } from 'path'
 import { parse as dotEnvParse } from 'dotenv'
 
 const PORT = 5173
@@ -17,13 +17,22 @@ const config: UserConfig = {
 }
 
 // TODO:P2 refactor this with the same code in tools/get-env-vars.js
-function getEnvVars() {
+// The issue here is that the playlet-web is an ES module (as it should be)
+// But the tools are not (because brighterscript is expecting CommonJs)
+// so we can't import the function from the tools/get-env-vars.js.
+function getEnvVars(requiredVars = undefined) {
   const envFile = joinPath(__dirname, '../.env');
 
   let envVars = process.env;
   if (existsSync(envFile)) {
     const envConfig = dotEnvParse(readFileSync(envFile));
     envVars = { ...envVars, ...envConfig };
+  }
+  if (requiredVars) {
+    const missingVars = requiredVars.filter((key) => !envVars[key]);
+    if (missingVars.length) {
+      throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
+    }
   }
 
   return envVars;

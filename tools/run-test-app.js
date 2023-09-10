@@ -53,7 +53,7 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
     let success = false;
     let telnet;
     try {
-        const config = getEnvVars();
+        const config = getEnvVars(['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD']);
 
         const parser = getArgumentParser()
         const args = parser.parse_args()

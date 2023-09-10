@@ -4,11 +4,17 @@ const path = require('path');
 
 const envFile = path.join(__dirname, '../.env');
 
-function getEnvVars() {
+function getEnvVars(requiredVars = undefined) {
     let envVars = process.env;
     if (fs.existsSync(envFile)) {
         const envConfig = dotenv.parse(fs.readFileSync(envFile));
         envVars = { ...envVars, ...envConfig };
+    }
+    if (requiredVars) {
+        const missingVars = requiredVars.filter((key) => !envVars[key]);
+        if (missingVars.length) {
+            throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
+        }
     }
 
     return envVars;
