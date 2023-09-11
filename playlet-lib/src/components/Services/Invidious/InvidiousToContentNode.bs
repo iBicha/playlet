@@ -70,6 +70,8 @@ namespace InvidiousContent
         node.videoCountText = PlaylistGetVideoCountText(item)
         SetIfExists(node, "viewCount", item, "viewCount")
         node.viewCountText = PlaylistGetViewCountText(item)
+        SetIfExists(node, "updated", item, "updated")
+        node.updatedText = PlaylistGetUpdatedText(item)
 
         if item.videos <> invalid
             childCount = node.getChildCount()
@@ -208,4 +210,42 @@ namespace InvidiousContent
         return VideoGetViewCountText(playlistItem)
     end function
 
+    function PlaylistGetUpdatedText(playlistItem as object) as string
+        updated = playlistItem.updated
+        if not IsInt(updated)
+            return ""
+        end if
+        span = TimeUtils.Now().AsSeconds() - updated
+        if span < 1
+            return ""
+        end if
+
+        count = ""
+        total_days = span \ 86400
+        if total_days > 365
+            years = total_days \ 365
+            count = years > 1 ? `${years} years` : "1 year"
+        else if total_days > 30
+            months = total_days \ 30
+            count = months > 1 ? `${months} months` : "1 month"
+        else if total_days > 7
+            weeks = total_days \ 7
+            count = weeks > 1 ? `${weeks} weeks` : "1 week"
+        else if total_days > 1
+            count = `${total_days} days`
+        else if span > 3600
+            hours = span \ 3600
+            count = hours > 1 ? `${hours} hours` : "1 hour"
+        else if span > 60
+            minutes = span \ 60
+            count = minutes > 1 ? `${minutes} minutes` : "1 minute"
+        else
+            count = span > 1 ? `${span} seconds` : "1 second"
+        end if
+
+        if StringUtils.IsNullOrEmpty(count)
+            return ""
+        end if
+        return `Updated ${count} ago`
+    end function
 end namespace
