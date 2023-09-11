@@ -1,8 +1,17 @@
 # Playlet Brighterscript Plugins
 
-<!-- markdownlint-disable MD024 -->
+- [Json5/Yaml support](#json5yaml-support)
+- [Manifest editing](#manifest-editing)
+- [Validation](#validation)
+- [Includes](#includes)
+- [@oninit](#oninit)
+- [Bindings](#bindings)
+- [Async Task Generator](#async-task-generator)
+- [Tracking transpilied files](#tracking-transpilied-files)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
+
+<!-- markdownlint-disable MD024 -->
 
 ## Json5/Yaml support
 
