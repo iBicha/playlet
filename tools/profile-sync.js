@@ -16,6 +16,7 @@ function getArgumentParser() {
 
     parser.add_argument('--browser', { help: 'Use cookies from browser' });
     parser.add_argument('--invidious', { help: 'Invidious instance to sync to' });
+    parser.add_argument('--invidious-token-file', { help: 'Invidious auth token. If provided, manual authorization will be skipped' });
     parser.add_argument('--output-file', { help: 'Write profile to Invidious JSON compatible file' });
     parser.add_argument('--playlist-limit', { help: 'Maximum playlist video count', type: 'int', default: 500 });
 
@@ -272,11 +273,13 @@ async function deleteAccessToken(invidiousInstance, token) {
 (async () => {
     let invidiousInstance = undefined
     let token = undefined;
+    let unregisterToken = false;
     try {
         const parser = getArgumentParser()
         const args = parser.parse_args()
 
         invidiousInstance = args.invidious
+        invidiousTokenFile = args.invidious_token_file
         browser = args.browser
         outputFile = args.output_file
         playlistLimit = args.playlist_limit
@@ -317,18 +320,22 @@ async function deleteAccessToken(invidiousInstance, token) {
                 }
             }
 
-            token = await getAccessToken(invidiousInstance)
+            if (!invidiousTokenFile) {
+                token = await getAccessToken(invidiousInstance)
+                unregisterToken = true;
+            } else {
+                token = fs.readFileSync(invidiousTokenFile, 'utf8');
+            }
 
             await deletePlaylists(invidiousInstance, token, playlistsToDelete)
             await importInvidiousProfile(invidiousInstance, token, profile);
         }
-
     }
     catch (error) {
         console.error(error);
     }
     finally {
-        if (token) {
+        if (token && unregisterToken) {
             console.log("Deleting token")
             await deleteAccessToken(invidiousInstance, token)
         }
