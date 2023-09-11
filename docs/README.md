@@ -19,7 +19,6 @@ This document contains various kinds of information related to Playlet developme
     - [Debug endpoints](#debug-endpoints)
   - [Releases from Github](#releases-from-github)
   - [Dev library hosted by VS Code Extension](#dev-library-hosted-by-vs-code-extension)
-  - [AsyncAwait Task Generator](#asyncawait-task-generator)
   - [Feature flags](#feature-flags)
   - [User preferences](#user-preferences)
   - [Home page layout](#home-page-layout)
