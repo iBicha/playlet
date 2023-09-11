@@ -56,7 +56,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 ### Picture-in-picture
 
 - When viewing a video in full screen, press ⬇️ (down) button on your remote to shrink the video
-- You can browser or search for videos while you watch
+- You can browse or search for videos while you watch
 - To restore currently playing video to full screen, press the ✳️ (options) button
 
 ### Customize Invidious instance
