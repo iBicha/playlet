@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A field to indicate when a playlist was last updated
 - Voice search in search page
 
+### Changed
+
+- Renamed `Unstable` releases to `Canary`
+
 ## [0.11.0] - 2023-09-10
 
 This version went through a major refactor, which resulted in a different arcitecture of the app to support new features, the rewrite of many pieces, as well as new features.

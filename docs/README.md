@@ -290,7 +290,7 @@ The developer settings are only visible through the web app. They are found at t
 
 For now, it allows you to point to a different Github release other than the default `latest`.
 
-This is mostly useful to QA the `unstable` release in a "production" setting before making it available to all users as the official "latest" version. Consider the `unstable` version a [Canary release](https://en.wikipedia.org/wiki/Feature_toggle#Canary_release)
+This is mostly useful to QA the `canary` release (see [Canary release](https://en.wikipedia.org/wiki/Feature_toggle#Canary_release)) in a "production" setting before making it available to all users as the official "latest" version.
 
 #### In case of a softlock
 
@@ -306,8 +306,8 @@ This will remove the custom lib, and revert to using default (latest release fro
 
 On pull requests, a Github action will run `lint:fix` and `format:fix` and push changes to the PR branch, to keep things tidy.
 
-When merged to main branch, a Github action will build Playlet, run static analysis using Roku's [Static Channel Analysis tool](https://devtools.web.roku.com/#static-channel-analysis-tool), and release a new version tagged `unstable`, with the build artifacts attached, and changelog included.
+When merged to main branch, a Github action will build Playlet, run static analysis using Roku's [Static Channel Analysis tool](https://devtools.web.roku.com/#static-channel-analysis-tool), and release a new version tagged `canary`, with the build artifacts attached, and changelog included.
 
-Existing `unstable` release will be removed before creating a new one.
+Existing `canary` release will be removed before creating a new one.
 
 This makes [Releasing](./RELEASING.md) simpler.

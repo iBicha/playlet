@@ -21,9 +21,9 @@
     if (
       value?.app?.lib_url_type === "custom" &&
       value?.app?.lib_url ===
-        "https://github.com/iBicha/playlet/releases/download/unstable/playlet-lib.zip"
+        "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.zip"
     ) {
-      version += "-unstable";
+      version += "-canary";
     }
     loggedIn = value?.invidious?.logged_in;
     auth_url = value?.invidious?.auth_url;

@@ -3,10 +3,10 @@
 # Releasing
 
 The release process for Playlet is very simple, since most of the work is automated.
-The automation makes `unstable` releases.
+The automation makes `canary` releases.
 
 ```makefile
-unstable release + QA = stable version
+canary release + QA = stable version
 ```
 
 These are mostly the steps when releasing a new version:
@@ -23,12 +23,12 @@ These are mostly the steps when releasing a new version:
   - Title: `Release v$VERSION`
   - Comment: `Release $VERSION \nIt should contain everything planned from #6`
 - Wait for CI and merge
-- Wait for CI on main branch to create the `unstable` release
-- Edit `unstable` release
+- Wait for CI on main branch to create the `canary` release
+- Edit `canary` release
   - Tag: `v$VERSION`
   - Title: `v$VERSION`
   - Body: the content from CHANGELOG.md for this version
-    - This should be already included, just remove the notes about testing the unstable release
+    - This should be already included, just remove the notes about testing the canary release
   - Uncheck `Set as a pre-release`
   - Check `Set as the latest release`
   - Click `update release`

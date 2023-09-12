@@ -6,6 +6,6 @@ To test this release:
 
 - Open Playlet web app in a browser (`http://ROKU_IP_ADDRESS:8888/index.html`)
 - Go to settings, and scroll down to `Developer settings`
-- Set `Playlet Library version` to `unstable` and click `Apply`
+- Set `Playlet Library version` to `canary` and click `Apply`
 - Restart Playlet
-- You can verify that you're testing the `unstable` release in the `Info` tab in Playlet or the web app
+- You can verify that you're testing the `canary` release in the `Info` tab in Playlet or the web app

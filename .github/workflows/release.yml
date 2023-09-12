@@ -52,18 +52,18 @@ jobs:
       - name: Run Analysis on Playlet App
         run: ./sca-cmd/bin/sca-cmd ./release/playlet.zip --exit error
 
-      - name: Delete unstable release
+      - name: Delete Canary release
         uses: dev-drprasad/delete-tag-and-release@v1.0
         with:
-          tag_name: unstable
+          tag_name: canary
           github_token: ${{ secrets.GH_TOKEN }}
 
       - name: Extract changelog
         run: |
           latest_release=$(awk 'BEGIN { RS="## \\[" } NR==2 { print "## ["$0 }' CHANGELOG.md)
-          echo -e "\n$latest_release" >> docs/unstable-changelog.md
+          echo -e "\n$latest_release" >> docs/canary-changelog.md
 
-      - name: Create unstable release
-        run: gh release create unstable ./release/playlet.zip ./release/playlet-lib.zip --notes-file docs/unstable-changelog.md --prerelease --title unstable
+      - name: Create Canary release
+        run: gh release create canary ./release/playlet.zip ./release/playlet-lib.zip --notes-file docs/canary-changelog.md --prerelease --title Canary
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
