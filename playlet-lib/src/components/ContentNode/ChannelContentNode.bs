@@ -1,0 +1,48 @@
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/components/ContentNode/ChannelContentTask.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
+
+function Init()
+    m.top.latestVideos = m.top.findNode("latestVideos")
+end function
+
+function LoadChannel(invidiousNode as object) as void
+    if m.contentTask <> invalid
+        m.contentTask.cancel = true
+    end if
+
+    loadState = m.top.loadState
+    if loadState = FeedLoadState.Loading or loadState = FeedLoadState.Loaded
+        return
+    end if
+
+    m.top.loadState = FeedLoadState.Loading
+    m.contentTask = StartAsyncTask(ChannelContentTask, {
+        content: m.top,
+        invidious: invidiousNode
+    }, OnChannelContentTaskResult)
+end function
+
+function OnChannelContentTaskResult(output as object) as void
+    m.contentTask = invalid
+
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        m.log.error(error)
+        playlistId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
+        return
+    end if
+end function
