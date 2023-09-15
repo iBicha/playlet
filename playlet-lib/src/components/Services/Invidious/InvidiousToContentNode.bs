@@ -21,8 +21,7 @@ namespace InvidiousContent
         else if item.type = "playlist"
             return ToPlaylistContentNode(invalid, item, instance)
         else if item.type = "channel"
-            return invalid
-            ' return ToChannelContentNode(item, instance)
+            return ToChannelContentNode(invalid, item, instance)
         else
             return invalid
         end if
@@ -67,7 +66,7 @@ namespace InvidiousContent
         SetIfExists(node, "playlistId", item, "playlistId")
         SetIfExists(node, "title", item, "title")
         SetIfExists(node, "videoCount", item, "videoCount")
-        node.videoCountText = PlaylistGetVideoCountText(item)
+        node.videoCountText = GetVideoCountText(item)
         SetIfExists(node, "viewCount", item, "viewCount")
         node.viewCountText = PlaylistGetViewCountText(item)
         SetIfExists(node, "updated", item, "updated")
@@ -99,9 +98,39 @@ namespace InvidiousContent
         return node
     end function
 
-    function ToChannelContentNode(item as object, instance as dynamic) as object
-        node = CreateObject("roSGNode", "ChannelContentNode")
+    function ToChannelContentNode(node as object, item as object, instance as dynamic) as object
+        if node = invalid
+            node = CreateObject("roSGNode", "ChannelContentNode")
+            node.loadState = FeedLoadState.None
+        end if
         node.type = "channel"
+
+        ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+        SetIfExists(node, "_author", item, "author")
+        SetIfExists(node, "authorId", item, "authorId")
+        SetIfExists(node, "description", item, "description")
+        SetIfExists(node, "subCount", item, "subCount")
+        node.subCountText = GetChannelSubCountText(item)
+        SetIfExists(node, "videoCount", item, "videoCount")
+        node.videoCountText = GetVideoCountText(item)
+        node.thumbnail = GetChannelThumbnail(item.authorThumbnails)
+        node.banner = GetChannelBanner(item.authorBanners)
+
+        if item.latestVideos <> invalid
+            newNodes = []
+
+            for each video in item.latestVideos
+                video.type = "video"
+                videoNode = ToVideoContentNode(invalid, video, instance)
+                if videoNode <> invalid
+                    newNodes.push(videoNode)
+                end if
+            end for
+
+            if newNodes.Count() > 0
+                node.latestVideos.appendChildren(newNodes)
+            end if
+        end if
 
         return node
     end function
@@ -201,9 +230,32 @@ namespace InvidiousContent
         node[nodeField] = thumbnail
     end function
 
-    function PlaylistGetVideoCountText(playlistItem as object) as string
-        videoCount = ValidInt(playlistItem.videoCount)
+    function GetChannelThumbnail(authorThumbnails as object) as string
+        if authorThumbnails = invalid or authorThumbnails.Count() = 0
+            return ""
+        end if
+        url = authorThumbnails[authorThumbnails.Count() - 1].url
+        if url.startsWith("//")
+            url = "https:" + url
+        end if
+        return url
+    end function
+
+    function GetChannelBanner(authorBanners as object) as string
+        if authorBanners = invalid or authorBanners.Count() = 0
+            return ""
+        end if
+        return authorBanners[authorBanners.Count() - 1].url
+    end function
+
+    function GetVideoCountText(item as object) as string
+        videoCount = ValidInt(item.videoCount)
         return videoCount = 1 ? "1 video" : `${videoCount} videos`
+    end function
+
+    function GetChannelSubCountText(channel as object) as string
+        subCount = ValidInt(channel.subCount)
+        return subCount = 1 ? "1 subscriber" : `${subCount} subscribers`
     end function
 
     function PlaylistGetViewCountText(playlistItem as object) as string
