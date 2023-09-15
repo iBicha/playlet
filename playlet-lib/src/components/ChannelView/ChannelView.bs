@@ -1,6 +1,7 @@
 import "pkg:/source/roku_modules/log/LogMixin.brs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
     m.log = new log.Logger("ChannelView")
@@ -34,7 +35,14 @@ function OnContentSet() as void
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     m.authorLabel.text = content._author
     m.banner.uri = content.banner
-    m.thumbnail.uri = content.thumbnail
+    if StringUtils.IsNullOrEmpty(content.thumbnail)
+        m.thumbnail.uri = ""
+    else
+        if m.thumbnail.uri <> content.thumbnail or m.thumbnail.loadStatus = "failed"
+            m.thumbnail.loadingBitmapUri = m.thumbnail.uri
+            m.thumbnail.uri = content.thumbnail
+        end if
+    end if
 
     m.rowList.content = content
 
