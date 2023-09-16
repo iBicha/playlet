@@ -1,0 +1,273 @@
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/ArrayUtils.bs"
+
+function Init()
+    options = {
+        date: [{
+            title: "Any date",
+            value: ""
+        }, {
+            title: "Last hour",
+            value: "hour"
+        }, {
+            title: "Today",
+            value: "today"
+        }, {
+            title: "This week",
+            value: "week"
+        }, {
+            title: "This month",
+            value: "month"
+        }, {
+            title: "This year",
+            value: "year"
+        }],
+        type: [{
+            title: "Any type",
+            value: ""
+        }, {
+            title: "Video",
+            value: "video"
+        }, {
+            title: "Playlist",
+            value: "playlist"
+        }, {
+            title: "Channel",
+            value: "channel"
+        }, {
+            title: "Movie",
+            value: "movie"
+        }, {
+            title: "Show",
+            value: "show"
+        }],
+        duration: [{
+            title: "Any duration",
+            value: ""
+        }, {
+            title: "Under 4 minutes",
+            value: "short"
+        }, {
+            title: "4 - 20 minutes",
+            value: "medium"
+        }, {
+            title: "Over 20 minutes",
+            value: "long"
+        }],
+        features: [{
+            title: "Live",
+            value: "live"
+        }, {
+            title: "4K",
+            value: "4k"
+        }, {
+            title: "HD",
+            value: "hd"
+        }, {
+            title: "Subtitles/CC",
+            value: "subtitles"
+        }, {
+            title: "Creative Commons",
+            value: "creative_commons"
+        }, {
+            title: "360°",
+            value: "360"
+        }, {
+            title: "VR180",
+            value: "vr180"
+        }, {
+            title: "3D",
+            value: "3d"
+        }, {
+            title: "HDR",
+            value: "hdr"
+        }, {
+            title: "Purchased",
+            value: "purchased"
+        }, {
+            title: "Location",
+            value: "location"
+        }],
+        sort_by: [{
+            title: "Relevance",
+            value: ""
+        }, {
+            title: "Upload date",
+            value: "upload_date"
+        }, {
+            title: "View count",
+            value: "view_count"
+        }, {
+            title: "Rating",
+            value: "rating"
+        }]
+    }
+
+    m.controls = {
+        date: m.top.findNode("UploadDateList"),
+        type: m.top.findNode("TypeList"),
+        duration: m.top.findNode("DurationList"),
+        features: m.top.findNode("FeaturesList"),
+        sort_by: m.top.findNode("SortByList")
+    }
+
+    for each filterKey in m.controls
+        control = m.controls[filterKey]
+        control.addFields({ filterKey: filterKey })
+    end for
+
+    m.contentNodes = {
+        date: m.controls.date.content,
+        type: m.controls.type.content,
+        duration: m.controls.duration.content,
+        features: m.controls.features.content,
+        sort_by: m.controls.sort_by.content
+    }
+
+    PopulateLists(m.contentNodes, options)
+
+    navigationNodes = [m.controls.date, m.controls.type, m.controls.duration, m.controls.features, m.controls.sort_by]
+    for i = 0 to navigationNodes.count() - 2
+        SetNavigation(navigationNodes[i], "right", navigationNodes[i + 1])
+    end for
+    for i = 1 to navigationNodes.count() - 1
+        SetNavigation(navigationNodes[i], "left", navigationNodes[i - 1])
+    end for
+end function
+
+function PopulateLists(contentNodes as object, options as object)
+    for each key in options
+        contentNode = contentNodes[key]
+        list = options[key]
+        for each item in list
+            node = CreateObject("roSGNode", "ContentNode")
+            node.title = item.title
+            node.addFields({ value: item.value })
+            contentNode.appendChild(node)
+        end for
+    end for
+end function
+
+function OnNodeReady()
+    m.log = new log.Logger("SearchFilters")
+
+    RefreshUI()
+
+    m.controls.date.ObserveField("checkedItem", FuncName(OnListChecked))
+    m.controls.type.ObserveField("checkedItem", FuncName(OnListChecked))
+    m.controls.duration.ObserveField("checkedItem", FuncName(OnListChecked))
+    m.controls.features.ObserveField("checkedState", FuncName(OnListChecked))
+    m.controls.sort_by.ObserveField("checkedItem", FuncName(OnListChecked))
+end function
+
+function RefreshUI()
+    filters = m.searchScreen.filters
+    for each key in filters
+        control = m.controls[key]
+        value = filters[key]
+        if IsString(value)
+            SetCheckedItem(control, value)
+        else if IsArray(value)
+            SetCheckedItemArray(control, value)
+        end if
+    end for
+end function
+
+function SetCheckedItem(control as object, value as string) as void
+    content = control.content
+    childCount = content.getChildCount()
+    for i = 0 to childCount - 1
+        child = content.getChild(i)
+        if child.value = value
+            control.checkedItem = i
+            return
+        end if
+    end for
+end function
+
+function SetCheckedItemArray(control as object, values as object) as void
+    content = control.content
+    childCount = content.getChildCount()
+    checkedState = []
+    for i = 0 to childCount - 1
+        child = content.getChild(i)
+        value = child.value
+        checkedState.push(ArrayUtils.IndexOfString(values, value) >= 0)
+    end for
+    control.checkedState = checkedState
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.controls.date, true)
+end function
+
+function OnListChecked(event as object)
+    control = event.getRoSGNode()
+    filterKey = control.filterKey
+
+    state = m.searchScreen.filters
+    if IsString(state[filterKey])
+        SetFilterString(control)
+    else if IsArray(state[filterKey])
+        SetFilterArray(control)
+    end if
+end function
+
+function SetFilterString(control as object) as void
+    content = control.content
+    selectedNode = content.getChild(control.checkedItem)
+    value = selectedNode.value
+
+    filterKey = control.filterKey
+    state = m.searchScreen.filters
+    state[filterKey] = value
+    m.searchScreen.filters = state
+end function
+
+function SetFilterArray(control as object) as void
+    content = control.content
+    checkedState = control.checkedState
+
+    values = []
+    for i = 0 to checkedState.count() - 1
+        if checkedState[i]
+            node = content.getChild(i)
+            values.push(node.value)
+        end if
+    end for
+
+    filterKey = control.filterKey
+    state = m.searchScreen.filters
+    state[filterKey] = values
+    m.searchScreen.filters = state
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    navigation = NavigationKeyHandler(key, press)
+    if navigation.handled
+        m.currentNavigtionNode = navigation.node
+        return true
+    end if
+
+    if key = "options" and press
+        ' A pass-through to the app controller, so it can toggle picture-in-picture
+        return false
+    end if
+
+    if key = "back" and press
+        Close()
+        return true
+    end if
+
+    return true
+end function
+
+function Close()
+    m.appController@.PopScreen(invalid)
+end function

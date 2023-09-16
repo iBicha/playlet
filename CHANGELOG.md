@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A field to indicate when a playlist was last updated
 - Voice search in search page
 - Basic support for channels (open channel, see latest videos)
+- Search filters (Upload date, type, duration, features, and sort by)
 
 ### Changed
 

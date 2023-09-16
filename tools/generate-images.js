@@ -48,7 +48,7 @@ const logoOutput = {
     },
 };
 
-const iconsInput = './playlet-app/src/images/vector/icons';
+const iconsInput = './playlet-lib/src/images/vector/icons';
 const iconsOutput = './playlet-lib/src/images/icons';
 
 (async () => {

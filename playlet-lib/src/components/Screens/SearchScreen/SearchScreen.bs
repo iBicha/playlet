@@ -14,10 +14,21 @@ function Init()
     m.scrollAnimation = m.top.FindNode("scrollAnimation")
     m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
     m.suggestions = m.top.FindNode("suggestions")
+    m.filtersButton = m.top.FindNode("filtersButton")
 
     textEditBox = m.keyboard.textEditBox
     textEditBox.voiceEntryType = "generic"
     textEditBox.voiceEnabled = true
+
+    m.top.filters = {
+        date: "",
+        type: "",
+        duration: "",
+        features: [],
+        sort_by: ""
+    }
+
+    m.top.ObserveField("filters", FuncName(OnFiltersChange))
 end function
 
 function OnNodeReady()
@@ -27,6 +38,8 @@ function OnNodeReady()
     m.keyboard.ObserveField("text", FuncName(OnTextChange))
     m.suggestions.ObserveField("buttonFocused", FuncName(OnSearchButtonFocused))
     m.suggestions.ObserveField("buttonSelected", FuncName(OnSearchButtonSelected))
+    m.filtersButton.ObserveField("buttonSelected", FuncName(OnFiltersButtonSelected))
+
     m.top.ObserveField("visible", FuncName(OnVisibilityChange))
     m.rowlist.ObserveFieldScoped("onError", FuncName(OnSearchError))
 
@@ -34,18 +47,25 @@ function OnNodeReady()
         ScrollUp()
     end function)
     SetNavigation(m.suggestions, "right", m.keyboard)
+    SetNavigation(m.filtersButton, "right", m.keyboard)
     SetNavigation(m.keyboard, "left", m.suggestions)
     SetNavigation(m.suggestions, "left", m.navBar)
+    SetNavigation(m.filtersButton, "left", m.navBar)
     SetNavigation(m.keyboard, "left", m.navBar)
     SetNavigation(m.rowList, "left", m.navBar, function()
         ScrollUp()
     end function)
+    SetNavigation(m.filtersButton, "down", m.suggestions)
+    SetNavigation(m.filtersButton, "down", m.keyboard)
+
     SetNavigation(invalid, "down", m.rowList, function()
         ScrollDown()
     end function)
     SetNavigation(m.rowList, "up", m.suggestions, function()
         ScrollUp()
     end function)
+
+    SetNavigation(m.suggestions, "up", m.filtersButton)
 
     m.currentNavigtionNode = m.suggestions
     ' Trigger suggestions
@@ -123,6 +143,13 @@ function OnSearchSuggestionsTaskResults(output as object) as void
     m.suggestions.focusable = m.suggestions.buttons.Count() > 0
 end function
 
+function OnFiltersButtonSelected()
+    searchFilters = CreateObject("roSGNode", "SearchFilters")
+    m.appController@.PushScreen(searchFilters)
+    searchFilters.searchScreen = m.top
+    searchFilters@.BindNode(invalid)
+end function
+
 function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
@@ -149,19 +176,56 @@ function OnSearchButtonFocused() as void
     m.keyboard.text = text
 end function
 
+function OnFiltersChange()
+    filterCount = 0
+    filters = m.top.filters
+    for each filter in filters
+        value = filters[filter]
+        if IsString(value) and value.len() > 0
+            filterCount++
+        else if IsArray(value) and value.Count() > 0
+            filterCount += value.Count()
+        end if
+    end for
+    if filterCount > 0
+        m.filtersButton.text = `Filters (${filterCount})`
+    else
+        m.filtersButton.text = "Filters"
+    end if
+end function
+
 function Search(text as string)
     m.rowlist.UnobserveFieldScoped("someContentReady")
+    ' TODO:P1 someContentReady only fires if there are search results.
+    ' The case where search results are empty is not handled.
     m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
     ShowLoadingScreen()
 
-    m.rowList.contentData = [{
+    requestData = {
         title: `Search - ${text}`,
         apiType: "Invidious",
         endpoint: "search",
         queryParams: {
             q: text
         }
-    }]
+    }
+
+    filters = m.top.filters
+    for each filter in filters
+        value = filters[filter]
+        if IsString(value) and value.len() > 0
+            requestData.queryParams[filter] = value
+        else if IsArray(value) and value.Count() > 0
+            ' TODO:P1 this is http client implementation details leaking
+            ' We need a declarative way to set array types
+            requestData.queryParams[filter] = {
+                value: value,
+                __arrayType: HttpClient.QueryParamArrayType.CommaSeparated
+            }
+        end if
+    end for
+
+    m.rowList.contentData = [requestData]
 end function
 
 function OnSearchContentReady() as void
