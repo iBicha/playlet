@@ -19,7 +19,7 @@ could be public instances hosted by volenteers. These instances are available
 While invidious does no data collection by default, and it is in fact built to
 be privacy driven, but in theory, from a playlet request it is possible to 
 know the IP address of a user, the identifiers of watched video, and search 
-keywords. In case the user is unreasonably paranoid, they can host their own
+keywords. In case the user has privacy concerns, they can host their own
 Invidious instance and use it from Playlet.
 
 ## SponsorBlock
