@@ -155,7 +155,7 @@ export class LoggerPlugin implements CompilerPlugin {
         }
 
         const msg = args.map((arg) => {
-            return `LogArgToString(${arg})`;
+            return `ToString(${arg})`;
         }).join(` + " " + `);
 
         const func = logFunctions[level as 'LogError' | 'LogWarn' | 'LogInfo' | 'LogDebug'];
