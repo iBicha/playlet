@@ -1,6 +1,6 @@
 #const DISABLE_CACHE = false
 
-import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -45,7 +45,6 @@ namespace HttpClient
         public urlTransfer as object
 
         function new()
-            m.log = new log.Logger("HttpRequest")
             m._timeoutSeconds = 30
         end function
 
@@ -198,7 +197,7 @@ namespace HttpClient
             if m._noCache <> true
                 cache = HttpClientCache.Get(m)
                 if cache <> invalid
-                    m.log.info("Cache hit", m._method, m.BuildUrl())
+                    LogInfo("Cache hit", m._method, m.BuildUrl())
                     m._cache = cache
                     return m
                 end if
@@ -206,7 +205,7 @@ namespace HttpClient
 
             m.urlTransfer = m.CreateRoUrlTransfer()
             if m.urlTransfer = invalid
-                m.log.error("Failed to create roUrlTransfer. We're probably not in a background thread.")
+                LogError("Failed to create roUrlTransfer. We're probably not in a background thread.")
                 return m
             end if
 
@@ -219,7 +218,7 @@ namespace HttpClient
                 m.urlTransfer.SetMessagePort(CreateObject("roMessagePort"))
             end if
 
-            m.log.info("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
+            LogInfo("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
 
             #if DEBUG
                 ? `════════ curl command ════════\n${m.ToCurlCommand()}\n══════════════════════════════`
@@ -237,7 +236,7 @@ namespace HttpClient
             end if
 
             if m._sent <> true
-                m.log.error("Failed to send request")
+                LogError("Failed to send request")
             end if
 
             return m
@@ -295,19 +294,19 @@ namespace HttpClient
 
             if msg = invalid
                 ' timeout
-                m.log.info("Timeout", "ID:", m.urlTransfer.GetIdentity())
+                LogInfo("Timeout", "ID:", m.urlTransfer.GetIdentity())
                 m.urlTransfer.AsyncCancel()
             else
                 eventType = type(msg)
                 if eventType = "roUrlEvent"
-                    m.log.info("Finished", "ID:", m.urlTransfer.GetIdentity())
+                    LogInfo("Finished", "ID:", m.urlTransfer.GetIdentity())
                 else if eventType = "roSGNodeEvent"
                     node = msg.getRoSGNode()
                     field = msg.getField()
                     value = msg.getData()
                     ' cancellation
                     if node.isSameNode(m._cancellation.node) and field = m._cancellation.field and value = m._cancellation.value
-                        m.log.info("Cancelled", "ID:", m.urlTransfer.GetIdentity())
+                        LogInfo("Cancelled", "ID:", m.urlTransfer.GetIdentity())
                         m._cancelled = true
                         m.urlTransfer.AsyncCancel()
                     end if
@@ -544,9 +543,6 @@ namespace HttpClient
 
 end namespace
 
-' TODO:P2 introduce the concept of "loose" cache
-' For playlists that show in a feed or in a search, we don't want to make a request to get the playlist details
-' But if we have that information in the cache already, it can be used
 namespace HttpClientCache
     function GetLocation(request as HttpClient.HttpRequest) as dynamic
         if request._cacheLocation <> invalid

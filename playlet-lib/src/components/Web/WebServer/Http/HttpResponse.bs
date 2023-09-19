@@ -9,8 +9,6 @@ namespace Http
     end function
 
     class HttpResponse
-        private log as log.Logger
-
         private source = Http.HttpResponseSource.NONE
 
         ' members
@@ -32,7 +30,6 @@ namespace Http
         private settings
 
         function new(request as HttpRequest, server as HttpServer, settings as HttpSettings)
-            m.log = new log.Logger("HttpResponse")
             m.id = Http.GetHttpResponseId()
             m.request = request
             m.server = server
@@ -111,20 +108,20 @@ namespace Http
                 if m.start + m.sent >= m.buf_start + m.body_buffer.count()
                     m.buf_start = m.start + m.sent
                     m.body_buffer.ReadFile(m.path, m.buf_start, bufsize)
-                    m.log.info(`Read ${m.body_buffer.count()} bytes from source file @${m.buf_start}`)
+                    LogDebug(`Read ${m.body_buffer.count()} bytes from source file @${m.buf_start}`)
                 end if
             end if
             buf_pos = m.start + m.sent - m.buf_start
             buf_remaining = m.body_buffer.count() - buf_pos
             if buf_remaining = 0
-                m.log.info("source buffer is empty")
+                LogInfo("source buffer is empty")
             end if
             req_remaining = m.body_buffer_length - m.sent
             if buf_remaining > req_remaining
                 buf_remaining = req_remaining
             end if
             sent = sock.send(m.body_buffer, buf_pos, buf_remaining)
-            m.LogInfo(sent, m.buf_start + buf_pos, m.body_buffer_length)
+            m.LogSentRange(sent, m.buf_start + buf_pos, m.body_buffer_length)
             if sent > 0
                 m.sent = m.sent + sent
             end if
@@ -141,7 +138,7 @@ namespace Http
             else
                 sent = sock.sendStr(m.header.mid(m.header_sent))
             end if
-            m.LogInfo(sent, m.header_sent, m.header_length)
+            m.LogSentRange(sent, m.header_sent, m.header_length)
             if sent > 0
                 m.header_sent = m.header_sent + sent
             end if
@@ -176,8 +173,8 @@ namespace Http
             return m.header_sent = m.header_length
         end function
 
-        function LogInfo(recent as integer, from as integer, total as integer)
-            m.log.info(`Sent ${recent} [${m.MakeRange(from, recent, total)}]`)
+        function LogSentRange(recent as integer, from as integer, total as integer)
+            LogDebug(`Sent ${recent} [${m.MakeRange(from, recent, total)}]`)
         end function
 
         function KeepAlive(keepAlive as boolean)

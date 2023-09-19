@@ -16,16 +16,17 @@
 
 function Main(args as object) as void
     screen = CreateObject("roSGScreen")
-    m.port = CreateObject("roMessagePort")
-    screen.setMessagePort(m.port)
+    port = CreateObject("roMessagePort")
+    screen.setMessagePort(port)
     m.global = screen.getGlobalNode()
+    m.global.addFields({ port: port })
 
     ClearPlayletLibUrlsIfNeeded(args)
 
     scene = screen.CreateScene("BootstrapScene")
     screen.show()
 
-    scene.ObserveField("exitChannel", m.port)
+    scene.ObserveField("exitChannel", port)
     scene.launchArgs = args
 
     ' These vars are needed to pass certification.
@@ -42,7 +43,16 @@ function Main(args as object) as void
     end if
 
     input = CreateObject("roInput")
-    input.setMessagePort(m.port)
+    input.setMessagePort(port)
+
+    ' TODO:P1 follow up on bug where roSystemLog does not fire for a video player in ComponentLibrary
+    ' https://community.roku.com/t5/Roku-Developer-Program/BUG-roSystemLog-not-firing-with-ComponentLibrary/td-p/906075
+    systemLog = CreateObject("roSystemLog")
+    systemLog.SetMessagePort(port)
+    systemLog.EnableType("http.connect")
+    systemLog.EnableType("http.error")
+    systemLog.EnableType("http.complete")
+    systemLog.EnableType("bandwidth.minute")
 
     #if DEBUG
         ' The following comment is to enable the SceneGraph inspector
@@ -54,9 +64,11 @@ function Main(args as object) as void
     #end if
 
     while true
-        msg = wait(0, m.port)
+        msg = wait(0, port)
         msgType = type(msg)
-        if msgType = "roSGScreenEvent"
+        if msgType = "roSystemLogEvent"
+            scene.systemLogEvent = msg.GetInfo()
+        else if msgType = "roSGScreenEvent"
             if msg.isScreenClosed()
                 return
             end if

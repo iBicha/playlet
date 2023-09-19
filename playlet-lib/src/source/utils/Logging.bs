@@ -1,17 +1,66 @@
-import "pkg:/source/roku_modules/log/LogMixin.brs"
-
 enum LogLevel
     ERROR = 0
     WARN = 1
     INFO = 2
-    VERBOSE = 3
     DEBUG = 3
 end enum
 
-function InitializeLogging() as void
-    instance = log.getLogInstance()
-    if instance <> invalid
-        return
+function InitializeLogger(logLevel = LogLevel.Info as LogLevel) as void
+    logger = CreateObject("roSGNode", "Logger")
+    logger.logLevel = logLevel
+    m.global.addFields({ logger: logger })
+    logger.control = "run"
+end function
+
+function LogError(arg1 = invalid as dynamic, arg2 = invalid as dynamic, arg3 = invalid as dynamic, arg4 = invalid as dynamic, arg5 = invalid as dynamic, arg6 = invalid as dynamic, arg7 = invalid as dynamic, arg8 = invalid as dynamic, arg9 = invalid as dynamic, arg10 = invalid as dynamic, arg11 = invalid as dynamic, arg12 = invalid as dynamic, arg13 = invalid as dynamic, arg14 = invalid as dynamic, arg15 = invalid as dynamic, arg16 = invalid as dynamic) as void
+    throw "FATAL: Calling LogError() which is a stub function"
+end function
+
+function LogWarn(arg1 = invalid as dynamic, arg2 = invalid as dynamic, arg3 = invalid as dynamic, arg4 = invalid as dynamic, arg5 = invalid as dynamic, arg6 = invalid as dynamic, arg7 = invalid as dynamic, arg8 = invalid as dynamic, arg9 = invalid as dynamic, arg10 = invalid as dynamic, arg11 = invalid as dynamic, arg12 = invalid as dynamic, arg13 = invalid as dynamic, arg14 = invalid as dynamic, arg15 = invalid as dynamic, arg16 = invalid as dynamic) as void
+    throw "FATAL: Calling LogWarn() which is a stub function"
+end function
+
+function LogInfo(arg1 = invalid as dynamic, arg2 = invalid as dynamic, arg3 = invalid as dynamic, arg4 = invalid as dynamic, arg5 = invalid as dynamic, arg6 = invalid as dynamic, arg7 = invalid as dynamic, arg8 = invalid as dynamic, arg9 = invalid as dynamic, arg10 = invalid as dynamic, arg11 = invalid as dynamic, arg12 = invalid as dynamic, arg13 = invalid as dynamic, arg14 = invalid as dynamic, arg15 = invalid as dynamic, arg16 = invalid as dynamic) as void
+    throw "FATAL: Calling LogInfo() which is a stub function"
+end function
+
+function LogDebug(arg1 = invalid as dynamic, arg2 = invalid as dynamic, arg3 = invalid as dynamic, arg4 = invalid as dynamic, arg5 = invalid as dynamic, arg6 = invalid as dynamic, arg7 = invalid as dynamic, arg8 = invalid as dynamic, arg9 = invalid as dynamic, arg10 = invalid as dynamic, arg11 = invalid as dynamic, arg12 = invalid as dynamic, arg13 = invalid as dynamic, arg14 = invalid as dynamic, arg15 = invalid as dynamic, arg16 = invalid as dynamic) as void
+    throw "FATAL: Calling LogDebug() which is a stub function"
+end function
+
+function ToString(value as dynamic) as string
+    if getInterface(value, "ifString") <> invalid
+        return value
     end if
-    log.initializeLogManager(["log_PrintTransport", "log_FileTransport"], LogLevel.INFO)
+
+    valueType = type(value)
+
+    if valueType = "<uninitialized>"
+        return valueType
+    else if value = invalid
+        return "<invalid>"
+    else if GetInterface(value, "ifToStr") <> invalid
+        return value.toStr()
+    else if valueType = "roSGNode"
+        return "Node(" + value.subType() + ":" + value.id + ")"
+    else if valueType = "roAssociativeArray"
+        return AssocArrayToString(value)
+    end if
+
+    return "<" + valueType + ">"
+end function
+
+function AssocArrayToString(dict as object) as string
+    result = "{"
+    count = dict.count()
+    i = 0
+    for each key in dict
+        result += key + ": " + ToString(dict[key])
+        if i < count - 1
+            result += ", "
+        end if
+        i++
+    end for
+    result += "}"
+    return result
 end function

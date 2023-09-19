@@ -3,8 +3,6 @@ import "pkg:/source/utils/StringUtils.bs"
 namespace Http
 
     class HttpStaticFilesRouter extends HttpRouter
-        private log as log.Logger
-
         private root
         private route
         private showDirectories
@@ -13,7 +11,6 @@ namespace Http
 
         function new(route as string, root as string, showDirectories = false as boolean, showHidden = false as boolean, fsCheck = true as boolean)
             super()
-            m.log = new log.Logger("HttpStaticFilesRouter")
 
             m.root = root
             m.route = route
@@ -78,7 +75,7 @@ namespace Http
                     mimetype = server.utils.MimeType(decoded_path)
                     response.ContentType(mimetype)
                     response.fileLength = stat.size
-                    router.log.info(`uri=${request.uri}, target=${path}, content-type=${mimetype}, content-length=${response.fileLength}`)
+                    LogInfo(`uri=${request.uri}, target=${path}, content-type=${mimetype}, content-length=${response.fileLength}`)
                     router.GenerateFile(path, router, request, response)
                     return true
                 else
@@ -117,7 +114,7 @@ namespace Http
                         start = 0
                     end if
                 else
-                    router.log.error(1, "internal error - range start/finish logic inconsistency")
+                    LogError(1, "internal error - range start/finish logic inconsistency")
                 end if
 
                 response.start = start
@@ -126,7 +123,7 @@ namespace Http
                 response.headers["Content-Range"] = "bytes " + response.MakeRange(response.start, response.body_buffer_length, response.filelength)
                 response.http_code = 206
 
-                router.log.info("sending range " + response.MakeRange(start, response.body_buffer_length, response.fileLength))
+                LogInfo("sending range " + response.MakeRange(start, response.body_buffer_length, response.fileLength))
             else ' no range stuff
                 response.body_buffer_length = response.fileLength
                 response.ContentLength(response.body_buffer_length)
@@ -198,7 +195,7 @@ namespace Http
                         safe_url = uri ' UrlEncode(uri) ' too much encoding
                         listing += `<a href="${safe_url}">${item}${indicator}</a>\n`
                     else
-                        router.log.warn("insufficient stat info to include '" + dir + item + "'")
+                        LogWarn("insufficient stat info to include '" + dir + item + "'")
                     end if
                 end if
             end for

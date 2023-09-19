@@ -10,8 +10,6 @@ namespace Http
     end function
 
     class HttpRequest
-        private log as log.Logger
-
         ' members
         private method = invalid
         private uri = invalid
@@ -33,7 +31,6 @@ namespace Http
         private ready_for_response = false
 
         function new()
-            m.log = new log.Logger("HttpRequest")
             m.id = Http.GetHttpRequestId()
             m.headers = CreateObject("roAssociativeArray")
         end function
@@ -81,7 +78,7 @@ namespace Http
 
         function ParseOperation() as boolean
             if m.buffer_index <> 0
-                m.log.error(`invalid state: reading operation, but request is at index ${m.buffer_index}`)
+                LogError(`invalid state: reading operation, but request is at index ${m.buffer_index}`)
                 m.ready_for_response = true
                 return false
             end if
@@ -93,7 +90,7 @@ namespace Http
             operation = m.ReadHeaderLine()
 
             if operation = invalid or operation = ""
-                m.log.error("empty request")
+                LogError("empty request")
                 m.ready_for_response = true
                 return false
             end if
@@ -103,9 +100,9 @@ namespace Http
                 m.method = Ucase(parts[0])
                 m.uri = parts[1]
                 m.protocol = Ucase(parts[2])
-                m.log.info(`${m.method} '${m.uri}'`)
+                LogInfo(`${m.method} '${m.uri}'`)
             else
-                m.log.error("invalid request: " + operation)
+                LogError("invalid request: " + operation)
                 m.ready_for_response = true
             end if
 
@@ -148,7 +145,7 @@ namespace Http
             if m.headers["Content-Length"] = invalid
                 m.ready_for_response = true
                 if m.body.len() > 0
-                    m.log.error("invalid request: request body found, but no Content-Length header")
+                    LogError("invalid request: request body found, but no Content-Length header")
                     return false
                 else
                     return true
@@ -160,7 +157,7 @@ namespace Http
                 end if
 
                 if m.body.len() > contentLength
-                    m.log.error("invalid request: request body is larger than Content-Length")
+                    LogError("invalid request: request body is larger than Content-Length")
                     m.ready_for_response = true
                     return false
                 end if
@@ -233,7 +230,7 @@ namespace Http
                         m.range_end_given = true
                     end if
                 end if
-                m.log.info("range request begin" + Stri(m.range_begin) + " end" + Stri(m.range_end))
+                LogInfo("range request begin" + Stri(m.range_begin) + " end" + Stri(m.range_end))
             end if
         end function
 

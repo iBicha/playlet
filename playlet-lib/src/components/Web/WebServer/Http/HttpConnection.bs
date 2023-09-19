@@ -3,14 +3,12 @@ import "HttpRequest.bs"
 import "HttpResponse.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/StringUtils.bs"
-import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/Logging.bs"
 
 namespace Http
     const BUFSIZE = 65536
 
     class HttpConnection
-        private log as log.Logger
-
         private total_received = 0
         private total_sent = 0
         private id = "<uninit>"
@@ -22,7 +20,6 @@ namespace Http
         private settings as HttpSettings
 
         function new(server as HttpServer, settings as HttpSettings)
-            m.log = new log.Logger("HttpConnection")
             m.server = server
             m.settings = settings
             m.Reset()
@@ -42,14 +39,13 @@ namespace Http
             m.header = invalid
             m.response = invalid
             m.header_only = false
-            m.http_code = 0
             m.close = true
             m.ws_upgrade = false
             m.SetState(Http.HttpConnectionState.INIT)
         end function
 
         function Recycle()
-            m.log.info("recycle")
+            LogInfo("recycle")
             m.Restart()
             m.SetState(Http.HttpConnectionState.RECV_REQUEST) ' ready for another
         end function
@@ -60,7 +56,7 @@ namespace Http
             m.SetState(Http.HttpConnectionState.RECV_REQUEST)
             m.client = m.socket.getReceivedFromAddress().getAddress()
 
-            m.log.info("accepted connection @" + m.client)
+            LogInfo("accepted connection @" + m.client)
 
             ' try to read right away rather than going through another iteration
             ' of the poll loop.
@@ -69,7 +65,7 @@ namespace Http
 
         function PollRequest(server as HttpServer)
             if m.state <> Http.HttpConnectionState.RECV_REQUEST
-                m.log.error("illegal request state @" + m.client)
+                LogError("illegal request state @" + m.client)
             end if
 
             rcvStrByteLen = m.socket.GetCountRcvBuf()
@@ -96,7 +92,7 @@ namespace Http
                 else
                     m.setState(Http.HttpConnectionState.DONE)
                     m.close = true
-                    m.log.error("couldn't process request or response, closing @" + m.client)
+                    LogError("couldn't process request or response, closing @" + m.client)
                 end if
             else if m.request.buffer.len() > m.settings.MaxRequestLength ' die if it's too long
                 m.response = new HttpResponse(m.request, m.server, m.settings)
@@ -114,7 +110,7 @@ namespace Http
 
         function PollHeader(server as HttpServer) as void
             if m.state <> Http.HttpConnectionState.SEND_HEADER
-                m.log.error("illegal header state @" + m.client)
+                LogError("illegal header state @" + m.client)
             end if
 
             sent = m.response.SendHeader(m.socket, Http.BUFSIZE)
@@ -136,7 +132,7 @@ namespace Http
 
         function PollResponse(server as HttpServer)
             if m.state <> Http.HttpConnectionState.SEND_RESPONSE or m.response.header_only
-                m.log.error("illegal response state @" + m.client)
+                LogError("illegal response state @" + m.client)
             end if
 
             sent = m.response.Send(m.socket, Http.BUFSIZE)
@@ -166,9 +162,9 @@ namespace Http
                 'info(m,op + " would have blocked @"+m.client)
             else
                 if m.socket.eSuccess()
-                    m.log.info(op + " peer closed @" + m.client)
+                    LogInfo(op + " peer closed @" + m.client)
                 else
-                    m.log.error(op + " transfer error @" + m.client, m.socket.status())
+                    LogError(op + " transfer error @" + m.client, m.socket.status())
                 end if
                 m.close = true
                 m.SetState(Http.HttpConnectionState.DONE)
@@ -178,14 +174,8 @@ namespace Http
 
         function SetState(newState as Http.HttpConnectionState)
             if m.state <> newState
-                ' m.log.debug(m, "state change" + Stri(m.state) + " ->" + Stri(newState))
+                LogDebug(m, "state change" + Stri(m.state) + " ->" + Stri(newState))
                 m.state = newState
-            end if
-        end function
-
-        function LogInfo()
-            if m.http_code <> 0 and not StringUtils.IsNullOrEmpty(m.method)
-                m.log.info(m.last_active.totalSeconds(), " client:", m.client, " meth:", m.method, " uri:", m.uri, " code:", m.code, " sent:", m.total_sent, " referer:", m.referer, " user agent:", m.user_agent)
             end if
         end function
 
