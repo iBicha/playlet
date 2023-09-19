@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `roku-log` package
+- `ropm`
 
 ## [0.12.0] - 2023-09-17
 
