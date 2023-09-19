@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - New logger: less features, and less rendezvous
 
+### Fixed
+
+- A bug where the app crashes if an error happens loading channel info
+
 ### Removed
 
 - `roku-log` package
