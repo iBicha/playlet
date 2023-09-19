@@ -2,7 +2,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
-import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
@@ -10,8 +10,6 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 
 function Init()
-    m.log = new log.Logger("PlaylistView")
-
     m.background = m.top.findNode("background")
     m.backgroundSmall = m.top.findNode("backgroundSmall")
     m.titleLabel = m.top.findNode("titleLabel")
@@ -90,7 +88,7 @@ function OnItemSelected(event as object)
     video = playlist.getChild(index)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
-        m.log.info("Play playlist: " + playlistId + " video: " + videoId)
+        LogInfo("Play playlist: " + playlistId + " video: " + videoId)
         m.playQueue@.Play(playlist, index)
     end if
 end function
@@ -146,7 +144,7 @@ function OnPlaylistContentTaskResult(output as object) as void
             error = output.result.error
         end if
         error = ErrorUtils.Format(error)
-        m.log.error(error)
+        LogError(error)
         playlistId = output.task.input.content.playlistId
         message = `Failed to load playlist ${playlistId}\n${error}`
         DialogUtils.ShowDialog(message, "Playlist load fail", true)

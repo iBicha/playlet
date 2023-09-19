@@ -7,8 +7,6 @@ import "HttpConnection.bs"
 namespace Http
 
     class HttpServer
-        private log as log.Logger
-
         ' members
         private connections = invalid
         private sockin = invalid
@@ -26,7 +24,6 @@ namespace Http
         public task as object
 
         function new(settings as HttpSettings, task as object)
-            m.log = new log.Logger("HttpServer")
             m.settings = settings
             m.task = task
             m.routers = []
@@ -44,13 +41,13 @@ namespace Http
             sockin = CreateObject("roStreamSocket")
             if sockin = invalid
                 success = false
-                m.log.error("socket()")
+                LogError("socket()")
             end if
 
             ' reuse address
             if not sockin.setReuseAddr(true)
                 success = false
-                m.log.error("setsockopt(SO_REUSEADDR)", sockin.status())
+                LogError("setsockopt(SO_REUSEADDR)", sockin.status())
             end if
 
             ' bind socket
@@ -58,12 +55,12 @@ namespace Http
             addrin.setPort(m.settings.Port)
             if not sockin.setAddress(addrin)
                 success = false
-                m.log.error("bind(port" + Stri(m.settings.Port) + ")", sockin.status())
+                LogError("bind(port" + Stri(m.settings.Port) + ")", sockin.status())
             end if
             ' listen on socket
             if not sockin.listen(m.settings.MaxConnections)
                 success = false
-                m.log.error("listen()", sockin.status())
+                LogError("listen()", sockin.status())
             end if
             ' monitor socket
             sockin.setMessagePort(m.settings.MessagePort)
@@ -71,7 +68,7 @@ namespace Http
 
             m.sockin = sockin
 
-            m.log.info("listening on " + addrin.getAddress())
+            LogInfo("listening on " + addrin.getAddress())
             return success
         end function
 
@@ -95,7 +92,7 @@ namespace Http
                     conn.socket.notifyWritable(true)
                     conn.socket.notifyReadable(false)
                 else
-                    m.log.error("invalid state")
+                    LogError("invalid state")
                 end if
             end for
         end function
@@ -126,7 +123,7 @@ namespace Http
                 else if cs = Http.HttpConnectionState.DONE
                     ' handle with other connections that might transition to done
                 else
-                    m.log.error("invalid state")
+                    LogError("invalid state")
                 end if
                 cs = conn.state
                 if cs = Http.HttpConnectionState.DONE
@@ -134,7 +131,7 @@ namespace Http
                         conn.socket.close()
                         connections.delete(id)
                     else if conn.ws_upgrade and m.websocket <> invalid
-                        m.log.info("upgrading connection to web socket")
+                        LogInfo("upgrading connection to web socket")
                         m.websocket.AddConnection(conn.socket)
                         connections.delete(id)
                     else
@@ -149,7 +146,7 @@ namespace Http
             sockin = m.sockin
             socket = sockin.accept()
             if not sockin.eOK()
-                m.log.error("accept()", sockin.status())
+                LogError("accept()", sockin.status())
             end if
             if socket = invalid
                 return invalid
@@ -171,7 +168,7 @@ namespace Http
                 m.websocket.Close()
             end if
             ' final stats
-            m.log.info(`\n` + m.stats())
+            LogInfo(`\n` + m.stats())
         end function
 
         function Stats() as string

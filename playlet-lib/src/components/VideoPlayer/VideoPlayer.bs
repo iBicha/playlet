@@ -10,7 +10,6 @@ import "pkg:/components/VideoPlayer/SponsorBlock.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 function Init()
-    m.log = new log.Logger("VideoPlayer")
     SetPlayerStyle()
     SetupAnimation()
 
@@ -90,7 +89,7 @@ function OnVideoContentTaskResults(output as object) as void
             error = output.result.error
         end if
         error = ErrorUtils.Format(error)
-        m.log.error(error)
+        LogError(error)
         videoId = output.task.input.content.videoId
         message = `Failed to load video information for ${videoId}\n${error}`
         DialogUtils.ShowDialog(message, "Video load fail", true)
@@ -145,13 +144,13 @@ function OnVideoPlayerStateChange() as void
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
     ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
     if state = "playing" and not m.videoPlayingSuccess
-        m.log.info(`Now playing video ${m.top.content.url}`)
+        LogInfo(`Now playing video ${m.top.content.url}`)
         m.videoPlayingSuccess = true
     end if
 
     if state = "error"
         errorInfo = m.top.errorInfo
-        m.log.error(`Error playing video ${m.top.content.videoId}`, errorInfo)
+        LogError(`Error playing video ${m.top.content.videoId}`, errorInfo)
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
@@ -162,7 +161,7 @@ function OnVideoPlayerStateChange() as void
                 m.top.content.playletStreamUrlIndex = playletStreamUrlIndex
                 if playletStreamUrlIndex < playletStreamUrls.Count()
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
-                    m.log.error(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+                    LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
                     m.top.content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
@@ -231,7 +230,7 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
             continue for
         end if
         if not m.container@.watchedVideosContain(videoId)
-            m.log.info(`Playing next recommended video (${videoId})`)
+            LogInfo(`Playing next recommended video (${videoId})`)
             node = InvidiousContent.ToVideoContentNode(invalid, metadata, invalid)
             VideoUtils.PlayVideo(node)
             return true

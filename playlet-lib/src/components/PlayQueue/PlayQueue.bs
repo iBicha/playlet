@@ -3,13 +3,12 @@ import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
-import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
 
 function Init()
-    m.log = new log.Logger("PlayQueue")
     m.pendingLoadTasks = {}
     ' TODO:P1 prevent adding duplicates of the same video/playlist
     m.queue = CreateObject("roArray", 0, true)
@@ -163,7 +162,7 @@ function OnPlaylistContentTaskResult(output as object) as void
             error = output.result.error
         end if
         error = ErrorUtils.Format(error)
-        m.log.error(error)
+        LogError(error)
         playlistId = playlist.playlistId
         message = `Failed to load playlist ${playlistId}\n${error}`
         ' TODO:P1 play next upon closing the dialog

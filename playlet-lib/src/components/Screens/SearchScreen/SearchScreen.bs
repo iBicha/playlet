@@ -4,7 +4,7 @@ import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/source/services/SearchHistory.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/FocusManagement.bs"
-import "pkg:/source/roku_modules/log/LogMixin.brs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 
 function Init()
@@ -32,8 +32,6 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.log = new log.Logger("SearchScreen")
-
     m.rowlist@.BindNode(invalid)
     m.keyboard.ObserveField("text", FuncName(OnTextChange))
     m.suggestions.ObserveField("buttonFocused", FuncName(OnSearchButtonFocused))
@@ -112,7 +110,7 @@ function OnSearchSuggestionsTaskResults(output as object) as void
     end if
 
     if not output.success
-        m.log.error(ErrorUtils.Format(output.error))
+        LogError(ErrorUtils.Format(output.error))
         return
     end if
     ' In case this is an old request, discard suggestions
