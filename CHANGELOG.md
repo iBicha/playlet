@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Playlists, streams, podcasts and related channels to Channel UI
+  - Pagination supported
+- Channels show up in web app (but no UI for channel details yet)
+
 ### Fixed
 
 - Another bug where the app crashes if an error happens loading channel info

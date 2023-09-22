@@ -5,6 +5,7 @@
   import VideoCell from "lib/Screens/Home/VideoCell.svelte";
   import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
   import SearchThinIcon from "assets/search-thin-icon.svg.svelte";
+  import ChannelCell from "./Home/ChannelCell.svelte";
 
   export let visibility: boolean;
 
@@ -156,6 +157,8 @@
           <VideoCell {...video} />
         {:else if video.type === "playlist"}
           <PlaylistCell {...video} />
+        {:else if video.type === "channel"}
+          <ChannelCell {...video} />
         {/if}
       {/each}
     </div>
