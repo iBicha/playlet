@@ -43,7 +43,7 @@ function VideoRowListRowContentTask(input as object) as object
 
     instance = service.GetInstance()
     itemNodes = []
-    for each item in response.result
+    for each item in response.result.items
         itemNode = InvidiousContent.ToRowCellContentNode(item, instance)
         if itemNode <> invalid
             itemNodes.Push(itemNode)
@@ -53,8 +53,20 @@ function VideoRowListRowContentTask(input as object) as object
     RemovePlaceHolderItems(contentNode)
     contentNode.appendChildren(itemNodes)
 
-    if contentNode.pagination = true and response.result.Count() > 0
-        contentNode.loadState = FeedLoadState.LoadedPage
+    hasContinuation = not StringUtils.IsNullOrEmpty(response.result.continuation)
+    if hasContinuation
+        contentNode.continuation = response.result.continuation
+    end if
+
+    if response.result.items.Count() > 0
+        pageType = contentNode.paginationType
+        if pageType = PaginationType.Continuation and hasContinuation
+            contentNode.loadState = FeedLoadState.LoadedPage
+        else if pageType = PaginationType.Pages
+            contentNode.loadState = FeedLoadState.LoadedPage
+        else
+            contentNode.loadState = FeedLoadState.Loaded
+        end if
     else
         contentNode.loadState = FeedLoadState.Loaded
     end if

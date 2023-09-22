@@ -115,22 +115,7 @@ namespace InvidiousContent
         node.videoCountText = GetVideoCountText(item)
         node.thumbnail = GetChannelThumbnail(item.authorThumbnails)
         node.banner = GetChannelBanner(item.authorBanners)
-
-        if item.latestVideos <> invalid
-            newNodes = []
-
-            for each video in item.latestVideos
-                video.type = "video"
-                videoNode = ToVideoContentNode(invalid, video, instance)
-                if videoNode <> invalid
-                    newNodes.push(videoNode)
-                end if
-            end for
-
-            if newNodes.Count() > 0
-                node.latestVideos.appendChildren(newNodes)
-            end if
-        end if
+        SetIfExists(node, "tabs", item, "tabs")
 
         return node
     end function
@@ -245,7 +230,7 @@ namespace InvidiousContent
         if authorBanners = invalid or authorBanners.Count() = 0
             return ""
         end if
-        return authorBanners[authorBanners.Count() - 1].url
+        return authorBanners[0].url
     end function
 
     function GetVideoCountText(item as object) as string

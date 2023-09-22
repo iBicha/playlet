@@ -4,6 +4,7 @@ import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/components/VideoFeed/PaginationType.bs"
 
 namespace Invidious
     const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
@@ -48,7 +49,9 @@ namespace Invidious
                 DefaultHandler: m.DefaultHandler,
                 AuthFeedHandler: m.AuthFeedHandler,
                 PlaylistHandler: m.PlaylistHandler,
-                ChannelHandler: m.ChannelHandler
+                ChannelVideosHandler: m.ChannelVideosHandler,
+                ChannelPlaylistsHandler: m.ChannelPlaylistsHandler,
+                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
             }
         end function
 
@@ -155,18 +158,26 @@ namespace Invidious
             requestData = contentNode.feed
 
             endpoint = m.endpoints[requestData.endpoint]
-            if endpoint = invalid or endpoint.pagination <> true
+            if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
                 return
             end if
-
-            contentNode.pagination = true
-            contentNode.page += 1
 
             if not requestData.DoesExist("queryParams")
                 requestData.queryParams = {}
             end if
 
-            requestData.queryParams.page = contentNode.page
+            contentNode.paginationType = endpoint.paginationType
+
+            if endpoint.paginationType = PaginationType.Pages
+                contentNode.page += 1
+                requestData.queryParams.page = contentNode.page
+            else if endpoint.paginationType = PaginationType.Continuation
+                continuation = contentNode.continuation
+                if not StringUtils.IsNullOrEmpty(continuation)
+                    requestData.queryParams.continuation = continuation
+                end if
+            end if
+
             contentNode.feed = requestData
         end function
 
@@ -254,21 +265,54 @@ namespace Invidious
         end function
 
         function DefaultHandler(m as object, requestData as object, response as object) as object
-            return response.Json()
+            if response.StatusCode() = 200
+                json = response.Json()
+                return {
+                    items: json
+                }
+            end if
+            return invalid
         end function
 
         function PlaylistHandler(m as object, requestData as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
-                return json.videos
+                return {
+                    items: json.videos
+                }
             end if
             return invalid
         end function
 
-        function ChannelHandler(m as object, requestData as object, response as object) as object
+        function ChannelVideosHandler(m as object, requestData as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
-                return json.videos
+                return {
+                    items: json.videos,
+                    continuation: json.continuation
+                }
+            end if
+            return invalid
+        end function
+
+        function ChannelPlaylistsHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                return {
+                    items: json.playlists,
+                    continuation: json.continuation
+                }
+            end if
+            return invalid
+        end function
+
+        function ChannelRelatedChannelsHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                return {
+                    items: json.relatedChannels,
+                    continuation: json.continuation
+                }
             end if
             return invalid
         end function
@@ -281,7 +325,9 @@ namespace Invidious
                 videos = []
                 videos.Append(json.notifications)
                 videos.Append(json.videos)
-                return videos
+                return {
+                    items: videos
+                }
             end if
             return invalid
         end function
