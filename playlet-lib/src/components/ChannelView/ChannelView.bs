@@ -3,12 +3,19 @@ import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
+    m.container = m.top.findNode("container")
+    m.scrollAnimation = m.top.findNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.scrollAnimation.findNode("scrollAnimationInterpolator")
+
     m.banner = m.top.findNode("banner")
     m.thumbnail = m.top.findNode("thumbnail")
     m.authorLabel = m.top.findNode("authorLabel")
     m.rowList = m.top.FindNode("rowList")
 
     m.banner.ObserveField("loadStatus", FuncName(OnBannerLoadStatus))
+    m.authorId = ""
+
+    InitializeTabs()
 end function
 
 function OnNodeready()
@@ -42,9 +49,28 @@ function OnContentSet() as void
         end if
     end if
 
-    m.rowList.content = content
-
     content@.LoadChannel(m.invidious)
+
+    authorId = ValidString(content.authorId)
+    if authorId <> m.authorId and IsArray(content.tabs)
+        m.authorId = authorId
+        m.rowList.contentData = CreateChannelFeeds(m.authorId, content.tabs)
+    end if
+end function
+
+function CreateChannelFeeds(authorId as string, tabs as object) as object
+    if authorId = ""
+        return invalid
+    end if
+
+    feeds = []
+    for i = 0 to tabs.count() - 1
+        tabName = tabs[i]
+        if m.tabs.DoesExist(tabName)
+            feeds.Push(m.tabs[tabName](authorId))
+        end if
+    end for
+    return feeds
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -71,4 +97,47 @@ function OnBannerLoadStatus() as void
 
     aspect = m.banner.bitmapWidth / m.banner.bitmapHeight
     m.banner.height = m.banner.width / aspect
+    m.banner.translation = [0, -m.banner.height]
+    m.banner.visible = true
+
+    startPos = [0, 0]
+    endPos = [0, m.banner.height]
+    midPos = [0, m.banner.height / 2]
+
+    m.scrollAnimationInterpolator.keyValue = [startPos, midPos, endPos]
+    m.scrollAnimation.control = "start"
+end function
+
+function InitializeTabs()
+    m.tabs = {
+        videos: function(authorId as string) as object
+            return CreateChannelFeed("Latest videos", "channel_videos", authorId)
+        end function,
+        shorts: function(authorId as string) as object
+            return CreateChannelFeed("Shorts", "channel_shorts", authorId)
+        end function,
+        streams: function(authorId as string) as object
+            return CreateChannelFeed("Live", "channel_streams", authorId)
+        end function,
+        podcasts: function(authorId as string) as object
+            return CreateChannelFeed("Podcasts", "channel_podcasts", authorId)
+        end function,
+        playlists: function(authorId as string) as object
+            return CreateChannelFeed("Playlists", "channel_playlists", authorId)
+        end function,
+        channels: function(authorId as string) as object
+            return CreateChannelFeed("Channels", "channel_channels", authorId)
+        end function
+    }
+end function
+
+function CreateChannelFeed(title as string, endpoint as string, ucid as string) as object
+    return {
+        title: title,
+        apiType: "Invidious",
+        endpoint: endpoint,
+        pathParams: {
+            ucid: ucid
+        }
+    }
 end function

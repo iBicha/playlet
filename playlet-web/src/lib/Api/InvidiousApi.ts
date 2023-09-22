@@ -12,7 +12,6 @@ export class InvidiousApi {
         // Note: handlers for authenticated requests are not needed, since they are handled server side
         this.responseHandlers = {
             "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
-            "PlaylistHandler": (requestData, response) => this.PlaylistHandler(requestData, response),
         }
     }
 
@@ -91,12 +90,8 @@ export class InvidiousApi {
     }
 
     private async DefaultHandler(requestData, response) {
-        return await response.json();
-    }
-
-    private async PlaylistHandler(requestData, response) {
-        const playlist = await response.json();
-        return playlist.videos
+        const items = await response.json();
+        return { items };
     }
 
     private makeUrl(url: string, params: any) {

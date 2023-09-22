@@ -1,5 +1,6 @@
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
     m.titleLabel = m.top.FindNode("titleLabel")
@@ -23,36 +24,30 @@ function OnContentSet() as void
     m.titleLabel.text = content.title
     m.authorLabel.text = content.author
 
-    if content.isUpcoming = true
-        m.viewCountDateLabel.text = content.premiereTimestampText
-    else
-        publishedText = ValidString(content.publishedText)
-        viewCountText = ValidString(content.viewCountText)
-        if publishedText = "" and viewCountText = ""
-            m.viewCountDateLabel.text = ""
-        else
-            m.viewCountDateLabel.text = `${publishedText} • ${viewCountText}`
+    if not StringUtils.IsNullOrEmpty(content.publishedText)
+        label = content.publishedText
+        if not StringUtils.IsNullOrEmpty(content.viewCountText)
+            label = `${label} • ${content.viewCountText}`
         end if
+        m.viewCountDateLabel.text = label
+    else if content.isUpcoming = true
+        m.viewCountDateLabel.text = content.premiereTimestampText
     end if
 
     m.thumbnail.uri = content.thumbnail
 
-    if content.isUpcoming = true
-        m.upcomingRect.visible = true
-        m.liveRect.visible = false
-        m.durationRect.visible = false
-    else if content.liveNow
-        m.upcomingRect.visible = false
-        m.liveRect.visible = true
-        m.durationRect.visible = false
+    m.durationRect.visible = false
+    m.upcomingRect.visible = false
+    m.liveRect.visible = false
+
+    if ValidInt(content.lengthSeconds) <> 0
+        SetDurationText(content.lengthText)
+        m.durationRect.visible = true
     else
-        m.upcomingRect.visible = false
-        m.liveRect.visible = false
-        if ValidInt(content.lengthSeconds) <> 0
-            SetDurationText(content.lengthText)
-            m.durationRect.visible = true
-        else
-            m.durationRect.visible = false
+        if content.isUpcoming = true
+            m.upcomingRect.visible = true
+        else if content.liveNow
+            m.liveRect.visible = true
         end if
     end if
 end function
