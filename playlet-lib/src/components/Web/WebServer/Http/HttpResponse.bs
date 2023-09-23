@@ -1,6 +1,5 @@
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
-import "HttpResponseSource.bs"
 
 namespace Http
     function GetHttpResponseId() as integer
@@ -9,8 +8,6 @@ namespace Http
     end function
 
     class HttpResponse
-        private source = Http.HttpResponseSource.NONE
-
         ' members
         private body_buffer = invalid
         private header_buffer = invalid
@@ -42,7 +39,14 @@ namespace Http
             routers = m.server.routers
             for each router in routers
                 if router.OnRequest(m.request, m, connection)
-                    return true
+                    exit for
+                end if
+            end for
+
+            postRouters = m.server.postRouters
+            for each router in postRouters
+                if router.OnRequest(m.request, m, connection)
+                    exit for
                 end if
             end for
 
@@ -62,8 +66,6 @@ namespace Http
 
             m.SetBodyDataString(buffer)
             m.ContentType("text/html")
-
-            m.source = Http.HttpResponseSource.GENERATED
         end function
 
         function Redirect(where as string, code = 302 as integer)
@@ -78,8 +80,6 @@ namespace Http
             buffer = FormatJson(data)
             m.SetBodyDataString(buffer)
             m.ContentType("application/json")
-
-            m.source = Http.HttpResponseSource.GENERATED
         end function
 
         function SetBodyDataBuffer(buffer as object)
@@ -94,6 +94,20 @@ namespace Http
             m.ContentLength(m.body_buffer_length)
         end function
 
+        function SetBodyDataFile(path as string)
+            m.body_buffer.ReadFile(path)
+            m.body_buffer_length = m.body_buffer.count()
+            m.ContentLength(m.body_buffer_length)
+        end function
+
+        function ClearBody(clearContentLength = true as boolean)
+            m.body_buffer.clear()
+            m.body_buffer_length = 0
+            if clearContentLength
+                m.ContentLength(0)
+            end if
+        end function
+
         function ContentLength(length as integer)
             m.headers["Content-Length"] = Stri(length).trim()
         end function
@@ -104,13 +118,6 @@ namespace Http
 
         function Send(sock as object, bufsize as integer) as integer
             sent = -1
-            if m.source = Http.HttpResponseSource.FROMFILE
-                if m.start + m.sent >= m.buf_start + m.body_buffer.count()
-                    m.buf_start = m.start + m.sent
-                    m.body_buffer.ReadFile(m.path, m.buf_start, bufsize)
-                    LogDebug(`Read ${m.body_buffer.count()} bytes from source file @${m.buf_start}`)
-                end if
-            end if
             buf_pos = m.start + m.sent - m.buf_start
             buf_remaining = m.body_buffer.count() - buf_pos
             if buf_remaining = 0

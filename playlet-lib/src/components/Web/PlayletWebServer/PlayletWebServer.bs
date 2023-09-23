@@ -6,6 +6,7 @@ import "pkg:/components/Web/PlayletWebServer/Middleware/PlayQueueRouter.bs"
 import "pkg:/components/Web/WebServer/Middleware/CorsMiddleware.bs"
 import "pkg:/components/Web/WebServer/Middleware/HttpStaticFilesRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/PlayletLibUrlsRouter.bs"
+import "pkg:/components/Web/WebServer/Middleware/EtagMiddleware.bs"
 
 function Init()
     m.top.packageName = "Playlet"
@@ -37,14 +38,22 @@ function SetupRoutes(server as object)
     server.UseRouter(new Http.PlayQueueRouter())
     server.UseRouter(new Http.SearchHistoryRouter())
     server.UseRouter(new Http.PlayletLibUrlsRouter())
-    server.UseRouter(new Http.HttpStaticFilesRouter("/", "libpkg:/www", false, false, false))
-    server.UseRouter(new Http.HttpStaticFilesRouter("/config", "libpkg:/config", false, false, false))
-    server.UseRouter(new Http.HttpStaticFilesRouter("/logs", "cachefs:/logs", false, false))
+
+    etags = new Http.EtagUtils()
+    server.UseRouter(new Http.HttpStaticFilesRouter("/", "libpkg:/www", etags, { staticFiles: true }))
+    server.UseRouter(new Http.HttpStaticFilesRouter("/config", "libpkg:/config", etags, { staticFiles: true }))
+    server.UseRouter(new Http.HttpStaticFilesRouter("/logs", "cachefs:/logs", etags, { fsCheck: true }))
     #if DEBUG
-        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", true, true, false))
-        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/pkg", "pkg:/", true, true))
-        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/tmp", "tmp:/", true, true))
-        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/cachefs", "cachefs:/", true, true))
-        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/common", "common:/", true, true))
+        options = { showDirectories: true, showHidden: true, staticFiles: true }
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", etags, options))
+        options = { showDirectories: true, showHidden: true, fsCheck: true, staticFiles: true }
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/pkg", "pkg:/", etags, options))
+        options = { showDirectories: true, showHidden: true }
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/tmp", "tmp:/", etags, options))
+        options = { showDirectories: true, showHidden: true }
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/cachefs", "cachefs:/", etags, options))
+        options = { showDirectories: true, showHidden: true, fsCheck: true, staticFiles: true }
+        server.UseRouter(new Http.HttpStaticFilesRouter("/debug/common", "common:/", etags, options))
     #end if
+    server.UsePostRouter(new Http.EtagMiddleware(etags))
 end function

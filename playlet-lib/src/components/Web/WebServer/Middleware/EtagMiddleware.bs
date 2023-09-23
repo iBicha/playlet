@@ -1,0 +1,33 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "EtagUtils.bs"
+
+namespace Http
+
+    class EtagMiddleware extends HttpRouter
+
+        function new(etags as EtagUtils)
+            super()
+
+            m.etags = etags
+
+            m.Get("*", function(context as object) as boolean
+                router = context.router
+                request = context.request
+                response = context.response
+
+                if response.http_code <> 200
+                    return false
+                end if
+
+                router.etags.AddEtagFromBody(request, response)
+                router.etags.ClearContentIfNoneMatch(request, response)
+
+                return false
+            end function)
+        end function
+
+    end class
+
+end namespace
