@@ -1,0 +1,87 @@
+namespace Http
+
+    class EtagUtils
+        function new()
+            m.pathToEtags = {}
+        end function
+
+        function AddEtagFromBody(request as object, response as object, path = "" as string) as boolean
+            cacheControl = request.headers["Cache-Control"]
+            if IsString(cacheControl) and cacheControl.instr("no-cache") <> -1
+                return false
+            end if
+
+            etag = response.headers["ETag"]
+            if not StringUtils.IsNullOrEmpty(etag)
+                return false
+            end if
+
+            body = response.body_buffer
+            if not IsByteArray(body)
+                return false
+            end if
+
+            response.headers["ETag"] = `"${m.HashContent(body)}"`
+
+            if not StringUtils.IsNullOrEmpty(path)
+                m.pathToEtags[path] = {
+                    etag: response.headers["ETag"],
+                    size: body.count()
+                }
+            end if
+            return true
+        end function
+
+        function AddFileEtagFromCache(request as object, response as object, path as string) as boolean
+            if not m.pathToEtags.DoesExist(path)
+                return false
+            end if
+
+            cacheControl = request.headers["Cache-Control"]
+            if IsString(cacheControl) and cacheControl.instr("no-cache") <> -1
+                return false
+            end if
+
+            etag = response.headers["ETag"]
+            if not StringUtils.IsNullOrEmpty(etag)
+                return false
+            end if
+
+            etagObject = m.pathToEtags[path]
+            response.headers["ETag"] = etagObject.etag
+            response.ContentLength(etagObject.size)
+            return true
+        end function
+
+        function ClearContentIfNoneMatch(request as object, response as object) as boolean
+            ifNoneMatch = request.headers["If-None-Match"]
+            if StringUtils.IsNullOrEmpty(ifNoneMatch)
+                return false
+            end if
+
+            etag = response.headers["ETag"]
+            if StringUtils.IsNullOrEmpty(etag)
+                return false
+            end if
+
+            if etag <> ifNoneMatch
+                return false
+            end if
+
+            LogInfo("ETag cache hit:", etag)
+            response.http_code = 304
+            ' The response should not contain the body with a 304, but it should contain
+            ' the original Content-Length header.
+            response.ClearBody(false)
+            return true
+        end function
+
+        function HashContent(content as object) as string
+            digest = CreateObject("roEVPDigest")
+            digest.Setup("md5")
+            return digest.Process(content)
+        end function
+
+    end class
+
+end namespace

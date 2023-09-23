@@ -24,10 +24,6 @@ namespace Http
         private state = Http.HttpRequestState.INIT
         private id = 0
         ' copied members
-        private range_begin = 0
-        private range_end = 0
-        private range_begin_given = false
-        private range_end_given = false
         private ready_for_response = false
 
         function new()
@@ -197,7 +193,6 @@ namespace Http
         end function
 
         function ProcessHeaders(connection as HttpConnection)
-            m.ParseRange()
             m.ParseConnection(connection)
         end function
 
@@ -209,28 +204,6 @@ namespace Http
                 m.query = utils.ParseUrlQueryComponents(m.uri)
             else
                 m.query = {}
-            end if
-        end function
-
-        ' TODO:P2 this function does not take into account multiple ranges.
-        function ParseRange()
-            range = m.headers.range
-            if range <> invalid
-                endpoints = lcase(range).tokenize("=")
-                if endpoints.count() = 2 and endpoints.GetHead() = "bytes"
-                    range = endpoints.GetTail().Trim()
-                    hyphen = range.instr("-")
-                    if hyphen > 0
-                        m.range_begin = strtoi(range.left(hyphen))
-                        m.range_begin_given = true
-                    end if
-                    last = range.len() - 1
-                    if hyphen < last
-                        m.range_end = strtoi(range.right(last - hyphen))
-                        m.range_end_given = true
-                    end if
-                end if
-                LogInfo("range request begin" + Stri(m.range_begin) + " end" + Stri(m.range_end))
             end if
         end function
 

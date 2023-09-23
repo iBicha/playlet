@@ -5,18 +5,31 @@ namespace Http
     class HttpStaticFilesRouter extends HttpRouter
         private root
         private route
+        private etags
+
         private showDirectories
         private showHidden
         private fsCheck
+        private staticFiles
 
-        function new(route as string, root as string, showDirectories = false as boolean, showHidden = false as boolean, fsCheck = true as boolean)
+        function new(route as string, root as string, etags as object, options = {} as object)
             super()
 
             m.root = root
             m.route = route
-            m.showDirectories = showDirectories
-            m.showHidden = showHidden
-            m.fsCheck = fsCheck
+            m.etags = etags
+
+            ' showDirectories: if true, will generate a directory listing for directories. Otherwise, 403.
+            m.showDirectories = ValidBool(options.showDirectories)
+            ' showHidden: if true, will show hidden files. Hidden files are those that start with a dot.
+            ' Actual attributes not checked.
+            m.showHidden = ValidBool(options.showHidden)
+            ' fsCheck: if true, will use roFilesystem to check if file exists.
+            ' Otherwise, will use roByteArray.ReadFile() to check if file exists.
+            ' fsCheck should be false primarily for libpkg:/ files, which do not work with roFilesystem.
+            m.fsCheck = ValidBool(options.fsCheck)
+            ' staticFiles: if true, Etag tags will be cached to skip reading the file entirely.
+            m.staticFiles = ValidBool(options.staticFiles)
 
             m.Get("*", function(context as object) as boolean
                 router = context.router
@@ -33,6 +46,16 @@ namespace Http
                 decoded_path = path_in_route.DecodeUri()
                 full_path = StringUtils.PathJoin(router.root, decoded_path)
 
+                if router.staticFiles
+                    ' Although we have an Etag middleware, having a check here allows us to
+                    ' skip reading the file entirely if the Etag matches.
+                    if router.etags.AddFileEtagFromCache(request, response, full_path)
+                        if router.etags.ClearContentIfNoneMatch(request, response)
+                            return true
+                        end if
+                    end if
+                end if
+
                 if not router.fsCheck
                     ' libpkg:/ does not work with roFilesystem...
                     buffer = createObject("roByteArray")
@@ -41,7 +64,10 @@ namespace Http
                         response.SetBodyDataBuffer(buffer)
                         response.ContentType(mimetype)
                         response.http_code = 200
-                        response.source = Http.HttpResponseSource.GENERATED
+
+                        if router.staticFiles
+                            router.etags.AddEtagFromBody(request, response, full_path)
+                        end if
                         return true
                     end if
                 end if
@@ -70,69 +96,25 @@ namespace Http
                     end if
                     response.ContentType("text/html")
                     router.GenerateDirectoryListing(path, router, request, response)
+                    if router.staticFiles
+                        router.etags.AddEtagFromBody(request, response, full_path)
+                    end if
                     return true
                 else if stat.type = "file"
                     mimetype = server.utils.MimeType(decoded_path)
                     response.ContentType(mimetype)
-                    response.fileLength = stat.size
-                    LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", response.fileLength)
-                    router.GenerateFile(path, router, request, response)
+                    response.SetBodyDataFile(path)
+                    response.http_code = 200
+                    LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", stat.size)
+                    if router.staticFiles
+                        router.etags.AddEtagFromBody(request, response, full_path)
+                    end if
                     return true
                 else
                     response.Default(403, "Not a regular file.")
                     return true
                 end if
             end function)
-        end function
-
-        function GenerateFile(path as object, router as object, request as HttpRequest, response as HttpResponse) as boolean
-            response.path = path
-            response.source = Http.HttpResponseSource.FROMFILE
-            fileFinish = response.fileLength - 1
-
-            if request.range_begin_given or request.range_end_given
-                start = 0
-                finish = 0
-                if request.range_begin_given and request.range_end_given
-                    ' 100-200
-                    start = request.range_begin
-                    finish = request.range_end
-                    ' clamp finish to fileFinish
-                    if finish > fileFinish
-                        finish = fileFinish
-                    end if
-                else if request.range_begin_given and not request.range_end_given
-                    ' 100- :: yields 100 to end
-                    start = request.range_begin
-                    finish = fileFinish
-                else if not request.range_begin_given and request.range_end_given
-                    ' -200 :: yields last 200
-                    finish = fileFinish
-                    start = finish - request.range_end + 1
-                    ' check for wrapping
-                    if start > finish
-                        start = 0
-                    end if
-                else
-                    LogError(1, "internal error - range start/finish logic inconsistency")
-                end if
-
-                response.start = start
-                response.body_buffer_length = finish - start + 1
-                response.ContentLength(response.body_buffer_length)
-                response.headers["Content-Range"] = "bytes " + response.MakeRange(response.start, response.body_buffer_length, response.filelength)
-                response.http_code = 206
-
-                LogInfo("sending range " + response.MakeRange(start, response.body_buffer_length, response.fileLength))
-            else ' no range stuff
-                response.body_buffer_length = response.fileLength
-                response.ContentLength(response.body_buffer_length)
-                response.http_code = 200
-            end if
-
-            response.headers["Accept-Ranges"] = "bytes"
-            response.KeepAlive(true)
-            return true
         end function
 
         function GenerateDirectoryListing(path as object, router as object, request as HttpRequest, response as HttpResponse) as boolean
@@ -205,7 +187,6 @@ namespace Http
             response.SetBodyDataString(listing)
             response.http_code = 200
             response.KeepAlive(true)
-            response.source = Http.HttpResponseSource.GENERATED
             return true
         end function
     end class
