@@ -8,6 +8,7 @@ import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Navigation/LongPress.bs"
 
 function Init()
     m.background = m.top.findNode("background")
@@ -21,7 +22,7 @@ end function
 
 function OnNodeReady()
     m.list.ObserveField("itemFocused", FuncName(OnItemFocused))
-    m.list.observeField("itemSelected", FuncName(OnItemSelected))
+    InitializeLongPressTimer()
 end function
 
 function OnFocusChange() as void
@@ -58,6 +59,20 @@ function OnContentSet() as void
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
+    if LongPressHandler(key, press)
+        return true
+    end if
+
+    if key = "longPress" and press
+        OnItemLongPressed(m.list.itemFocused)
+        return true
+    end if
+
+    if key = "OK" and not press
+        OnItemSelected(m.list.itemFocused)
+        return true
+    end if
+
     if press = false
         return false
     end if
@@ -81,15 +96,40 @@ function OnItemFocused()
     LoadPlaylistIfNeeded()
 end function
 
-function OnItemSelected(event as object)
-    index = event.getData()
+function OnItemSelected(index as integer) as void
     playlist = m.list.content
+    if playlist = invalid
+        return
+    end if
+
+    if index < 0 or index >= playlist.getChildCount()
+        return
+    end if
+
     playlistId = playlist.playlistId
     video = playlist.getChild(index)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
         LogInfo("Play playlist: " + playlistId + " video: " + videoId)
         m.playQueue@.Play(playlist, index)
+    end if
+end function
+
+function OnItemLongPressed(index as integer) as void
+    playlist = m.list.content
+    if playlist = invalid
+        return
+    end if
+
+    if index < 0 or index >= playlist.getChildCount()
+        return
+    end if
+
+    playlistId = playlist.playlistId
+    video = playlist.getChild(index)
+    videoId = video.videoId
+    if not StringUtils.IsNullOrEmpty(videoId)
+        LogInfo("Long press: playlist:", playlistId, "video:" + videoId)
     end if
 end function
 

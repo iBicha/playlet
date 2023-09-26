@@ -8,6 +8,7 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/Navigation/LongPress.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
 ' E.g. NBC News does not return any related chnanels
@@ -18,11 +19,11 @@ end function
 function OnNodeReady()
     m.top.ObserveField("itemFocused", FuncName(OnItemFocused))
     m.top.ObserveField("rowItemFocused", FuncName(OnRowItemFocused))
-    m.top.ObserveField("rowItemSelected", FuncName(OnRowItemSelected))
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
     m.top.ObserveField("visible", FuncName(OnVisibilityChange))
 
     m.invidious.ObserveFieldScoped("authToken", FuncName(OnAuthTokenChange))
+    InitializeLongPressTimer()
 end function
 
 function OnFocusedChildChange() as void
@@ -60,12 +61,25 @@ function OnRowItemFocused(event as object) as void
     end if
 end function
 
-function OnRowItemSelected(event as object)
-    index = event.GetData()
+function OnRowItemSelected(index as object) as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
     rowIndex = index[0]
     rowItemIndex = index[1]
 
-    row = m.top.content.GetChild(rowIndex)
+    if rowIndex < 0 or rowIndex >= content.GetChildCount()
+        LogWarn("Invalid row index:", rowIndex)
+        return
+    end if
+    row = content.GetChild(rowIndex)
+
+    if rowItemIndex < 0 or rowItemIndex >= row.GetChildCount()
+        LogWarn("Invalid row item index:", rowItemIndex)
+        return
+    end if
     rowItem = row.GetChild(rowItemIndex)
 
     if rowItem.type = "video"
@@ -86,6 +100,41 @@ function OnRowItemSelected(event as object)
             dialog@.BindNode(invalid)
             m.top.getScene().dialog = dialog
         end if
+    end if
+end function
+
+function OnRowItemLongPressed(index as object) as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    rowIndex = index[0]
+    rowItemIndex = index[1]
+
+    if rowIndex < 0 or rowIndex >= content.GetChildCount()
+        LogWarn("Invalid row index:", rowIndex)
+        return
+    end if
+    row = content.GetChild(rowIndex)
+
+    if rowItemIndex < 0 or rowItemIndex >= row.GetChildCount()
+        LogWarn("Invalid row item index:", rowItemIndex)
+        return
+    end if
+    rowItem = row.GetChild(rowItemIndex)
+
+    if rowItem.type = "video"
+        videoId = rowItem.videoId
+        LogInfo("Video long pressed:", videoId)
+    else if rowItem.type = "playlist"
+        playlistId = rowItem.playlistId
+        LogInfo("Playlist long pressed:", playlistId)
+    else if rowItem.type = "channel"
+        authorId = rowItem.authorId
+        LogInfo("Channel long pressed:", authorId)
+    else
+        LogWarn("Unknown long pressed item type:", rowItem.type)
     end if
 end function
 
@@ -206,4 +255,22 @@ function OnVideoRowListRowContentTaskResult(output as object) as void
     end if
 
     LoadRowsIfNeeded()
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    ' LogInfo("OnkeyEvent", key, press)
+    if LongPressHandler(key, press)
+        return true
+    end if
+
+    if key = "longPress" and press
+        OnRowItemLongPressed(m.top.rowItemFocused)
+        return true
+    end if
+
+    if key = "OK" and not press
+        OnRowItemSelected(m.top.rowItemFocused)
+        return true
+    end if
+    return false
 end function
