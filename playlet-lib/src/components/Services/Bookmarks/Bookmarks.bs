@@ -1,0 +1,110 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
+
+function Init()
+    m.bookmarksString = ""
+    Load()
+    m.top.ObserveField("change", FuncName(OnChange))
+end function
+
+function Load() as void
+    bookmarksString = RegistryUtils.Read(RegistryUtils.BOOKMARKS)
+    if bookmarksString = invalid
+        return
+    end if
+
+    m.bookmarksString = bookmarksString
+    bookmarks = ParseJson(bookmarksString)
+    if bookmarks = invalid
+        return
+    end if
+
+    for each bookmark in bookmarks.bookmarks
+        AddBookmarkGroup(bookmark.title)
+        for each item in bookmark.items
+            AddBookmark(item.type, item.id, bookmark.title)
+        end for
+    end for
+end function
+
+function Save() as void
+    bookmarkGroups = m.top.getChildren(-1, 0)
+    if bookmarkGroups.Count() = 0
+        RegistryUtils.Delete(RegistryUtils.BOOKMARKS)
+        return
+    end if
+
+    bookmarks = []
+    for each group in bookmarkGroups
+        items = []
+        nodes = group.getChildren(-1, 0)
+        for each node in nodes
+            items.Push({
+                type: node.type,
+                id: node.itemId
+            })
+        end for
+        bookmarks.push({
+            title: group.title,
+            items: items
+        })
+    end for
+
+    bookmarksString = FormatJson({
+        __version: m.top.__version,
+        bookmarks: bookmarks
+    })
+
+    if m.bookmarksString = bookmarksString
+        return
+    end if
+
+    RegistryUtils.Write(RegistryUtils.BOOKMARKS, bookmarksString)
+    m.bookmarksString = bookmarksString
+end function
+
+function AddBookmarkGroup(groupName as string) as object
+    node = CreateObject("roSGNode", "ContentNode")
+    node.id = groupName
+    node.title = groupName
+    m.top.appendChild(node)
+    return node
+end function
+
+function AddBookmark(bookmarkType as string, id as string, groupName as string)
+    groupNode = m.top.findNode(groupName)
+    if groupNode = invalid
+        groupNode = AddBookmarkGroup(groupName)
+    end if
+
+    node = CreateObject("roSGNode", "ContentNode")
+    node.id = id
+    node.addFields({
+        type: bookmarkType,
+        itemId: id
+    })
+    groupNode.appendChild(node)
+end function
+
+function OnChange(event as object) as void
+    change = event.getData()
+    if change.Operation = "none"
+        return
+    end if
+
+    Save()
+end function
+
+' When a video is selected:
+'   - Add to "Videos" bookmark
+'   - Add to new bookmark group...
+
+' When a channel is selected:
+'   - Add to "Channels" bookmark
+'   - Add to <ChannelName> bookmark
+'   - Add to new bookmark group...
+
+' When a playlist is selected:
+'   - Add to "Playlists" bookmark
+'   - Add to <PlaylistName> bookmark
+'   - Add to new bookmark group...
