@@ -1,0 +1,89 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+' TODO:P1 animation (fade in/out)
+function Init()
+    m.buttonGroup = m.top.findNode("buttonGroup")
+end function
+
+function OnNodeReady()
+    m.buttonGroup.ObserveField("buttonSelected", FuncName(OnButtonSelected))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+    NodeSetFocus(m.buttonGroup, true)
+end function
+
+function OnMenuSet() as void
+    menu = m.top.menu
+    if menu = invalid
+        return
+    end if
+
+    buttons = []
+    for each item in menu
+        buttons.push(item.text)
+    end for
+
+    m.buttonGroup.buttons = buttons
+
+    rect = m.buttonGroup.boundingRect()
+    m.buttonGroup.translation = [1280 / 2 - rect.width / 2, 720 / 2 - rect.height / 2]
+end function
+
+function OnButtonSelected(event as object) as void
+    index = event.getData()
+    button = m.buttonGroup.buttons[index]
+    LogInfo("Menu button selected:", button)
+    Close()
+
+    menu = m.top.menu
+    if index >= menu.count()
+        LogError("Menu button index out of range:", index)
+        return
+    end if
+
+    menuItem = menu[index]
+
+    if menuItem.action.node = invalid or StringUtils.IsNullOrEmpty(menuItem.action.func) or menuItem.action.args = invalid
+        LogError("Menu button action is invalid")
+        return
+    end if
+
+    node = menuItem.action.node
+    func = menuItem.action.func
+    args = menuItem.action.args
+
+    if args.count() = 1
+        node.callFunc(func, args[0])
+    else if args.count() = 2
+        node.callFunc(func, args[0], args[1])
+    else if args.count() = 3
+        node.callFunc(func, args[0], args[1], args[2])
+    else if args.count() = 4
+        node.callFunc(func, args[0], args[1], args[2], args[3])
+    else if args.count() = 5
+        node.callFunc(func, args[0], args[1], args[2], args[3], args[4])
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+
+    if key = "back"
+        Close()
+        return true
+    end if
+    return false
+end function
+
+function Close()
+    m.appController@.PopScreen(invalid)
+end function

@@ -124,18 +124,64 @@ function OnRowItemLongPressed(index as object) as void
     end if
     rowItem = row.GetChild(rowItemIndex)
 
+    OpenContextMenu(rowItem)
+end function
+
+function OpenContextMenu(rowItem as object) as void
+    menu = []
+
     if rowItem.type = "video"
         videoId = rowItem.videoId
         LogInfo("Video long pressed:", videoId)
+
+        menu.push({
+            text: `Play "${rowItem.title}"`,
+            action: {
+                node: m.playQueue,
+                func: "Play",
+                args: [rowItem, -1]
+            }
+        })
+        menu.push({
+            text: `Queue "${rowItem.title}"`,
+            action: {
+                node: m.playQueue,
+                func: "AddToQueue",
+                args: [rowItem]
+            }
+        })
     else if rowItem.type = "playlist"
         playlistId = rowItem.playlistId
         LogInfo("Playlist long pressed:", playlistId)
+
+        menu.push({
+            text: `Play "${rowItem.title}"`,
+            action: {
+                node: m.playQueue,
+                func: "Play",
+                args: [rowItem, -1]
+            }
+        })
+        menu.push({
+            text: `Queue "${rowItem.title}"`,
+            action: {
+                node: m.playQueue,
+                func: "AddToQueue",
+                args: [rowItem]
+            }
+        })
     else if rowItem.type = "channel"
         authorId = rowItem.authorId
         LogInfo("Channel long pressed:", authorId)
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
+        return
     end if
+
+    contextMenu = CreateObject("roSGNode", "ContextMenu")
+    m.appController@.PushScreen(contextMenu)
+    contextMenu@.BindNode(invalid)
+    contextMenu.menu = menu
 end function
 
 function OnAuthTokenChange()
