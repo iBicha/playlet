@@ -89,11 +89,11 @@ function OnRowItemSelected(index as object) as void
     else if rowItem.type = "playlist"
         playlistId = rowItem.playlistId
         LogInfo("Open playlist: " + playlistId)
-        PlaylistUtils.Open(rowItem)
+        OpenPlaylist(rowItem)
     else if rowItem.type = "channel"
         authorId = rowItem.authorId
         LogInfo("Open channel: " + authorId)
-        ChannelUtils.Open(rowItem)
+        OpenChannel(rowItem)
     else if rowItem.type = "action"
         if rowItem.action = "LoginDialog"
             dialog = CreateObject("roSGNode", "LoginDialog")
@@ -128,25 +128,59 @@ function OnRowItemLongPressed(index as object) as void
 end function
 
 function OpenContextMenu(rowItem as object) as void
+    ' TODO:P0
+    ' Video menu:
+    '   - Play - DONE
+    '   - Queue - DONE
+    '   - Open channel - DONE
+    '   - Add to bookmarks... / Remove from bookmarks
+    ' Playlist menu:
+    '   - Play - DONE
+    '   - Queue - DONE
+    '   - Open playlist - DONE
+    '   - Open channel
+    '   - Add to bookmarks... / Remove from bookmarks
+    ' Channel menu:
+    '   - Open channel - DONE
+    '   - Add to bookmarks... / Remove from bookmarks
+
     menu = []
+    title = ""
+    subtitle = ""
+    thumbnail = ""
+
+    playAction = {
+        text: "Play",
+        action: {
+            node: m.playQueue,
+            func: "Play",
+            args: [rowItem, -1]
+        }
+    }
+    queueAction = {
+        text: "Queue",
+        action: {
+            node: m.playQueue,
+            func: "AddToQueue",
+            args: [rowItem]
+        }
+    }
 
     if rowItem.type = "video"
         videoId = rowItem.videoId
         LogInfo("Video long pressed:", videoId)
 
+        title = rowItem.title
+        subtitle = rowItem.author
+        thumbnail = rowItem.thumbnail
+
+        menu.push(playAction)
+        menu.push(queueAction)
         menu.push({
-            text: `Play "${rowItem.title}"`,
+            text: "Open channel",
             action: {
-                node: m.playQueue,
-                func: "Play",
-                args: [rowItem, -1]
-            }
-        })
-        menu.push({
-            text: `Queue "${rowItem.title}"`,
-            action: {
-                node: m.playQueue,
-                func: "AddToQueue",
+                node: m.top,
+                func: "OpenVideoChannel",
                 args: [rowItem]
             }
         })
@@ -154,25 +188,35 @@ function OpenContextMenu(rowItem as object) as void
         playlistId = rowItem.playlistId
         LogInfo("Playlist long pressed:", playlistId)
 
+        title = rowItem.title
+        subtitle = rowItem._author
+        thumbnail = rowItem.thumbnail
+
+        menu.push(playAction)
+        menu.push(queueAction)
         menu.push({
-            text: `Play "${rowItem.title}"`,
+            text: "Open",
             action: {
-                node: m.playQueue,
-                func: "Play",
-                args: [rowItem, -1]
-            }
-        })
-        menu.push({
-            text: `Queue "${rowItem.title}"`,
-            action: {
-                node: m.playQueue,
-                func: "AddToQueue",
+                node: m.top,
+                func: "OpenPlaylist",
                 args: [rowItem]
             }
         })
     else if rowItem.type = "channel"
         authorId = rowItem.authorId
         LogInfo("Channel long pressed:", authorId)
+
+        title = rowItem._author
+        thumbnail = rowItem.thumbnail
+
+        menu.push({
+            text: "Open",
+            action: {
+                node: m.top,
+                func: "OpenChannel",
+                args: [rowItem]
+            }
+        })
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
         return
@@ -181,7 +225,28 @@ function OpenContextMenu(rowItem as object) as void
     contextMenu = CreateObject("roSGNode", "ContextMenu")
     m.appController@.PushScreen(contextMenu)
     contextMenu@.BindNode(invalid)
+    contextMenu.title = title
+    contextMenu.subtitle = subtitle
+    contextMenu.thumbnail = thumbnail
     contextMenu.menu = menu
+end function
+
+function OpenPlaylist(playlist as object)
+    PlaylistUtils.Open(playlist)
+end function
+
+function OpenChannel(channel as object)
+    ChannelUtils.Open(channel)
+end function
+
+function OpenVideoChannel(video as object) as void
+    authorId = video.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    ChannelUtils.Open(channel)
 end function
 
 function OnAuthTokenChange()
