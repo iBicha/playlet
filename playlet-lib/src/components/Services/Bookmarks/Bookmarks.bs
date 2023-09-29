@@ -1,5 +1,11 @@
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+
+const VIDEOS_GROUP = "Videos"
+const CHANNELS_GROUP = "Channels"
+const PLAYLISTS_GROUP = "Playlists"
 
 function Init()
     m.bookmarksString = ""
@@ -68,6 +74,7 @@ function AddBookmarkGroup(groupName as string) as object
     node.id = groupName
     node.title = groupName
     m.top.appendChild(node)
+    LogInfo("Added bookmark group:", groupName)
     return node
 end function
 
@@ -83,7 +90,24 @@ function AddBookmark(bookmarkType as string, id as string, groupName as string)
         type: bookmarkType,
         itemId: id
     })
-    groupNode.appendChild(node)
+    groupNode.insertChild(node, 0)
+    LogInfo("Added bookmark:", id)
+end function
+
+function RemoveBookmark(id as string) as void
+    node = m.top.findNode(id)
+    if node = invalid
+        return
+    end if
+
+    parent = node.getParent()
+    parent.removeChild(node)
+    LogInfo("Removed bookmark:", id)
+
+    if parent.getChildCount() = 0
+        m.top.removeChild(parent)
+        LogInfo("Removed bookmark group:", parent.title)
+    end if
 end function
 
 function OnChange(event as object) as void
@@ -95,16 +119,109 @@ function OnChange(event as object) as void
     Save()
 end function
 
+function GetMenuForVideo(videoNode as object) as object
+    videoId = videoNode.videoId
+    if StringUtils.IsNullOrEmpty(videoId)
+        return []
+    end if
+
+    menu = []
+    isInBookmarks = m.top.findNode(videoId) <> invalid
+    if isInBookmarks
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Remove from bookmarks"
+        item.node = m.top
+        item.func = "RemoveBookmark"
+        item.args = [videoId]
+        menu.push(item)
+    else
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = `Add to "${VIDEOS_GROUP}" bookmark`
+        item.node = m.top
+        item.func = "AddBookmark"
+        item.args = ["video", videoId, VIDEOS_GROUP]
+        menu.push(item)
+    end if
+    return menu
+end function
+
+function GetMenuForPlaylist(playlistNode as object) as object
+    playlistId = playlistNode.playlistId
+    if StringUtils.IsNullOrEmpty(playlistId)
+        return []
+    end if
+
+    menu = []
+    isInBookmarks = m.top.findNode(playlistId) <> invalid
+    if isInBookmarks
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Remove from bookmarks"
+        item.node = m.top
+        item.func = "RemoveBookmark"
+        item.args = [playlistId]
+        menu.push(item)
+    else
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = `Add to "${PLAYLISTS_GROUP}" bookmark`
+        item.node = m.top
+        item.func = "AddBookmark"
+        item.args = ["playlist", playlistId, PLAYLISTS_GROUP]
+        menu.push(item)
+
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = `Add to "${playlistNode.title}" bookmark`
+        item.node = m.top
+        item.func = "AddBookmark"
+        item.args = ["playlist", playlistId, playlistNode.title]
+        menu.push(item)
+    end if
+    return menu
+end function
+
+function GetMenuForChannel(channelNode as object) as object
+    authorId = channelNode.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        return []
+    end if
+
+    menu = []
+    isInBookmarks = m.top.findNode(authorId) <> invalid
+    if isInBookmarks
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Remove from bookmarks"
+        item.node = m.top
+        item.func = "RemoveBookmark"
+        item.args = [authorId]
+        menu.push(item)
+    else
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = `Add to "${CHANNELS_GROUP}" bookmark`
+        item.node = m.top
+        item.func = "AddBookmark"
+        item.args = ["channel", authorId, CHANNELS_GROUP]
+        menu.push(item)
+
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = `Add to "${channelNode._author}" bookmark`
+        item.node = m.top
+        item.func = "AddBookmark"
+        item.args = ["channel", authorId, channelNode._author]
+        menu.push(item)
+    end if
+    return menu
+end function
+
+' TODO:P0
 ' When a video is selected:
-'   - Add to "Videos" bookmark
-'   - Add to new bookmark group...
+'   - Add to "Videos" bookmark - DONE
+'   - Add to bookmarks...
 
 ' When a channel is selected:
-'   - Add to "Channels" bookmark
-'   - Add to <ChannelName> bookmark
-'   - Add to new bookmark group...
+'   - Add to "Channels" bookmark - DONE
+'   - Add to <ChannelName> bookmark - DONE
+'   - Add to bookmarks...
 
 ' When a playlist is selected:
-'   - Add to "Playlists" bookmark
-'   - Add to <PlaylistName> bookmark
-'   - Add to new bookmark group...
+'   - Add to "Playlists" bookmark - DONE
+'   - Add to <PlaylistName> bookmark - DONE
+'   - Add to bookmarks...

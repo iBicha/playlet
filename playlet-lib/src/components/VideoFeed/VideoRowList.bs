@@ -149,22 +149,17 @@ function OpenContextMenu(rowItem as object) as void
     subtitle = ""
     thumbnail = ""
 
-    playAction = {
-        text: "Play",
-        action: {
-            node: m.playQueue,
-            func: "Play",
-            args: [rowItem, -1]
-        }
-    }
-    queueAction = {
-        text: "Queue",
-        action: {
-            node: m.playQueue,
-            func: "AddToQueue",
-            args: [rowItem]
-        }
-    }
+    playAction = CreateObject("roSGNode", "ContextMenuItemContentNode")
+    playAction.title = "Play"
+    playAction.node = m.playQueue
+    playAction.func = "Play"
+    playAction.args = [rowItem, -1]
+
+    queueAction = CreateObject("roSGNode", "ContextMenuItemContentNode")
+    queueAction.title = "Queue"
+    queueAction.node = m.playQueue
+    queueAction.func = "AddToQueue"
+    queueAction.args = [rowItem]
 
     if rowItem.type = "video"
         videoId = rowItem.videoId
@@ -176,14 +171,15 @@ function OpenContextMenu(rowItem as object) as void
 
         menu.push(playAction)
         menu.push(queueAction)
-        menu.push({
-            text: "Open channel",
-            action: {
-                node: m.top,
-                func: "OpenVideoChannel",
-                args: [rowItem]
-            }
-        })
+
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Open channel"
+        item.node = m.top
+        item.func = "OpenVideoChannel"
+        item.args = [rowItem]
+        menu.push(item)
+
+        menu.append(m.bookmarks@.GetMenuForVideo(rowItem))
     else if rowItem.type = "playlist"
         playlistId = rowItem.playlistId
         LogInfo("Playlist long pressed:", playlistId)
@@ -194,14 +190,15 @@ function OpenContextMenu(rowItem as object) as void
 
         menu.push(playAction)
         menu.push(queueAction)
-        menu.push({
-            text: "Open",
-            action: {
-                node: m.top,
-                func: "OpenPlaylist",
-                args: [rowItem]
-            }
-        })
+
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Open"
+        item.node = m.top
+        item.func = "OpenPlaylist"
+        item.args = [rowItem]
+        menu.push(item)
+
+        menu.append(m.bookmarks@.GetMenuForPlaylist(rowItem))
     else if rowItem.type = "channel"
         authorId = rowItem.authorId
         LogInfo("Channel long pressed:", authorId)
@@ -209,14 +206,14 @@ function OpenContextMenu(rowItem as object) as void
         title = rowItem._author
         thumbnail = rowItem.thumbnail
 
-        menu.push({
-            text: "Open",
-            action: {
-                node: m.top,
-                func: "OpenChannel",
-                args: [rowItem]
-            }
-        })
+        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        item.title = "Open"
+        item.node = m.top
+        item.func = "OpenChannel"
+        item.args = [rowItem]
+        menu.push(item)
+
+        menu.append(m.bookmarks@.GetMenuForChannel(rowItem))
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
         return

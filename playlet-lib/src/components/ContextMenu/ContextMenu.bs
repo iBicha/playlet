@@ -27,7 +27,7 @@ function OnMenuSet() as void
 
     buttons = []
     for each item in menu
-        buttons.push(item.text)
+        buttons.push(item.title)
     end for
 
     m.buttonGroup.buttons = buttons
@@ -36,8 +36,8 @@ end function
 function OnButtonSelected(event as object) as void
     index = event.getData()
     button = m.buttonGroup.buttons[index]
-    LogInfo("Menu button selected:", button)
     Close()
+    LogInfo("Menu button selected:", button)
 
     menu = m.top.menu
     if index >= menu.count()
@@ -47,14 +47,14 @@ function OnButtonSelected(event as object) as void
 
     menuItem = menu[index]
 
-    if menuItem.action.node = invalid or StringUtils.IsNullOrEmpty(menuItem.action.func) or menuItem.action.args = invalid
+    node = menuItem.node
+    func = menuItem.func
+    args = menuItem.args
+
+    if node = invalid or StringUtils.IsNullOrEmpty(func) or args = invalid
         LogError("Menu button action is invalid")
         return
     end if
-
-    node = menuItem.action.node
-    func = menuItem.action.func
-    args = menuItem.action.args
 
     if args.count() = 1
         node.callFunc(func, args[0])
@@ -66,6 +66,8 @@ function OnButtonSelected(event as object) as void
         node.callFunc(func, args[0], args[1], args[2], args[3])
     else if args.count() = 5
         node.callFunc(func, args[0], args[1], args[2], args[3], args[4])
+    else
+        LogError("Menu button action has too many arguments")
     end if
 end function
 
