@@ -1,3 +1,4 @@
+import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -8,9 +9,10 @@ const CHANNELS_GROUP = "Channels"
 const PLAYLISTS_GROUP = "Playlists"
 
 function Init()
+    m.top.content = m.top.findNode("content")
     m.bookmarksString = ""
     Load()
-    m.top.ObserveField("change", FuncName(OnChange))
+    m.top.content.ObserveField("change", FuncName(OnChange))
 end function
 
 function Load() as void
@@ -34,7 +36,7 @@ function Load() as void
 end function
 
 function Save() as void
-    bookmarkGroups = m.top.getChildren(-1, 0)
+    bookmarkGroups = m.top.content.getChildren(-1, 0)
     if bookmarkGroups.Count() = 0
         RegistryUtils.Delete(RegistryUtils.BOOKMARKS)
         return
@@ -71,15 +73,15 @@ end function
 
 function AddBookmarkGroup(groupName as string) as object
     node = CreateObject("roSGNode", "ContentNode")
-    node.id = groupName
+    node.id = CryptoUtils.GetMd5(groupName)
     node.title = groupName
-    m.top.appendChild(node)
+    m.top.content.appendChild(node)
     LogInfo("Added bookmark group:", groupName)
     return node
 end function
 
 function AddBookmark(bookmarkType as string, id as string, groupName as string)
-    groupNode = m.top.findNode(groupName)
+    groupNode = m.top.content.findNode(CryptoUtils.GetMd5(groupName))
     if groupNode = invalid
         groupNode = AddBookmarkGroup(groupName)
     end if
@@ -95,18 +97,18 @@ function AddBookmark(bookmarkType as string, id as string, groupName as string)
 end function
 
 function RemoveBookmark(id as string) as void
-    node = m.top.findNode(id)
+    node = m.top.content.findNode(id)
     if node = invalid
         return
     end if
 
-    parent = node.getParent()
-    parent.removeChild(node)
+    group = node.getParent()
+    group.removeChild(node)
     LogInfo("Removed bookmark:", id)
 
-    if parent.getChildCount() = 0
-        m.top.removeChild(parent)
-        LogInfo("Removed bookmark group:", parent.title)
+    if group.getChildCount() = 0
+        m.top.content.removeChild(group)
+        LogInfo("Removed bookmark group:", group.title)
     end if
 end function
 
@@ -126,7 +128,7 @@ function GetMenuForVideo(videoNode as object) as object
     end if
 
     menu = []
-    isInBookmarks = m.top.findNode(videoId) <> invalid
+    isInBookmarks = m.top.content.findNode(videoId) <> invalid
     if isInBookmarks
         item = CreateObject("roSGNode", "ContextMenuItemContentNode")
         item.title = "Remove from bookmarks"
@@ -152,7 +154,7 @@ function GetMenuForPlaylist(playlistNode as object) as object
     end if
 
     menu = []
-    isInBookmarks = m.top.findNode(playlistId) <> invalid
+    isInBookmarks = m.top.content.findNode(playlistId) <> invalid
     if isInBookmarks
         item = CreateObject("roSGNode", "ContextMenuItemContentNode")
         item.title = "Remove from bookmarks"
@@ -185,7 +187,7 @@ function GetMenuForChannel(channelNode as object) as object
     end if
 
     menu = []
-    isInBookmarks = m.top.findNode(authorId) <> invalid
+    isInBookmarks = m.top.content.findNode(authorId) <> invalid
     if isInBookmarks
         item = CreateObject("roSGNode", "ContextMenuItemContentNode")
         item.title = "Remove from bookmarks"
