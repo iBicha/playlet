@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Pagination supported
 - Channels show up in web app (but no UI for channel details yet)
 - Support for `Etag` header on the web server to improve performance with caching
+- Support to pause/play while picture-in-picture
 
 ### Fixed
 
