@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Another bug where the app crashes if an error happens loading channel info
 - Issue with default instance (by changing default instance)
+- Cropped text in a couple of buttons
 
 ### Removed
 
