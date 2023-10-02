@@ -1,4 +1,5 @@
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/Logging.bs"
 
 function Init()
     m.top.functionName = "LoggerLoop"
@@ -13,6 +14,18 @@ function Init()
     end if
 
     m.port = port
+
+    StartLogger(m.top)
+end function
+
+function StartLogger(logger as object, logLevel = LogLevel.Info as LogLevel) as void
+    if m.global.logger <> invalid
+        return
+    end if
+
+    logger.logLevel = logLevel
+    m.global.addFields({ logger: logger })
+    logger.control = "run"
 end function
 
 function LoggerLoop()
