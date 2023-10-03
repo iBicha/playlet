@@ -12,7 +12,7 @@ function Init()
     m.top.content = m.top.findNode("content")
     m.bookmarksString = ""
     Load()
-    m.top.content.ObserveField("change", FuncName(OnChange))
+    m.top.ObserveField("contentChange", FuncName(OnContentChange))
 end function
 
 function Load() as void
@@ -94,6 +94,7 @@ function AddBookmark(bookmarkType as string, id as string, groupName as string)
     })
     groupNode.insertChild(node, 0)
     LogInfo("Added bookmark:", id)
+    m.top.contentChange = true
 end function
 
 function RemoveBookmark(id as string) as void
@@ -110,14 +111,10 @@ function RemoveBookmark(id as string) as void
         m.top.content.removeChild(group)
         LogInfo("Removed bookmark group:", group.title)
     end if
+    m.top.contentChange = true
 end function
 
-function OnChange(event as object) as void
-    change = event.getData()
-    if change.Operation = "none"
-        return
-    end if
-
+function OnContentChange(event as object) as void
     Save()
 end function
 
@@ -149,7 +146,7 @@ end function
 
 function GetMenuForPlaylist(playlistNode as object) as object
     playlistId = playlistNode.playlistId
-    if StringUtils.IsNullOrEmpty(playlistId)
+    if StringUtils.IsNullOrEmpty(playlistId) or playlistId.StartsWith("IV")
         return []
     end if
 
@@ -212,18 +209,3 @@ function GetMenuForChannel(channelNode as object) as object
     end if
     return menu
 end function
-
-' TODO:P0
-' When a video is selected:
-'   - Add to "Videos" bookmark - DONE
-'   - Add to bookmarks...
-
-' When a channel is selected:
-'   - Add to "Channels" bookmark - DONE
-'   - Add to <ChannelName> bookmark - DONE
-'   - Add to bookmarks...
-
-' When a playlist is selected:
-'   - Add to "Playlists" bookmark - DONE
-'   - Add to <PlaylistName> bookmark - DONE
-'   - Add to bookmarks...

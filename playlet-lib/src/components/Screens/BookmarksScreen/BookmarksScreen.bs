@@ -6,6 +6,9 @@ function Init()
     m.noBookmarks = m.top.findNode("noBookmarks")
     m.yesBookmarks = m.top.findNode("yesBookmarks")
     m.rowList = m.top.FindNode("rowList")
+    m.isDirty = true
+
+    m.top.ObserveField("visible", FuncName(OnVisibleChange))
 end function
 
 function OnNodeReady()
@@ -15,7 +18,7 @@ function OnNodeReady()
     m.rowList@.BindNode(invalid)
 
     OnBookmarksChange()
-    m.bookmarks.content.ObserveField("change", FuncName(OnBookmarksChange))
+    m.bookmarks.ObserveField("contentChange", FuncName(OnBookmarksChange))
 end function
 
 function OnFocusChange() as void
@@ -30,16 +33,25 @@ function OnFocusChange() as void
     end if
 end function
 
-' TODO:P0 handle visiblity: only refresh bookmarks if screen visible.
-' Else mark as dirty and refresh when visible
-function OnBookmarksChange()
+function OnVisibleChange()
+    if m.top.visible and m.isDirty
+        m.isDirty = false
+        OnBookmarksChange()
+    end if
+end function
+
+function OnBookmarksChange() as void
+    if not m.top.visible
+        m.isDirty = true
+        return
+    end if
     hasBookmarks = m.bookmarks.content.getChildCount() > 0
     m.noBookmarks.visible = not hasBookmarks
     m.yesBookmarks.visible = hasBookmarks
     m.top.focusable = hasBookmarks
 
     if hasBookmarks
-        SetRowListContent()
+        SetRowListContent(m.bookmarks.content)
     else
         if m.rowList.hasFocus()
             NodeSetFocus(m.navBar, true)
@@ -47,8 +59,72 @@ function OnBookmarksChange()
     end if
 end function
 
-function SetRowListContent()
+function SetRowListContent(bookmarksContent as object)
+    bookmarks = bookmarksContent.getChildren(-1, 0)
 
+    contentData = []
+    for each bookmarkGroup in bookmarks
+        items = bookmarkGroup.getChildren(-1, 0)
+        rowData = {
+            title: bookmarkGroup.title,
+            items: []
+        }
+
+        for each item in items
+            if item.type = "video"
+                rowItemData = {
+                    apiType: "Invidious",
+                    endpoint: "video_info",
+                    pathParams: {
+                        id: item.itemId
+                    }
+                }
+                rowData.items.push(rowItemData)
+            else if item.type = "playlist"
+                rowItemData = {
+                    apiType: "Invidious",
+                    endpoint: "playlist_info",
+                    pathParams: {
+                        plid: item.itemId
+                    }
+                }
+                rowData.items.push(rowItemData)
+                if items.Count() = 1
+                    rowItemData = {
+                        apiType: "Invidious",
+                        endpoint: "playlist",
+                        pathParams: {
+                            plid: item.itemId
+                        }
+                    }
+                    rowData.items.push(rowItemData)
+                end if
+            else if item.type = "channel"
+                rowItemData = {
+                    apiType: "Invidious",
+                    endpoint: "channel_info",
+                    pathParams: {
+                        ucid: item.itemId
+                    }
+                }
+                rowData.items.push(rowItemData)
+                if items.Count() = 1
+                    rowItemData = {
+                        apiType: "Invidious",
+                        endpoint: "channel_videos",
+                        pathParams: {
+                            ucid: item.itemId
+                        }
+                    }
+                    rowData.items.push(rowItemData)
+                end if
+            end if
+        end for
+
+        contentData.push(rowData)
+    end for
+
+    m.rowList.contentData = contentData
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean

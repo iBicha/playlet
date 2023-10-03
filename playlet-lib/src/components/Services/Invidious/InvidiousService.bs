@@ -49,6 +49,9 @@ namespace Invidious
                 DefaultHandler: m.DefaultHandler,
                 AuthFeedHandler: m.AuthFeedHandler,
                 PlaylistHandler: m.PlaylistHandler,
+                VideoInfoHandler: m.VideoInfoHandler,
+                PlaylistInfoHandler: m.PlaylistInfoHandler,
+                ChannelInfoHandler: m.ChannelInfoHandler,
                 ChannelVideosHandler: m.ChannelVideosHandler,
                 ChannelPlaylistsHandler: m.ChannelPlaylistsHandler,
                 ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
@@ -158,36 +161,70 @@ namespace Invidious
         function MarkFeedPagination(contentNode as object) as void
             requestData = contentNode.feed
 
-            endpoint = m.endpoints[requestData.endpoint]
+            ' Only one item feeds will be paginated.
+            if requestData.items.Count() <> 1
+                return
+            end if
+            item = requestData.items[0]
+
+            endpoint = m.endpoints[item.endpoint]
             if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
                 return
             end if
 
-            if not requestData.DoesExist("queryParams")
-                requestData.queryParams = {}
+            if not item.DoesExist("queryParams")
+                item.queryParams = {}
             end if
 
             contentNode.paginationType = endpoint.paginationType
 
             if endpoint.paginationType = PaginationType.Pages
                 contentNode.page += 1
-                requestData.queryParams.page = contentNode.page
+                item.queryParams.page = contentNode.page
             else if endpoint.paginationType = PaginationType.Continuation
                 continuation = contentNode.continuation
                 if not StringUtils.IsNullOrEmpty(continuation)
-                    requestData.queryParams.continuation = continuation
+                    item.queryParams.continuation = continuation
                 end if
             end if
 
+            requestData.items[0] = item
             contentNode.feed = requestData
         end function
 
         function MakeRequest(requestData as object, cancellation = invalid as object) as object
-            endpoint = m.endpoints[requestData.endpoint]
+            aggregateResponse = {
+                success: true,
+                result: {
+                    items: []
+                }
+            }
+
+            for i = 0 to requestData.items.Count() - 1
+                requestDataItem = requestData.items[i]
+                response = m.MakeRequestSingle(requestDataItem, cancellation)
+                if not response.success
+                    ' TODO:P1 handle errors better
+                    ' I don't feel confortable aborting the whole feed just because a single item failed
+                    ' This could cause the whole feed to fail if one item (like a video or playlist) got deleted
+                    return response
+                end if
+                aggregateResponse.result.items.Append(response.result.items)
+
+                if requestData.items.Count() = 1 and IsString(response.result.continuation)
+                    aggregateResponse.result.continuation = response.result.continuation
+                end if
+            end for
+
+            return aggregateResponse
+        end function
+
+        function MakeRequestSingle(requestDataItem as object, cancellation = invalid as object) as object
+            endpoint = m.endpoints[requestDataItem.endpoint]
             if endpoint = invalid
                 return {
                     success: false,
-                    error: `Endpoint ${requestData.endpoint} not found`
+                    error: `Endpoint ${requestDataItem.endpoint} not found`
                 }
             end if
 
@@ -230,18 +267,18 @@ namespace Invidious
                 end for
             end if
 
-            if requestData.cacheSeconds <> invalid
-                request.CacheSeconds(requestData.cacheSeconds)
+            if requestDataItem.cacheSeconds <> invalid
+                request.CacheSeconds(requestDataItem.cacheSeconds)
             else if endpoint.cacheSeconds <> invalid
                 request.CacheSeconds(endpoint.cacheSeconds)
             end if
 
-            if requestData.queryParams <> invalid
-                request.QueryParams(requestData.queryParams)
+            if requestDataItem.queryParams <> invalid
+                request.QueryParams(requestDataItem.queryParams)
             end if
 
-            if requestData.pathParams <> invalid
-                request.PathParams(requestData.pathParams)
+            if requestDataItem.pathParams <> invalid
+                request.PathParams(requestDataItem.pathParams)
             end if
 
             request.Cancellation(cancellation)
@@ -250,7 +287,7 @@ namespace Invidious
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
-            result = responseHandler(m, requestData, response)
+            result = responseHandler(m, requestDataItem, response)
 
             if response.IsSuccess() and result <> invalid
                 return {
@@ -313,6 +350,39 @@ namespace Invidious
                 return {
                     items: json.relatedChannels,
                     continuation: json.continuation
+                }
+            end if
+            return invalid
+        end function
+
+        function VideoInfoHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "video"
+                return {
+                    items: [json]
+                }
+            end if
+            return invalid
+        end function
+
+        function PlaylistInfoHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "playlist"
+                return {
+                    items: [json]
+                }
+            end if
+            return invalid
+        end function
+
+        function ChannelInfoHandler(m as object, requestData as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "channel"
+                return {
+                    items: [json]
                 }
             end if
             return invalid
