@@ -36,6 +36,18 @@ function VideoRowListRowContentTask(input as object) as object
                 success: true
             }
         end if
+
+        ' Invidious returns 500 and "{"error":"Closed stream"}" when the Popular feed is disabled
+        ' TODO:P2 check the endpoint.name instead of contentNode.title to avoid conflict with other feeds
+        if contentNode.title = "Popular" and response.error.instr("Closed stream") > 0
+            LogWarn("Deleting feed", contentNode.title, "-", response.error)
+            parent = contentNode.getParent()
+            parent.removeChild(contentNode)
+            return {
+                success: true
+            }
+        end if
+
         contentNode.loadState = FeedLoadState.Error
         contentNode.title += " (Failed to load)"
         return response

@@ -1,3 +1,4 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
@@ -6,6 +7,17 @@ namespace VideoUtils
         CloseVideo(false)
 
         container = GetVideoContainer()
+        ' There should be no reason for this to be invalid, but there was a crash report
+        ' with this being invalid, so we'll abort playing a video and try to restore focus to the top screen
+        if container = invalid
+            LogError("VideoContainer not found! Attempting to restore focus to top screen...")
+            appController = m.top.getScene().findNode("AppController")
+            if appController <> invalid
+                appController@.FocusTopScreen(invalid)
+            end if
+            DialogUtils.ShowDialog(`VideoContainer not found!\nPlease try again. If the problem persist, contact Playlet authors.`, "Error playing video")
+            return
+        end if
         videoPlayer = container.createChild("videoPlayer")
         videoPlayer.id = "VideoPlayer"
         videoPlayer@.BindNode(invalid)
@@ -79,6 +91,18 @@ namespace VideoUtils
             return
         end if
         player.control = "resume"
+    end function
+
+    function TogglePause() as void
+        player = GetVideoPlayer()
+        if player = invalid
+            return
+        end if
+        if player.state = "playing"
+            player.control = "pause"
+        else if player.state = "paused"
+            player.control = "resume"
+        end if
     end function
 
 end namespace
