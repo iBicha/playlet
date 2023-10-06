@@ -30,7 +30,7 @@ import "pkg:/source/utils/Types.bs"
 '      - "Add to <PlaylistName> bookmark" - DONE
 '      - If playlist is already in a bookmark, "Remove from Bookmarks" - DONE
 '    When any:
-'      - "Reload feed"
+'      - "Reload feed" - DONE
 '
 ' From Playlist view:
 '    When a video is selected:
@@ -70,7 +70,7 @@ import "pkg:/source/utils/Types.bs"
 '      - Inherit options
 '      - "Remove item from Bookmarks"
 '      - "Remove group from Bookmarks"
-'      - "Reload bookmarks"
+'      - "Reload bookmarks" - DONE
 '
 ' TODO:P1 Playlist item seletected from the bookmarks need to play as a playlist, not as a single video
 ' TODO:P1 Context menu might need to be scrollable (both horizontally and vertically)
@@ -91,12 +91,12 @@ import "pkg:/source/utils/Types.bs"
 '        all items at once (per row).
 '
 function Init()
-    m.buttonGroup = m.top.findNode("buttonGroup")
+    m.optionsList = m.top.findNode("optionsList")
     m.showAnimation = m.top.findNode("showAnimation")
 end function
 
-function OnNodeReady()
-    m.buttonGroup.ObserveField("buttonSelected", FuncName(OnButtonSelected))
+function Show(unsued as dynamic)
+    m.optionsList.ObserveField("itemSelected", FuncName(OnItemSelected))
     m.showAnimation.control = "start"
 end function
 
@@ -104,40 +104,42 @@ function OnFocusChange() as void
     if not m.top.focus
         return
     end if
-    NodeSetFocus(m.buttonGroup, true)
+    NodeSetFocus(m.optionsList, true)
 end function
 
-function OnMenuSet() as void
-    menu = m.top.menu
-    if menu = invalid
+function OnOptionsSet() as void
+    options = m.top.options
+    if options = invalid
         return
     end if
 
-    buttons = []
-    for each item in menu
-        buttons.push(item.title)
+    content = CreateObject("roSGNode", "ContentNode")
+    for each option in options
+        optionNode = CreateObject("roSGNode", "ContentNode")
+        optionNode.title = option.title
+        content.appendChild(optionNode)
     end for
 
-    m.buttonGroup.buttons = buttons
+    m.optionsList.content = content
 end function
 
-function OnButtonSelected(event as object) as void
+function OnItemSelected(event as object) as void
     index = event.getData()
-    button = m.buttonGroup.buttons[index]
+    button = m.optionsList.content.getChild(index)
     Close()
-    LogInfo("Menu button selected:", button)
+    LogInfo("Menu button selected:", button.title)
 
-    menu = m.top.menu
-    if index >= menu.count()
+    options = m.top.options
+    if index >= options.count()
         LogError("Menu button index out of range:", index)
         return
     end if
 
-    menuItem = menu[index]
+    option = options[index]
 
-    node = menuItem.node
-    func = menuItem.func
-    args = menuItem.args
+    node = option.node
+    func = option.func
+    args = option.args
 
     if node = invalid or StringUtils.IsNullOrEmpty(func) or args = invalid
         LogError("Menu button action is invalid")
@@ -172,5 +174,5 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 end function
 
 function Close()
-    m.appController@.PopScreen(invalid)
+    m.top.appController@.PopScreen(invalid)
 end function

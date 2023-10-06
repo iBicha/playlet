@@ -1,3 +1,4 @@
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
@@ -6,6 +7,7 @@ function Init()
     m.noBookmarks = m.top.findNode("noBookmarks")
     m.yesBookmarks = m.top.findNode("yesBookmarks")
     m.rowList = m.top.FindNode("rowList")
+    m.rowList.screen = m.top
     m.isDirty = true
 
     m.top.ObserveField("visible", FuncName(OnVisibleChange))
@@ -35,9 +37,13 @@ end function
 
 function OnVisibleChange()
     if m.top.visible and m.isDirty
-        m.isDirty = false
         OnBookmarksChange()
     end if
+end function
+
+function Refresh(unused as dynamic)
+    m.isDirty = true
+    OnBookmarksChange()
 end function
 
 function OnBookmarksChange() as void
@@ -45,6 +51,8 @@ function OnBookmarksChange() as void
         m.isDirty = true
         return
     end if
+    m.isDirty = false
+
     hasBookmarks = m.bookmarks.content.getChildCount() > 0
     m.noBookmarks.visible = not hasBookmarks
     m.yesBookmarks.visible = hasBookmarks
@@ -118,6 +126,8 @@ function SetRowListContent(bookmarksContent as object)
                     }
                     rowData.items.push(rowItemData)
                 end if
+            else if item.type = "feed"
+                rowData.items.append(item.feed.items)
             end if
         end for
 
@@ -132,4 +142,9 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     return false
+end function
+
+function GetContextMenuOptionsForItem(rowItem as object) as object
+    refreshItem = ContextMenuUtils.CreateOption("Refresh Bookmarks", m.top, "Refresh", [invalid])
+    return [refreshItem]
 end function

@@ -1,3 +1,4 @@
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
@@ -30,7 +31,11 @@ function Load() as void
     for each bookmark in bookmarks.bookmarks
         AddBookmarkGroup(bookmark.title)
         for each item in bookmark.items
-            AddBookmark(item.type, item.id, bookmark.title)
+            if item.type = "feed"
+                AddFeedBookmark(item.feed)
+            else
+                AddBookmark(item.type, item.id, bookmark.title)
+            end if
         end for
     end for
 end function
@@ -47,10 +52,14 @@ function Save() as void
         items = []
         nodes = group.getChildren(-1, 0)
         for each node in nodes
-            items.Push({
+            item = {
                 type: node.type,
                 id: node.itemId
-            })
+            }
+            if item.type = "feed"
+                item.feed = node.feed
+            end if
+            items.Push(item)
         end for
         bookmarks.push({
             title: group.title,
@@ -97,6 +106,30 @@ function AddBookmark(bookmarkType as string, id as string, groupName as string)
     m.top.contentChange = true
 end function
 
+function AddFeedBookmark(feed as object)
+    title = feed.bookmarkTitle
+    if StringUtils.IsNullOrEmpty(title)
+        title = feed.title
+    end if
+
+    id = CryptoUtils.GetMd5(title)
+    groupNode = m.top.content.findNode(id)
+    if groupNode = invalid
+        groupNode = AddBookmarkGroup(title)
+    end if
+
+    node = CreateObject("roSGNode", "ContentNode")
+    node.id = id
+    node.addFields({
+        type: "feed",
+        itemId: id,
+        feed: feed
+    })
+    groupNode.insertChild(node, 0)
+    LogInfo("Added feed bookmark:", title, "id:", id)
+    m.top.contentChange = true
+end function
+
 function RemoveBookmark(id as string) as void
     node = m.top.content.findNode(id)
     if node = invalid
@@ -118,6 +151,19 @@ function OnContentChange(event as object) as void
     Save()
 end function
 
+function GetContextMenuOptionsForItem(item as object) as object
+    options = []
+    if item.type = "video"
+        options.append(GetMenuForVideo(item))
+    else if item.type = "playlist"
+        options.append(GetMenuForPlaylist(item))
+    else if item.type = "channel"
+        options.append(GetMenuForChannel(item))
+    end if
+    options.append(GetMenuForParentFeed(item))
+    return options
+end function
+
 function GetMenuForVideo(videoNode as object) as object
     videoId = videoNode.videoId
     if StringUtils.IsNullOrEmpty(videoId)
@@ -127,18 +173,10 @@ function GetMenuForVideo(videoNode as object) as object
     menu = []
     isInBookmarks = m.top.content.findNode(videoId) <> invalid
     if isInBookmarks
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Remove from bookmarks"
-        item.node = m.top
-        item.func = "RemoveBookmark"
-        item.args = [videoId]
+        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [videoId])
         menu.push(item)
     else
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = `Add to "${VIDEOS_GROUP}" bookmark`
-        item.node = m.top
-        item.func = "AddBookmark"
-        item.args = ["video", videoId, VIDEOS_GROUP]
+        item = ContextMenuUtils.CreateOption(`Add to "${VIDEOS_GROUP}" bookmark`, m.top, "AddBookmark", ["video", videoId, VIDEOS_GROUP])
         menu.push(item)
     end if
     return menu
@@ -153,25 +191,13 @@ function GetMenuForPlaylist(playlistNode as object) as object
     menu = []
     isInBookmarks = m.top.content.findNode(playlistId) <> invalid
     if isInBookmarks
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Remove from bookmarks"
-        item.node = m.top
-        item.func = "RemoveBookmark"
-        item.args = [playlistId]
+        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [playlistId])
         menu.push(item)
     else
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = `Add to "${PLAYLISTS_GROUP}" bookmark`
-        item.node = m.top
-        item.func = "AddBookmark"
-        item.args = ["playlist", playlistId, PLAYLISTS_GROUP]
+        item = ContextMenuUtils.CreateOption(`Add to "${PLAYLISTS_GROUP}" bookmark`, m.top, "AddBookmark", ["playlist", playlistId, PLAYLISTS_GROUP])
         menu.push(item)
 
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = `Add to "${playlistNode.title}" bookmark`
-        item.node = m.top
-        item.func = "AddBookmark"
-        item.args = ["playlist", playlistId, playlistNode.title]
+        item = ContextMenuUtils.CreateOption(`Add to "${playlistNode.title}" bookmark`, m.top, "AddBookmark", ["playlist", playlistId, playlistNode.title])
         menu.push(item)
     end if
     return menu
@@ -186,25 +212,50 @@ function GetMenuForChannel(channelNode as object) as object
     menu = []
     isInBookmarks = m.top.content.findNode(authorId) <> invalid
     if isInBookmarks
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Remove from bookmarks"
-        item.node = m.top
-        item.func = "RemoveBookmark"
-        item.args = [authorId]
+        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [authorId])
         menu.push(item)
     else
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = `Add to "${CHANNELS_GROUP}" bookmark`
-        item.node = m.top
-        item.func = "AddBookmark"
-        item.args = ["channel", authorId, CHANNELS_GROUP]
+        item = ContextMenuUtils.CreateOption(`Add to "${CHANNELS_GROUP}" bookmark`, m.top, "AddBookmark", ["channel", authorId, CHANNELS_GROUP])
         menu.push(item)
 
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = `Add to "${channelNode._author}" bookmark`
-        item.node = m.top
-        item.func = "AddBookmark"
-        item.args = ["channel", authorId, channelNode._author]
+        item = ContextMenuUtils.CreateOption(`Add to "${channelNode._author}" bookmark`, m.top, "AddBookmark", ["channel", authorId, channelNode._author])
+        menu.push(item)
+    end if
+    return menu
+end function
+
+function GetMenuForParentFeed(itemNode as object) as object
+    if itemNode = invalid
+        return []
+    end if
+    if itemNode.type <> "video" and itemNode.type <> "playlist" and itemNode.type <> "channel"
+        return []
+    end if
+    parent = itemNode.getParent()
+    if parent = invalid
+        return []
+    end if
+    if parent.subtype() <> "FeedContentNode"
+        return []
+    end if
+
+    feed = parent.feed
+
+    title = feed.bookmarkTitle
+    if StringUtils.IsNullOrEmpty(title)
+        title = feed.title
+    end if
+
+    feedId = CryptoUtils.GetMd5(title)
+
+    menu = []
+    isInBookmarks = m.top.content.findNode(feedId) <> invalid
+
+    if isInBookmarks
+        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [feedId])
+        menu.push(item)
+    else
+        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedBookmark", [feed])
         menu.push(item)
     end if
     return menu

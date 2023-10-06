@@ -1,4 +1,5 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
@@ -134,92 +135,37 @@ function OnRowItemLongPressed(index as object) as void
     end if
     rowItem = row.GetChild(rowItemIndex)
 
-    OpenContextMenu(rowItem)
+    contextMenuProviders = [m.top, m.bookmarks, m.top.screen]
+    ContextMenuUtils.Open(contextMenuProviders, m.appController, rowItem)
 end function
 
-function OpenContextMenu(rowItem as object) as void
-    menu = []
-    title = ""
-    subtitle = ""
-    thumbnail = ""
+function GetContextMenuOptionsForItem(rowItem as object) as object
+    options = []
 
-    playAction = CreateObject("roSGNode", "ContextMenuItemContentNode")
-    playAction.title = "Play"
-    playAction.node = m.playQueue
-    playAction.func = "Play"
-    playAction.args = [rowItem, -1]
-
-    queueAction = CreateObject("roSGNode", "ContextMenuItemContentNode")
-    queueAction.title = "Queue"
-    queueAction.node = m.playQueue
-    queueAction.func = "AddToQueue"
-    queueAction.args = [rowItem]
+    playAction = ContextMenuUtils.CreateOption("Play", m.playQueue, "Play", [rowItem, -1])
+    queueAction = ContextMenuUtils.CreateOption("Queue", m.playQueue, "AddToQueue", [rowItem])
 
     if rowItem.type = "video"
-        videoId = rowItem.videoId
-        LogInfo("Video long pressed:", videoId)
+        options.push(playAction)
+        options.push(queueAction)
 
-        title = rowItem.title
-        subtitle = rowItem.author
-        thumbnail = rowItem.thumbnail
-
-        menu.push(playAction)
-        menu.push(queueAction)
-
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Open channel"
-        item.node = m.top
-        item.func = "OpenVideoChannel"
-        item.args = [rowItem]
-        menu.push(item)
-
-        menu.append(m.bookmarks@.GetMenuForVideo(rowItem))
+        item = ContextMenuUtils.CreateOption("Open channel", m.top, "OpenVideoChannel", [rowItem])
+        options.push(item)
     else if rowItem.type = "playlist"
-        playlistId = rowItem.playlistId
-        LogInfo("Playlist long pressed:", playlistId)
+        options.push(playAction)
+        options.push(queueAction)
 
-        title = rowItem.title
-        subtitle = rowItem._author
-        thumbnail = rowItem.thumbnail
-
-        menu.push(playAction)
-        menu.push(queueAction)
-
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Open"
-        item.node = m.top
-        item.func = "OpenPlaylist"
-        item.args = [rowItem]
-        menu.push(item)
-
-        menu.append(m.bookmarks@.GetMenuForPlaylist(rowItem))
+        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenPlaylist", [rowItem])
+        options.push(item)
     else if rowItem.type = "channel"
-        authorId = rowItem.authorId
-        LogInfo("Channel long pressed:", authorId)
-
-        title = rowItem._author
-        thumbnail = rowItem.thumbnail
-
-        item = CreateObject("roSGNode", "ContextMenuItemContentNode")
-        item.title = "Open"
-        item.node = m.top
-        item.func = "OpenChannel"
-        item.args = [rowItem]
-        menu.push(item)
-
-        menu.append(m.bookmarks@.GetMenuForChannel(rowItem))
+        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenChannel", [rowItem])
+        options.push(item)
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
-        return
+        return []
     end if
 
-    contextMenu = CreateObject("roSGNode", "ContextMenu")
-    m.appController@.PushScreen(contextMenu)
-    contextMenu@.BindNode(invalid)
-    contextMenu.title = title
-    contextMenu.subtitle = subtitle
-    contextMenu.thumbnail = thumbnail
-    contextMenu.menu = menu
+    return options
 end function
 
 function OpenPlaylist(playlist as object)
@@ -238,6 +184,10 @@ function OpenVideoChannel(video as object) as void
     end if
     channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
     ChannelUtils.Open(channel)
+end function
+
+function Refresh(unsued as dynamic)
+    InitContent()
 end function
 
 function OnAuthTokenChange()
@@ -360,12 +310,11 @@ function OnVideoRowListRowContentTaskResult(output as object) as void
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
-    ' LogInfo("OnkeyEvent", key, press)
     if LongPressHandler(key, press)
         return true
     end if
 
-    if key = "longPress" and press
+    if key = LONG_PRESS_KEY and press
         OnRowItemLongPressed(m.top.rowItemFocused)
         return true
     end if
