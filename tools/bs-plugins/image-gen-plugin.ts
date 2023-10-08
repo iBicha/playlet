@@ -17,6 +17,15 @@ export class ImageGenPlugin implements CompilerPlugin {
     public name = 'ImageGenPlugin';
 
     beforeProgramCreate(builder: ProgramBuilder) {
+        // Debug flag
+        // @ts-ignore
+        const debug = !!builder.options.debug;
+        if (debug) {
+            // Since the plugin does a lot of scanning of files, it is fine not to run it in debug mode
+            // The change will be picked up on release
+            return;
+        }
+
         const rootDir = builder.options.rootDir!;
 
         const svgFiles = globSync(`**/*.svg`, { cwd: rootDir });
