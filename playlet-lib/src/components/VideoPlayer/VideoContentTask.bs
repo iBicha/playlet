@@ -88,7 +88,7 @@ function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as st
         return
     end if
 
-    dashUrl = metadata.dashUrl
+    dashUrl = AddQueryParam(metadata.dashUrl, "thumbnails", "true")
     dashUrlLocal = AddLocalFlag(dashUrl)
 
     AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
@@ -106,10 +106,14 @@ function AddStreamUrls(streamUrls as object, metadata as object, service as Invi
 end function
 
 function AddLocalFlag(url as string) as string
+    return AddQueryParam(url, "local", "true")
+end function
+
+function AddQueryParam(url as string, key as string, value as string) as string
     if url.InStr("?") = -1
-        return url + "?local=true"
+        return url + `?${key}=${value}`
     else
-        return url + "&local=true"
+        return url + `&${key}=${value}`
     end if
 end function
 
@@ -161,4 +165,3 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
     contentNode.ClosedCaptions = True
     contentNode.SubtitleTracks = subtitleTracks
 end function
-
