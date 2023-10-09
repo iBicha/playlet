@@ -1,13 +1,13 @@
 // This plugin converts svg files to png/jpeg files 
 
 import {
-    CompilerPlugin, ProgramBuilder,
+    CompilerPlugin, FileObj, ProgramBuilder,
 } from 'brighterscript';
-import { readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { existsSync } from 'fs-extra';
 import { globSync } from 'glob';
 import md5 from 'crypto-js/md5';
-import { join as joinPath, relative as relativePath } from 'path';
+import { join as joinPath } from 'path';
 import json5 from 'json5';
 const shell = require('shelljs');
 
@@ -16,7 +16,7 @@ const META_EXT = '.meta.json5';
 export class ImageGenPlugin implements CompilerPlugin {
     public name = 'ImageGenPlugin';
 
-    beforeProgramCreate(builder: ProgramBuilder) {
+    beforePrepublish(builder: ProgramBuilder, files: FileObj[]) {
         // Debug flag
         // @ts-ignore
         const debug = !!builder.options.debug;
@@ -30,21 +30,20 @@ export class ImageGenPlugin implements CompilerPlugin {
 
         const svgFiles = globSync(`**/*.svg`, { cwd: rootDir });
 
-        svgFiles.forEach((svg) => {
+        svgFiles.forEach((svgFile) => {
             // Web app can use svg files, no need to convert
-            if (svg.includes('www')) {
+            if (svgFile.includes('www')) {
                 return;
             }
 
-            const svgFile = relativePath(process.cwd(), joinPath(rootDir, svg));
-            const metafile = `${svgFile}${META_EXT}`;
+            const metafile = joinPath(rootDir, `${svgFile}${META_EXT}`);
             if (!existsSync(metafile)) {
                 this.createDefaultMetaFile(svgFile, metafile);
             }
 
             const meta = json5.parse(readFileSync(metafile, 'utf8'));
 
-            this.generateImages(svgFile, meta, metafile);
+            this.generateImages(svgFile, meta, metafile, rootDir, files);
         });
     }
 
@@ -62,9 +61,9 @@ export class ImageGenPlugin implements CompilerPlugin {
         writeFileSync(metafile, json5.stringify(meta, null, 2));
     }
 
-    generateImages(svgFile: string, meta: any, metafile: string) {
+    generateImages(svgFile: string, meta: any, metafile: string, rootDir: string, files: FileObj[]) {
         let metaChanged = false;
-        const inputHash = this.checkFileHash(svgFile, meta.inputHash);
+        const inputHash = this.checkFileHash(joinPath(rootDir, svgFile), meta.inputHash);
         if (!inputHash.valid) {
             meta.inputHash = inputHash.hash;
             metaChanged = true;
@@ -73,14 +72,17 @@ export class ImageGenPlugin implements CompilerPlugin {
         for (var i in meta.outputs) {
             const output = meta.outputs[i];
 
-            let outputHash = this.checkFileHash(output.outputFilePath, output.outputHash);
+            const outputFilePath = joinPath(rootDir, output.outputFilePath);
+            let outputHash = this.checkFileHash(outputFilePath, output.outputHash);
 
             if (inputHash.valid && outputHash.valid) {
                 continue;
             }
 
-            this.generateImage(svgFile, output);
-            outputHash = this.checkFileHash(output.outputFilePath, output.outputHash);
+            this.generateImage(svgFile, output, rootDir);
+            outputHash = this.checkFileHash(outputFilePath, output.outputHash);
+
+            files.push({ src: outputFilePath, dest: output.outputFilePath })
 
             output.outputHash = outputHash.hash;
             metaChanged = true;
@@ -91,8 +93,10 @@ export class ImageGenPlugin implements CompilerPlugin {
         }
     }
 
-    generateImage(svgFile: string, output: any) {
-        shell.exec(`node ../tools/convert-image.js --input "${svgFile}" --options '${JSON.stringify(output)}'`)
+    generateImage(svgFile: string, output: any, rootDir: string) {
+        shell.exec(`node ../../tools/convert-image.js --input "${svgFile}" --options '${JSON.stringify(output)}'`, {
+            cwd: rootDir
+        })
     }
 
     checkFileHash(file: string, hash: string) {
