@@ -1,0 +1,47 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/DashManifest.bs"
+
+namespace Http
+
+    class DashRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/api/dash", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                task = context.server.task
+                invidiousNode = task.invidious
+
+                v = request.query.v
+                local = request.query.local
+
+                service = new Invidious.InvidiousService(invidiousNode)
+                metadataRequest = service.GetVideoMetadata(v)
+                if not metadataRequest.IsSuccess()
+                    response.Default(metadataRequest.StatusCode(), metadataRequest.ErrorMessage())
+                    return true
+                end if
+
+                metadata = metadataRequest.Json()
+                instance = service.GetInstance()
+
+                dash = new DashManifest()
+                dash.setInvidiousInstance(instance)
+                dash.createFromVideoMetadata(metadata, local <> invalid)
+
+                xmlContent = dash.stringify()
+
+                response.http_code = 200
+                response.SetBodyDataString(xmlContent)
+                response.ContentType("application/dash+xml")
+
+                return true
+            end function)
+        end function
+
+    end class
+
+end namespace
