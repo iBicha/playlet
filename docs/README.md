@@ -210,13 +210,13 @@ Additionally, the web server exposes the settings under `/api/preferences`, whic
 
 When Playlet starts, it shows a video feed on the screen. Subscription, Trending videos, and so on.
 
-The layout is defined under [playlet-lib/src/config/default_home_layout.json5](/playlet-lib/src/config/default_home_layout.json5).
+The layout is defined under [playlet-lib/src/config/default_home_layout.yaml](/playlet-lib/src/config/default_home_layout.yaml).
 
 This could allow users to define custom layouts, so they can see what they find relevant in the home page. This can include Subscription, Trending, Popular videos, Search per keywords, or Playlists.
 
 Additionally each feed has information on how it is fetched. For now, only Invidious can be data source, but other systems should be configured in the same way.
 
-Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.json5](/playlet-lib/src/config/invidious_video_api.json5), and Playlet parses these at runtime and make the right API calls to fetch the data.
+Invidious API definitions are defined under [playlet-lib/src/config/invidious_video_api.yaml](/playlet-lib/src/config/invidious_video_api.yaml), and Playlet parses these at runtime and make the right API calls to fetch the data.
 
 Finally, this layout system is what allows both the BrightScript app and the Web app to display the same homepage.
 

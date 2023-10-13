@@ -1,0 +1,180 @@
+trending:
+  url: /api/v1/trending
+  cacheSeconds: 21600 # 6 hours
+  queryParams:
+    type:
+      type:
+        - Music
+        - Gaming
+        - Movies
+    region:
+      type: "#ISO3166"
+      default: GetUserCountryCode
+    fields:
+      type: []
+      arrayType: "comma-separated"
+      default:
+        - title
+        - videoId
+        - videoThumbnails
+        - lengthSeconds
+        - viewCount
+        - author
+        - authorId
+        - publishedText
+        - liveNow
+        - isUpcoming
+        - premiereTimestamp
+
+popular:
+  url: /api/v1/popular
+  queryParams:
+    fields:
+      type: []
+      arrayType: "comma-separated"
+      default:
+        - title
+        - videoId
+        - videoThumbnails
+        - lengthSeconds
+        - viewCount
+        - author
+        - authorId
+        - publishedText
+        - liveNow
+        - isUpcoming
+        - premiereTimestamp
+
+search:
+  url: /api/v1/search
+  paginationType: Pages
+  queryParams:
+    q:
+      type: string
+    sort_by:
+      type:
+        - relevance
+        - rating
+        - upload_date
+        - view_count
+    date:
+      type:
+        - hour
+        - today
+        - week
+        - month
+        - year
+    duration:
+      type:
+        - short
+        - long
+    type:
+      type:
+        - video
+        - playlist
+        - channel
+        - all
+      arrayType: comma-separated
+      default:
+        - video
+        - playlist
+        - channel
+    features:
+      type:
+        - hd
+        - subtitles
+        - creative_commons
+        - 3d
+        - live
+        - purchased
+        - 4k
+        - 360
+        - location
+        - hdr
+      arrayType: comma-separated
+    region:
+      type: "#ISO3166"
+      default: GetUserCountryCode
+  cacheSeconds: 900 # 15 minutes
+
+# Auth endpoints
+auth_feed:
+  url: /api/v1/auth/feed
+  authenticated: true
+  queryParams:
+    max_results:
+      type: number
+      default: 20
+  paginationType: Pages
+  responseHandler: AuthFeedHandler
+
+auth_playlists:
+  url: /api/v1/auth/playlists
+  authenticated: true
+
+playlist:
+  url: /api/v1/playlists/{plid}
+  responseHandler: PlaylistHandler
+  paginationType: Pages
+
+# video_info, playlist_info and channel_info are used by the
+# Bookmarks, so they are cached for longer
+video_info:
+  url: /api/v1/videos/{id}
+  responseHandler: VideoInfoHandler
+  cacheSeconds: 259200 # 3 days
+
+playlist_info:
+  url: /api/v1/playlists/{plid}
+  responseHandler: PlaylistInfoHandler
+  cacheSeconds: 259200 # 3 days
+
+channel_info:
+  url: /api/v1/channels/{ucid}
+  responseHandler: ChannelInfoHandler
+  cacheSeconds: 259200 # 3 days
+
+# Channel endpoints
+channel_videos:
+  url: /api/v1/channels/{ucid}/videos
+  responseHandler: ChannelVideosHandler
+  paginationType: Continuation
+  queryParams:
+    sort_by:
+      # defaults to newest
+      type:
+        - newest
+        - oldest
+        - popular
+
+channel_playlists:
+  url: /api/v1/channels/{ucid}/playlists
+  responseHandler: ChannelPlaylistsHandler
+  paginationType: Continuation
+  queryParams:
+    sort_by:
+      required: false
+      type:
+        - newest
+        - oldest
+        - last
+
+channel_shorts:
+  url: /api/v1/channels/{ucid}/shorts
+  responseHandler: ChannelVideosHandler
+  paginationType: Continuation
+
+channel_streams:
+  url: /api/v1/channels/{ucid}/streams
+  responseHandler: ChannelVideosHandler
+  paginationType: Continuation
+
+channel_podcasts:
+  url: /api/v1/channels/{ucid}/podcasts
+  responseHandler: ChannelPlaylistsHandler
+  paginationType: Continuation
+
+channel_channels:
+  url: /api/v1/channels/{ucid}/channels
+  responseHandler: ChannelRelatedChannelsHandler
+  paginationType: Continuation
