@@ -555,7 +555,7 @@ namespace HttpClientCache
         end if
 
         hash = CryptoUtils.GetMd5(cacheKey)
-        request._cacheLocation = `cachefs:/request_v1_${hash}.json`
+        request._cacheLocation = `cachefs:/request_v2_${hash}.json`
         return request._cacheLocation
     end function
 
@@ -590,16 +590,37 @@ namespace HttpClientCache
 
         cacheLocation = GetLocation(request)
         cacheText = ReadAsciiFile(cacheLocation)
-        cacheObject = ParseJson(cacheText)
-        if cacheObject = invalid
+        if cacheText = invalid
+            return invalid
+        end if
+
+        firstLineIndex = cacheText.InStr(`\n`)
+        if firstLineIndex = -1
+            LogWarn("Failed to parse cache.")
+            Delete(request)
+            return invalid
+        end if
+
+        metadataText = cacheText.Left(firstLineIndex)
+        metadata = ParseJson(metadataText)
+        if metadata = invalid
+            LogWarn("Failed to parse metadata from cache.")
+            Delete(request)
+            return invalid
+        end if
+
+        headersText = cacheText.Mid(firstLineIndex + 1, metadata.headers)
+        headers = ParseJson(headersText)
+        if headers = invalid
+            LogWarn("Failed to parse headers from cache.")
             Delete(request)
             return invalid
         end if
 
         expireSeconds = request._expireSeconds
 
-        if expireSeconds = invalid and cacheObject.headers <> invalid
-            expireSeconds = ParseHeadersForCacheControl(cacheObject.headers)
+        if expireSeconds = invalid and headers <> invalid
+            expireSeconds = ParseHeadersForCacheControl(headers)
         end if
 
         if expireSeconds = invalid
@@ -608,12 +629,21 @@ namespace HttpClientCache
 
         date = CreateObject("roDateTime")
         nowTimestamp = date.AsSeconds()
-        if cacheObject.timestamp + expireSeconds < nowTimestamp
+        if metadata.timestamp + expireSeconds < nowTimestamp
             Delete(request)
             return invalid
         end if
 
-        return cacheObject
+        body = ""
+        if metadata.body > 0
+            body = cacheText.Mid(firstLineIndex + 1 + metadata.headers, metadata.body)
+        end if
+
+        return {
+            statusCode: metadata.statusCode,
+            headers: headers,
+            body: body
+        }
     end function
 
     function Set(response as HttpClient.HttpResponse) as void
@@ -643,17 +673,32 @@ namespace HttpClientCache
         date = CreateObject("roDateTime")
         timestamp = date.AsSeconds()
 
-        cacheObject = {
+        ' Cache file format:
+        ' First line is a json payload of metadata:
+        ' {
+        '     timestamp: number,
+        '     statusCode: number,
+        '     headers: number, ' this is the size of the headers json array in chars
+        '     body: number ' this is the size of the body in chars
+        ' }
+        ' {headers} ' a json objects with headers, string size matching metadata.headers
+        ' {body} ' the body as is, string size matching metadata.body
+
+        jsonHeaders = FormatJson(response.Headers())
+        body = ValidString(response.Text())
+
+        cacheMetadata = {
             timestamp: timestamp,
             statusCode: response.StatusCode(),
-            headers: response.Headers(),
-            body: response.Text()
+            headers: jsonHeaders.Len(),
+            body: body.Len()
         }
 
+        jsonMetadata = FormatJson(cacheMetadata)
+
         cacheLocation = GetLocation(response.request)
-        ' TODO:P2 use a diferent format other than json for better performance
-        cacheText = FormatJson(cacheObject)
-        WriteAsciiFile(cacheLocation, cacheText)
+
+        WriteAsciiFile(cacheLocation, jsonMetadata + `\n` + jsonHeaders + body)
     end function
 
     function Delete(request as HttpClient.HttpRequest) as boolean

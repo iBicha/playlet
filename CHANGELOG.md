@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Layout in channel view so that the upload time and view count of videos is visible
 
+### Changed
+
+- Cache format so it does less parsing work
+
 ## [0.13.1] - 2023-10-08
 
 ### Added
