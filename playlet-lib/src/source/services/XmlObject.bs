@@ -1,0 +1,100 @@
+import "pkg:/source/utils/Types.bs"
+
+class XmlObject
+    private stack = []
+
+    private root = invalid
+
+    private INDENT_SIZE = 2
+
+    function new()
+        m.escapeChars = {}
+        m.escapeChars["&"] = "&amp;"
+        m.escapeChars["<"] = "&lt;"
+        m.escapeChars[">"] = "&gt;"
+        m.escapeChars[`"`] = `&quot;`
+        m.escapeChars["'"] = "&apos;"
+    end function
+
+    function Node(name as string, attributes = invalid as object) as boolean
+        newNode = {
+            name: name,
+            attributes: attributes,
+            children: []
+        }
+
+        if m.root = invalid
+            m.root = newNode
+        end if
+
+        if m.stack.count() > 0
+            m.stack[m.stack.count() - 1].children.push(newNode)
+        end if
+
+        m.stack.push(newNode)
+        return true
+    end function
+
+    function Text(text as string)
+        if m.stack.count() > 0
+            m.stack[m.stack.count() - 1].children.push(text)
+        end if
+    end function
+
+    function End()
+        m.stack.pop()
+    end function
+
+    function ToXmlString() as string
+        return `<?xml version="1.0" encoding="UTF-8"?>\n` + m.NodeToXmlString(m.root, 0)
+    end function
+
+    function NodeToXmlString(node as object, indentLevel as integer) as string
+        indentString = string(indentLevel * m.INDENT_SIZE, " ")
+        xmlString = indentString + "<" + node.name
+
+        if node.attributes <> invalid
+            for each key in node.attributes.keys()
+                xmlString += ` ${key}="${node.attributes[key]}"`
+            end for
+        end if
+
+        if node.children.count() = 0
+            xmlString += ` />\n`
+        else
+            xmlString += `>`
+
+            for i = 0 to node.children.count() - 1
+                child = node.children[i]
+                if i = 0
+                    if not IsString(child)
+                        xmlString += `\n`
+                    end if
+                end if
+
+                if IsString(child)
+                    xmlString += m.XmlEscape(child)
+                else
+                    xmlString += m.NodeToXmlString(child, indentLevel + 1)
+                end if
+
+                if i = node.children.count() - 1
+                    if not IsString(child)
+                        xmlString += `${indentString}`
+                    end if
+                end if
+            end for
+            xmlString += `</${node.name}>\n`
+        end if
+
+        return xmlString
+    end function
+
+    function XmlEscape(input as string) as string
+        for each escChar in m.escapeChars
+            input = input.replace(escChar, m.escapeChars[escChar])
+        end for
+        return input
+    end function
+
+end class

@@ -1,0 +1,269 @@
+import "pkg:/components/Web/WebServer/Http/HttpUtils.bs"
+import "pkg:/source/services/XmlObject.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+class DashManifest
+
+    public invidiousInstance as dynamic
+
+    function new(invidiousInstance as string)
+        m.utils = new Http.Utils()
+        m.invidiousInstance = invidiousInstance
+    end function
+
+    function fromVideoMetadata(metadata as object, local as boolean) as string
+        adaptiveFormats = []
+        adaptiveFormats.Append (metadata.adaptiveFormats)
+
+        if local
+            urlRegex = CreateObject("roRegex", "https?:\/\/\S+(\/\S+)", "i")
+
+            for i = 0 to adaptiveFormats.Count() - 1
+                adaptiveFormats[i].url = urlRegex.replace(adaptiveFormats[i].url, m.invidiousInstance + "\1")
+            end for
+        end if
+
+        audioStreams = m.getAudioStreams(adaptiveFormats)
+        videoStreams = m.getVideoStreams(adaptiveFormats)
+
+        videoMimeTypes = m.getMimeTypes(videoStreams)
+        audioSets = m.getMimeTypeLanguageCombos(audioStreams)
+
+        xml = new XmlObject()
+
+        if xml.Node("MPD", {
+                "xmlns": "urn:mpeg:dash:schema:mpd:2011",
+                "profiles": "urn:mpeg:dash:profile:full:2011",
+                "minBufferTime": "PT1.5S",
+                "type": "static",
+                "mediaPresentationDuration": `PT${metadata.lengthSeconds ?? 0}S`
+            })
+            if xml.Node("Period")
+
+                id = 0
+                for each audioSet in audioSets
+                    adaptationSetAttributes = {
+                        "id": `${id}`,
+                        "mimeType": audioSet.mimeType,
+                        "startWithSAP": "1",
+                        "subsegmentAlignment": "true"
+                    }
+                    if not StringUtils.IsNullOrEmpty(audioSet.lang)
+                        adaptationSetAttributes["lang"] = audioSet.lang
+                    end if
+
+                    if xml.Node("AdaptationSet", adaptationSetAttributes)
+                        xml.Node("Role", {
+                            "schemeIdUri": "urn:mpeg:dash:role:2011",
+                            "value": audioSet.acont = "original" ? "main" : "alternate"
+                        })
+                        xml.End()
+
+                        for i = 0 to audioStreams.Count() - 1
+                            stream = audioStreams[i]
+                            streamMimeType = stream.type.Tokenize(";")[0]
+                            if streamMimeType <> audioSet.mimeType or stream.languageInfo.lang <> audioSet.lang or stream.languageInfo.acont <> audioSet.acont
+                                continue for
+                            end if
+
+                            codecs = stream.type.split("codecs=")[1]
+                            if codecs.startsWith(`"`)
+                                codecs = codecs.mid(1)
+                            end if
+                            if codecs.endsWith(`"`)
+                                codecs = codecs.left(codecs.len() - 1)
+                            end if
+
+                            if xml.Node("Representation", {
+                                    "id": stream.itag,
+                                    "codecs": codecs,
+                                    "bandwidth": stream.bitrate
+                                })
+
+                                xml.Node("AudioChannelConfiguration", {
+                                    "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011",
+                                    "value": `${stream.audioChannels}`
+                                })
+                                xml.End()
+
+                                if xml.Node("BaseURL")
+                                    xml.Text(stream.url)
+                                    xml.End()
+                                end if
+
+                                if xml.Node("SegmentBase", {
+                                        "indexRange": stream.index
+                                    })
+                                    if xml.Node("Initialization", {
+                                            "range": stream.init
+                                        })
+                                        xml.End()
+                                    end if
+                                    xml.End()
+                                end if
+
+                                xml.End()
+                            end if
+                        end for
+                        xml.End()
+                    end if
+
+                    id += 1
+                end for
+
+                for each mimeType in videoMimeTypes
+                    if xml.Node("AdaptationSet", {
+                            "id": `${id}`,
+                            "mimeType": mimeType,
+                            "startWithSAP": "1",
+                            "subsegmentAlignment": "true"
+                        })
+
+                        for i = 0 to videoStreams.Count() - 1
+                            stream = videoStreams[i]
+                            streamMimeType = stream.type.Tokenize(";")[0]
+                            if streamMimeType <> mimeType
+                                continue for
+                            end if
+
+                            codecs = stream.type.split("codecs=")[1]
+                            if codecs.startsWith(`"`)
+                                codecs = codecs.mid(1)
+                            end if
+                            if codecs.endsWith(`"`)
+                                codecs = codecs.left(codecs.len() - 1)
+                            end if
+
+                            representationAttributes = {
+                                "id": stream.itag,
+                                "codecs": codecs,
+                                "startWithSAP": "1",
+                                "maxPlayoutRate": "1",
+                                "bandwidth": stream.bitrate
+                            }
+                            if stream.width <> invalid
+                                representationAttributes["width"] = `${stream.width}`
+                            end if
+                            if stream.height <> invalid
+                                representationAttributes["height"] = `${stream.height}`
+                            end if
+                            if stream.fps <> invalid
+                                representationAttributes["frameRate"] = `${stream.fps}`
+                            end if
+
+                            if xml.Node("Representation", representationAttributes)
+                                if xml.Node("BaseURL")
+                                    xml.Text(stream.url)
+                                    xml.End()
+                                end if
+
+                                if xml.Node("SegmentBase", {
+                                        "indexRange": stream.index
+                                    })
+                                    if xml.Node("Initialization", {
+                                            "range": stream.init
+                                        })
+                                        xml.End()
+                                    end if
+                                    xml.End()
+                                end if
+
+                                xml.End()
+                            end if
+                        end for
+
+                        xml.End()
+                    end if
+
+                    id += 1
+                end for
+
+                xml.End()
+            end if
+            xml.End()
+        end if
+
+        return xml.ToXmlString()
+    end function
+
+    function getAudioStreams(streams as object) as object
+        audioStreams = []
+        for i = 0 to streams.Count() - 1
+            stream = streams[i]
+            if stream.type.startsWith("audio/") and stream.bitrate <> invalid and stream.init <> invalid and stream.index <> invalid
+                stream.languageInfo = m.ParseAudioLanguage(stream.url)
+                audioStreams.Push(stream)
+            end if
+        end for
+
+        audioStreams.SortBy("bitrate", "r")
+        return audioStreams
+    end function
+
+    function getVideoStreams(streams as object) as object
+        videoStreams = []
+        for i = 0 to streams.Count() - 1
+            stream = streams[i]
+            if stream.type.startsWith("video/") and stream.init <> invalid and stream.index <> invalid
+                videoStreams.Push(stream)
+            end if
+        end for
+
+        videoStreams.SortBy("width", "r")
+        return videoStreams
+    end function
+
+    function getMimeTypes(streams as object) as object
+        mimeTypes = {}
+        for i = 0 to streams.Count() - 1
+            stream = streams[i]
+            mimeType = stream.type.Tokenize(";")[0]
+            mimeTypes[mimeType] = true
+        end for
+        return mimeTypes.Keys()
+    end function
+
+    function getMimeTypeLanguageCombos(streams as object) as object
+        types = {}
+        for i = 0 to streams.Count() - 1
+            stream = streams[i]
+            mimeType = stream.type.Tokenize(";")[0]
+            types[`${mimeType}-${stream.languageInfo.lang}-${stream.languageInfo.acont}`] = {
+                "mimeType": mimeType,
+                "lang": stream.languageInfo.lang,
+                "acont": stream.languageInfo.acont
+            }
+        end for
+
+        combos = []
+        for each t in types
+            combos.Push(types[t])
+        end for
+
+        return combos
+    end function
+
+    function ParseAudioLanguage(url as string) as object
+        result = { lang: "", acont: "" }
+        queryParams = m.utils.ParseUrlQueryComponents(url)
+        if StringUtils.IsNullOrEmpty(queryParams["xtags"])
+            return result
+        end if
+
+        xtags = queryParams["xtags"].split(":")
+        for each xtag in xtags
+            if xtag.instr("=") > 0
+                parts = xtag.split("=")
+                if parts.Count() = 2
+                    if parts[0] = "lang"
+                        result["lang"] = parts[1]
+                    end if
+                    if parts[0] = "acont"
+                        result["acont"] = parts[1]
+                    end if
+                end if
+            end if
+        end for
+        return result
+    end function
+end class
