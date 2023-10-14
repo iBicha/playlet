@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Local DASH manifest generation
   - This adds support for multi languages audio tracks
   - Also adds thumbnails/preview in trick play mode
+    - Known issue: thumbnails might appear cropped/misaligned at the end of videos. This will be addressed in a later release.
 
 ### Fixed
 
