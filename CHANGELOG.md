@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Local DASH manifest generation
+  - This adds support for multi languages audio tracks
+
 ### Fixed
 
 - Layout in channel view so that the upload time and view count of videos is visible

@@ -1,4 +1,6 @@
+import "pkg:/components/Web/WebServer/Http/HttpUtils.bs"
 import "pkg:/source/services/XmlObject.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 class DashManifest
 
@@ -7,6 +9,7 @@ class DashManifest
     public invidiousInstance as dynamic
 
     function new(invidiousInstance as string)
+        m.utils = new Http.Utils()
         m.invidiousInstance = invidiousInstance
     end function
 
@@ -26,7 +29,7 @@ class DashManifest
         videoStreams = m.getVideoStreams(adaptiveFormats)
 
         videoMimeTypes = m.getMimeTypes(videoStreams)
-        audioMimeTypes = m.getMimeTypes(audioStreams)
+        audioSets = m.getMimeTypeLanguageCombos(audioStreams)
 
         xml = new XmlObject()
 
@@ -40,23 +43,28 @@ class DashManifest
             if xml.Node("Period")
 
                 id = 0
-                for each mimeType in audioMimeTypes
-                    if xml.Node("AdaptationSet", {
-                            "id": `${id}`,
-                            "mimeType": mimeType,
-                            "startWithSAP": "1",
-                            "subsegmentAlignment": "true"
-                        })
+                for each audioSet in audioSets
+                    adaptationSetAttributes = {
+                        "id": `${id}`,
+                        "mimeType": audioSet.mimeType,
+                        "startWithSAP": "1",
+                        "subsegmentAlignment": "true"
+                    }
+                    if not StringUtils.IsNullOrEmpty(audioSet.lang)
+                        adaptationSetAttributes["lang"] = audioSet.lang
+                    end if
+
+                    if xml.Node("AdaptationSet", adaptationSetAttributes)
                         xml.Node("Role", {
                             "schemeIdUri": "urn:mpeg:dash:role:2011",
-                            "value": id = 0 ? "main" : "alternate"
+                            "value": audioSet.acont = "original" ? "main" : "alternate"
                         })
                         xml.End()
 
                         for i = 0 to audioStreams.Count() - 1
                             stream = audioStreams[i]
                             streamMimeType = stream.type.Tokenize(";")[0]
-                            if streamMimeType <> mimeType
+                            if streamMimeType <> audioSet.mimeType or stream.languageInfo.lang <> audioSet.lang or stream.languageInfo.acont <> audioSet.acont
                                 continue for
                             end if
 
@@ -185,6 +193,7 @@ class DashManifest
         for i = 0 to streams.Count() - 1
             stream = streams[i]
             if stream.type.startsWith("audio/") and stream.bitrate <> invalid and stream.init <> invalid and stream.index <> invalid
+                stream.languageInfo = m.ParseAudioLanguage(stream.url)
                 audioStreams.Push(stream)
             end if
         end for
@@ -214,5 +223,49 @@ class DashManifest
             mimeTypes[mimeType] = true
         end for
         return mimeTypes.Keys()
+    end function
+
+    function getMimeTypeLanguageCombos(streams as object) as object
+        types = {}
+        for i = 0 to streams.Count() - 1
+            stream = streams[i]
+            mimeType = stream.type.Tokenize(";")[0]
+            types[`${mimeType}-${stream.languageInfo.lang}-${stream.languageInfo.acont}`] = {
+                "mimeType": mimeType,
+                "lang": stream.languageInfo.lang,
+                "acont": stream.languageInfo.acont
+            }
+        end for
+
+        combos = []
+        for each t in types
+            combos.Push(types[t])
+        end for
+
+        return combos
+    end function
+
+    function ParseAudioLanguage(url as string) as object
+        result = { lang: "", acont: "" }
+        queryParams = m.utils.ParseUrlQueryComponents(url)
+        if StringUtils.IsNullOrEmpty(queryParams["xtags"])
+            return result
+        end if
+
+        xtags = queryParams["xtags"].split(":")
+        for each xtag in xtags
+            if xtag.instr("=") > 0
+                parts = xtag.split("=")
+                if parts.Count() = 2
+                    if parts[0] = "lang"
+                        result["lang"] = parts[1]
+                    end if
+                    if parts[0] = "acont"
+                        result["acont"] = parts[1]
+                    end if
+                end if
+            end if
+        end for
+        return result
     end function
 end class
