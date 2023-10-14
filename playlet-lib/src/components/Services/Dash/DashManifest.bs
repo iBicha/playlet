@@ -28,6 +28,7 @@ class DashManifest
 
         videoMimeTypes = m.getMimeTypes(videoStreams)
         audioSets = m.getMimeTypeLanguageCombos(audioStreams)
+        storyboards = metadata.storyboards
 
         xml = new XmlObject()
 
@@ -171,6 +172,84 @@ class DashManifest
                                 xml.End()
                             end if
                         end for
+
+                        xml.End()
+                    end if
+
+                    id += 1
+                end for
+
+                ' https://developer.roku.com/en-ca/docs/developer-program/media-playback/trick-mode/hls-and-dash.md#dash-standard-thumbnail-tiles
+                for each storyboard in storyboards
+                    interval = ValidInt(storyboard.interval)
+                    if interval = 0
+                        LogWarn("Invalid storyboard interval=0")
+                        continue for
+                    end if
+
+                    templateUrl = storyboard.templateUrl
+                    if templateUrl.Instr("$M") = -1
+                        LogWarn("Invalid storyboard url: url does not contain $M:", templateUrl)
+                        continue for
+                    end if
+
+                    storyboardWidth = storyboard.storyboardWidth
+                    storyboardHeight = storyboard.storyboardHeight
+                    storyboardCount = storyboard.storyboardCount
+                    tileWidthInPixels = storyboard.width
+                    tileHeightInPixels = storyboard.height
+                    totalTileCount = storyboard.count
+
+                    ' For the last page, the image height might be smaller than the storyboard height
+                    if storyboardCount = 1
+                        storyboardHeight = totalTileCount \ storyboardWidth
+                        if totalTileCount mod storyboardWidth > 0
+                            storyboardHeight += 1
+                        end if
+                    end if
+
+                    intervalInSeconds = interval \ 1000
+
+                    ' Youtube template uses the var $M for tile pages
+                    ' DASH-IF uses $Number$ in the SegmentTemplate
+                    url = templateUrl.replace("$M", "$Number$")
+
+                    tilesPerPage = storyboardWidth * storyboardHeight
+                    duration = tilesPerPage * intervalInSeconds
+
+                    storyboardWidthInPixels = tileWidthInPixels * storyboardWidth
+                    storyboardHeightInPixels = tileHeightInPixels * storyboardHeight
+
+                    ' Bandwidth is kind of a guess...
+                    bandwidth = ((storyboardWidthInPixels * storyboardHeightInPixels * 0.5) / duration)
+
+                    if xml.Node("AdaptationSet", {
+                            "id": `${id}`,
+                            "mimeType": "image/jpeg",
+                            "contentType": "image"
+                        })
+                        xml.Node("SegmentTemplate", {
+                            "media": url,
+                            "duration": duration,
+                            "startNumber": 0
+                        })
+                        xml.End()
+
+                        if xml.Node("Representation", {
+                                "id": `thumbnails_${id}`,
+                                "bandwidth": bandwidth,
+                                "width": storyboardWidthInPixels,
+                                "height": storyboardHeightInPixels
+                            })
+
+                            xml.Node("EssentialProperty", {
+                                "schemeIdUri": "http://dashif.org/guidelines/thumbnail_tile",
+                                "value": `${storyboardWidth}x${storyboardHeight}`
+                            })
+                            xml.End()
+
+                            xml.End()
+                        end if
 
                         xml.End()
                     end if
