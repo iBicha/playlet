@@ -85,9 +85,17 @@ function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as str
 end function
 
 function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerUrl as string) as void
-    dashUrl = `${playletServerUrl}/api/dash?v=${metadata.videoId}`
-    dashUrlLocal = AddLocalFlag(dashUrl)
+    #if LOCAL_DASH
+        dashUrl = `${playletServerUrl}/api/dash?v=${metadata.videoId}`
+    #else
+        if metadata.dashUrl = invalid
+            return
+        end if
 
+        dashUrl = metadata.dashUrl
+    #end if
+
+    dashUrlLocal = AddLocalFlag(dashUrl)
     AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
 end function
 
