@@ -270,7 +270,19 @@ class DashManifest
         audioStreams = []
         for i = 0 to streams.Count() - 1
             stream = streams[i]
-            if stream.type.startsWith("audio/") and stream.bitrate <> invalid and stream.init <> invalid and stream.index <> invalid
+            if stream.type.startsWith("audio/")
+                if stream.bitrate = invalid
+                    LogWarn("Invalid audio stream bitrate, itag:", stream.itag)
+                    continue for
+                end if
+                if stream.init = invalid
+                    LogWarn("Invalid audio stream init, itag:", stream.itag)
+                    continue for
+                end if
+                if stream.index = invalid
+                    LogWarn("Invalid audio stream index, itag:", stream.itag)
+                    continue for
+                end if
                 stream.languageInfo = m.ParseAudioLanguage(stream.url)
                 audioStreams.Push(stream)
             end if
@@ -284,12 +296,24 @@ class DashManifest
         videoStreams = []
         for i = 0 to streams.Count() - 1
             stream = streams[i]
-            if stream.type.startsWith("video/") and stream.init <> invalid and stream.index <> invalid
+            if stream.type.startsWith("video/")
+                if stream.bitrate = invalid
+                    LogWarn("Invalid video stream bitrate, itag:", stream.itag)
+                    continue for
+                end if
+                if stream.init = invalid
+                    LogWarn("Invalid video stream init, itag:", stream.itag)
+                    continue for
+                end if
+                if stream.index = invalid
+                    LogWarn("Invalid video stream index, itag:", stream.itag)
+                    continue for
+                end if
                 videoStreams.Push(stream)
             end if
         end for
 
-        videoStreams.SortBy("width", "r")
+        videoStreams.SortBy("bitrate", "r")
         return videoStreams
     end function
 
