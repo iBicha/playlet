@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Local DASH manifest generation
+  - This adds support for multi languages audio tracks
+  - Also adds thumbnails/preview in trick play mode
+    - Known issue: thumbnails might appear cropped/misaligned at the end of videos. This will be addressed in a later release.
+
+### Fixed
+
+- Layout in channel view so that the upload time and view count of videos is visible
+
+### Changed
+
+- Cache format so it does less parsing work
+- Removed "chapter" from SponsorBlock categories
+
 ## [0.13.1] - 2023-10-08
 
 ### Added
