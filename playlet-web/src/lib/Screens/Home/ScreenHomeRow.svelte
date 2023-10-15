@@ -5,7 +5,7 @@
   import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
 
-  export let requestData: any = undefined;
+  export let feed: any = undefined;
   export let videos = undefined;
 
   let itemWidths = [];
@@ -40,7 +40,7 @@
   });
 
   async function updateRow() {
-    const result = await invidiousApi.makeRequest(requestData);
+    const result = await invidiousApi.makeRequest(feed);
     if (result && result.items) {
       result.items.forEach((item) => {
         if (item.videoId) {
@@ -89,7 +89,7 @@
 
 {#if videos}
   <div class="text-lg font-semibold m-4">
-    {requestData.title}
+    {feed.title}
   </div>
   <div
     class="carousel carousel-center rounded-box w-full space-x-4"

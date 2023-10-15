@@ -6,7 +6,7 @@
 </script>
 
 <div class={visibility ? "" : "hidden"}>
-  {#each $homeLayoutFileStore as homeLayoutItem}
-    <ScreenHomeRow requestData={homeLayoutItem} />
+  {#each $homeLayoutFileStore as feed}
+    <ScreenHomeRow {feed} />
   {/each}
 </div>

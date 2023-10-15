@@ -203,7 +203,7 @@ function Search(text as string)
     m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
     ShowLoadingScreen()
 
-    requestDataItem = {
+    feedSource = {
         apiType: "Invidious",
         endpoint: "search",
         queryParams: {
@@ -215,11 +215,11 @@ function Search(text as string)
     for each filter in filters
         value = filters[filter]
         if IsString(value) and value.len() > 0
-            requestDataItem.queryParams[filter] = value
+            feedSource.queryParams[filter] = value
         else if IsArray(value) and value.Count() > 0
             ' TODO:P1 this is http client implementation details leaking
             ' We need a declarative way to set array types
-            requestDataItem.queryParams[filter] = {
+            feedSource.queryParams[filter] = {
                 value: value,
                 __arrayType: HttpClient.QueryParamArrayType.CommaSeparated
             }
@@ -228,7 +228,7 @@ function Search(text as string)
 
     m.rowList.contentData = [{
         title: `Search - ${text}`,
-        items: [requestDataItem]
+        feedSources: [feedSource]
     }]
 end function
 

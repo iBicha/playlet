@@ -30,12 +30,15 @@ export class InvidiousApi {
         return await response.json();
     }
 
-    public async makeRequest(requestData: any) {
-        if (!requestData || !this.instance || !this.endpoints) {
+    public async makeRequest(feed: any) {
+        // TODO:P0 handle multiple feed sources
+        const feedSource = feed.feedSources[0]
+
+        if (!feedSource || !this.instance || !this.endpoints) {
             return null;
         }
 
-        let endpoint = this.endpoints[requestData.endpoint];
+        let endpoint = this.endpoints[feedSource.endpoint];
         if (!endpoint) {
             return null;
         }
@@ -49,7 +52,7 @@ export class InvidiousApi {
             if (!this.isLoggedIn) {
                 return null;
             }
-            return await PlayletApi.invidiousAuthenticatedRequest(requestData);
+            return await PlayletApi.invidiousAuthenticatedRequest(feedSource);
         }
 
         if (endpoint.queryParams !== undefined) {
@@ -69,13 +72,13 @@ export class InvidiousApi {
             }
         }
 
-        if (requestData.queryParams !== undefined) {
-            queryParams = { ...queryParams, ...requestData.queryParams };
+        if (feedSource.queryParams !== undefined) {
+            queryParams = { ...queryParams, ...feedSource.queryParams };
         }
 
-        if (requestData.pathParams !== undefined) {
-            for (let param in requestData.pathParams) {
-                url = url.replace(`{${param}}`, requestData.pathParams[param]);
+        if (feedSource.pathParams !== undefined) {
+            for (let param in feedSource.pathParams) {
+                url = url.replace(`{${param}}`, feedSource.pathParams[param]);
             }
         }
 
@@ -86,10 +89,10 @@ export class InvidiousApi {
         if (!responseHandler) {
             return null;
         }
-        return await responseHandler(requestData, response);
+        return await responseHandler(feedSource, response);
     }
 
-    private async DefaultHandler(requestData, response) {
+    private async DefaultHandler(feedSource, response) {
         const items = await response.json();
         return { items };
     }

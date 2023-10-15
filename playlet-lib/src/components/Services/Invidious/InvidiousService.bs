@@ -160,33 +160,33 @@ namespace Invidious
             requestData = contentNode.feed
 
             ' Only one item feeds will be paginated.
-            if requestData.items.Count() <> 1
+            if requestData.feedSources.Count() <> 1
                 return
             end if
-            item = requestData.items[0]
+            feedSource = requestData.feedSources[0]
 
-            endpoint = m.endpoints[item.endpoint]
+            endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
                 return
             end if
 
-            if not item.DoesExist("queryParams")
-                item.queryParams = {}
+            if not feedSource.DoesExist("queryParams")
+                feedSource.queryParams = {}
             end if
 
             contentNode.paginationType = endpoint.paginationType
 
             if endpoint.paginationType = PaginationType.Pages
                 contentNode.page += 1
-                item.queryParams.page = contentNode.page
+                feedSource.queryParams.page = contentNode.page
             else if endpoint.paginationType = PaginationType.Continuation
                 continuation = contentNode.continuation
                 if not StringUtils.IsNullOrEmpty(continuation)
-                    item.queryParams.continuation = continuation
+                    feedSource.queryParams.continuation = continuation
                 end if
             end if
 
-            requestData.items[0] = item
+            requestData.feedSources[0] = feedSource
             contentNode.feed = requestData
         end function
 
@@ -198,9 +198,9 @@ namespace Invidious
                 }
             }
 
-            for i = 0 to requestData.items.Count() - 1
-                requestDataItem = requestData.items[i]
-                response = m.MakeRequestSingle(requestDataItem, cancellation)
+            for i = 0 to requestData.feedSources.Count() - 1
+                feedSource = requestData.feedSources[i]
+                response = m.MakeRequestSingle(feedSource, cancellation)
                 if not response.success
                     ' TODO:P1 handle errors better
                     ' I don't feel confortable aborting the whole feed just because a single item failed
@@ -209,7 +209,7 @@ namespace Invidious
                 end if
                 aggregateResponse.result.items.Append(response.result.items)
 
-                if requestData.items.Count() = 1 and IsString(response.result.continuation)
+                if requestData.feedSources.Count() = 1 and IsString(response.result.continuation)
                     aggregateResponse.result.continuation = response.result.continuation
                 end if
             end for
@@ -217,12 +217,12 @@ namespace Invidious
             return aggregateResponse
         end function
 
-        function MakeRequestSingle(requestDataItem as object, cancellation = invalid as object) as object
-            endpoint = m.endpoints[requestDataItem.endpoint]
+        function MakeRequestSingle(feedSource as object, cancellation = invalid as object) as object
+            endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid
                 return {
                     success: false,
-                    error: `Endpoint ${requestDataItem.endpoint} not found`
+                    error: `Endpoint ${feedSource.endpoint} not found`
                 }
             end if
 
@@ -265,18 +265,18 @@ namespace Invidious
                 end for
             end if
 
-            if requestDataItem.cacheSeconds <> invalid
-                request.CacheSeconds(requestDataItem.cacheSeconds)
+            if feedSource.cacheSeconds <> invalid
+                request.CacheSeconds(feedSource.cacheSeconds)
             else if endpoint.cacheSeconds <> invalid
                 request.CacheSeconds(endpoint.cacheSeconds)
             end if
 
-            if requestDataItem.queryParams <> invalid
-                request.QueryParams(requestDataItem.queryParams)
+            if feedSource.queryParams <> invalid
+                request.QueryParams(feedSource.queryParams)
             end if
 
-            if requestDataItem.pathParams <> invalid
-                request.PathParams(requestDataItem.pathParams)
+            if feedSource.pathParams <> invalid
+                request.PathParams(feedSource.pathParams)
             end if
 
             request.Cancellation(cancellation)
@@ -285,7 +285,7 @@ namespace Invidious
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
-            result = responseHandler(m, requestDataItem, response)
+            result = responseHandler(m, feedSource, response)
 
             if response.IsSuccess() and result <> invalid
                 return {
@@ -300,7 +300,7 @@ namespace Invidious
             end if
         end function
 
-        function DefaultHandler(m as object, requestData as object, response as object) as object
+        function DefaultHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -310,7 +310,7 @@ namespace Invidious
             return invalid
         end function
 
-        function PlaylistHandler(m as object, requestData as object, response as object) as object
+        function PlaylistHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -320,7 +320,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelVideosHandler(m as object, requestData as object, response as object) as object
+        function ChannelVideosHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -331,7 +331,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelPlaylistsHandler(m as object, requestData as object, response as object) as object
+        function ChannelPlaylistsHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -342,7 +342,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelRelatedChannelsHandler(m as object, requestData as object, response as object) as object
+        function ChannelRelatedChannelsHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -353,7 +353,7 @@ namespace Invidious
             return invalid
         end function
 
-        function VideoInfoHandler(m as object, requestData as object, response as object) as object
+        function VideoInfoHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 json.type = "video"
@@ -364,7 +364,7 @@ namespace Invidious
             return invalid
         end function
 
-        function PlaylistInfoHandler(m as object, requestData as object, response as object) as object
+        function PlaylistInfoHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 json.type = "playlist"
@@ -375,7 +375,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelInfoHandler(m as object, requestData as object, response as object) as object
+        function ChannelInfoHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 json.type = "channel"
@@ -386,7 +386,7 @@ namespace Invidious
             return invalid
         end function
 
-        function AuthFeedHandler(m as object, requestData as object, response as object) as object
+        function AuthFeedHandler(m as object, feedSource as object, response as object) as object
             m.DeleteExpiredToken(response)
 
             if response.StatusCode() = 200
