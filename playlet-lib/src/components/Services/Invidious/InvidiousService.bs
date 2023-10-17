@@ -156,40 +156,45 @@ namespace Invidious
             return `${instance}/latest_version?id=${videoId}`
         end function
 
-        function MarkFeedPagination(contentNode as object) as void
-            requestData = contentNode.feed
+        function MarkFeedPagination(feedContentNode as object) as object
+            feedSources = feedContentNode.feedSources
+            feedSourcesIndex = feedContentNode.feedSourcesIndex
 
-            ' Only one item feeds will be paginated.
-            if requestData.feedSources.Count() <> 1
-                return
-            end if
-            feedSource = requestData.feedSources[0]
+            feedSource = feedSources[feedSourcesIndex]
 
             endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
-                return
+                return feedSource
             end if
 
-            if not feedSource.DoesExist("queryParams")
-                feedSource.queryParams = {}
+            feedSourceState = feedSource.state
+            if not feedSourceState.DoesExist("queryParams")
+                feedSourceState.queryParams = {}
             end if
 
-            contentNode.paginationType = endpoint.paginationType
-
-            if endpoint.paginationType = PaginationType.Pages
-                contentNode.page += 1
-                feedSource.queryParams.page = contentNode.page
-            else if endpoint.paginationType = PaginationType.Continuation
-                continuation = contentNode.continuation
+            feedSourceState.paginationType = endpoint.paginationType
+            if feedSourceState.paginationType = PaginationType.Pages
+                if not IsInt(feedSourceState.page)
+                    feedSourceState.page = 0
+                end if
+                feedSourceState.page += 1
+                feedSourceState.queryParams.page = feedSourceState.page
+            else if feedSourceState.paginationType = PaginationType.Continuation
+                continuation = feedSourceState.continuation
                 if not StringUtils.IsNullOrEmpty(continuation)
-                    feedSource.queryParams.continuation = continuation
+                    feedSourceState.queryParams.continuation = continuation
+                else
+                    feedSourceState.queryParams.Delete("continuation")
                 end if
             end if
 
-            requestData.feedSources[0] = feedSource
-            contentNode.feed = requestData
+            feedSource.state = feedSourceState
+            feedSources[feedSourcesIndex] = feedSource
+            feedContentNode.feedSources = feedSources
+            return feedSource
         end function
 
+        ' TODO:P0 remove this function, as it is not used
         function MakeRequest(requestData as object, cancellation = invalid as object) as object
             aggregateResponse = {
                 success: true,
@@ -217,7 +222,7 @@ namespace Invidious
             return aggregateResponse
         end function
 
-        function MakeRequestSingle(feedSource as object, cancellation = invalid as object) as object
+        function MakeRequestSingle(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
             endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid
                 return {
@@ -273,6 +278,10 @@ namespace Invidious
 
             if feedSource.queryParams <> invalid
                 request.QueryParams(feedSource.queryParams)
+            end if
+
+            if additionalQueryParams <> invalid
+                request.QueryParams(additionalQueryParams)
             end if
 
             if feedSource.pathParams <> invalid

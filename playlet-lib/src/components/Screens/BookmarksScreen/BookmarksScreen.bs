@@ -68,73 +68,82 @@ function OnBookmarksChange() as void
 end function
 
 function SetRowListContent(bookmarksContent as object)
-    bookmarks = bookmarksContent.getChildren(-1, 0)
+    bookmarkGroupNodes = bookmarksContent.getChildren(-1, 0)
 
-    contentData = []
-    for each bookmarkGroup in bookmarks
-        items = bookmarkGroup.getChildren(-1, 0)
-        rowData = {
-            title: bookmarkGroup.title,
-            items: []
+    feeds = []
+    for each bookmarkGroupNode in bookmarkGroupNodes
+        bookmarkNodes = bookmarkGroupNode.getChildren(-1, 0)
+        feed = {
+            title: bookmarkGroupNode.title,
+            feedSources: []
         }
 
-        for each item in items
-            if item.type = "video"
-                rowItemData = {
+        for each bookmarkNode in bookmarkNodes
+            if bookmarkNode.type = "video"
+                feedSource = {
+                    title: "Video",
                     apiType: "Invidious",
                     endpoint: "video_info",
                     pathParams: {
-                        id: item.itemId
+                        id: bookmarkNode.itemId
                     }
                 }
-                rowData.items.push(rowItemData)
-            else if item.type = "playlist"
-                rowItemData = {
+                feed.feedSources.push(feedSource)
+            else if bookmarkNode.type = "playlist"
+                feedSource = {
+                    title: "Playlist",
                     apiType: "Invidious",
                     endpoint: "playlist_info",
                     pathParams: {
-                        plid: item.itemId
+                        plid: bookmarkNode.itemId
                     }
                 }
-                rowData.items.push(rowItemData)
-                if items.Count() = 1
-                    rowItemData = {
+                feed.feedSources.push(feedSource)
+                ' TODO:P0 expanding playlists like this is not a good idea
+                ' This should be defined at the bookmark level
+                if bookmarkNodes.Count() = 1
+                    feedSource = {
+                        title: "Playlist Videos",
                         apiType: "Invidious",
                         endpoint: "playlist",
                         pathParams: {
-                            plid: item.itemId
+                            plid: bookmarkNode.itemId
                         }
                     }
-                    rowData.items.push(rowItemData)
+                    feed.feedSources.push(feedSource)
                 end if
-            else if item.type = "channel"
-                rowItemData = {
+            else if bookmarkNode.type = "channel"
+                feedSource = {
+                    title: "Channel",
                     apiType: "Invidious",
                     endpoint: "channel_info",
                     pathParams: {
-                        ucid: item.itemId
+                        ucid: bookmarkNode.itemId
                     }
                 }
-                rowData.items.push(rowItemData)
-                if items.Count() = 1
-                    rowItemData = {
+                feed.feedSources.push(feedSource)
+                ' TODO:P0 expanding channel videos like this is not a good idea
+                ' This should be defined at the bookmark level
+                if bookmarkNodes.Count() = 1
+                    feedSource = {
+                        title: "Channel Videos",
                         apiType: "Invidious",
                         endpoint: "channel_videos",
                         pathParams: {
-                            ucid: item.itemId
+                            ucid: bookmarkNode.itemId
                         }
                     }
-                    rowData.items.push(rowItemData)
+                    feed.feedSources.push(feedSource)
                 end if
-            else if item.type = "feed"
-                rowData.items.append(item.feed.items)
+            else if bookmarkNode.type = "feedSource"
+                feed.feedSources.push(bookmarkNode.feedSource)
             end if
         end for
 
-        contentData.push(rowData)
+        feeds.push(feed)
     end for
 
-    m.rowList.contentData = contentData
+    m.rowList.feeds = feeds
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean

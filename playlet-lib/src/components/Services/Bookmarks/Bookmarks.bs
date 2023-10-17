@@ -23,14 +23,19 @@ import "pkg:/source/utils/Types.bs"
 ' - endpoint: ApiEndpoint
 ' - pathParams
 ' - queryParams
-' - page (Runtime field)
-' - continuation (Runtime field)
+' - state:
+'   - paginationtype (Runtime field)
+'   - page (Runtime field)
+'   - continuation (Runtime field)
+'   - queryParams.page (Runtime field)
+'   - queryParams.continuation (Runtime field)
 '
 ' Feed/FeedContentNode:
 ' - Title
 ' - feedSources: FeedSource[]
+' - feedSourceIndex (Runtime field)
 
-' ScreenLayout
+' RowListLayout
 ' - Feed[]
 
 ' Bookmarks
@@ -41,7 +46,7 @@ import "pkg:/source/utils/Types.bs"
 ' - Bookmark[]
 
 ' Bookmark
-' - type: video|playlist|channel|feed
+' - type: video|playlist|channel|feedSource
 ' - ItemId
 ' - FeedSource
 
@@ -71,8 +76,8 @@ function Load() as void
     for each bookmark in bookmarks.bookmarks
         AddBookmarkGroup(bookmark.title)
         for each item in bookmark.items
-            if item.type = "feed"
-                AddFeedBookmark(item.feed)
+            if item.type = "feedSource"
+                AddFeedSourceBookmark(item.feedSource)
             else
                 AddBookmark(item.type, item.id, bookmark.title)
             end if
@@ -81,28 +86,28 @@ function Load() as void
 end function
 
 function Save() as void
-    bookmarkGroups = m.top.content.getChildren(-1, 0)
-    if bookmarkGroups.Count() = 0
+    bookmarkGroupNodes = m.top.content.getChildren(-1, 0)
+    if bookmarkGroupNodes.Count() = 0
         RegistryUtils.Delete(RegistryUtils.BOOKMARKS)
         return
     end if
 
     bookmarks = []
-    for each group in bookmarkGroups
+    for each bookmarkGroupNode in bookmarkGroupNodes
         items = []
-        nodes = group.getChildren(-1, 0)
-        for each node in nodes
+        bookmarkNodes = bookmarkGroupNode.getChildren(-1, 0)
+        for each bookmarkNode in bookmarkNodes
             item = {
-                type: node.type,
-                id: node.itemId
+                type: bookmarkNode.type,
+                id: bookmarkNode.itemId
             }
-            if item.type = "feed"
-                item.feed = node.feed
+            if item.type = "feedSource"
+                item.feedSource = bookmarkNode.feedSource
             end if
             items.Push(item)
         end for
         bookmarks.push({
-            title: group.title,
+            title: bookmarkGroupNode.title,
             items: items
         })
     end for
@@ -146,27 +151,25 @@ function AddBookmark(bookmarkType as string, id as string, groupName as string)
     m.top.contentChange = true
 end function
 
-function AddFeedBookmark(feed as object)
-    title = feed.bookmarkTitle
-    if StringUtils.IsNullOrEmpty(title)
-        title = feed.title
+function AddFeedSourceBookmark(feedSource as object)
+    title = feedSource.title
+    id = CryptoUtils.GetMd5(title)
+    bookmarkGroupNode = m.top.content.findNode(id)
+    if bookmarkGroupNode = invalid
+        bookmarkGroupNode = AddBookmarkGroup(title)
     end if
 
-    id = CryptoUtils.GetMd5(title)
-    groupNode = m.top.content.findNode(id)
-    if groupNode = invalid
-        groupNode = AddBookmarkGroup(title)
-    end if
+    feedSource.Delete("state")
 
     node = CreateObject("roSGNode", "ContentNode")
     node.id = id
     node.addFields({
-        type: "feed",
+        type: "feedSource",
         itemId: id,
-        feed: feed
+        feedSource: feedSource
     })
-    groupNode.insertChild(node, 0)
-    LogInfo("Added feed bookmark:", title, "id:", id)
+    bookmarkGroupNode.insertChild(node, 0)
+    LogInfo("Added feedSource bookmark:", title, "id:", id)
     m.top.contentChange = true
 end function
 
@@ -200,7 +203,7 @@ function GetContextMenuOptionsForItem(item as object) as object
     else if item.type = "channel"
         options.append(GetMenuForChannel(item))
     end if
-    options.append(GetMenuForParentFeed(item))
+    options.append(GetMenuForParentFeedSource(item))
     return options
 end function
 
@@ -266,38 +269,34 @@ function GetMenuForChannel(channelNode as object) as object
     return menu
 end function
 
-function GetMenuForParentFeed(itemNode as object) as object
+function GetMenuForParentFeedSource(itemNode as object) as object
     if itemNode = invalid
         return []
     end if
     if itemNode.type <> "video" and itemNode.type <> "playlist" and itemNode.type <> "channel"
         return []
     end if
-    parent = itemNode.getParent()
-    if parent = invalid
+    if not IsInt(itemNode.feedSourcesIndex) or itemNode.feedSourcesIndex = -1
         return []
     end if
-    if parent.subtype() <> "FeedContentNode"
+    feedContentNode = itemNode.getParent()
+    if feedContentNode = invalid or feedContentNode.subtype() <> "FeedContentNode"
         return []
     end if
 
-    feed = parent.feed
+    feedSource = feedContentNode.feedSources[itemNode.feedSourcesIndex]
 
-    title = feed.bookmarkTitle
-    if StringUtils.IsNullOrEmpty(title)
-        title = feed.title
-    end if
-
-    feedId = CryptoUtils.GetMd5(title)
+    title = feedSource.title
+    feedSourceId = CryptoUtils.GetMd5(title)
 
     menu = []
-    isInBookmarks = m.top.content.findNode(feedId) <> invalid
+    isInBookmarks = m.top.content.findNode(feedSourceId) <> invalid
 
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [feedId])
+        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [feedSourceId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedBookmark", [feed])
+        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedSourceBookmark", [feedSource])
         menu.push(item)
     end if
     return menu

@@ -39,7 +39,7 @@ function OnVisibilityChange()
     end if
 end function
 
-function OnContentData() as void
+function OnFeedsChange() as void
     InitContent()
 end function
 
@@ -200,14 +200,14 @@ function InitContent() as void
     CancelCurrentTasks()
     m.top.someContentReady = false
 
-    if m.top.contentData = invalid
+    if m.top.feeds = invalid
         m.top.content = invalid
         return
     end if
 
     task = StartAsyncTask(VideoRowListContentTask, {
         node: m.top,
-        contentData: m.top.contentData
+        feeds: m.top.feeds
     }, OnVideoRowListContentTaskResult)
     m.pendingLoadTasks[task.id] = task
 end function
@@ -279,8 +279,8 @@ function LoadRowContent(contentNode as object)
 
     contentNode.loadState = FeedLoadState.Loading
     task = StartAsyncTask(VideoRowListRowContentTask, {
-        node: m.top,
-        contentNode: contentNode,
+        rowList: m.top,
+        feedContentNode: contentNode,
         invidious: m.invidious
     }, OnVideoRowListRowContentTaskResult)
     m.pendingLoadTasks[task.id] = task
@@ -290,20 +290,6 @@ function OnVideoRowListRowContentTaskResult(output as object) as void
     m.pendingLoadTasks.Delete(output.task.id)
     if output.cancelled
         return
-    end if
-
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-        m.top.onError = error
-        message = `Failed to load feed\n${error}`
-        DialogUtils.ShowDialog(message, "Feed load fail", true)
     end if
 
     LoadRowsIfNeeded()
