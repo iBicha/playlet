@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Bookmarks: different items can now be bookmarked, and be found in the `Bookmarks` screen.
+  Things that can be bookmarked:
+  - A video
+  - A channel
+  - A playlist
+  - Subscriptions
+  - Trending
+  - Popular
+  - Playlists
+  - Search results
+  - Channel tabs (latest videos, live streams, playlists, shorts, podcasts, related channels)
+- Context menu: press and hold `OK` to show a context menu to:
+  - Play/queue a video or a playlist
+  - Open the channel of a playlist or of a video
+  - Manage bookmarks
 - Local DASH manifest generation
   - This adds support for multi languages audio tracks
   - Also adds thumbnails/preview in trick play mode
@@ -17,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Layout in channel view so that the upload time and view count of videos is visible
+- A few things in the logger
 
 ### Changed
 
