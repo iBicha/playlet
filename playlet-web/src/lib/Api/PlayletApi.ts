@@ -138,6 +138,14 @@ export class PlayletApi {
                 link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
                 type: 'custom'
             }]
+            // When an official release is out, it replaces the current canary release.
+            // To avoid the "not found" error, we fallback to the default "latest" release.
+            if (tag === "canary") {
+                urls.push({
+                    link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip`,
+                    type: 'custom'
+                })
+            }
             await PlayletApi.postJson(`${PlayletApi.host()}/api/playlet-lib-urls`, urls);
         } else {
             return await fetch(`${PlayletApi.host()}/api/playlet-lib-urls`, { method: "DELETE" });
