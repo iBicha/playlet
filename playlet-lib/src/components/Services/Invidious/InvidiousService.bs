@@ -194,35 +194,7 @@ namespace Invidious
             return feedSource
         end function
 
-        ' TODO:P0 remove this function, as it is not used
-        function MakeRequest(requestData as object, cancellation = invalid as object) as object
-            aggregateResponse = {
-                success: true,
-                result: {
-                    items: []
-                }
-            }
-
-            for i = 0 to requestData.feedSources.Count() - 1
-                feedSource = requestData.feedSources[i]
-                response = m.MakeRequestSingle(feedSource, cancellation)
-                if not response.success
-                    ' TODO:P1 handle errors better
-                    ' I don't feel confortable aborting the whole feed just because a single item failed
-                    ' This could cause the whole feed to fail if one item (like a video or playlist) got deleted
-                    return response
-                end if
-                aggregateResponse.result.items.Append(response.result.items)
-
-                if requestData.feedSources.Count() = 1 and IsString(response.result.continuation)
-                    aggregateResponse.result.continuation = response.result.continuation
-                end if
-            end for
-
-            return aggregateResponse
-        end function
-
-        function MakeRequestSingle(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
+        function MakeRequest(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
             endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid
                 return {
