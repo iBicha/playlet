@@ -19,6 +19,8 @@ import "pkg:/source/utils/Types.bs"
 ' - responseHandler
 '
 ' FeedSource:
+' - id
+' - title
 ' - apiType: string ("Invidious")
 ' - endpoint: ApiEndpoint
 ' - pathParams
@@ -43,12 +45,7 @@ import "pkg:/source/utils/Types.bs"
 
 ' BookmarkGroup
 ' - title
-' - Bookmark[]
-
-' Bookmark
-' - type: video|playlist|channel|feedSource
-' - ItemId
-' - FeedSource
+' - feedSources: FeedSource[]
 
 const VIDEOS_GROUP = "Videos"
 const CHANNELS_GROUP = "Channels"
@@ -73,14 +70,10 @@ function Load() as void
         return
     end if
 
-    for each bookmark in bookmarks.bookmarks
-        AddBookmarkGroup(bookmark.title)
-        for each item in bookmark.items
-            if item.type = "feedSource"
-                AddFeedSourceBookmark(item.feedSource)
-            else
-                AddBookmark(item.type, item.id, bookmark.title)
-            end if
+    for each bookmarkGroup in bookmarks.groups
+        bookmarkGroupNode = GetOrCreateBookmarkGroup(bookmarkGroup.title)
+        for each bookmark in bookmarkGroup.bookmarks
+            AddFeedSourceBookmark(bookmark.feedSource, bookmark.id, bookmarkGroupNode)
         end for
     end for
 end function
@@ -92,29 +85,25 @@ function Save() as void
         return
     end if
 
-    bookmarks = []
+    groups = []
     for each bookmarkGroupNode in bookmarkGroupNodes
-        items = []
+        bookmarks = []
         bookmarkNodes = bookmarkGroupNode.getChildren(-1, 0)
         for each bookmarkNode in bookmarkNodes
-            item = {
-                type: bookmarkNode.type,
-                id: bookmarkNode.itemId
-            }
-            if item.type = "feedSource"
-                item.feedSource = bookmarkNode.feedSource
-            end if
-            items.Push(item)
+            bookmarks.push({
+                id: bookmarkNode.id,
+                feedSource: bookmarkNode.feedSource
+            })
         end for
-        bookmarks.push({
+        groups.push({
             title: bookmarkGroupNode.title,
-            items: items
+            bookmarks: bookmarks
         })
     end for
 
     bookmarksString = FormatJson({
         __version: m.top.__version,
-        bookmarks: bookmarks
+        groups: groups
     })
 
     if m.bookmarksString = bookmarksString
@@ -125,52 +114,122 @@ function Save() as void
     m.bookmarksString = bookmarksString
 end function
 
-function AddBookmarkGroup(groupName as string) as object
+function GetOrCreateBookmarkGroup(groupName as string) as object
+    id = CryptoUtils.GetMd5(groupName)
+    node = m.top.content.findNode(id)
+    if node <> invalid
+        return node
+    end if
     node = CreateObject("roSGNode", "ContentNode")
-    node.id = CryptoUtils.GetMd5(groupName)
+    node.id = id
     node.title = groupName
     m.top.content.appendChild(node)
     LogInfo("Added bookmark group:", groupName)
     return node
 end function
 
-function AddBookmark(bookmarkType as string, id as string, groupName as string)
-    groupNode = m.top.content.findNode(CryptoUtils.GetMd5(groupName))
-    if groupNode = invalid
-        groupNode = AddBookmarkGroup(groupName)
-    end if
-
-    node = CreateObject("roSGNode", "ContentNode")
-    node.id = id
-    node.addFields({
-        type: bookmarkType,
-        itemId: id
-    })
-    groupNode.insertChild(node, 0)
-    LogInfo("Added bookmark:", id)
-    m.top.contentChange = true
-end function
-
-function AddFeedSourceBookmark(feedSource as object)
-    title = feedSource.title
-    id = CryptoUtils.GetMd5(title)
-    bookmarkGroupNode = m.top.content.findNode(id)
-    if bookmarkGroupNode = invalid
-        bookmarkGroupNode = AddBookmarkGroup(title)
+function AddFeedSourceBookmark(feedSource as object, id as string, bookmarkGroupNode as dynamic)
+    if IsString(bookmarkGroupNode)
+        bookmarkGroupNode = GetOrCreateBookmarkGroup(bookmarkGroupNode)
     end if
 
     feedSource.Delete("state")
 
-    node = CreateObject("roSGNode", "ContentNode")
-    node.id = id
-    node.addFields({
-        type: "feedSource",
-        itemId: id,
-        feedSource: feedSource
-    })
-    bookmarkGroupNode.insertChild(node, 0)
-    LogInfo("Added feedSource bookmark:", title, "id:", id)
+    bookmarkNode = CreateObject("roSGNode", "BookmarkContentNode")
+    bookmarkNode.id = id
+    bookmarkNode.feedSource = feedSource
+
+    bookmarkGroupNode.insertChild(bookmarkNode, 0)
+    LogInfo("Added feedSource bookmark:", feedSource.title, "id:", id)
     m.top.contentChange = true
+end function
+
+function AddVideoBookmark(id as string, groupName as string)
+    bookmarkGroupNode = GetOrCreateBookmarkGroup(groupName)
+
+    feedSource = {
+        apiType: "Invidious",
+        endpoint: "video_info",
+        pathParams: {
+            id: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, id, bookmarkGroupNode)
+end function
+
+function AddPlaylistBookmark(id as string, groupName as string)
+    bookmarkGroupNode = GetOrCreateBookmarkGroup(groupName)
+
+    feedSource = {
+        apiType: "Invidious",
+        endpoint: "playlist_info",
+        pathParams: {
+            plid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, id, bookmarkGroupNode)
+end function
+
+'TODO:P0 Remove bookmark is not woring
+function AddPlaylistBookmarkWithSpread(id as string, groupName as string)
+    bookmarkGroupNode = GetOrCreateBookmarkGroup(groupName)
+
+    feedSource = {
+        id: `inv_playlist_${id}`,
+        title: `${groupName} videos`,
+        apiType: "Invidious",
+        endpoint: "playlist",
+        pathParams: {
+            plid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, `inv_playlist_${id}`, bookmarkGroupNode)
+
+    feedSource = {
+        apiType: "Invidious",
+        endpoint: "playlist_info",
+        pathParams: {
+            plid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, id, bookmarkGroupNode)
+end function
+
+function AddChannelBookmark(id as string, groupName as string)
+    bookmarkGroupNode = GetOrCreateBookmarkGroup(groupName)
+
+    feedSource = {
+        apiType: "Invidious",
+        endpoint: "channel_info",
+        pathParams: {
+            ucid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, id, bookmarkGroupNode)
+end function
+
+function AddChannelBookmarkWithSpread(id as string, groupName as string)
+    bookmarkGroupNode = GetOrCreateBookmarkGroup(groupName)
+
+    feedSource = {
+        id: `inv_channel_videos_${id}`,
+        title: `${groupName} videos`,
+        apiType: "Invidious",
+        endpoint: "channel_videos",
+        pathParams: {
+            ucid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, `inv_channel_videos_${id}`, bookmarkGroupNode)
+
+    feedSource = {
+        apiType: "Invidious",
+        endpoint: "channel_info",
+        pathParams: {
+            ucid: id
+        }
+    }
+    AddFeedSourceBookmark(feedSource, id, bookmarkGroupNode)
 end function
 
 function RemoveBookmark(id as string) as void
@@ -214,12 +273,14 @@ function GetMenuForVideo(videoNode as object) as object
     end if
 
     menu = []
-    isInBookmarks = m.top.content.findNode(videoId) <> invalid
+    bookmark = m.top.content.findNode(videoId)
+    isInBookmarks = bookmark <> invalid
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [videoId])
+        bookmarkGroup = bookmark.getParent()
+        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [videoId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${VIDEOS_GROUP}" bookmark`, m.top, "AddBookmark", ["video", videoId, VIDEOS_GROUP])
+        item = ContextMenuUtils.CreateOption(`Add to "${VIDEOS_GROUP}" bookmark`, m.top, "AddVideoBookmark", [videoId, VIDEOS_GROUP])
         menu.push(item)
     end if
     return menu
@@ -232,17 +293,17 @@ function GetMenuForPlaylist(playlistNode as object) as object
     end if
 
     menu = []
-    ' TODO:P0 create function for checking if a bookmark exists
-    ' Function should rely on bookmarks, not nodes in content
-    isInBookmarks = m.top.content.findNode(playlistId) <> invalid
+    bookmark = m.top.content.findNode(playlistId)
+    isInBookmarks = bookmark <> invalid
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [playlistId])
+        bookmarkGroup = bookmark.getParent()
+        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [playlistId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${PLAYLISTS_GROUP}" bookmark`, m.top, "AddBookmark", ["playlist", playlistId, PLAYLISTS_GROUP])
+        item = ContextMenuUtils.CreateOption(`Add to "${PLAYLISTS_GROUP}" bookmark`, m.top, "AddPlaylistBookmark", [playlistId, PLAYLISTS_GROUP])
         menu.push(item)
 
-        item = ContextMenuUtils.CreateOption(`Add to "${playlistNode.title}" bookmark`, m.top, "AddBookmark", ["playlist", playlistId, playlistNode.title])
+        item = ContextMenuUtils.CreateOption(`Add to "${playlistNode.title}" bookmark`, m.top, "AddPlaylistBookmarkWithSpread", [playlistId, playlistNode.title])
         menu.push(item)
     end if
     return menu
@@ -255,15 +316,17 @@ function GetMenuForChannel(channelNode as object) as object
     end if
 
     menu = []
-    isInBookmarks = m.top.content.findNode(authorId) <> invalid
+    bookmark = m.top.content.findNode(authorId)
+    isInBookmarks = bookmark <> invalid
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [authorId])
+        bookmarkGroup = bookmark.getParent()
+        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [authorId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${CHANNELS_GROUP}" bookmark`, m.top, "AddBookmark", ["channel", authorId, CHANNELS_GROUP])
+        item = ContextMenuUtils.CreateOption(`Add to "${CHANNELS_GROUP}" bookmark`, m.top, "AddChannelBookmark", [authorId, CHANNELS_GROUP])
         menu.push(item)
 
-        item = ContextMenuUtils.CreateOption(`Add to "${channelNode._author}" bookmark`, m.top, "AddBookmark", ["channel", authorId, channelNode._author])
+        item = ContextMenuUtils.CreateOption(`Add to "${channelNode._author}" bookmark`, m.top, "AddChannelBookmarkWithSpread", [authorId, channelNode._author])
         menu.push(item)
     end if
     return menu
@@ -285,18 +348,21 @@ function GetMenuForParentFeedSource(itemNode as object) as object
     end if
 
     feedSource = feedContentNode.feedSources[itemNode.feedSourcesIndex]
+    if StringUtils.IsNullOrEmpty(feedSource.title) or StringUtils.IsNullOrEmpty(feedSource.id)
+        return []
+    end if
 
     title = feedSource.title
-    feedSourceId = CryptoUtils.GetMd5(title)
+    feedSourceId = feedSource.id
 
     menu = []
     isInBookmarks = m.top.content.findNode(feedSourceId) <> invalid
 
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption("Remove from bookmarks", m.top, "RemoveBookmark", [feedSourceId])
+        item = ContextMenuUtils.CreateOption(`Remove "${feedSource.title}" from bookmarks`, m.top, "RemoveBookmark", [feedSourceId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedSourceBookmark", [feedSource])
+        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedSourceBookmark", [feedSource, feedSourceId, title])
         menu.push(item)
     end if
     return menu
