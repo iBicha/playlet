@@ -1,3 +1,4 @@
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -13,6 +14,18 @@ function Init()
     end if
 
     m.port = port
+
+    StartLogger(m.top)
+end function
+
+function StartLogger(logger as object, logLevel = LogLevel.Info as LogLevel) as void
+    if m.global.logger <> invalid
+        return
+    end if
+
+    logger.logLevel = logLevel
+    m.global.addFields({ logger: logger })
+    logger.control = "run"
 end function
 
 function LoggerLoop()
@@ -54,7 +67,7 @@ function OnLineSysLog(event as object, logsFile as string, buffer as object) as 
     if info.LogType <> "http.error"
         return
     end if
-    line = `[SysLog] ${FormatJson(info)}`
+    line = "[ERROR][SysLog] " + ToString(info)
     ' bs:disable-next-line LINT3012
     print line
 

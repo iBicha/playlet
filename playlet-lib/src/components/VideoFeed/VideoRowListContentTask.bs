@@ -1,17 +1,25 @@
 import "FeedLoadState.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 @asynctask
 function VideoRowListContentTask(input as object)
-    contentData = input.contentData
+    feeds = input.feeds
     rowList = input.node
 
     contentNode = CreateObject("roSGNode", "ContentNode")
 
-    for each feed in contentData
+    for each feed in feeds
         feedContentNode = CreateObject("roSGNode", "FeedContentNode")
-        feedContentNode.feed = feed
-        feedContentNode.loadState = FeedLoadState.None
         feedContentNode.title = feed.title
+        feedContentNode.feedSourcesIndex = 0
+        feedContentNode.loadState = FeedLoadState.None
+        feedSources = feed.feedSources
+        for i = 0 to feedSources.count() - 1
+            feedSources[i].state = {
+                loadState: FeedLoadState.None
+            }
+        end for
+        feedContentNode.feedSources = feedSources
 
         for i = 1 to 4
             feedContentNode.createChild("LoadingContentNode")

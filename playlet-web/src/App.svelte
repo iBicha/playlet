@@ -28,13 +28,8 @@
       homeLayoutFileStore.set(value);
     });
 
-    PlayletApi.getInvidiousVideoApiFile().then((invidiousVideoApiFile) => {
-      const invidiousVideoApiDefinitions =
-        invidiousVideoApiFile.endpoints.reduce((acc, endpoint) => {
-          acc[endpoint.name] = endpoint;
-          return acc;
-        }, {});
-      invidiousVideoApiStore.set(invidiousVideoApiDefinitions);
+    PlayletApi.getInvidiousVideoApiFile().then((apiDefinitions) => {
+      invidiousVideoApiStore.set(apiDefinitions);
     });
 
     PlayletApi.getPreferencesFile().then((value) => {

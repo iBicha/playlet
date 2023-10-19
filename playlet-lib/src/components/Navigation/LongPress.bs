@@ -1,0 +1,39 @@
+const LONG_PRESS_KEY = "OK_LONG_PRESS"
+
+function InitializeLongPressTimer(duration = 1.0 as float)
+    m._longPressTimer = CreateObject("roSGNode", "Timer")
+    m._longPressTimer.duration = duration
+    m._longPressFired = false
+    m._longPressTimer.ObserveField("fire", FuncName(LongPressTimerFired))
+end function
+
+function LongPressHandler(key as string, press as boolean) as boolean
+    #if DEBUG
+        if key = "Lit_l"
+            LogInfo("Simulating long press using key:", key, "press:", press)
+            m._longPressFired = true
+            return OnkeyEvent(LONG_PRESS_KEY, press)
+        end if
+    #end if
+    if key = "OK" and press
+        m._longPressTimer.control = "stop"
+        m._longPressTimer.control = "start"
+        m._longPressFired = false
+        return true
+    end if
+
+    if key = "OK" and not press
+        m._longPressTimer.control = "stop"
+        if m._longPressFired = true
+            m._longPressFired = false
+            return true
+        end if
+    end if
+
+    return false
+end function
+
+function LongPressTimerFired()
+    m._longPressFired = true
+    OnkeyEvent(LONG_PRESS_KEY, true)
+end function

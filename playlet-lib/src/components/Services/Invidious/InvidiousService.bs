@@ -36,19 +36,16 @@ namespace Invidious
 
         function new(node as object)
             m.node = node
-            ' TODO:P2 api definitions are not needed everytime, move them to a separate function and lazy load
-            apiDefinitions = node.apiDefinitions
 
-            m.endpoints = {}
-
-            for each apiDefinition in apiDefinitions.endpoints
-                m.endpoints[apiDefinition.name] = apiDefinition
-            end for
+            m.endpoints = node.apiDefinitions
 
             m.responseHanlders = {
                 DefaultHandler: m.DefaultHandler,
                 AuthFeedHandler: m.AuthFeedHandler,
                 PlaylistHandler: m.PlaylistHandler,
+                VideoInfoHandler: m.VideoInfoHandler,
+                PlaylistInfoHandler: m.PlaylistInfoHandler,
+                ChannelInfoHandler: m.ChannelInfoHandler,
                 ChannelVideosHandler: m.ChannelVideosHandler,
                 ChannelPlaylistsHandler: m.ChannelPlaylistsHandler,
                 ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
@@ -149,6 +146,7 @@ namespace Invidious
             request = HttpClient.Get(url)
             request.QueryParams(m.DefaultQueryParams())
             request.Cancellation(cancellation)
+            request.CacheSeconds(60 * 60 * 24)' 24 hours
 
             return request.Await()
         end function
@@ -158,39 +156,50 @@ namespace Invidious
             return `${instance}/latest_version?id=${videoId}`
         end function
 
-        function MarkFeedPagination(contentNode as object) as void
-            requestData = contentNode.feed
+        function MarkFeedPagination(feedContentNode as object) as object
+            feedSources = feedContentNode.feedSources
+            feedSourcesIndex = feedContentNode.feedSourcesIndex
 
-            endpoint = m.endpoints[requestData.endpoint]
+            feedSource = feedSources[feedSourcesIndex]
+
+            endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
-                return
+                return feedSource
             end if
 
-            if not requestData.DoesExist("queryParams")
-                requestData.queryParams = {}
+            feedSourceState = feedSource.state
+            if not feedSourceState.DoesExist("queryParams")
+                feedSourceState.queryParams = {}
             end if
 
-            contentNode.paginationType = endpoint.paginationType
-
-            if endpoint.paginationType = PaginationType.Pages
-                contentNode.page += 1
-                requestData.queryParams.page = contentNode.page
-            else if endpoint.paginationType = PaginationType.Continuation
-                continuation = contentNode.continuation
+            feedSourceState.paginationType = endpoint.paginationType
+            if feedSourceState.paginationType = PaginationType.Pages
+                if not IsInt(feedSourceState.page)
+                    feedSourceState.page = 0
+                end if
+                feedSourceState.page += 1
+                feedSourceState.queryParams.page = feedSourceState.page
+            else if feedSourceState.paginationType = PaginationType.Continuation
+                continuation = feedSourceState.continuation
                 if not StringUtils.IsNullOrEmpty(continuation)
-                    requestData.queryParams.continuation = continuation
+                    feedSourceState.queryParams.continuation = continuation
+                else
+                    feedSourceState.queryParams.Delete("continuation")
                 end if
             end if
 
-            contentNode.feed = requestData
+            feedSource.state = feedSourceState
+            feedSources[feedSourcesIndex] = feedSource
+            feedContentNode.feedSources = feedSources
+            return feedSource
         end function
 
-        function MakeRequest(requestData as object, cancellation = invalid as object) as object
-            endpoint = m.endpoints[requestData.endpoint]
+        function MakeRequest(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
+            endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid
                 return {
                     success: false,
-                    error: `Endpoint ${requestData.endpoint} not found`
+                    error: `Endpoint ${feedSource.endpoint} not found`
                 }
             end if
 
@@ -233,18 +242,22 @@ namespace Invidious
                 end for
             end if
 
-            if requestData.cacheSeconds <> invalid
-                request.CacheSeconds(requestData.cacheSeconds)
+            if feedSource.cacheSeconds <> invalid
+                request.CacheSeconds(feedSource.cacheSeconds)
             else if endpoint.cacheSeconds <> invalid
                 request.CacheSeconds(endpoint.cacheSeconds)
             end if
 
-            if requestData.queryParams <> invalid
-                request.QueryParams(requestData.queryParams)
+            if feedSource.queryParams <> invalid
+                request.QueryParams(feedSource.queryParams)
             end if
 
-            if requestData.pathParams <> invalid
-                request.PathParams(requestData.pathParams)
+            if additionalQueryParams <> invalid
+                request.QueryParams(additionalQueryParams)
+            end if
+
+            if feedSource.pathParams <> invalid
+                request.PathParams(feedSource.pathParams)
             end if
 
             request.Cancellation(cancellation)
@@ -253,7 +266,7 @@ namespace Invidious
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
 
-            result = responseHandler(m, requestData, response)
+            result = responseHandler(m, feedSource, response)
 
             if response.IsSuccess() and result <> invalid
                 return {
@@ -268,7 +281,7 @@ namespace Invidious
             end if
         end function
 
-        function DefaultHandler(m as object, requestData as object, response as object) as object
+        function DefaultHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -278,7 +291,7 @@ namespace Invidious
             return invalid
         end function
 
-        function PlaylistHandler(m as object, requestData as object, response as object) as object
+        function PlaylistHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -288,7 +301,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelVideosHandler(m as object, requestData as object, response as object) as object
+        function ChannelVideosHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -299,7 +312,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelPlaylistsHandler(m as object, requestData as object, response as object) as object
+        function ChannelPlaylistsHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -310,7 +323,7 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelRelatedChannelsHandler(m as object, requestData as object, response as object) as object
+        function ChannelRelatedChannelsHandler(m as object, feedSource as object, response as object) as object
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -321,7 +334,40 @@ namespace Invidious
             return invalid
         end function
 
-        function AuthFeedHandler(m as object, requestData as object, response as object) as object
+        function VideoInfoHandler(m as object, feedSource as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "video"
+                return {
+                    items: [json]
+                }
+            end if
+            return invalid
+        end function
+
+        function PlaylistInfoHandler(m as object, feedSource as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "playlist"
+                return {
+                    items: [json]
+                }
+            end if
+            return invalid
+        end function
+
+        function ChannelInfoHandler(m as object, feedSource as object, response as object) as object
+            if response.StatusCode() = 200
+                json = response.Json()
+                json.type = "channel"
+                return {
+                    items: [json]
+                }
+            end if
+            return invalid
+        end function
+
+        function AuthFeedHandler(m as object, feedSource as object, response as object) as object
             m.DeleteExpiredToken(response)
 
             if response.StatusCode() = 200

@@ -8,6 +8,7 @@ import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/Logging.bs"
 
 function Init()
+    m.top.focusable = true
     m.container = m.top.FindNode("container")
     m.keyboard = m.top.FindNode("keyboard")
     m.rowList = m.top.FindNode("rowList")
@@ -15,6 +16,8 @@ function Init()
     m.scrollAnimationInterpolator = m.top.FindNode("scrollAnimationInterpolator")
     m.suggestions = m.top.FindNode("suggestions")
     m.filtersButton = m.top.FindNode("filtersButton")
+
+    m.rowList.screen = m.top
 
     textEditBox = m.keyboard.textEditBox
     textEditBox.voiceEntryType = "generic"
@@ -200,7 +203,8 @@ function Search(text as string)
     m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
     ShowLoadingScreen()
 
-    requestData = {
+    feedSource = {
+        id: `inv_search_${CryptoUtils.GetMd5(text)}`,
         title: `Search - ${text}`,
         apiType: "Invidious",
         endpoint: "search",
@@ -213,18 +217,21 @@ function Search(text as string)
     for each filter in filters
         value = filters[filter]
         if IsString(value) and value.len() > 0
-            requestData.queryParams[filter] = value
+            feedSource.queryParams[filter] = value
         else if IsArray(value) and value.Count() > 0
             ' TODO:P1 this is http client implementation details leaking
             ' We need a declarative way to set array types
-            requestData.queryParams[filter] = {
+            feedSource.queryParams[filter] = {
                 value: value,
                 __arrayType: HttpClient.QueryParamArrayType.CommaSeparated
             }
         end if
     end for
 
-    m.rowList.contentData = [requestData]
+    m.rowList.feeds = [{
+        title: `Search - ${text}`,
+        feedSources: [feedSource]
+    }]
 end function
 
 function OnSearchContentReady() as void
@@ -243,7 +250,7 @@ function OnSearchContentReady() as void
 end function
 
 function OnSearchError()
-    m.rowlist.contentData = invalid
+    m.rowlist.feeds = invalid
     m.rowlist.focusable = false
     HideLoadingScreen()
 end function
@@ -258,7 +265,7 @@ end function
 
 function ClearSearch()
     m.keyboard.text = ""
-    m.rowlist.contentData = invalid
+    m.rowlist.feeds = invalid
     m.rowlist.focusable = false
     ScrollUp()
 end function

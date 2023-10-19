@@ -1,0 +1,76 @@
+import "pkg:/source/utils/Logging.bs"
+
+namespace ContextMenuUtils
+    function Open(providers as object, appController as object, item as object) as object
+        if item = invalid
+            return invalid
+        end if
+
+        options = GetOptions(item, providers)
+        if options.Count() = 0
+            LogWarn("No context menu options available for item")
+            return invalid
+        end if
+
+        contextMenu = CreateObject("roSGNode", "ContextMenu")
+        contextMenu.appController = appController
+        appController@.PushScreen(contextMenu)
+
+        ContextMenuUtils.SetItem(contextMenu, item)
+        contextMenu.options = options
+
+        contextMenu@.Show(invalid)
+        return contextMenu
+    end function
+
+    function SetItem(contextMenu as object, item as object)
+        title = ""
+        subtitle = ""
+        thumbnail = ""
+
+        if item.type = "video"
+            LogInfo("Opening context menu for video:", item.videoId)
+            title = item.title
+            subtitle = item.author
+            thumbnail = item.thumbnail
+        else if item.type = "playlist"
+            LogInfo("Opening context menu for playlist:", item.playlistId)
+            title = item.title
+            subtitle = item._author
+            thumbnail = item.thumbnail
+        else if item.type = "channel"
+            LogInfo("Opening context menu for channel:", item.authorId)
+            title = item._author
+            thumbnail = item.thumbnail
+        end if
+
+        contextMenu.title = title
+        contextMenu.subtitle = subtitle
+        contextMenu.thumbnail = thumbnail
+    end function
+
+    function GetOptions(item as object, providers as object) as object
+        allOptions = []
+
+        for each provider in providers
+            if provider <> invalid and provider.hasField("supportsContextMenu") and provider.supportsContextMenu = true
+                options = provider@.GetContextMenuOptionsForItem(item)
+                if options <> invalid
+                    allOptions.append(options)
+                end if
+            end if
+
+        end for
+
+        return allOptions
+    end function
+
+    function CreateOption(title as string, node as object, func as string, args as object) as object
+        option = CreateObject("roSGNode", "ContextMenuItemContentNode")
+        option.title = title
+        option.node = node
+        option.func = func
+        option.args = args
+        return option
+    end function
+end namespace

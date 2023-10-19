@@ -1,4 +1,7 @@
+import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
@@ -21,7 +24,7 @@ end function
 
 function OnNodeReady()
     m.list.ObserveField("itemFocused", FuncName(OnItemFocused))
-    m.list.observeField("itemSelected", FuncName(OnItemSelected))
+    InitializeLongPressTimer()
 end function
 
 function OnFocusChange() as void
@@ -58,6 +61,20 @@ function OnContentSet() as void
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
+    if LongPressHandler(key, press)
+        return true
+    end if
+
+    if key = LONG_PRESS_KEY and press
+        OnItemLongPressed(m.list.itemFocused)
+        return true
+    end if
+
+    if key = "OK" and not press
+        OnItemSelected(m.list.itemFocused)
+        return true
+    end if
+
     if press = false
         return false
     end if
@@ -81,18 +98,94 @@ function OnItemFocused()
     LoadPlaylistIfNeeded()
 end function
 
-function OnItemSelected(event as object)
-    index = event.getData()
+function OnItemSelected(index as integer) as void
     playlist = m.list.content
+    if playlist = invalid
+        return
+    end if
+
+    if index < 0 or index >= playlist.getChildCount()
+        return
+    end if
+
     playlistId = playlist.playlistId
     video = playlist.getChild(index)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
-        LogInfo("Play playlist: " + playlistId + " video: " + videoId)
+        LogInfo("Play playlist:", playlistId, "video:", videoId)
         m.playQueue@.Play(playlist, index)
     end if
 end function
 
+function OnItemLongPressed(index as integer) as void
+    playlist = m.list.content
+    if playlist = invalid
+        return
+    end if
+
+    if index < 0 or index >= playlist.getChildCount()
+        return
+    end if
+
+    playlistId = playlist.playlistId
+    video = playlist.getChild(index)
+    videoId = video.videoId
+    if StringUtils.IsNullOrEmpty(videoId)
+        LogWarn("Long press video with no id in playlist/ playlist:", playlistId, "video:", videoId)
+        return
+    end if
+
+    LogInfo("Long press: playlist:", playlistId, "video:", videoId)
+
+    contextMenuProviders = [m.top]
+    ContextMenuUtils.Open(contextMenuProviders, m.appController, video)
+end function
+
+function GetContextMenuOptionsForItem(video as object) as object
+    playlist = m.list.content
+    if playlist = invalid
+        return []
+    end if
+
+    index = m.list.itemFocused
+    if index < 0 or index >= playlist.getChildCount()
+        return []
+    end if
+
+    selectedVideo = playlist.getChild(m.list.itemFocused)
+    if selectedVideo = invalid or not selectedVideo.isSameNode(video)
+        return []
+    end if
+
+    options = [
+        ContextMenuUtils.CreateOption("Play", m.playQueue, "Play", [playlist, index]),
+        ContextMenuUtils.CreateOption("Queue", m.playQueue, "AddToQueue", [playlist])
+        ContextMenuUtils.CreateOption("Play video", m.playQueue, "Play", [video, -1]),
+        ContextMenuUtils.CreateOption("Queue video", m.playQueue, "AddToQueue", [video]),
+    ]
+
+    if not StringUtils.IsNullOrEmpty(playlist.authorId)
+        options.push(ContextMenuUtils.CreateOption("Open channel", m.top, "OpenPlaylistChannel", [playlist]))
+    end if
+
+    options.append(m.bookmarks@.GetMenuForPlaylist(playlist))
+    options.append(m.bookmarks@.GetMenuForVideo(video))
+
+    return options
+end function
+
+function OpenPlaylistChannel(playlist as object) as void
+    authorId = playlist.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    ChannelUtils.Open(channel)
+end function
+
+'TODO:P1 a playlist could have been opened from the bookmarks, which can be as old as 3 days
+' We should make a request in this case, and let the cache handle freshness.
 function LoadPlaylistIfNeeded() as void
     content = m.top.content
     if content = invalid

@@ -12,8 +12,10 @@ function Init()
     m.thumbnail = m.top.findNode("thumbnail")
     m.authorLabel = m.top.findNode("authorLabel")
     m.rowList = m.top.FindNode("rowList")
+    m.rowList.screen = m.top
 
     m.banner.ObserveField("loadStatus", FuncName(OnBannerLoadStatus))
+    m.author = ""
     m.authorId = ""
 
     InitializeTabs()
@@ -39,7 +41,6 @@ function OnContentSet() as void
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     m.authorLabel.text = content._author
-    ' TODO:P1 handle case where there's no banner - a big portion of the screen is blank
     m.banner.uri = content.banner
     if StringUtils.IsNullOrEmpty(content.thumbnail)
         m.thumbnail.uri = ""
@@ -53,13 +54,15 @@ function OnContentSet() as void
     content@.LoadChannel(m.invidious)
 
     authorId = ValidString(content.authorId)
-    if authorId <> m.authorId and IsArray(content.tabs)
+    author = ValidString(content._author)
+    if (authorId <> m.authorId or author <> m.author) and IsArray(content.tabs)
         m.authorId = authorId
-        m.rowList.contentData = CreateChannelFeeds(m.authorId, content.tabs)
+        m.author = author
+        m.rowList.feeds = CreateChannelFeeds(m.authorId, author, content.tabs)
     end if
 end function
 
-function CreateChannelFeeds(authorId as string, tabs as object) as object
+function CreateChannelFeeds(authorId as string, author as string, tabs as object) as object
     if authorId = ""
         return invalid
     end if
@@ -68,7 +71,7 @@ function CreateChannelFeeds(authorId as string, tabs as object) as object
     for i = 0 to tabs.count() - 1
         tabName = tabs[i]
         if m.tabs.DoesExist(tabName)
-            feeds.Push(m.tabs[tabName](authorId))
+            feeds.Push(m.tabs[tabName](authorId, author))
         end if
     end for
     return feeds
@@ -119,34 +122,47 @@ end function
 
 function InitializeTabs()
     m.tabs = {
-        videos: function(authorId as string) as object
-            return CreateChannelFeed("Latest videos", "channel_videos", authorId)
+        videos: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Latest videos", "channel_videos", authorId, author)
         end function,
-        shorts: function(authorId as string) as object
-            return CreateChannelFeed("Shorts", "channel_shorts", authorId)
+        shorts: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Shorts", "channel_shorts", authorId, author)
         end function,
-        streams: function(authorId as string) as object
-            return CreateChannelFeed("Live", "channel_streams", authorId)
+        streams: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Live", "channel_streams", authorId, author)
         end function,
-        podcasts: function(authorId as string) as object
-            return CreateChannelFeed("Podcasts", "channel_podcasts", authorId)
+        podcasts: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Podcasts", "channel_podcasts", authorId, author)
         end function,
-        playlists: function(authorId as string) as object
-            return CreateChannelFeed("Playlists", "channel_playlists", authorId)
+        playlists: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Playlists", "channel_playlists", authorId, author)
         end function,
-        channels: function(authorId as string) as object
-            return CreateChannelFeed("Channels", "channel_channels", authorId)
+        channels: function(authorId as string, author as string) as object
+            return CreateChannelFeed("Channels", "channel_channels", authorId, author)
         end function
     }
 end function
 
-function CreateChannelFeed(title as string, endpoint as string, ucid as string) as object
+function CreateChannelFeed(title as string, endpoint as string, ucid as string, author as string) as object
     return {
         title: title,
-        apiType: "Invidious",
-        endpoint: endpoint,
-        pathParams: {
-            ucid: ucid
-        }
+        feedSources: [{
+            id: `inv_${endpoint}_${ucid}`,
+            title: `${author} - ${title}`,
+            apiType: "Invidious",
+            endpoint: endpoint,
+            pathParams: {
+                ucid: ucid
+            }
+        }]
     }
+end function
+
+function GetContextMenuOptionsForItem(video as object) as object
+    content = m.top.content
+    if content = invalid or StringUtils.IsNullOrEmpty(content.authorId)
+        return []
+    end if
+
+    return m.bookmarks@.GetMenuForChannel(content)
 end function

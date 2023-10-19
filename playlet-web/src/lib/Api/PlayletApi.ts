@@ -14,12 +14,12 @@ export class PlayletApi {
     }
 
     static async getHomeLayoutFile() {
-        const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.json5`);
+        const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.yaml`);
         return await response.json();
     }
 
     static async getInvidiousVideoApiFile() {
-        const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.json5`);
+        const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.yaml`);
         return await response.json();
     }
 
