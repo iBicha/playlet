@@ -1,6 +1,4 @@
-# Playlet
-
-<!-- markdownlint-disable MD033 -->
+<!-- markdownlint-disable MD033 MD041 -->
 <p align="center">
   <img src="docs/banner.png" style="display:block;text-align:center" alt="Playlet Logo" width="800"/>
   <br/><br/>
@@ -18,6 +16,8 @@
     <img alt="Roku Channel Store" src="https://img.shields.io/badge/Roku%20Store-Install-blueviolet?logo=roku&logoColor=blueviolet&labelColor=white"/>
   </a>
 </p>
+
+# Playlet
 
 Playlet is an unofficial Youtube client for Roku 📺
 
