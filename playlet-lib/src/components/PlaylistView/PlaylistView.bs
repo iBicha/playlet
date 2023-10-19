@@ -1,3 +1,5 @@
+import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
@@ -110,7 +112,7 @@ function OnItemSelected(index as integer) as void
     video = playlist.getChild(index)
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
-        LogInfo("Play playlist: " + playlistId + " video: " + videoId)
+        LogInfo("Play playlist:", playlistId, "video:", videoId)
         m.playQueue@.Play(playlist, index)
     end if
 end function
@@ -128,9 +130,58 @@ function OnItemLongPressed(index as integer) as void
     playlistId = playlist.playlistId
     video = playlist.getChild(index)
     videoId = video.videoId
-    if not StringUtils.IsNullOrEmpty(videoId)
-        LogInfo("Long press: playlist:", playlistId, "video:" + videoId)
+    if StringUtils.IsNullOrEmpty(videoId)
+        LogWarn("Long press video with no id in playlist/ playlist:", playlistId, "video:", videoId)
+        return
     end if
+
+    LogInfo("Long press: playlist:", playlistId, "video:", videoId)
+
+    contextMenuProviders = [m.top]
+    ContextMenuUtils.Open(contextMenuProviders, m.appController, video)
+end function
+
+function GetContextMenuOptionsForItem(video as object) as object
+    playlist = m.list.content
+    if playlist = invalid
+        return []
+    end if
+
+    index = m.list.itemFocused
+    if index < 0 or index >= playlist.getChildCount()
+        return []
+    end if
+
+    selectedVideo = playlist.getChild(m.list.itemFocused)
+    if selectedVideo = invalid or not selectedVideo.isSameNode(video)
+        return []
+    end if
+
+    options = [
+        ContextMenuUtils.CreateOption("Play", m.playQueue, "Play", [playlist, index]),
+        ContextMenuUtils.CreateOption("Queue", m.playQueue, "AddToQueue", [playlist])
+        ContextMenuUtils.CreateOption("Play video", m.playQueue, "Play", [video, -1]),
+        ContextMenuUtils.CreateOption("Queue video", m.playQueue, "AddToQueue", [video]),
+    ]
+
+    if not StringUtils.IsNullOrEmpty(playlist.authorId)
+        options.push(ContextMenuUtils.CreateOption("Open channel", m.top, "OpenPlaylistChannel", [playlist]))
+    end if
+
+    options.append(m.bookmarks@.GetMenuForPlaylist(playlist))
+    options.append(m.bookmarks@.GetMenuForVideo(video))
+
+    return options
+end function
+
+function OpenPlaylistChannel(playlist as object) as void
+    authorId = playlist.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    ChannelUtils.Open(channel)
 end function
 
 function LoadPlaylistIfNeeded() as void
