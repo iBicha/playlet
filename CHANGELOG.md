@@ -33,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Layout in channel view so that the upload time and view count of videos is visible
 - A few things in the logger
+- A bug where channels show "0 videos". Channel handle is shown instead.
 
 ### Changed
 
