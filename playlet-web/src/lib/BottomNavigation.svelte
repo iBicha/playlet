@@ -8,6 +8,12 @@
 
   function setScreen(screen: AppState["screen"]) {
     appStateStore.update((state) => {
+      if (state.screen === screen) {
+        window.scrollTo({
+          top: 0,
+          behavior: "smooth",
+        });
+      }
       state.screen = screen;
       return state;
     });
