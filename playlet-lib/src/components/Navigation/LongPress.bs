@@ -7,8 +7,6 @@ function InitializeLongPressTimer(duration = 1.0 as float)
     m._longPressTimer.ObserveField("fire", FuncName(LongPressTimerFired))
 end function
 
-' TODO:P0 When a dialog is shown, OK press down dismisses it, and the OK press up would play the video
-' This should not happen, and only a complete OK press should trigger the video
 function LongPressHandler(key as string, press as boolean) as boolean
     #if DEBUG
         if key = "Lit_l"
@@ -21,6 +19,7 @@ function LongPressHandler(key as string, press as boolean) as boolean
         m._longPressTimer.control = "stop"
         m._longPressTimer.control = "start"
         m._longPressFired = false
+        m._okPressed = true
         return true
     end if
 
@@ -28,6 +27,15 @@ function LongPressHandler(key as string, press as boolean) as boolean
         m._longPressTimer.control = "stop"
         if m._longPressFired = true
             m._longPressFired = false
+            m._okPressed = false
+            return true
+        end if
+        ' This case is for handling a dialog: The dialog will be dismissed with the OK down event,
+        ' and we would trigger the action with the OK up event. The action should only happen if
+        ' we detected both down and up events.
+        wasOkPressed = m._okPressed
+        m._okPressed = false
+        if wasOkPressed <> true
             return true
         end if
     end if
