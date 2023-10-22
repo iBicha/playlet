@@ -20,8 +20,22 @@ export class InvidiousApi {
         return await response.json();
     }
 
-    public async search(query: string) {
-        const response = await fetch(`${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`);
+    public async search(query: string, filters: any) {
+        let url = `${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
+        for (let filter in filters) {
+            if (typeof filters[filter] === 'string') {
+                if (filters[filter] === '') {
+                    continue;
+                }
+                url += `&${filter}=${filters[filter]}`;
+            } else {
+                if (filters[filter].length === 0) {
+                    continue;
+                }
+                url += `&${filter}=${filters[filter].join(',')}`;
+            }
+        }
+        const response = await fetch(url);
         return await response.json();
     }
 

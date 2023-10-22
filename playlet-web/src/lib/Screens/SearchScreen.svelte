@@ -5,7 +5,9 @@
   import VideoCell from "lib/Screens/Home/VideoCell.svelte";
   import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
   import SearchThinIcon from "assets/search-thin-icon.svg.svelte";
+  import FiltersIcon from "assets/filters.svg.svelte";
   import ChannelCell from "./Home/ChannelCell.svelte";
+  import SearchFilters from "./Search/SearchFilters.svelte";
 
   export let visibility: boolean;
 
@@ -17,6 +19,10 @@
   let videos = [];
   let searchHistory = [];
   let isLoading = false;
+
+  let searchFiltersComponent;
+  let searchFilters;
+  let searchFiltersLabel;
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
@@ -81,7 +87,7 @@
 
     try {
       isLoading = true;
-      videos = await invidiousApi.search(searchBoxText);
+      videos = await invidiousApi.search(searchBoxText, searchFilters);
     } finally {
       isLoading = false;
     }
@@ -123,6 +129,16 @@
           </div>
         </button>
       </div>
+      <button
+        class="btn border border-neutral rounded-full mt-1"
+        on:click={searchFiltersComponent.open()}
+      >
+        <div class="h-6">
+          <FiltersIcon />
+        </div>
+        {searchFiltersLabel}
+      </button>
+
       {#if suggestions.suggestions.length > 0}
         <ul
           class="dropdown-content menu z-10 p-2 shadow-xl bg-base-200 rounded-box"
@@ -163,4 +179,10 @@
       {/each}
     </div>
   </div>
+
+  <SearchFilters
+    bind:this={searchFiltersComponent}
+    bind:label={searchFiltersLabel}
+    bind:filters={searchFilters}
+  />
 </div>
