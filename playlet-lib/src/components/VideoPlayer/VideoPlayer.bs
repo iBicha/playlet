@@ -141,37 +141,37 @@ end function
 
 function OnVideoPlayerStateChange() as void
     state = m.top.state
-
+    content = m.top.content
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
     ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
     if state = "playing" and not m.videoPlayingSuccess
-        LogInfo(`Now playing video ${m.top.content.url}`)
+        LogInfo(`Now playing video ${content.url}`)
         m.videoPlayingSuccess = true
     end if
 
     if state = "error"
         errorInfo = m.top.errorInfo
-        LogError(`Error playing video ${m.top.content.videoId}`, errorInfo)
+        LogError(`Error playing video ${content.videoId}`, errorInfo)
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
-                currentUrl = m.top.content.url
-                playletStreamUrls = m.top.content.playletStreamUrls
-                playletStreamUrlIndex = m.top.content.playletStreamUrlIndex
+                currentUrl = content.url
+                playletStreamUrls = content.playletStreamUrls
+                playletStreamUrlIndex = content.playletStreamUrlIndex
                 playletStreamUrlIndex++
-                m.top.content.playletStreamUrlIndex = playletStreamUrlIndex
+                content.playletStreamUrlIndex = playletStreamUrlIndex
                 if playletStreamUrlIndex < playletStreamUrls.Count()
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
                     LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
-                    m.top.content.url = nextUrl
+                    content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
-                    if ValidInt(m.top.content.timestamp) > 0
-                        m.top.seek = m.top.content.timestamp
+                    if ValidInt(content.timestamp) > 0
+                        m.top.seek = content.timestamp
                     end if
                     return
                 end if
@@ -185,7 +185,7 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "finished"
-        metadata = m.top.content?.metadata
+        metadata = content?.metadata
         if not PlayNext(metadata?.recommendedVideos)
             m.container@.watchedVideosClear(invalid)
             VideoUtils.CloseVideo()
@@ -205,7 +205,7 @@ function OnVideoPlayerStateChange() as void
             end for
         end if
 
-        title = `Error playing video ${m.top.content.videoId}`
+        title = `Error playing video ${content.videoId}`
         LogError(title, messageLines)
         DialogUtils.ShowDialog(messageLines, title, true)
         ' TODO:P1 play next video in the queue after showing the error dialog
