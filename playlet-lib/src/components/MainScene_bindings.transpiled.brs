@@ -24,7 +24,8 @@ function InitializeBindings()
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 
-                "playQueue": "../PlayQueue"
+                "playQueue": "../PlayQueue", 
+                "bookmarks": "../Bookmarks"
             }
         }
     }
