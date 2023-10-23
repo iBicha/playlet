@@ -5,6 +5,7 @@
   export let author: string | undefined = undefined;
   export let authorId: string | undefined = undefined;
   export let authorThumbnails: any[] | undefined = undefined;
+  // TODO:P0 channelHandle instead of videoCount
   export let videoCount: number | undefined = undefined;
   export let subCount: number | undefined = undefined;
 

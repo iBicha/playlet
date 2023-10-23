@@ -128,6 +128,11 @@ export class PlayletApi {
         return await fetch(`${PlayletApi.host()}/api/search-history`, { method: "DELETE" });
     }
 
+    static async getBookmarkFeeds() {
+        const response = await fetch(`${PlayletApi.host()}/api/bookmarks/feeds`);
+        return await response.json();
+    }
+
     static async updateInstance(instance) {
         return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, { "invidious.instance": instance });
     }

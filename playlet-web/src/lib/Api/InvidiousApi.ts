@@ -12,6 +12,10 @@ export class InvidiousApi {
         // Note: handlers for authenticated requests are not needed, since they are handled server side
         this.responseHandlers = {
             "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
+            "VideoInfoHandler": (requestData, response) => this.VideoInfoHandler(requestData, response),
+            "ChannelInfoHandler": (requestData, response) => this.ChannelInfoHandler(requestData, response),
+            "PlaylistInfoHandler": (requestData, response) => this.PlaylistInfoHandler(requestData, response),
+            "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response)
         }
     }
 
@@ -109,6 +113,32 @@ export class InvidiousApi {
     private async DefaultHandler(feedSource, response) {
         const items = await response.json();
         return { items };
+    }
+
+    private async VideoInfoHandler(feedSource, response) {
+        const info = await response.json();
+        info.type = "video";
+        return { items: [info] };
+    }
+
+    private async ChannelInfoHandler(feedSource, response) {
+        const info = await response.json();
+        info.type = "channel";
+        return { items: [info] };
+    }
+
+    private async PlaylistInfoHandler(feedSource, response) {
+        const info = await response.json();
+        info.type = "playlist";
+        return { items: [info] };
+    }
+
+    private async ChannelVideosHandler(feedSource, response) {
+        const json = await response.json();
+        return {
+            items: json.videos,
+            continuation: json.continuation
+        };
     }
 
     private makeUrl(url: string, params: any) {
