@@ -50,6 +50,7 @@ export class InvidiousApi {
 
     public async makeRequest(feed: any) {
         // TODO:P0 handle multiple feed sources
+        // TODO:P0 implement localStorage caching
         const feedSource = feed.feedSources[0]
 
         if (!feedSource || !this.instance || !this.endpoints) {
