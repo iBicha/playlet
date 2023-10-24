@@ -249,6 +249,7 @@ export class InvidiousApi {
 
     private setCache(url: string, data: any) {
         const cacheData = {
+            __version: 1,
             timestamp: Date.now(),
             data
         };
