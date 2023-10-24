@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
 
   export let author: string | undefined = undefined;
@@ -32,7 +33,7 @@
   }
 
   async function openChannelOnTv() {
-    // TODO:P1 open channel on TV
+    await PlayletApi.openChannel(authorId);
   }
 
   function openInvidiousInNewTab() {
@@ -65,12 +66,12 @@
   <form method="dialog" class="modal-box bg-base-100">
     <h3 class="text-lg m-5">{author}</h3>
     <div class="flex flex-col">
-      <!-- <button class="btn m-2" on:click={openChannelOnTv}
-        >Open on {tvName}</button
-      > -->
-      <button class="btn m-2" on:click={openInvidiousInNewTab}
-        >Open in Invidious</button
-      >
+      <button class="btn m-2" on:click={openChannelOnTv}>
+        Open on {tvName}
+      </button>
+      <button class="btn m-2" on:click={openInvidiousInNewTab}>
+        Open in Invidious
+      </button>
       <button class="btn m-2">Cancel</button>
     </div>
   </form>
