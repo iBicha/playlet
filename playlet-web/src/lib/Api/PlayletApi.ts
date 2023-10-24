@@ -114,6 +114,20 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async openPlaylist(playlistId) {
+        if (!playlistId) {
+            return;
+        }
+        await fetch(`${PlayletApi.host()}/api/view/open?playlistId=${playlistId}`);
+    }
+
+    static async openChannel(authorId) {
+        if (!authorId) {
+            return;
+        }
+        await fetch(`${PlayletApi.host()}/api/view/open?authorId=${authorId}`);
+    }
+
     static async getSearchHistory() {
         const response = await fetch(`${PlayletApi.host()}/api/search-history`);
         return await response.json();

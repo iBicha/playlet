@@ -1,0 +1,44 @@
+import "pkg:/components/ChannelView/ChannelUtils.bs"
+import "pkg:/components/PlaylistView/PlaylistUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+
+namespace Http
+
+    class ViewRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/api/view/open", function(context as object) as boolean
+                request = context.request
+                response = context.response
+                appController = context.server.task.appController
+
+                playlistId = request.query.playlistId
+                authorId = request.query.authorId
+
+                if not StringUtils.IsNullOrEmpty(playlistId)
+                    contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid)
+                    PlaylistUtils.Open(contentNode, appController)
+                    if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
+                        VideoUtils.ToggleVideoPictureInPicture()
+                    end if
+                    response.Default(204, "OK")
+                else if not StringUtils.IsNullOrEmpty(authorId)
+                    contentNode = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+                    ChannelUtils.Open(contentNode, appController)
+                    if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
+                        VideoUtils.ToggleVideoPictureInPicture()
+                    end if
+                    response.Default(204, "OK")
+                else
+                    response.Default(400, "Invalid request")
+                end if
+
+                return true
+            end function)
+        end function
+
+    end class
+
+end namespace

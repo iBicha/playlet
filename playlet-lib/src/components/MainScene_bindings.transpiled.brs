@@ -21,6 +21,7 @@ function InitializeBindings()
                 "preferences": "../Preferences"
             }, 
             "WebServer": {
+                "appController": "/AppController", 
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 

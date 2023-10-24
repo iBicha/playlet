@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Also adds thumbnails/preview in trick play mode
     - Known issue: thumbnails might appear cropped/misaligned at the end of videos. This will be addressed in a later release.
 - Search filters in web app
+- Channels and Playlists can be opened on TV from web app
 
 ### Fixed
 

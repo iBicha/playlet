@@ -55,6 +55,10 @@
     await PlayletApi.queuePlaylist(playlistId, title, videoCount);
   }
 
+  async function openPlaylistOnTv() {
+    await PlayletApi.openPlaylist(playlistId);
+  }
+
   function openInvidiousInNewTab() {
     let url = `${invidiousInstance}/playlist?list=${playlistId}`;
     window.open(url);
@@ -89,15 +93,18 @@
   <form method="dialog" class="modal-box bg-base-100">
     <h3 class="text-lg m-5">{title}</h3>
     <div class="flex flex-col">
-      <button class="btn m-2" on:click={playPlaylistOnTv}
-        >Play on {tvName}</button
-      >
-      <button class="btn m-2" on:click={queuePlaylistOnTv}
-        >Queue on {tvName}
+      <button class="btn m-2" on:click={playPlaylistOnTv}>
+        Play on {tvName}
       </button>
-      <button class="btn m-2" on:click={openInvidiousInNewTab}
-        >Open in Invidious</button
-      >
+      <button class="btn m-2" on:click={queuePlaylistOnTv}>
+        Queue on {tvName}
+      </button>
+      <button class="btn m-2" on:click={openPlaylistOnTv}>
+        Open on {tvName}
+      </button>
+      <button class="btn m-2" on:click={openInvidiousInNewTab}>
+        Open in Invidious
+      </button>
       <button class="btn m-2">Cancel</button>
     </div>
   </form>
