@@ -83,7 +83,6 @@ export class InvidiousApi {
     }
 
     public async makeRequest(feedSource: any) {
-        // TODO:P0 implement localStorage caching
         if (!feedSource || !this.instance || !this.endpoints) {
             return null;
         }
@@ -95,7 +94,6 @@ export class InvidiousApi {
 
         let url = this.instance + endpoint.url
         let queryParams = {}
-        let headers = {}
 
         if (endpoint.authenticated) {
             // Authenticated requests on the web app would be blocked by CORS, so we use the Playlet API as a proxy
@@ -137,66 +135,66 @@ export class InvidiousApi {
         }
 
         url = this.makeUrl(url, queryParams);
-        const response = await fetch(url, { headers: headers });
+
+        let cacheSeconds = undefined
+        if (feedSource.cacheSeconds !== undefined) {
+            cacheSeconds = feedSource.cacheSeconds
+        } else if (endpoint.cacheSeconds !== undefined) {
+            cacheSeconds = endpoint.cacheSeconds
+        }
+
+        const responseJson = await this.cachedFetch(url, cacheSeconds);
 
         let responseHandler = endpoint.responseHandler !== undefined ? this.responseHandlers[endpoint.responseHandler] : this.responseHandlers["DefaultHandler"];
         if (!responseHandler) {
             return null;
         }
-        return await responseHandler(feedSource, response);
+        return await responseHandler(feedSource, responseJson);
     }
 
-    private async DefaultHandler(feedSource, response) {
-        const items = await response.json();
-        return { items };
+    private async DefaultHandler(feedSource, responseJson) {
+        return { items: responseJson };
     }
 
-    private async PlaylistHandler(feedSource, response) {
-        const json = await response.json();
+    private async PlaylistHandler(feedSource, responseJson) {
         return {
-            items: json.videos,
+            items: responseJson.videos,
         };
     }
 
-    private async VideoInfoHandler(feedSource, response) {
-        const info = await response.json();
-        info.type = "video";
-        return { items: [info] };
+    private async VideoInfoHandler(feedSource, responseJson) {
+        responseJson.type = "video";
+        return { items: [responseJson] };
     }
 
-    private async ChannelInfoHandler(feedSource, response) {
-        const info = await response.json();
-        info.type = "channel";
-        return { items: [info] };
+    private async ChannelInfoHandler(feedSource, responseJson) {
+        responseJson.type = "channel";
+        return { items: [responseJson] };
     }
 
-    private async PlaylistInfoHandler(feedSource, response) {
-        const info = await response.json();
-        info.type = "playlist";
-        return { items: [info] };
+    private async PlaylistInfoHandler(feedSource, responseJson) {
+        responseJson.type = "playlist";
+        return { items: [responseJson] };
     }
 
-    private async ChannelVideosHandler(feedSource, response) {
-        const json = await response.json();
+    private async ChannelVideosHandler(feedSource, responseJson) {
         return {
-            items: json.videos,
-            continuation: json.continuation
+            items: responseJson.videos,
+            continuation: responseJson.continuation
         };
     }
 
-    private async ChannelPlaylistsHandler(feedSource, response) {
-        const json = await response.json();
+    private async ChannelPlaylistsHandler(feedSource, responseJson) {
         return {
-            items: json.playlists,
-            continuation: json.continuation
+            items: responseJson.playlists,
+            continuation: responseJson.continuation
         };
     }
 
-    private async ChannelRelatedChannelsHandler(feedSource, response) {
-        const json = await response.json();
+    private async ChannelRelatedChannelsHandler(feedSource, responseJson) {
         return {
-            items: json.relatedChannels,
-            continuation: json.continuation
+            items: responseJson.relatedChannels,
+            continuation: responseJson.continuation
         };
     }
 
@@ -211,5 +209,50 @@ export class InvidiousApi {
 
         encodedUrl.search = mergedParams.toString();
         return encodedUrl.toString();
+    }
+
+    private async cachedFetch(url: string, cacheSeconds?: number) {
+        if (!cacheSeconds) {
+            const response = await fetch(url);
+            return await response.json();
+        }
+
+        const cache = this.getCache(url, cacheSeconds);
+        if (cache) {
+            return cache;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+        this.setCache(url, data);
+        return data;
+    }
+
+    private getCache(url: string, cacheSeconds: number) {
+        const cache = localStorage.getItem(url);
+        if (!cache) {
+            return null;
+        }
+
+        try {
+            const cacheData = JSON.parse(cache);
+            if (cacheData.timestamp + cacheSeconds * 1000 < Date.now()) {
+                return null;
+            }
+            console.log(`Cache hit for ${url}`);
+            return cacheData.data;
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
+
+    private setCache(url: string, data: any) {
+        const cacheData = {
+            timestamp: Date.now(),
+            data
+        };
+
+        localStorage.setItem(url, JSON.stringify(cacheData));
     }
 }
