@@ -6,7 +6,7 @@
   import ChannelCell from "./ChannelCell.svelte";
 
   export let feed: any = undefined;
-  export let videos = undefined;
+  export let videos = [];
 
   enum FeedLoadState {
     None,
@@ -22,6 +22,7 @@
   let itemWidths = [];
 
   let carouselElement;
+  let carouselElementIntersecting = false;
 
   let scrollStart = 0;
   let scrollEnd = 0;
@@ -30,8 +31,23 @@
   const videoItemWidth = 320 + 16 * 2;
   const channelItemWidth = 240 + 16 * 2;
 
+  const intersectionObserver = new IntersectionObserver(
+    function (entries) {
+      carouselElementIntersecting = entries[0].isIntersecting;
+      if (carouselElementIntersecting) {
+        loadRow();
+      }
+    },
+    { threshold: [0] }
+  );
+
   $: {
-    if (carouselElement && itemWidths && itemWidths.length) {
+    if (
+      carouselElement &&
+      carouselElementIntersecting &&
+      itemWidths &&
+      itemWidths.length
+    ) {
       recalculateVisibileCells();
     }
   }
@@ -39,6 +55,12 @@
   $: {
     if (videos && scrollEnd >= videos.length - 1) {
       loadRow();
+    }
+  }
+
+  $: {
+    if (carouselElement) {
+      intersectionObserver.observe(carouselElement);
     }
   }
 
@@ -58,6 +80,14 @@
 
   async function loadRow() {
     if (!invidiousApi.canMakeRequest()) {
+      return;
+    }
+
+    if (!carouselElementIntersecting) {
+      return;
+    }
+
+    if (scrollEnd < videos.length - 3) {
       return;
     }
 
@@ -191,29 +221,26 @@
   }
 </script>
 
-{#if videos}
-  <div class="text-lg font-semibold m-4">
-    {feed.title}
-  </div>
-  <div
-    class="carousel carousel-center rounded-box w-full space-x-4"
-    bind:this={carouselElement}
-    on:scroll={recalculateVisibileCells}
-  >
-    {#each videos as video, i}
-      <div
-        class="carousel-item {video.type === 'channel' ? 'w-60' : 'w-80'} p-2"
-      >
-        {#if i >= scrollStart && i <= scrollEnd}
-          {#if video.type === "video"}
-            <VideoCell {...video} />
-          {:else if video.type === "playlist"}
-            <PlaylistCell {...video} />
-          {:else if video.type === "channel"}
-            <ChannelCell {...video} />
-          {/if}
+<div class="text-lg font-semibold m-4">
+  {feed.title}
+</div>
+<div
+  class="carousel carousel-center rounded-box w-full space-x-4"
+  style="min-height: 16rem;"
+  bind:this={carouselElement}
+  on:scroll={recalculateVisibileCells}
+>
+  {#each videos as video, i}
+    <div class="carousel-item {video.type === 'channel' ? 'w-60' : 'w-80'} p-2">
+      {#if i >= scrollStart && i <= scrollEnd}
+        {#if video.type === "video"}
+          <VideoCell {...video} />
+        {:else if video.type === "playlist"}
+          <PlaylistCell {...video} />
+        {:else if video.type === "channel"}
+          <ChannelCell {...video} />
         {/if}
-      </div>
-    {/each}
-  </div>
-{/if}
+      {/if}
+    </div>
+  {/each}
+</div>
