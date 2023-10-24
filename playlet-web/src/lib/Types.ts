@@ -1,5 +1,5 @@
 export type AppState = {
-    screen: "search" | "home" | "settings" | "info"
+    screen: "search" | "home" | "bookmarks" | "settings" | "info"
 }
 
 export type PlayletState = {

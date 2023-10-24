@@ -1,0 +1,65 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+
+namespace Http
+
+    class BookmarksRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Get("/api/bookmarks", function(context as object) as boolean
+                response = context.response
+
+                bookmarksString = RegistryUtils.Read(RegistryUtils.BOOKMARKS)
+                if bookmarksString = invalid
+                    response.Json({
+                        groups: []
+                    })
+                    return true
+                end if
+
+                response.SetBodyDataString(bookmarksString)
+                response.ContentType("application/json")
+                response.http_code = 200
+
+                return true
+            end function)
+
+            m.Get("/api/bookmarks/feeds", function(context as object) as boolean
+                response = context.response
+                router = context.router
+                bookmarks = context.server.task.bookmarks
+
+                feeds = router.BookmarksContentToFeeds(bookmarks.content)
+
+                response.Json(feeds)
+
+                return true
+            end function)
+        end function
+
+        ' TODO:P1 refactor to share code with Bookmarks screen
+        function BookmarksContentToFeeds(bookmarksContent as object) as object
+            bookmarkGroupNodes = bookmarksContent.getChildren(-1, 0)
+
+            feeds = []
+            for each bookmarkGroupNode in bookmarkGroupNodes
+                bookmarkNodes = bookmarkGroupNode.getChildren(-1, 0)
+
+                feedSources = []
+                for each bookmarkNode in bookmarkNodes
+                    feedSources.push(bookmarkNode.feedSource)
+                end for
+
+                feeds.push({
+                    "title": bookmarkGroupNode.title,
+                    "feedSources": feedSources
+                })
+            end for
+
+            return feeds
+        end function
+
+    end class
+
+end namespace

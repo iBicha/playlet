@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ScreenHomeRow from "lib/Screens/Home/ScreenHomeRow.svelte";
+  import VideoListRow from "lib/Screens/Home/VideoListRow.svelte";
   import { homeLayoutFileStore } from "lib/Stores";
 
   export let visibility: boolean;
@@ -7,6 +7,6 @@
 
 <div class={visibility ? "" : "hidden"}>
   {#each $homeLayoutFileStore as feed}
-    <ScreenHomeRow {feed} />
+    <VideoListRow {feed} />
   {/each}
 </div>

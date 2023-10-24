@@ -4,6 +4,7 @@
   import { PlayletApi } from "lib/Api/PlayletApi";
   import {
     appStateStore,
+    bookmarksStore,
     homeLayoutFileStore,
     invidiousVideoApiStore,
     playletStateStore,
@@ -18,6 +19,7 @@
   import SettingsScreen from "lib/Screens/SettingsScreen.svelte";
   import InfoScreen from "lib/Screens/InfoScreen.svelte";
   import LinkDragDrop from "lib/LinkDragDrop.svelte";
+  import BookmarksScreen from "lib/Screens/BookmarksScreen.svelte";
 
   onMount(async () => {
     PlayletApi.getState().then((value) => {
@@ -43,6 +45,10 @@
     PlayletApi.getSearchHistory().then((value) => {
       searchHistoryStore.set(value);
     });
+
+    PlayletApi.getBookmarkFeeds().then((value) => {
+      bookmarksStore.set(value);
+    });
   });
 
   let currentScreen: AppState["screen"];
@@ -60,6 +66,8 @@
     <SearchScreen visibility={currentScreen == "search"} />
 
     <HomeScreen visibility={currentScreen == "home"} />
+
+    <BookmarksScreen visibility={currentScreen == "bookmarks"} />
 
     <SettingsScreen visibility={currentScreen == "settings"} />
 

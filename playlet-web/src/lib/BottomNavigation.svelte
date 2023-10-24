@@ -3,6 +3,8 @@
   import InfoIcon from "../assets/info-icon.svg.svelte";
   import SearchIcon from "../assets/search-icon.svg.svelte";
   import SettingsIcon from "../assets/settings-icon.svg.svelte";
+  import BookmarksIcon from "../assets/star-icon.svg.svelte";
+
   import { appStateStore } from "lib/Stores";
   import type { AppState } from "lib/Types";
 
@@ -35,6 +37,14 @@
   >
     <div class="h-6">
       <HomeIcon />
+    </div>
+  </button>
+  <button
+    on:click={() => setScreen("bookmarks")}
+    class={$appStateStore.screen === "bookmarks" ? "active" : ""}
+  >
+    <div class="h-6">
+      <BookmarksIcon />
     </div>
   </button>
   <button
