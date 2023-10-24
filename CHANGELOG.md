@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Known issue: thumbnails might appear cropped/misaligned at the end of videos. This will be addressed in a later release.
 - Search filters in web app
 - Channels and Playlists can be opened on TV from web app
+- Channel links can be drag and dropped into the web app
 
 ### Fixed
 

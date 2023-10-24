@@ -182,6 +182,9 @@
           }
         }
       } catch (error) {
+        // TODO:P0 handle case of unauthenticated calls
+        // TODO:P0 handle case of popular feed disabled
+        // If we're done loading all the feed, but still have no videos, hide the whole component.
         console.error(error);
         feedSource.state.loadState = FeedLoadState.Error;
       }

@@ -51,6 +51,16 @@ export class InvidiousApi {
         return await response.json();
     }
 
+    public async getChannelMetadata(ucid: string) {
+        const response = await fetch(`${this.instance}/api/v1/channels/${ucid}`);
+        return await response.json();
+    }
+
+    public async resolveUrl(url: string) {
+        const response = await fetch(`${this.instance}/api/v1/resolveurl?url=${encodeURIComponent(url)}`);
+        return await response.json();
+    }
+
     public async markFeedSourcePagination(feedSource: any) {
         const endpoint = this.endpoints[feedSource.endpoint]
         if (!endpoint || !endpoint.paginationType) {

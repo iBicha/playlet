@@ -14,6 +14,7 @@
   let videoStartAtTimestamp;
 
   let videoMetadata;
+  let channelMetadata;
 
   let tvName = "Roku TV";
   let invidiousInstance;
@@ -44,14 +45,20 @@
     for (var i in event.dataTransfer.items) {
       let item = event.dataTransfer.items[i];
       if (item.kind === "string" && item.getAsString) {
-        let dataString = await new Promise((resolve) =>
+        let dataString = (await new Promise((resolve) =>
           item.getAsString(resolve)
-        );
+        )) as string;
         if (isValidHttpUrl(dataString)) {
           const videoInfo = parseYouTubeUrl(dataString);
           if (videoInfo.videoId) {
             searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
             return;
+          } else {
+            const urlInfo: any = await invidiousApi.resolveUrl(dataString);
+            if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
+              searchForChannelById(urlInfo.ucid);
+              return;
+            }
           }
         }
       }
@@ -66,6 +73,16 @@
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;
       }
+      modal.showModal();
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function searchForChannelById(channelId) {
+    try {
+      isLoading = true;
+      channelMetadata = await invidiousApi.getChannelMetadata(channelId);
       modal.showModal();
     } finally {
       isLoading = false;
@@ -162,11 +179,20 @@
     );
   }
 
-  function openInvidiousInNewTab() {
+  async function openChannelOnTv() {
+    await PlayletApi.openChannel(channelMetadata?.authorId);
+  }
+
+  function openVideoInvidiousInNewTab() {
     let url = `${invidiousInstance}/watch?v=${videoMetadata?.videoId}`;
     if (videoStartAtChecked && videoStartAtTimestamp) {
       url += `&t=${videoStartAtTimestamp}`;
     }
+    window.open(url);
+  }
+
+  function openChannelInvidiousInNewTab() {
+    let url = `${invidiousInstance}/channel/${channelMetadata?.authorId}`;
     window.open(url);
   }
 </script>
@@ -185,22 +211,37 @@
 
 <dialog bind:this={modal} id="modal_video_drag_drop" class="modal">
   <form method="dialog" class="modal-box bg-base-100">
-    <h3 class="text-lg m-5">{videoMetadata?.title}</h3>
-    <div class="flex flex-col">
-      <VideoStartAt
-        bind:checked={videoStartAtChecked}
-        bind:timestamp={videoStartAtTimestamp}
-        lengthSeconds={videoMetadata?.lengthSeconds}
-      />
-      <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
-      <button class="btn m-2" on:click={queueVideoOnTv}
-        >Queue on {tvName}
+    {#if videoMetadata}
+      <h3 class="text-lg m-5">{videoMetadata.title}</h3>
+      <div class="flex flex-col">
+        <VideoStartAt
+          bind:checked={videoStartAtChecked}
+          bind:timestamp={videoStartAtTimestamp}
+          lengthSeconds={videoMetadata.lengthSeconds}
+        />
+        <button class="btn m-2" on:click={playVideoOnTv}>
+          Play on {tvName}
+        </button>
+        <button class="btn m-2" on:click={queueVideoOnTv}>
+          Queue on {tvName}
+        </button>
+        <button class="btn m-2" on:click={openVideoInvidiousInNewTab}>
+          Open in Invidious
+        </button>
+      </div>
+    {:else if channelMetadata}
+      <h3 class="text-lg m-5">{channelMetadata.author}</h3>
+      <div class="text-sm m-5 line-clamp-3">{channelMetadata.description}</div>
+      <button class="btn m-2" on:click={openChannelOnTv}>
+        Open on {tvName}
       </button>
-      <button class="btn m-2" on:click={openInvidiousInNewTab}
-        >Open in Invidious</button
-      >
-      <button class="btn m-2">Cancel</button>
-    </div>
+      <button class="btn m-2" on:click={openChannelInvidiousInNewTab}>
+        Open in Invidious
+      </button>
+    {:else}
+      <span class="loading loading-spinner loading-md" />
+    {/if}
+    <button class="btn m-2">Cancel</button>
   </form>
   <form method="dialog" class="modal-backdrop">
     <button>close</button>
