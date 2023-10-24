@@ -12,10 +12,13 @@ export class InvidiousApi {
         // Note: handlers for authenticated requests are not needed, since they are handled server side
         this.responseHandlers = {
             "DefaultHandler": (requestData, response) => this.DefaultHandler(requestData, response),
+            "PlaylistHandler": (requestData, response) => this.PlaylistHandler(requestData, response),
             "VideoInfoHandler": (requestData, response) => this.VideoInfoHandler(requestData, response),
-            "ChannelInfoHandler": (requestData, response) => this.ChannelInfoHandler(requestData, response),
             "PlaylistInfoHandler": (requestData, response) => this.PlaylistInfoHandler(requestData, response),
-            "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response)
+            "ChannelInfoHandler": (requestData, response) => this.ChannelInfoHandler(requestData, response),
+            "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response),
+            "ChannelPlaylistsHandler": (requestData, response) => this.ChannelPlaylistsHandler(requestData, response),
+            "ChannelRelatedChannelsHandler": (requestData, response) => this.ChannelRelatedChannelsHandler(requestData, response),
         }
     }
 
@@ -48,11 +51,39 @@ export class InvidiousApi {
         return await response.json();
     }
 
-    public async makeRequest(feed: any) {
-        // TODO:P0 handle multiple feed sources
-        // TODO:P0 implement localStorage caching
-        const feedSource = feed.feedSources[0]
+    public async markFeedSourcePagination(feedSource: any) {
+        const endpoint = this.endpoints[feedSource.endpoint]
+        if (!endpoint || !endpoint.paginationType) {
+            return;
+        }
 
+        const feedSourceState = feedSource.state
+        feedSourceState.queryParams = feedSourceState.queryParams || {}
+
+        feedSourceState.paginationType = endpoint.paginationType
+
+        if (feedSourceState.paginationType === "Pages") {
+            if (!Number.isInteger(feedSourceState.page)) {
+                feedSourceState.page = 0;
+            }
+            feedSourceState.page += 1;
+            feedSourceState.queryParams.page = feedSourceState.page;
+        } else if (feedSourceState.paginationType === "Continuation") {
+            const continuation = feedSourceState.continuation;
+            if (continuation) {
+                feedSourceState.queryParams.continuation = continuation;
+            } else {
+                delete feedSourceState.queryParams.continuation;
+            }
+        }
+    }
+
+    public canMakeRequest() {
+        return !!(this.instance && this.endpoints && Object.keys(this.endpoints).length);
+    }
+
+    public async makeRequest(feedSource: any) {
+        // TODO:P0 implement localStorage caching
         if (!feedSource || !this.instance || !this.endpoints) {
             return null;
         }
@@ -95,6 +126,10 @@ export class InvidiousApi {
             queryParams = { ...queryParams, ...feedSource.queryParams };
         }
 
+        if (feedSource.state.queryParams !== undefined) {
+            queryParams = { ...queryParams, ...feedSource.state.queryParams };
+        }
+
         if (feedSource.pathParams !== undefined) {
             for (let param in feedSource.pathParams) {
                 url = url.replace(`{${param}}`, feedSource.pathParams[param]);
@@ -114,6 +149,13 @@ export class InvidiousApi {
     private async DefaultHandler(feedSource, response) {
         const items = await response.json();
         return { items };
+    }
+
+    private async PlaylistHandler(feedSource, response) {
+        const json = await response.json();
+        return {
+            items: json.videos,
+        };
     }
 
     private async VideoInfoHandler(feedSource, response) {
@@ -138,6 +180,22 @@ export class InvidiousApi {
         const json = await response.json();
         return {
             items: json.videos,
+            continuation: json.continuation
+        };
+    }
+
+    private async ChannelPlaylistsHandler(feedSource, response) {
+        const json = await response.json();
+        return {
+            items: json.playlists,
+            continuation: json.continuation
+        };
+    }
+
+    private async ChannelRelatedChannelsHandler(feedSource, response) {
+        const json = await response.json();
+        return {
+            items: json.relatedChannels,
             continuation: json.continuation
         };
     }

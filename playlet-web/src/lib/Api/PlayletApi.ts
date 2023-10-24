@@ -23,8 +23,8 @@ export class PlayletApi {
         return await response.json();
     }
 
-    static async invidiousAuthenticatedRequest(requestData) {
-        const url = PlayletApi.host() + "/invidious/authenticated-request?request-data=" + encodeURIComponent(JSON.stringify(requestData));
+    static async invidiousAuthenticatedRequest(feedSource) {
+        const url = PlayletApi.host() + "/invidious/authenticated-request?feed-source=" + encodeURIComponent(JSON.stringify(feedSource));
         const response = await fetch(url);
         return await response.json();
     }

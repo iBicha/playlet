@@ -47,14 +47,15 @@ namespace Http
 
             ' This is an endpoint allowing the web app to make an authenticated request
             ' without needing the Invidious token
+            ' TODO:P2 this should be a POST request
             m.Get("/invidious/authenticated-request", function(context as object) as boolean
                 request = context.request
                 response = context.response
                 invidiousNode = context.server.task.invidious
 
-                requestData = request.query["request-data"]
-                if requestData = invalid
-                    response.Default(400, "Expected request-data")
+                feedSource = request.query["feed-source"]
+                if feedSource = invalid
+                    response.Default(400, "Expected feed-source")
                     return true
                 end if
 
@@ -64,12 +65,10 @@ namespace Http
                     return true
                 end if
 
-                requestData = ParseJson(requestData)
+                feedSource = ParseJson(feedSource)
 
-                ' TODO:P0 handle pagination
-                ' Perhaps the page arg can be added to queryParam of requestData directly
                 invService = new Invidious.InvidiousService(invidiousNode)
-                invResponse = invService.MakeRequest(requestData)
+                invResponse = invService.MakeRequest(feedSource, feedSource.state.queryParams)
                 if not invResponse.success
                     response.Default(500, `Failed to make request: ${invResponse.error}`)
                     return true
