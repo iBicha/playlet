@@ -228,6 +228,7 @@ export class InvidiousApi {
         return data;
     }
 
+    // TODO:P2 use more appropriate cache storage
     private getCache(url: string, cacheSeconds: number) {
         const cache = localStorage.getItem(url);
         if (!cache) {
