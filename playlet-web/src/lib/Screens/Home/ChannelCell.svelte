@@ -1,12 +1,10 @@
 <script lang="ts">
-  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
 
   export let author: string | undefined = undefined;
   export let authorId: string | undefined = undefined;
   export let authorThumbnails: any[] | undefined = undefined;
-  // TODO:P0 channelHandle instead of videoCount
-  export let videoCount: number | undefined = undefined;
+  export let channelHandle: string | undefined = undefined;
   export let subCount: number | undefined = undefined;
 
   // svelte-ignore unused-export-let
@@ -35,7 +33,6 @@
 
   async function openChannelOnTv() {
     // TODO:P1 open channel on TV
-    // await PlayletApi.playPlaylist(playlistId, title, videoCount);
   }
 
   function openInvidiousInNewTab() {
@@ -59,7 +56,7 @@
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-1 min-h-8">{author}</h3>
       <div>{subCount} subscribers</div>
-      <div>{videoCount} videos</div>
+      <div>{channelHandle || ""}</div>
     </div>
   </div>
 </button>
