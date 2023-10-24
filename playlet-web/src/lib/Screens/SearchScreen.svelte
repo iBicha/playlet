@@ -87,6 +87,7 @@
 
     try {
       isLoading = true;
+      // TODO:P1: search pagination - load more results as we scroll
       videos = await invidiousApi.search(searchBoxText, searchFilters);
     } finally {
       isLoading = false;
