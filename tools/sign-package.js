@@ -12,7 +12,7 @@ const options = {
     outDir: 'release',
     outFile: 'playlet.zip',
     failOnCompileError: true,
-    stagingDir: 'dist/build/playlet-app',
+    stagingDir: 'build/playlet-app',
     retainStagingDir: true,
     signingPassword: config.ROKU_SIGN_PASSWORD,
 };
