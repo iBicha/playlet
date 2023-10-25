@@ -20,6 +20,7 @@
   import InfoScreen from "lib/Screens/InfoScreen.svelte";
   import LinkDragDrop from "lib/LinkDragDrop.svelte";
   import BookmarksScreen from "lib/Screens/BookmarksScreen.svelte";
+  import WebSockets from "lib/Api/WebSockets.svelte";
 
   onMount(async () => {
     PlayletApi.getState().then((value) => {
@@ -59,6 +60,7 @@
 
 <main>
   <LinkDragDrop />
+  <WebSockets />
 
   <NavBar />
   <!-- TODO:P2 a better way to make the BottomNavigation not hide screens -->
