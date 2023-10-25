@@ -18,6 +18,11 @@ namespace Http
                 v = request.query.v
                 local = request.query.local
 
+                if StringUtils.IsNullOrEmpty(v)
+                    response.Default(400, "Missing video id")
+                    return true
+                end if
+
                 service = new Invidious.InvidiousService(invidiousNode)
                 metadataRequest = service.GetVideoMetadata(v)
                 if not metadataRequest.IsSuccess()
@@ -29,7 +34,7 @@ namespace Http
                 instance = service.GetInstance()
 
                 dash = new DashManifest(instance)
-                xmlContent = dash.fromVideoMetadata(metadata, local <> invalid)
+                xmlContent = dash.fromVideoMetadata(metadata, ValidString(local) = "true")
 
                 response.http_code = 200
                 response.SetBodyDataString(xmlContent)
