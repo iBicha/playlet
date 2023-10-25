@@ -4,6 +4,7 @@ import "HttpRouter.bs"
 import "HttpSettings.bs"
 import "HttpUtils.bs"
 import "../WebSockets/WebSocketServer.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 namespace Http
 
@@ -75,13 +76,27 @@ namespace Http
             LogInfo("listening on " + addrin.getAddress())
 
             if m.settings.WebSocketsEnabled
-                m.websocket = new Web.WebSocketServer()
+                m.websocket = new Web.WebSocketServer(m)
                 LogInfo("WebSocketServer created")
                 ' TODO:P0 remove this test code
-                m.websocket.OnMessage(function(context as object)
+                m.websocket.OnMessage(function(context as object) as void
+                    invidiousNode = context.server.webServer.task.invidious
+
                     connection = context.connection
                     message = context.message
-                    connection.Send("Echo: " + message)
+
+                    feedSource = ParseJson(message)
+                    if feedSource = invalid
+                        LogError("invalid json")
+                        return
+                    end if
+
+                    invService = new Invidious.InvidiousService(invidiousNode)
+                    invResponse = invService.MakeRequest(feedSource, feedSource.state?.queryParams)
+
+                    response = FormatJson(invResponse)
+                    LogInfo("response: ", response.len())
+                    connection.Send(response)
                 end function)
             end if
             return success

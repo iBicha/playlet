@@ -4,7 +4,7 @@ import "pkg:/source/utils/Logging.bs"
 
 namespace Web
 
-    const BUFSIZE = 65536
+    const BUFSIZE = 524288
 
     class WebSocketConnection
         private server
@@ -67,10 +67,17 @@ namespace Web
             m.frame.SetPayloadText(text)
             written_bytes = m.frame.WriteToBuffer(m.buffer, 0, Web.BUFSIZE)
             if written_bytes > 0
-                m.socket.Send(m.buffer, 0, written_bytes)
+                total_sent = 0
+                ' TODO:P0 buffer instead of a while loop
+                while total_sent < written_bytes
+                    sent = m.socket.Send(m.buffer, total_sent, written_bytes - total_sent)
+                    if sent > 0
+                        total_sent += sent
+                        LogInfo("Sent bytes:", total_sent, "out of:", written_bytes)
+                    end if
+                end while
             end if
         end function
-
     end class
 
 end namespace

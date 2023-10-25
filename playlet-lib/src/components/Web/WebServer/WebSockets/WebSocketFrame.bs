@@ -7,6 +7,7 @@ namespace Web
         public opcode
         public is_masked
         public payload_size
+        public payload_size_buffer
         public mask
         public payload
 
@@ -15,6 +16,7 @@ namespace Web
 
         function new()
             m.payload = CreateObject("roByteArray")
+            m.payload_size_buffer = CreateObject("roByteArray")
         end function
 
         function ReadFromBuffer(buffer as object, index as integer, length as integer) as boolean
@@ -78,7 +80,13 @@ namespace Web
                 m.WriteByte(payloadSize and &hFF)
             else
                 m.WriteByte(127)
-                'TODO: Write size in 8 bytes
+                for i = 7 to 0 step -1
+                    m.payload_size_buffer[i] = payloadSize and &hFF
+                    payloadSize = payloadSize >> 8
+                next
+                for i = 0 to 7
+                    m.WriteByte(m.payload_size_buffer[i])
+                next
             end if
         end function
 
