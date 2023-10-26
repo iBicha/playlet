@@ -36,7 +36,6 @@ namespace InvidiousContent
         SetIfExists(node, "author", item, "author")
         SetIfExists(node, "authorId", item, "authorId")
         SetIfExists(node, "hlsUrl", item, "hlsUrl")
-        SetIfExists(node, "isUpcoming", item, "isUpcoming")
         SetIfExists(node, "lengthSeconds", item, "lengthSeconds")
         node.lengthText = TimeUtils.GetFormattedTime(item.lengthSeconds)
         node.liveNow = VideoIsLive(item)
@@ -159,11 +158,12 @@ namespace InvidiousContent
     end function
 
     function VideoIsUpcoming(videoItem as object) as boolean
-        return videoItem.isUpcoming = true
+        return videoItem.isUpcoming = true and ValidInt(videoItem.premiereTimestamp) <> 0
     end function
 
     function VideoSetPremiereTimestampText(node as object, videoItem as object)
-        if VideoIsUpcoming(videoItem) and videoItem.premiereTimestamp <> invalid
+        if VideoIsUpcoming(videoItem)
+            node.isUpcoming = true
             node.premiereTimestampText = `Premeres in ${TimeUtils.GetFormattedTimeLeft(videoItem.premiereTimestamp)}`
         end if
     end function

@@ -54,6 +54,8 @@
             searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
             return;
           } else {
+            // TODO:P2 make a HEAD request and check for a redirect, then
+            // resolve the redirect url.
             const urlInfo: any = await invidiousApi.resolveUrl(dataString);
             if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
               searchForChannelById(urlInfo.ucid);
