@@ -6,6 +6,7 @@
 </script>
 
 <div class={visibility ? "" : "hidden"}>
+  <!-- TODO:P0 Handle authenticated feed when not logged in -->
   {#each $homeLayoutFileStore as feed}
     <VideoListRow {feed} />
   {/each}
