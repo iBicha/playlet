@@ -40,7 +40,7 @@
   });
 
   async function onPaste(event) {
-    modal.close();
+    closeModal();
 
     const dataString = event.clipboardData.getData("text/plain");
     await processUrlText(dataString);
@@ -48,7 +48,7 @@
 
   async function onDrop(event) {
     event.preventDefault();
-    modal.close();
+    closeModal();
 
     isDragging = false;
     for (var i in event.dataTransfer.items) {
@@ -105,7 +105,7 @@
   }
 
   function onDragOver(event) {
-    modal.close();
+    closeModal();
     clearTimeout(dragEndTimeout);
     dragEndTimeout = setTimeout(() => {
       isDragging = false;
@@ -178,6 +178,12 @@
     }
 
     return result;
+  }
+
+  function closeModal() {
+    modal.close();
+    videoMetadata = undefined;
+    channelMetadata = undefined;
   }
 
   async function playVideoOnTv() {
