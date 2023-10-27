@@ -30,12 +30,21 @@
   onMount(async () => {
     document.body.addEventListener("drop", onDrop);
     document.body.addEventListener("dragover", onDragOver);
+    document.body.addEventListener("paste", onPaste);
   });
 
   onDestroy(() => {
     document.body.removeEventListener("drop", onDrop);
     document.body.removeEventListener("dragover", onDragOver);
+    document.body.removeEventListener("paste", onPaste);
   });
+
+  async function onPaste(event) {
+    modal.close();
+
+    const dataString = event.clipboardData.getData("text/plain");
+    await processUrlText(dataString);
+  }
 
   async function onDrop(event) {
     event.preventDefault();
@@ -48,20 +57,24 @@
         let dataString = (await new Promise((resolve) =>
           item.getAsString(resolve)
         )) as string;
-        if (isValidHttpUrl(dataString)) {
-          const videoInfo = parseYouTubeUrl(dataString);
-          if (videoInfo.videoId) {
-            searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
-            return;
-          } else {
-            // TODO:P2 make a HEAD request and check for a redirect, then
-            // resolve the redirect url.
-            const urlInfo: any = await invidiousApi.resolveUrl(dataString);
-            if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
-              searchForChannelById(urlInfo.ucid);
-              return;
-            }
-          }
+        await processUrlText(dataString);
+      }
+    }
+  }
+
+  async function processUrlText(dataString: string) {
+    if (isValidHttpUrl(dataString)) {
+      const videoInfo = parseYouTubeUrl(dataString);
+      if (videoInfo.videoId) {
+        searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
+        return;
+      } else {
+        // TODO:P2 make a HEAD request and check for a redirect, then
+        // resolve the redirect url.
+        const urlInfo: any = await invidiousApi.resolveUrl(dataString);
+        if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
+          searchForChannelById(urlInfo.ucid);
+          return;
         }
       }
     }
@@ -101,14 +114,17 @@
     event.preventDefault();
   }
 
-  function isValidHttpUrl(string) {
-    let url;
+  function isValidHttpUrl(url) {
+    if (!url) {
+      return false;
+    }
+    let urlObj;
     try {
-      url = new URL(string);
+      urlObj = new URL(url);
     } catch (_) {
       return false;
     }
-    return url.protocol === "http:" || url.protocol === "https:";
+    return urlObj.protocol === "http:" || urlObj.protocol === "https:";
   }
 
   function parseYouTubeUrl(url) {
