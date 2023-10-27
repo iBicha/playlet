@@ -16,6 +16,7 @@
   let searchBox;
   let searchBoxText = "";
   let suggestions: { suggestions: any[] } = { suggestions: [] };
+  let page = 1;
   let videos = [];
   let searchHistory = [];
   let isLoading = false;
@@ -75,26 +76,33 @@
 
   async function suggestionClicked(query) {
     searchBoxText = query;
+    page = 1;
+    videos = [];
     await searchVideos();
   }
 
   async function searchVideos() {
     suggestions = { suggestions: [] };
-    videos = [];
     if (searchBoxText.length === 0) {
       return;
     }
 
     try {
       isLoading = true;
-      // TODO:P1: search pagination - load more results as we scroll
-      videos = await invidiousApi.search(searchBoxText, searchFilters);
+      const newVideos = await invidiousApi.search(
+        searchBoxText,
+        searchFilters,
+        page
+      );
+      videos = [...videos, ...newVideos];
     } finally {
       isLoading = false;
     }
 
-    const newSearchHistory = await PlayletApi.putSearchHistory(searchBoxText);
-    searchHistoryStore.set(newSearchHistory);
+    if (page === 1) {
+      const newSearchHistory = await PlayletApi.putSearchHistory(searchBoxText);
+      searchHistoryStore.set(newSearchHistory);
+    }
   }
 </script>
 
@@ -103,6 +111,8 @@
     <form
       on:submit={async (e) => {
         e.preventDefault();
+        page = 1;
+        videos = [];
         await searchVideos();
       }}
     >
@@ -124,7 +134,14 @@
             }, 200);
           }}
         />
-        <button class="join-item btn" on:click={searchVideos}>
+        <button
+          class="join-item btn"
+          on:click={async () => {
+            page = 1;
+            videos = [];
+            await searchVideos();
+          }}
+        >
           <div class="h-6">
             <SearchThinIcon />
           </div>
@@ -160,12 +177,6 @@
   </div>
 
   <div>
-    {#if isLoading}
-      <div class="fixed w-full h-1/2 z-50 flex justify-center items-center">
-        <span class="loading loading-spinner loading-md" />
-      </div>
-    {/if}
-
     <div
       class="grid grid-flow-row-dense gap-4 items-center justify-center sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 m-4"
     >
@@ -179,6 +190,26 @@
         {/if}
       {/each}
     </div>
+
+    {#if !isLoading && videos.length > 0 && searchBoxText}
+      <div class="flex justify-center items-center">
+        <button
+          class="btn w-1/2"
+          on:click={async () => {
+            page++;
+            await searchVideos();
+          }}
+        >
+          Load more
+        </button>
+      </div>
+    {/if}
+
+    {#if isLoading}
+      <div class="w-full h-1/2 z-50 flex justify-center items-center">
+        <span class="loading loading-spinner loading-md" />
+      </div>
+    {/if}
   </div>
 
   <SearchFilters

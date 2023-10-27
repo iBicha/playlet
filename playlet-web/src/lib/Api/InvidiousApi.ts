@@ -27,7 +27,7 @@ export class InvidiousApi {
         return await response.json();
     }
 
-    public async search(query: string, filters: any) {
+    public async search(query: string, filters: any, page: number = 1) {
         let url = `${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
         for (let filter in filters) {
             if (typeof filters[filter] === 'string') {
@@ -42,6 +42,7 @@ export class InvidiousApi {
                 url += `&${filter}=${filters[filter].join(',')}`;
             }
         }
+        url += `&page=${page}`;
         const response = await fetch(url);
         return await response.json();
     }
