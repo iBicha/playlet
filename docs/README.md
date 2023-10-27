@@ -185,11 +185,11 @@ Since Component Libraries are simply zip files hosted at some https endpoint, Gi
 
 ### Dev library hosted by VS Code Extension
 
-When in debug mode, Playlet lib is packaged and served locally on port 8080, and Playlet app would use it instead of the Playlet lib from Github. This is an important detail, because once you stop debugging in VS Code, the dev app on your Roku TV won't function anymore, with an error:
+When in debug mode, Playlet lib is packaged and served locally on port 8086, and Playlet app would use it instead of the Playlet lib from Github. This is an important detail, because once you stop debugging in VS Code, the dev app on your Roku TV won't function anymore, with an error:
 
 > Could not load Playlet component library from any of the following urls:
 >
-> - \[debug\] http://192.168.1.x:8080/playlet-lib.zip <!-- markdownlint-disable-line -->
+> - \[debug\] http://192.168.1.x:8086/playlet-lib.zip <!-- markdownlint-disable-line -->
 >   Please restart Playlet.
 >   If the problem persist, contact Playlet authors.
 
