@@ -187,17 +187,19 @@
   }
 
   async function playVideoOnTv() {
+    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
     await PlayletApi.playVideo(
       videoMetadata?.videoId,
-      videoStartAtTimestamp,
+      timestamp,
       videoMetadata?.title,
       videoMetadata?.author
     );
   }
   async function queueVideoOnTv() {
+    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
     await PlayletApi.queueVideo(
       videoMetadata?.videoId,
-      videoStartAtTimestamp,
+      timestamp,
       videoMetadata?.title,
       videoMetadata?.author
     );

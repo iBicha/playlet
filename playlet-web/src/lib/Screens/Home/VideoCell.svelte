@@ -180,11 +180,13 @@
   }
 
   async function playVideoOnTv() {
-    await PlayletApi.playVideo(videoId, videoStartAtTimestamp, title, author);
+    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
+    await PlayletApi.playVideo(videoId, timestamp, title, author);
   }
 
   async function queueVideoOnTv() {
-    await PlayletApi.queueVideo(videoId, videoStartAtTimestamp, title, author);
+    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
+    await PlayletApi.queueVideo(videoId, timestamp, title, author);
   }
 
   function openInvidiousInNewTab() {
