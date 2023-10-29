@@ -2,11 +2,11 @@
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore, searchHistoryStore } from "lib/Stores";
-  import VideoCell from "lib/Screens/Home/VideoCell.svelte";
-  import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
+  import VideoCell from "lib/VideoFeed/VideoCell.svelte";
+  import PlaylistCell from "lib/VideoFeed/PlaylistCell.svelte";
+  import ChannelCell from "lib/VideoFeed/ChannelCell.svelte";
   import SearchThinIcon from "assets/search-thin-icon.svg.svelte";
   import FiltersIcon from "assets/filters.svg.svelte";
-  import ChannelCell from "./Home/ChannelCell.svelte";
   import SearchFilters from "./Search/SearchFilters.svelte";
 
   export let visibility: boolean;

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
-  import VideoStartAt from "lib/VideoStartAt.svelte";
+  import VideoCastDialog from "./VideoCastDialog.svelte";
+  import VideoThumbnail from "./VideoThumbnail.svelte";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;
@@ -38,13 +38,9 @@
   export let indexId: string = undefined;
 
   let modal;
-  let tvName = "Roku TV";
   let invidiousInstance;
-  let videoStartAtChecked;
-  let videoStartAtTimestamp;
 
   playletStateStore.subscribe((value) => {
-    tvName = value?.device?.friendly_name ?? "Roku TV";
     invidiousInstance = value?.invidious?.current_instance;
   });
 
@@ -110,20 +106,6 @@
     }
   }
 
-  function getThumbnailUrl(quality: string = "medium") {
-    if (!videoThumbnails || videoThumbnails.length === 0) {
-      return "";
-    }
-    const videoThumbnail =
-      videoThumbnails.find((thumbnail) => thumbnail.quality === quality) ||
-      videoThumbnails[0];
-    let url = videoThumbnail.url;
-    if (url.startsWith("/") && invidiousInstance) {
-      url = invidiousInstance + url;
-    }
-    return url;
-  }
-
   function formatViewCount(viewCount) {
     if (isNaN(viewCount)) {
       return "";
@@ -153,76 +135,18 @@
     X = X / 10;
     return X;
   }
-
-  function getFormattedTime(length) {
-    const hours = Math.floor(length / 3600);
-    const minutes = Math.floor((length / 60) % 60);
-    const seconds = length % 60;
-
-    const secondsString = seconds < 10 ? `0${seconds}` : seconds.toString();
-    const minutesString =
-      minutes < 10 && hours > 0 ? `0${minutes}` : minutes.toString();
-
-    let formattedTime = minutesString + ":" + secondsString;
-
-    if (hours > 0) {
-      formattedTime = hours.toString() + ":" + formattedTime;
-    }
-
-    return formattedTime;
-  }
-
-  function isVideoLive() {
-    if (liveNow) {
-      return true;
-    }
-    return lengthSeconds === 0 && viewCount === 0;
-  }
-
-  async function playVideoOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.playVideo(videoId, timestamp, title, author);
-  }
-
-  async function queueVideoOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.queueVideo(videoId, timestamp, title, author);
-  }
-
-  function openInvidiousInNewTab() {
-    let url = `${invidiousInstance}/watch?v=${videoId}`;
-    if (videoStartAtChecked && videoStartAtTimestamp) {
-      url += `&t=${videoStartAtTimestamp}`;
-    }
-    window.open(url);
-  }
 </script>
 
-<button class="w-80 p-2" on:click={modal.showModal()}>
+<button class="w-80 p-2" on:click={modal.show()}>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
-    <figure class="relative">
-      <img
-        class="w-full rounded-box aspect-video object-cover"
-        loading="lazy"
-        width="320"
-        height="180"
-        src={getThumbnailUrl()}
-        alt={title}
-      />
-      {#if isVideoLive()}
-        <div
-          class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
-        >
-          LIVE
-        </div>
-      {:else if lengthSeconds}
-        <div
-          class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2"
-        >
-          {getFormattedTime(lengthSeconds)}
-        </div>
-      {/if}
-    </figure>
+    <VideoThumbnail
+      bind:title
+      bind:videoThumbnails
+      bind:liveNow
+      bind:lengthSeconds
+      bind:viewCount
+      bind:invidiousInstance
+    />
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
       <div class="font-semibold">{author}</div>
@@ -230,27 +154,15 @@
     </div>
   </div>
 </button>
-<!-- TODO:P2 a dialog for every video is very slow. Need to reuse the same one -->
-<dialog bind:this={modal} id="modal_{videoId}" class="modal">
-  <form method="dialog" class="modal-box bg-base-100">
-    <h3 class="text-lg m-5">{title}</h3>
-    <div class="flex flex-col">
-      <VideoStartAt
-        bind:checked={videoStartAtChecked}
-        bind:timestamp={videoStartAtTimestamp}
-        {lengthSeconds}
-      />
-      <button class="btn m-2" on:click={playVideoOnTv}>Play on {tvName}</button>
-      <button class="btn m-2" on:click={queueVideoOnTv}
-        >Queue on {tvName}
-      </button>
-      <button class="btn m-2" on:click={openInvidiousInNewTab}
-        >Open in Invidious</button
-      >
-      <button class="btn m-2">Cancel</button>
-    </div>
-  </form>
-  <form method="dialog" class="modal-backdrop">
-    <button>close</button>
-  </form>
-</dialog>
+<VideoCastDialog
+  bind:this={modal}
+  bind:videoId
+  bind:title
+  bind:author
+  bind:lengthSeconds
+  bind:videoThumbnails
+  bind:liveNow
+  bind:viewCount
+  videoStartAtChecked={false}
+  videoStartAtTimestamp={0}
+/>
