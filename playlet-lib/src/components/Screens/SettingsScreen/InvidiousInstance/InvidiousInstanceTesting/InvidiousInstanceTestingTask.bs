@@ -105,14 +105,21 @@ function IsReachable(instance as string, testNode as object) as void
             return
         end if
 
-        name = json.software?.name
-        if not IsString(name)
+        software = json.software
+        if software = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read software.name)`
+            testNode.details = `Invalid json from ${url} (couldn't read $.software)`
             return
         end if
 
-        version = json.software?.version
+        name = software.name
+        if not IsString(name)
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url} (couldn't read $.software.name)`
+            return
+        end if
+
+        version = software.version
         if not IsString(version)
             testNode.state = "failed"
             testNode.details = `Invalid json from ${url} (couldn't read software.version)`
