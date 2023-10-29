@@ -185,8 +185,8 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "finished"
-        metadata = content?.metadata
-        if not PlayNext(metadata?.recommendedVideos)
+        metadata = content.metadata
+        if metadata <> invalid and not PlayNext(metadata.recommendedVideos)
             m.container@.watchedVideosClear(invalid)
             VideoUtils.CloseVideo()
         end if
@@ -231,7 +231,10 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
     end if
 
     for each metadata in recommendedVideos
-        videoId = metadata?.videoId
+        if metadata = invalid
+            continue for
+        end if
+        videoId = metadata.videoId
         if videoId = invalid
             continue for
         end if

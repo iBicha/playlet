@@ -1,8 +1,8 @@
 <script lang="ts">
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
-  import VideoCell from "lib/Screens/Home/VideoCell.svelte";
-  import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
+  import VideoCell from "./VideoCell.svelte";
+  import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
 
   // TODO:P1 figure out why some uncached feeds (e.g. channels/ucid/videos) get hit twice
@@ -124,7 +124,12 @@
       try {
         const result = await invidiousApi.makeRequest(feedSource);
         if (!result) {
-          return;
+          feedSource.state.loadState = FeedLoadState.Error;
+          feedSourcesIndex++;
+          if (feedSourcesIndex >= feedSources.length) {
+            feedLoadState = FeedLoadState.Loaded;
+          }
+          continue;
         }
 
         const hasContinuation = !!result.continuation;
@@ -225,26 +230,34 @@
   }
 </script>
 
-<div class="text-lg font-semibold m-4">
-  {feed.title}
-</div>
-<div
-  class="carousel carousel-center rounded-box w-full space-x-4"
-  style="min-height: 16rem;"
-  bind:this={carouselElement}
-  on:scroll={recalculateVisibileCells}
->
-  {#each videos as video, i}
-    <div class="carousel-item {video.type === 'channel' ? 'w-60' : 'w-80'} p-2">
-      {#if i >= scrollStart && i <= scrollEnd}
-        {#if video.type === "video"}
-          <VideoCell {...video} />
-        {:else if video.type === "playlist"}
-          <PlaylistCell {...video} />
-        {:else if video.type === "channel"}
-          <ChannelCell {...video} />
+<!-- Hide rows that are loaded but have no videos. Typically a 
+     disabled feed (like popular) or unauthenticated. 
+     TODO:P0 show action nodes (action to login)
+-->
+{#if feedLoadState !== FeedLoadState.Loaded || videos.length !== 0}
+  <div class="text-lg font-semibold m-4">
+    {feed.title}
+  </div>
+  <div
+    class="carousel carousel-center rounded-box w-full space-x-4"
+    style="min-height: 16rem;"
+    bind:this={carouselElement}
+    on:scroll={recalculateVisibileCells}
+  >
+    {#each videos as video, i}
+      <div
+        class="carousel-item {video.type === 'channel' ? 'w-60' : 'w-80'} p-2"
+      >
+        {#if i >= scrollStart && i <= scrollEnd}
+          {#if video.type === "video"}
+            <VideoCell {...video} />
+          {:else if video.type === "playlist"}
+            <PlaylistCell {...video} />
+          {:else if video.type === "channel"}
+            <ChannelCell {...video} />
+          {/if}
         {/if}
-      {/if}
-    </div>
-  {/each}
-</div>
+      </div>
+    {/each}
+  </div>
+{/if}

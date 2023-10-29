@@ -53,26 +53,37 @@ namespace Http
                 response = context.response
                 invidiousNode = context.server.task.invidious
 
-                feedSource = request.query["feed-source"]
-                if feedSource = invalid
-                    response.Default(400, "Expected feed-source")
-                    return true
-                end if
-
                 token = invidiousNode.authToken
                 if token = invalid
                     response.Default(403, "No token, not logged in")
                     return true
                 end if
 
+                feedSource = request.query["feed-source"]
+                if feedSource = invalid
+                    response.Default(400, "Expected feed-source")
+                    return true
+                end if
+
                 feedSource = ParseJson(feedSource)
+                if feedSource = invalid
+                    response.Default(400, "Expected valid JSON for feed-source")
+                    return true
+                end if
 
                 invService = new Invidious.InvidiousService(invidiousNode)
-                invResponse = invService.MakeRequest(feedSource, feedSource.state?.queryParams)
+
+                additionalQueryParams = invalid
+                if feedSource.state <> invalid and feedSource.state.queryParams <> invalid
+                    additionalQueryParams = feedSource.state.queryParams
+                end if
+
+                invResponse = invService.MakeRequest(feedSource, additionalQueryParams)
                 if not invResponse.success
                     response.Default(500, `Failed to make request: ${invResponse.error}`)
                     return true
                 end if
+
                 response.Json(invResponse.result)
                 return true
             end function)

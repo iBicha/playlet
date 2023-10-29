@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import VideoStartAt from "lib/VideoStartAt.svelte";
+  import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
+  import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
 
-  let modal;
+  let videoModal;
+  let channelModal;
   let isDragging;
   let isLoading;
   let dragEndTimeout;
@@ -30,16 +31,25 @@
   onMount(async () => {
     document.body.addEventListener("drop", onDrop);
     document.body.addEventListener("dragover", onDragOver);
+    document.body.addEventListener("paste", onPaste);
   });
 
   onDestroy(() => {
     document.body.removeEventListener("drop", onDrop);
     document.body.removeEventListener("dragover", onDragOver);
+    document.body.removeEventListener("paste", onPaste);
   });
+
+  async function onPaste(event) {
+    closeModal();
+
+    const dataString = event.clipboardData.getData("text/plain");
+    await processUrlText(dataString);
+  }
 
   async function onDrop(event) {
     event.preventDefault();
-    modal.close();
+    closeModal();
 
     isDragging = false;
     for (var i in event.dataTransfer.items) {
@@ -48,18 +58,24 @@
         let dataString = (await new Promise((resolve) =>
           item.getAsString(resolve)
         )) as string;
-        if (isValidHttpUrl(dataString)) {
-          const videoInfo = parseYouTubeUrl(dataString);
-          if (videoInfo.videoId) {
-            searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
-            return;
-          } else {
-            const urlInfo: any = await invidiousApi.resolveUrl(dataString);
-            if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
-              searchForChannelById(urlInfo.ucid);
-              return;
-            }
-          }
+        await processUrlText(dataString);
+      }
+    }
+  }
+
+  async function processUrlText(dataString: string) {
+    if (isValidHttpUrl(dataString)) {
+      const videoInfo = parseYouTubeUrl(dataString);
+      if (videoInfo.videoId) {
+        searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
+        return;
+      } else {
+        // TODO:P2 make a HEAD request and check for a redirect, then
+        // resolve the redirect url.
+        const urlInfo: any = await invidiousApi.resolveUrl(dataString);
+        if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
+          searchForChannelById(urlInfo.ucid);
+          return;
         }
       }
     }
@@ -73,7 +89,7 @@
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;
       }
-      modal.showModal();
+      videoModal.show();
     } finally {
       isLoading = false;
     }
@@ -83,14 +99,14 @@
     try {
       isLoading = true;
       channelMetadata = await invidiousApi.getChannelMetadata(channelId);
-      modal.showModal();
+      channelModal.show();
     } finally {
       isLoading = false;
     }
   }
 
   function onDragOver(event) {
-    modal.close();
+    closeModal();
     clearTimeout(dragEndTimeout);
     dragEndTimeout = setTimeout(() => {
       isDragging = false;
@@ -99,14 +115,17 @@
     event.preventDefault();
   }
 
-  function isValidHttpUrl(string) {
-    let url;
+  function isValidHttpUrl(url) {
+    if (!url) {
+      return false;
+    }
+    let urlObj;
     try {
-      url = new URL(string);
+      urlObj = new URL(url);
     } catch (_) {
       return false;
     }
-    return url.protocol === "http:" || url.protocol === "https:";
+    return urlObj.protocol === "http:" || urlObj.protocol === "https:";
   }
 
   function parseYouTubeUrl(url) {
@@ -162,38 +181,11 @@
     return result;
   }
 
-  async function playVideoOnTv() {
-    await PlayletApi.playVideo(
-      videoMetadata?.videoId,
-      videoStartAtTimestamp,
-      videoMetadata?.title,
-      videoMetadata?.author
-    );
-  }
-  async function queueVideoOnTv() {
-    await PlayletApi.queueVideo(
-      videoMetadata?.videoId,
-      videoStartAtTimestamp,
-      videoMetadata?.title,
-      videoMetadata?.author
-    );
-  }
-
-  async function openChannelOnTv() {
-    await PlayletApi.openChannel(channelMetadata?.authorId);
-  }
-
-  function openVideoInvidiousInNewTab() {
-    let url = `${invidiousInstance}/watch?v=${videoMetadata?.videoId}`;
-    if (videoStartAtChecked && videoStartAtTimestamp) {
-      url += `&t=${videoStartAtTimestamp}`;
-    }
-    window.open(url);
-  }
-
-  function openChannelInvidiousInNewTab() {
-    let url = `${invidiousInstance}/channel/${channelMetadata?.authorId}`;
-    window.open(url);
+  function closeModal() {
+    videoModal?.close();
+    channelModal?.close();
+    videoMetadata = undefined;
+    channelMetadata = undefined;
   }
 </script>
 
@@ -209,41 +201,22 @@
   {/if}
 </div>
 
-<dialog bind:this={modal} id="modal_video_drag_drop" class="modal">
-  <form method="dialog" class="modal-box bg-base-100">
-    {#if videoMetadata}
-      <h3 class="text-lg m-5">{videoMetadata.title}</h3>
-      <div class="flex flex-col">
-        <VideoStartAt
-          bind:checked={videoStartAtChecked}
-          bind:timestamp={videoStartAtTimestamp}
-          lengthSeconds={videoMetadata.lengthSeconds}
-        />
-        <button class="btn m-2" on:click={playVideoOnTv}>
-          Play on {tvName}
-        </button>
-        <button class="btn m-2" on:click={queueVideoOnTv}>
-          Queue on {tvName}
-        </button>
-        <button class="btn m-2" on:click={openVideoInvidiousInNewTab}>
-          Open in Invidious
-        </button>
-      </div>
-    {:else if channelMetadata}
-      <h3 class="text-lg m-5">{channelMetadata.author}</h3>
-      <div class="text-sm m-5 line-clamp-3">{channelMetadata.description}</div>
-      <button class="btn m-2" on:click={openChannelOnTv}>
-        Open on {tvName}
-      </button>
-      <button class="btn m-2" on:click={openChannelInvidiousInNewTab}>
-        Open in Invidious
-      </button>
-    {:else}
-      <span class="loading loading-spinner loading-md" />
-    {/if}
-    <button class="btn m-2">Cancel</button>
-  </form>
-  <form method="dialog" class="modal-backdrop">
-    <button>close</button>
-  </form>
-</dialog>
+<VideoCastDialog
+  bind:this={videoModal}
+  videoId={videoMetadata?.videoId}
+  title={videoMetadata?.title}
+  videoThumbnails={videoMetadata?.videoThumbnails}
+  author={videoMetadata?.author}
+  lengthSeconds={videoMetadata?.lengthSeconds}
+  liveNow={videoMetadata?.liveNow}
+  viewCount={videoMetadata?.viewCount}
+  bind:videoStartAtChecked
+  bind:videoStartAtTimestamp
+/>
+
+<ChannelCastDialog
+  bind:this={channelModal}
+  author={channelMetadata?.author}
+  authorId={channelMetadata?.authorId}
+  authorThumbnails={channelMetadata?.authorThumbnails}
+/>
