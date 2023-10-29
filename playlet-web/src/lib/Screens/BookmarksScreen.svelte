@@ -1,5 +1,5 @@
 <script lang="ts">
-  import VideoListRow from "./Home/VideoListRow.svelte";
+  import VideoListRow from "lib/VideoFeed/VideoListRow.svelte";
   import { bookmarksStore } from "lib/Stores";
 
   export let visibility: boolean;

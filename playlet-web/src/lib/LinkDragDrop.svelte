@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import VideoStartAt from "lib/VideoStartAt.svelte";
+  import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
+  import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
 
-  let modal;
+  let videoModal;
+  let channelModal;
   let isDragging;
   let isLoading;
   let dragEndTimeout;
@@ -88,7 +89,7 @@
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;
       }
-      modal.showModal();
+      videoModal.show();
     } finally {
       isLoading = false;
     }
@@ -98,7 +99,7 @@
     try {
       isLoading = true;
       channelMetadata = await invidiousApi.getChannelMetadata(channelId);
-      modal.showModal();
+      channelModal.show();
     } finally {
       isLoading = false;
     }
@@ -181,45 +182,10 @@
   }
 
   function closeModal() {
-    modal.close();
+    videoModal?.close();
+    channelModal?.close();
     videoMetadata = undefined;
     channelMetadata = undefined;
-  }
-
-  async function playVideoOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.playVideo(
-      videoMetadata?.videoId,
-      timestamp,
-      videoMetadata?.title,
-      videoMetadata?.author
-    );
-  }
-  async function queueVideoOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.queueVideo(
-      videoMetadata?.videoId,
-      timestamp,
-      videoMetadata?.title,
-      videoMetadata?.author
-    );
-  }
-
-  async function openChannelOnTv() {
-    await PlayletApi.openChannel(channelMetadata?.authorId);
-  }
-
-  function openVideoInvidiousInNewTab() {
-    let url = `${invidiousInstance}/watch?v=${videoMetadata?.videoId}`;
-    if (videoStartAtChecked && videoStartAtTimestamp) {
-      url += `&t=${videoStartAtTimestamp}`;
-    }
-    window.open(url);
-  }
-
-  function openChannelInvidiousInNewTab() {
-    let url = `${invidiousInstance}/channel/${channelMetadata?.authorId}`;
-    window.open(url);
   }
 </script>
 
@@ -235,41 +201,22 @@
   {/if}
 </div>
 
-<dialog bind:this={modal} id="modal_video_drag_drop" class="modal">
-  <form method="dialog" class="modal-box bg-base-100">
-    {#if videoMetadata}
-      <h3 class="text-lg m-5">{videoMetadata.title}</h3>
-      <div class="flex flex-col">
-        <VideoStartAt
-          bind:checked={videoStartAtChecked}
-          bind:timestamp={videoStartAtTimestamp}
-          lengthSeconds={videoMetadata.lengthSeconds}
-        />
-        <button class="btn m-2" on:click={playVideoOnTv}>
-          Play on {tvName}
-        </button>
-        <button class="btn m-2" on:click={queueVideoOnTv}>
-          Queue on {tvName}
-        </button>
-        <button class="btn m-2" on:click={openVideoInvidiousInNewTab}>
-          Open in Invidious
-        </button>
-      </div>
-    {:else if channelMetadata}
-      <h3 class="text-lg m-5">{channelMetadata.author}</h3>
-      <div class="text-sm m-5 line-clamp-3">{channelMetadata.description}</div>
-      <button class="btn m-2" on:click={openChannelOnTv}>
-        Open on {tvName}
-      </button>
-      <button class="btn m-2" on:click={openChannelInvidiousInNewTab}>
-        Open in Invidious
-      </button>
-    {:else}
-      <span class="loading loading-spinner loading-md" />
-    {/if}
-    <button class="btn m-2">Cancel</button>
-  </form>
-  <form method="dialog" class="modal-backdrop">
-    <button>close</button>
-  </form>
-</dialog>
+<VideoCastDialog
+  bind:this={videoModal}
+  videoId={videoMetadata?.videoId}
+  title={videoMetadata?.title}
+  videoThumbnails={videoMetadata?.videoThumbnails}
+  author={videoMetadata?.author}
+  lengthSeconds={videoMetadata?.lengthSeconds}
+  liveNow={videoMetadata?.liveNow}
+  viewCount={videoMetadata?.viewCount}
+  bind:videoStartAtChecked
+  bind:videoStartAtTimestamp
+/>
+
+<ChannelCastDialog
+  bind:this={channelModal}
+  author={channelMetadata?.author}
+  authorId={channelMetadata?.authorId}
+  authorThumbnails={channelMetadata?.authorThumbnails}
+/>

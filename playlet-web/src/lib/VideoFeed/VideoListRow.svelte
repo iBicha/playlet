@@ -1,8 +1,8 @@
 <script lang="ts">
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
-  import VideoCell from "lib/Screens/Home/VideoCell.svelte";
-  import PlaylistCell from "lib/Screens/Home/PlaylistCell.svelte";
+  import VideoCell from "./VideoCell.svelte";
+  import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
 
   // TODO:P1 figure out why some uncached feeds (e.g. channels/ucid/videos) get hit twice
