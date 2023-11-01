@@ -2,6 +2,7 @@
   import { playletStateStore } from "lib/Stores";
   import VideoCastDialog from "./VideoCastDialog.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
+  import ChannelCastDialog from "./ChannelCastDialog.svelte";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;
@@ -37,7 +38,8 @@
   // svelte-ignore unused-export-let
   export let indexId: string = undefined;
 
-  let modal;
+  let videoModal;
+  let channelModal;
   let invidiousInstance;
 
   playletStateStore.subscribe((value) => {
@@ -137,7 +139,7 @@
   }
 </script>
 
-<button class="w-80 p-2" on:click={modal.show()}>
+<button class="w-80 p-2" on:click={videoModal.show()}>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <VideoThumbnail
       bind:title
@@ -149,13 +151,21 @@
     />
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
-      <div class="font-semibold">{author}</div>
+      <button
+        class="font-semibold link"
+        on:click={(e) => {
+          e.stopPropagation();
+          channelModal.show();
+        }}
+      >
+        {author}
+      </button>
       <div>{getViewCountDateText()}</div>
     </div>
   </div>
 </button>
 <VideoCastDialog
-  bind:this={modal}
+  bind:this={videoModal}
   bind:videoId
   bind:title
   bind:author
@@ -166,3 +176,4 @@
   videoStartAtChecked={false}
   videoStartAtTimestamp={0}
 />
+<ChannelCastDialog bind:this={channelModal} bind:author bind:authorId />
