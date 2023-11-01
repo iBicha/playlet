@@ -1,0 +1,39 @@
+function DisposableObserveField(node as object, field as string, callback as string)
+    node.ObserveField(field, callback)
+
+    if m._disposableObserveFields = invalid
+        m._disposableObserveFields = []
+    end if
+    m._disposableObserveFields.push({
+        node: node,
+        field: field
+    })
+end function
+
+function DisposableObserveFieldScoped(node as object, field as string, callback as string)
+    node.ObserveFieldScoped(field, callback)
+
+    if m._disposableObserveFieldsScoped = invalid
+        m._disposableObserveFieldsScoped = []
+    end if
+    m._disposableObserveFieldsScoped.push({
+        node: node,
+        field: field
+    })
+end function
+
+function DisposeObservers()
+    if m._disposableObserveFields <> invalid
+        for each item in m._disposableObserveFields
+            item.node.UnobserveField(item.field)
+        next
+        m._disposableObserveFields = invalid
+    end if
+
+    if m._disposableObserveFieldsScoped <> invalid
+        for each item in m._disposableObserveFieldsScoped
+            item.node.UnobserveFieldScoped(item.field)
+        next
+        m._disposableObserveFieldsScoped = invalid
+    end if
+end function

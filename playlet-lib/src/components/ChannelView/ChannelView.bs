@@ -5,6 +5,7 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "SubscribeTask.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
 
 function Init()
     m.container = m.top.findNode("container")
@@ -20,7 +21,7 @@ function Init()
     m.rowList.focusable = true
     m.rowList.screen = m.top
 
-    m.banner.ObserveField("loadStatus", FuncName(OnBannerLoadStatus))
+    DisposableObserveField(m.banner, "loadStatus", FuncName(OnBannerLoadStatus))
     m.author = ""
     m.authorId = ""
 
@@ -34,12 +35,12 @@ function OnNodeready()
     SetNavigation(m.subscribeButton, "down", m.rowList)
 
     m.subscribeButton.text = "Subscribe"
-    m.subscribeButton.ObserveField("buttonSelected", FuncName(OnSubscribeButtonSelected))
+    DisposableObserveField(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
 
     SetSubscribeButtonVisibility()
-    m.invidious.ObserveFieldScoped("authToken", FuncName(SetSubscribeButtonVisibility))
+    DisposableObserveFieldScoped(m.invidious, "authToken", FuncName(SetSubscribeButtonVisibility))
     OnSubscriptionChanged()
-    m.invidious.ObserveFieldScoped("subscriptions", FuncName(OnSubscriptionChanged))
+    DisposableObserveFieldScoped(m.invidious, "subscriptions", FuncName(OnSubscriptionChanged))
 end function
 
 function OnFocusChange() as void
@@ -53,6 +54,7 @@ end function
 function OnContentSet() as void
     content = m.top.content
     if content = invalid
+        m.top.authorId = ""
         return
     end if
 
@@ -72,14 +74,13 @@ function OnContentSet() as void
 
     authorId = ValidString(content.authorId)
     author = ValidString(content._author)
+    m.top.authorId = authorId
+
     if (authorId <> m.authorId or author <> m.author) and IsArray(content.tabs)
         m.authorId = authorId
         m.author = author
         m.rowList.feeds = CreateChannelFeeds(m.authorId, author, content.tabs)
     end if
-
-    SetSubscribeButtonVisibility()
-    OnSubscriptionChanged()
 end function
 
 function CreateChannelFeeds(authorId as string, author as string, tabs as object) as object
@@ -115,6 +116,12 @@ end function
 
 function Close()
     m.appController@.PopScreen(invalid)
+    m.top.dispose = true
+end function
+
+function OnDispose()
+    m.rowList.dispose = true
+    DisposeObservers()
 end function
 
 function OnSubscribeButtonSelected()
@@ -196,12 +203,10 @@ function CreateChannelFeed(title as string, endpoint as string, ucid as string, 
 end function
 
 function GetContextMenuOptionsForItem(video as object) as object
-    content = m.top.content
-    if content = invalid or StringUtils.IsNullOrEmpty(content.authorId)
+    if StringUtils.IsNullOrEmpty(m.top.authorId)
         return []
     end if
-
-    return m.bookmarks@.GetMenuForChannel(content)
+    return m.bookmarks@.GetMenuForChannel(m.top.content)
 end function
 
 function IsLoggedIn() as boolean
@@ -209,8 +214,8 @@ function IsLoggedIn() as boolean
 end function
 
 function IsSubscribed() as boolean
-    content = m.top.content
-    if content = invalid or StringUtils.IsNullOrEmpty(content.authorId)
+    authorId = m.top.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
         return false
     end if
 
@@ -218,16 +223,20 @@ function IsSubscribed() as boolean
     if subscriptions = invalid
         return false
     end if
-    if not subscriptions.DoesExist(content.authorId)
+    if not subscriptions.DoesExist(authorId)
         return false
     end if
-    return subscriptions[content.authorId]
+    return subscriptions[authorId]
+end function
+
+function OnAuthorIdChange()
+    SetSubscribeButtonVisibility()
+    OnSubscriptionChanged()
 end function
 
 function SetSubscribeButtonVisibility()
     isLogged = IsLoggedIn()
-    content = m.top.content
-    m.subscribeButton.visible = isLogged and content <> invalid and not StringUtils.IsNullOrEmpty(content.authorId)
+    m.subscribeButton.visible = isLogged and not StringUtils.IsNullOrEmpty(m.top.authorId)
     if not m.subscribeButton.visible and m.subscribeButton.hasFocus()
         NodeSetFocus(m.rowList, true)
     end if
