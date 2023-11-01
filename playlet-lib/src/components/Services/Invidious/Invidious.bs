@@ -1,4 +1,6 @@
 import "InvidiousService.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
+import "InvidiousSubscriptionsTask.bs"
 
 function Init()
     m.top.apiDefinitions = ParseJson(ReadAsciiFile("libpkg:/config/invidious_video_api.yaml"))
@@ -16,4 +18,19 @@ end function
 
 function SetAuthToken(token as string, instance as string, username as dynamic)
     m.service.SetAuthToken(token, instance, username)
+end function
+
+function OnAuthTokenChange() as void
+    m.top.refreshSubscribtions = true
+end function
+
+function GetSubscriptions() as void
+    if m.subscriptionsTask <> invalid
+        m.subscriptionsTask.cancel = true
+    end if
+    if m.top.authToken = invalid
+        m.top.subscriptions = invalid
+        return
+    end if
+    m.subscriptionsTask = StartAsyncTask(InvidiousSubscriptionsTask, { invidious: m.top })
 end function
