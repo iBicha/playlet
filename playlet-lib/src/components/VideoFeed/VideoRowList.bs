@@ -7,6 +7,7 @@ import "pkg:/components/VideoFeed/VideoRowListContentTask.bs"
 import "pkg:/components/VideoFeed/VideoRowListRowContentTask.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
@@ -18,12 +19,13 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.top.ObserveField("itemFocused", FuncName(OnItemFocused))
-    m.top.ObserveField("rowItemFocused", FuncName(OnRowItemFocused))
-    m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
-    m.top.ObserveField("visible", FuncName(OnVisibilityChange))
+    DisposableObserveField(m.top, "itemFocused", FuncName(OnItemFocused))
+    DisposableObserveField(m.top, "rowItemFocused", FuncName(OnRowItemFocused))
+    DisposableObserveField(m.top, "focusedChild", FuncName(OnFocusedChildChange))
+    DisposableObserveField(m.top, "visible", FuncName(OnVisibilityChange))
 
-    m.invidious.ObserveFieldScoped("authToken", FuncName(OnAuthTokenChange))
+    ' TODO:P1 Reload when subscriptions change
+    DisposableObserveFieldScoped(m.invidious, "authToken", FuncName(OnAuthTokenChange))
     InitializeLongPressTimer()
 end function
 
@@ -310,4 +312,8 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return true
     end if
     return false
+end function
+
+function OnDispose()
+    DisposeObservers()
 end function

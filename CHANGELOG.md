@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Pagination support in web app search (load more button)
 - Video links pasted into the web app triggers the dialog to cast the video
+- Ability to subscribe/unsubscribe from a channel screen
 
 ### Fixed
 
 - A bug where casting from web included timestamp even if the "Start at" check box is unchecked
+- A leak where channel screens would reload data even when closed
 
 ## [0.14.0] - 2023-10-25
 
