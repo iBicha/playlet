@@ -41,9 +41,7 @@ namespace InvidiousContent
         node.liveNow = VideoIsLive(item)
         VideoSetPremiereTimestampText(node, item)
         SetIfExists(node, "publishedText", item, "publishedText")
-        if not StringUtils.IsNullOrEmpty(instance)
-            node.thumbnail = VideoGetThumbnail(item, instance) ?? "pkg:/images/thumbnail-missing.jpg"
-        end if
+        VideoSetThumbnail(node, item, instance)
         SetIfExists(node, "title", item, "title")
         SetIfExists(node, "timestamp", item, "timestamp")
         SetIfExists(node, "videoId", item, "videoId")
@@ -128,10 +126,11 @@ namespace InvidiousContent
         end if
     end function
 
-    function VideoGetThumbnail(videoItem as object, instance as dynamic, quality = "medium" as string) as dynamic
+    function VideoSetThumbnail(node as object, videoItem as object, instance as dynamic, quality = "medium" as string) as boolean
         videoThumbnails = videoItem.videoThumbnails
         if videoThumbnails = invalid or videoThumbnails.Count() = 0
-            return invalid
+            node.thumbnail = "pkg:/images/thumbnail-missing.jpg"
+            return false
         end if
         url = invalid
         for each thumbnail in videoThumbnails
@@ -143,10 +142,14 @@ namespace InvidiousContent
         if url = invalid
             url = videoThumbnails[0].url
         end if
-        if url.startsWith("/") and not StringUtils.IsNullOrEmpty(instance)
+        if url.startsWith("/")
+            if StringUtils.IsNullOrEmpty(instance)
+                return false
+            end if
             url = instance + url
         end if
-        return url
+        node.thumbnail = url
+        return true
     end function
 
     function VideoIsLive(videoItem as object) as boolean
@@ -208,7 +211,9 @@ namespace InvidiousContent
             end if
             thumbnail = thumbnailUrl
         else if playlistItem.videos <> invalid and playlistItem.videos.Count() > 0 and playlistItem.videos[0].index = 0
-            thumbnail = VideoGetThumbnail(playlistItem.videos[0], instance, quality)
+            if VideoSetThumbnail(node, playlistItem.videos[0], instance, quality)
+                return
+            end if
         else if node.getChildCount() > 0
             thumbnail = node.getChild(0).thumbnail
         end if
