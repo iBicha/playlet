@@ -372,16 +372,28 @@ namespace Invidious
         function AuthFeedHandler(m as object, feedSource as object, response as object) as object
             m.DeleteExpiredToken(response)
 
-            if response.StatusCode() = 200
-                json = response.Json()
-                videos = []
-                videos.Append(json.notifications)
-                videos.Append(json.videos)
-                return {
-                    items: videos
-                }
+            if response.StatusCode() <> 200
+                return invalid
             end if
-            return invalid
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            videos = []
+
+            if IsArray(json.notifications)
+                videos.Append(json.notifications)
+            end if
+
+            if IsArray(json.videos)
+                videos.Append(json.videos)
+            end if
+
+            return {
+                items: videos
+            }
         end function
 
         function DeleteExpiredToken(response as object)
