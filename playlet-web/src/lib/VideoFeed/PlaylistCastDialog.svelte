@@ -27,11 +27,11 @@
   });
 
   async function playOnTv() {
-    await PlayletApi.playPlaylist(playlistId, title, videoCount);
+    await PlayletApi.playPlaylist(getPlaylistInfo());
   }
 
   async function queueOnTv() {
-    await PlayletApi.queuePlaylist(playlistId, title, videoCount);
+    await PlayletApi.queuePlaylist(getPlaylistInfo());
   }
 
   async function openOnTv() {
@@ -41,6 +41,43 @@
   function openInvidious() {
     let url = `${invidiousInstance}/playlist?list=${playlistId}`;
     window.open(url);
+  }
+
+  function getPlaylistInfo() {
+    return {
+      type: "playlist",
+      playlistId,
+      title,
+      playlistThumbnail: getPlaylistThumbnail(),
+      videoCount,
+      videos,
+    };
+  }
+
+  function getPlaylistThumbnail() {
+    let url = "";
+    if (playlistThumbnail) {
+      url = playlistThumbnail;
+      if (url.startsWith("/") && invidiousInstance) {
+        url = invidiousInstance + url;
+      }
+    } else if (videos && videos.length) {
+      const video = videos[0];
+      if (video.videoThumbnails) {
+        const videoThumbnail =
+          video.videoThumbnails.find(
+            (thumbnail) => thumbnail.quality === "medium"
+          ) || video.videoThumbnails[0];
+        url = videoThumbnail.url;
+      }
+      if (url.startsWith("/") && invidiousInstance) {
+        url = invidiousInstance + url;
+      }
+    }
+    if (url === "") {
+      url = `${invidiousInstance}/vi/-----------/mqdefault.jpg`;
+    }
+    return url;
   }
 </script>
 

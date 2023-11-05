@@ -35,13 +35,11 @@
   });
 
   async function playOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.playVideo(videoId, timestamp, title, author);
+    await PlayletApi.playVideo(getVideoInfo());
   }
 
   async function queueOnTv() {
-    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
-    await PlayletApi.queueVideo(videoId, timestamp, title, author);
+    await PlayletApi.queueVideo(getVideoInfo());
   }
 
   function openInvidious() {
@@ -50,6 +48,36 @@
       url += `&t=${videoStartAtTimestamp}`;
     }
     window.open(url);
+  }
+
+  function getVideoInfo() {
+    const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
+    return {
+      type: "video",
+      videoId,
+      title,
+      videoThumbnails: getVideoThumbnails(),
+      author,
+      lengthSeconds,
+      liveNow,
+      viewCount,
+      timestamp,
+    };
+  }
+
+  function getVideoThumbnails() {
+    if (!invidiousInstance || !videoThumbnails || !videoThumbnails.length) {
+      return videoThumbnails;
+    }
+
+    return videoThumbnails.map((thumbnail) => {
+      let url = thumbnail.url;
+      if (url.startsWith("/")) {
+        url = invidiousInstance + url;
+        thumbnail.url = url;
+      }
+      return thumbnail;
+    });
   }
 </script>
 
