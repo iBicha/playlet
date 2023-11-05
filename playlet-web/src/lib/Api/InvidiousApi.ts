@@ -154,7 +154,14 @@ export class InvidiousApi {
             cacheSeconds = endpoint.cacheSeconds
         }
 
-        const responseJson = await this.cachedFetch(url, cacheSeconds);
+        let tryCount = 1;
+        if (feedSource.tryCount !== undefined) {
+            tryCount = feedSource.tryCount
+        } else if (endpoint.tryCount !== undefined) {
+            tryCount = endpoint.tryCount
+        }
+
+        const responseJson = await this.cachedFetch(url, cacheSeconds, tryCount);
 
         let responseHandler = endpoint.responseHandler !== undefined ? this.responseHandlers[endpoint.responseHandler] : this.responseHandlers["DefaultHandler"];
         if (!responseHandler) {
@@ -222,21 +229,47 @@ export class InvidiousApi {
         return encodedUrl.toString();
     }
 
-    private async cachedFetch(url: string, cacheSeconds?: number) {
-        if (!cacheSeconds) {
+    private async cachedFetch(url: string, cacheSeconds?: number, tryCount: number = 1) {
+        if (cacheSeconds) {
+            const cache = this.getCache(url, cacheSeconds);
+            if (cache) {
+                return cache;
+            }
+        }
+
+
+        try {
+            tryCount -= 1;
             const response = await fetch(url);
-            return await response.json();
+            if (!response.ok) {
+                throw new Error(response.statusText);
+            }
+            const data = await response.json();
+            this.setCache(url, data);
+            return data;
+
+        } catch (error) {
+            console.error(error);
         }
 
-        const cache = this.getCache(url, cacheSeconds);
-        if (cache) {
-            return cache;
-        }
+        while (tryCount > 0) {
+            tryCount -= 1;
+            let backOffMs = 1000 + Math.floor(Math.random() * (3000 - 1000));
+            console.log(`Retrying ${url} in ${backOffMs}ms`);
+            await new Promise(resolve => setTimeout(resolve, backOffMs));
 
-        const response = await fetch(url);
-        const data = await response.json();
-        this.setCache(url, data);
-        return data;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(response.statusText);
+                }
+                const data = await response.json();
+                this.setCache(url, data);
+                return data;
+            } catch (error) {
+                console.error(error);
+            }
+        }
     }
 
     // TODO:P2 use more appropriate cache storage

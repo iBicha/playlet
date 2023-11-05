@@ -46,6 +46,7 @@ namespace HttpClient
 
         function new()
             m._timeoutSeconds = 30
+            m._tryCount = 1
         end function
 
         function Method(method as string) as HttpRequest
@@ -141,6 +142,14 @@ namespace HttpClient
             return m
         end function
 
+        function TryCount(tryCount as integer) as HttpRequest
+            m._tryCount = ValidInt(tryCount)
+            if m._tryCount < 1
+                m._tryCount = 1
+            end if
+            return m
+        end function
+
         function NoCache() as HttpRequest
             m._noCache = true
             return m
@@ -179,14 +188,6 @@ namespace HttpClient
         end function
 
         function Send() as HttpRequest
-            return m.DoSend(false)
-        end function
-
-        function SendAndForget() as HttpRequest
-            return m.DoSend(true)
-        end function
-
-        private function DoSend(forget as boolean) as HttpRequest
             if m.urlTransfer <> invalid or m._cache <> invalid
                 return m
             end if
@@ -215,9 +216,7 @@ namespace HttpClient
                 m.urlTransfer.SetHeaders(m._headers)
             end if
 
-            if not forget
-                m.urlTransfer.SetMessagePort(CreateObject("roMessagePort"))
-            end if
+            m.urlTransfer.SetMessagePort(CreateObject("roMessagePort"))
 
             LogInfo("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
 
@@ -268,6 +267,36 @@ namespace HttpClient
         end function
 
         function Await() as HttpResponse
+            tryCount = m._tryCount
+            response = invalid
+
+            response = m.AwaitInternal()
+            if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
+                return response
+            end if
+            tryCount -= 1
+
+            while tryCount > 0
+                backoffMs = 1000 + Rnd(2000)
+                LogInfo("Request failed with status code:", response.StatusCode(), "ID:", m.urlTransfer.GetIdentity(), `\nRetrying:`, m._tryCount - tryCount, "in", backoffMs, "ms")
+
+                m.urlTransfer = invalid
+                m._cache = invalid
+                m._sent = invalid
+
+                sleep(backoffMs)
+
+                response = m.AwaitInternal()
+                if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
+                    return response
+                end if
+                tryCount -= 1
+            end while
+
+            return response
+        end function
+
+        private function AwaitInternal() as HttpResponse
             if m.urlTransfer = invalid and m._cache = invalid
                 m.Send()
             end if
