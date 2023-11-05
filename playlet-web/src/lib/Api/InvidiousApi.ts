@@ -274,7 +274,8 @@ export class InvidiousApi {
 
     // TODO:P2 use more appropriate cache storage
     private getCache(url: string, cacheSeconds: number) {
-        const cache = localStorage.getItem(url);
+        const cacheKey = this.getCacheKey(url);
+        const cache = localStorage.getItem(cacheKey);
         if (!cache) {
             return null;
         }
@@ -293,12 +294,17 @@ export class InvidiousApi {
     }
 
     private setCache(url: string, data: any) {
+        const cacheKey = this.getCacheKey(url);
         const cacheData = {
             __version: 1,
             timestamp: Date.now(),
             data
         };
 
-        localStorage.setItem(url, JSON.stringify(cacheData));
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    }
+
+    private getCacheKey(url: string) {
+        return `v1:${url}`;
     }
 }
