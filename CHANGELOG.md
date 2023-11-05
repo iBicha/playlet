@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pagination support in web app search (load more button)
 - Video links pasted into the web app triggers the dialog to cast the video
 - Ability to subscribe/unsubscribe from a channel screen
+  - This needs additional scope for the Invidious token. You will be logged out, and need to login again. Sorry for the inconvenience.
 - A notification when videos are added to the queue (can be disabled from the settings)
 
 ### Fixed
