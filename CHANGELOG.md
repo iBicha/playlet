@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A bug where casting from web included timestamp even if the "Start at" check box is unchecked
 - A leak where channel screens would reload data even when closed
 - A crash when fetching subscriptions
+- Fetching errors by adding a retry mechanism to web requests
 
 ## [0.14.0] - 2023-10-25
 
