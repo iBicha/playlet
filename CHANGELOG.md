@@ -5,16 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.15.0] - 2023-11-05
 
 ### Added
 
 - Pagination support in web app search (load more button)
 - Video links pasted into the web app triggers the dialog to cast the video
+- Ability to subscribe/unsubscribe from a channel screen
+  - This needs additional scope for the Invidious token. You will be logged out, and need to login again. Sorry for the inconvenience.
+- A notification when videos are added to the queue (can be disabled from the settings)
 
 ### Fixed
 
 - A bug where casting from web included timestamp even if the "Start at" check box is unchecked
+- A leak where channel screens would reload data even when closed
+- A crash when fetching subscriptions
+- Fetching errors by adding a retry mechanism to web requests
 
 ## [0.14.0] - 2023-10-25
 

@@ -22,8 +22,10 @@ namespace Invidious
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
 
-    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/register,POST:tokens/unregister,POST:history*"
+    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,POST:history*,:subscriptions*"
+
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
+    const AUTH_SUBSCRIPTIONS = "/api/v1/auth/subscriptions"
     const AUTH_TOKENS_UNREGISTER = "/api/v1/auth/tokens/unregister"
     const AUTH_TOKENS_REGISTER = "/api/v1/auth/tokens/register"
 
@@ -86,7 +88,7 @@ namespace Invidious
             url = `${authToken.instance}${Invidious.HISTORY_ENDPOINT}/${videoId}`
             request = HttpClient.Post(url, "")
             request.Headers(m.GetAuthenticationHeaders(authToken.token))
-            request.SendAndForget()
+            request.Send()
         end function
 
         function SearchSuggestions(q as string, cancellation = invalid as object) as object
@@ -147,6 +149,7 @@ namespace Invidious
             request.QueryParams(m.DefaultQueryParams())
             request.Cancellation(cancellation)
             request.CacheSeconds(60 * 60 * 24)' 24 hours
+            request.TryCount(3)
 
             return request.Await()
         end function
@@ -246,6 +249,12 @@ namespace Invidious
                 request.CacheSeconds(feedSource.cacheSeconds)
             else if endpoint.cacheSeconds <> invalid
                 request.CacheSeconds(endpoint.cacheSeconds)
+            end if
+
+            if feedSource.tryCount <> invalid
+                request.TryCount(feedSource.tryCount)
+            else if endpoint.tryCount <> invalid
+                request.TryCount(endpoint.tryCount)
             end if
 
             if feedSource.queryParams <> invalid
@@ -370,16 +379,28 @@ namespace Invidious
         function AuthFeedHandler(m as object, feedSource as object, response as object) as object
             m.DeleteExpiredToken(response)
 
-            if response.StatusCode() = 200
-                json = response.Json()
-                videos = []
-                videos.Append(json.notifications)
-                videos.Append(json.videos)
-                return {
-                    items: videos
-                }
+            if response.StatusCode() <> 200
+                return invalid
             end if
-            return invalid
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            videos = []
+
+            if IsArray(json.notifications)
+                videos.Append(json.notifications)
+            end if
+
+            if IsArray(json.videos)
+                videos.Append(json.videos)
+            end if
+
+            return {
+                items: videos
+            }
         end function
 
         function DeleteExpiredToken(response as object)
@@ -461,7 +482,7 @@ namespace Invidious
             request.Headers(m.GetAuthenticationHeaders(authToken.token))
             request.Header("Content-Type", "application/json")
 
-            request.SendAndForget()
+            request.Send()
         end function
 
         function GetAuthorizeTokenLink() as dynamic
@@ -481,6 +502,47 @@ namespace Invidious
             return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
         end function
 
+        function GetSubscriptions(cancellation = invalid as object) as object
+            authToken = m.node.authToken
+            if authToken = invalid
+                return invalid
+            end if
+
+            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}`
+            request = HttpClient.Get(url)
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
+
+        function Subscribe(channelId as string, cancellation = invalid as object) as object
+            authToken = m.node.authToken
+            if authToken = invalid
+                return invalid
+            end if
+
+            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
+            request = HttpClient.Post(url, "")
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
+
+        function Unsubscribe(channelId as string, cancellation = invalid as object) as object
+            authToken = m.node.authToken
+            if authToken = invalid
+                return invalid
+            end if
+
+            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
+            request = HttpClient.Delete(url)
+            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Cancellation(cancellation)
+
+            return request.Await()
+        end function
     end class
 
 end namespace

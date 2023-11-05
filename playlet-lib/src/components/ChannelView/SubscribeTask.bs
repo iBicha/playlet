@@ -1,0 +1,35 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function SubscribeTask(input as object) as object
+    invidiousNode = input.invidious
+    ucid = input.ucid
+    subscribe = input.subscribe
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    if subscribe
+        response = service.Subscribe(ucid)
+    else
+        response = service.Unsubscribe(ucid)
+    end if
+
+    if not response.IsSuccess()
+        error = response.ErrorMessage()
+        LogError("Failed to subscribe/unsubscribe to channel:", error)
+        return {
+            success: false,
+            error: error
+        }
+    end if
+
+    invidiousNode.refreshSubscribtions = true
+
+    return {
+        success: true
+    }
+end function

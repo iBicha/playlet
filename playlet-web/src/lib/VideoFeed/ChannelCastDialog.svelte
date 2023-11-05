@@ -37,9 +37,11 @@
 <dialog bind:this={modal} class="modal">
   <form method="dialog" class="modal-box bg-base-100">
     <div class="flex flex-col items-center">
-      <div class="w-32">
-        <ChannelThumbnail bind:author bind:authorThumbnails />
-      </div>
+      {#if authorThumbnails}
+        <div class="w-32">
+          <ChannelThumbnail bind:author bind:authorThumbnails />
+        </div>
+      {/if}
       <div class="m-4">{author}</div>
     </div>
     <div class="flex flex-col">

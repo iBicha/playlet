@@ -13,7 +13,9 @@ function InitializeBindings()
                 "appController": "/AppController"
             }, 
             "PlayQueue": {
-                "invidious": "../Invidious"
+                "invidious": "../Invidious", 
+                "notifications": "../Notifications", 
+                "preferences": "../Preferences"
             }, 
             "Invidious": {
                 "webServer": "../WebServer", 
