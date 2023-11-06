@@ -11,20 +11,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: playlet
 
       - name: Checkout Wiki
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository }}.wiki
-          path: playlet.wiki
+          path: ./playlet.wiki
 
       - name: Configure repo
         run: |
           git config --local user.email "githubaction@githubaction.com"
           git config --local user.name "github-action wiki updater"
-        working-directory: ./playlet
+        working-directory: ./playlet.wiki
 
       - name: Use Node.js 18.x
         uses: actions/setup-node@v3
@@ -34,16 +32,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: ./playlet
 
       - name: Download attachements
         run: node tools/download-stats.js
-        working-directory: ./playlet
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GMAIL_CREDENTIALS: ${{ secrets.GMAIL_CREDENTIALS }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_LABEL: ${{ secrets.GMAIL_LABEL }}
+          EMAIL: ${{ secrets.EMAIL }}
+          EMAIL_APP_PASSWORD: ${{ secrets.EMAIL_APP_PASSWORD }}
 
       - name: Update wiki
         run: git add "." && git commit -m "Update stats" --no-verify && git push || true
