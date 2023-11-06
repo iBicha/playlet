@@ -15,7 +15,7 @@ function writeMarkDownFile(images) {
 
     let markdownContent = `# Playlet stats
 
-This page was automatically generated on ${new Date().toUTCString()}.
+This page was automatically generated on ${new Date().toString()}.
 
 `;
     images.forEach(image => {
