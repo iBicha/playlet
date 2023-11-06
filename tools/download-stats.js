@@ -13,9 +13,13 @@ const attachmentDestination = './playlet.wiki';
 function writeMarkDownFile(images) {
     const markdownFile = path.join(attachmentDestination, 'Home.md');
 
+    const date = new Date();
+    const options = { timeZone: 'America/New_York' };
+    const formattedDate = `${date.toLocaleString('en-US', options)} (Eastern Time)`;
+
     let markdownContent = `# Playlet stats
 
-This page was automatically generated on ${new Date().toString()}.
+This page was automatically generated on ${formattedDate}.
 
 `;
     images.forEach(image => {
