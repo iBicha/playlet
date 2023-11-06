@@ -113,6 +113,40 @@ async function getAttachementAsync(from, subject, since) {
         });
     });
 }
+
+async function moveToTrash(from, subject, since) {
+    return new Promise(async (resolve, reject) => {
+        const results = await searchAsync([['FROM', from], ['SUBJECT', subject], ['SINCE', since]]);
+        const fetch = imap.fetch(results, { bodies: '' });
+
+        fetch.on('message', function (msg, seqno) {
+            console.log('Processing message #%d', seqno);
+
+            msg.on('attributes', attributes => {
+                imap.move([attributes.uid], '[Gmail]/Trash', function (err) {
+                    if (err) {
+                        console.error(err);
+                        reject(err);
+                    } else {
+                        console.log('Moved message #%d to Trash', seqno);
+                    }
+                });
+            });
+
+            msg.once('error', err => reject(err));
+
+            msg.once('end', function () {
+                console.log('Finished processing message #%d', seqno);
+            });
+        });
+
+        fetch.once('end', function () {
+            console.log('All messages processed');
+            resolve();
+        });
+    });
+}
+
 const timeout = setTimeout(() => {
     console.log('Timeout');
     process.exit(1);
@@ -143,6 +177,10 @@ imap.once('ready', async () => {
         })
 
         writeMarkDownFile(images);
+
+        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
 
         imap.end();
     } catch (error) {
