@@ -33,6 +33,21 @@ This page was automatically generated on ${formattedDate}.
     fs.writeFileSync(markdownFile, markdownContent);
 }
 
+async function deleteExistingAttachments() {
+    try {
+        const files = fs.readdirSync(attachmentDestination);
+
+        for (const file of files) {
+            if (path.extname(file) === '.png') {
+                fs.unlinkSync(path.join(attachmentDestination, file));
+                console.log(`Deleted ${file}`);
+            }
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 const config = getEnvVars(['EMAIL', 'EMAIL_APP_PASSWORD']);
 
 const imap = new Imap({
@@ -110,6 +125,8 @@ imap.once('ready', async () => {
         const now = new Date();
         const yesterday = new Date(now - 24 * 60 * 60 * 1000);
         const yesterdayString = yesterday.toISOString().slice(0, 19).replace('T', ' ');
+
+        deleteExistingAttachments();
 
         const images = []
         images.push({
