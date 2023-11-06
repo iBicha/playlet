@@ -1,7 +1,7 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Screens/SearchScreen/SearchSuggestionsTask.bs"
+import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
-import "pkg:/source/services/SearchHistory.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
@@ -99,7 +99,8 @@ function OnTextChange() as void
 
     m.searchSuggestionsTask = StartAsyncTask(SearchSuggestionsTask, {
         q: m.keyboard.text,
-        invidious: m.invidious
+        invidious: m.invidious,
+        preferences: m.preferences
     }, OnSearchSuggestionsTaskResults)
 end function
 
@@ -155,7 +156,7 @@ end function
 function OnSearchButtonSelected()
     selected = m.suggestions.buttonSelected
     text = m.suggestions.buttons[selected]
-    SearchHistory.Save(text)
+    SearchHistoryUtils.Save(m.preferences, text)
     Search(text)
 end function
 

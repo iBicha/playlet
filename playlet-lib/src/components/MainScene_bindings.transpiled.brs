@@ -17,6 +17,9 @@ function InitializeBindings()
                 "notifications": "../Notifications", 
                 "preferences": "../Preferences"
             }, 
+            "SearchHistory": {
+                "preferences": "../Preferences"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
