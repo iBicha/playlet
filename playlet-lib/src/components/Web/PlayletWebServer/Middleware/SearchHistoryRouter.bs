@@ -1,4 +1,4 @@
-import "pkg:/source/services/SearchHistory.bs"
+import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 
 namespace Http
 
@@ -9,13 +9,18 @@ namespace Http
 
             m.Get("/api/search-history", function(context as object) as boolean
                 response = context.response
-                response.Json(SearchHistory.GetAllSaved())
+                task = context.server.task
+                preferences = task.preferences
+
+                response.Json(SearchHistoryUtils.GetAllSaved(preferences))
                 return true
             end function)
 
             m.Put("/api/search-history", function(context as object) as boolean
                 request = context.request
                 response = context.response
+                task = context.server.task
+                preferences = task.preferences
 
                 payload = request.Json()
                 if payload = invalid
@@ -29,15 +34,15 @@ namespace Http
                     return true
                 end if
 
-                SearchHistory.Save(query)
-                response.Json(SearchHistory.GetAllSaved())
+                SearchHistoryUtils.Save(preferences, query)
+                response.Json(SearchHistoryUtils.GetAllSaved(preferences))
                 return true
             end function)
 
             m.Delete("/api/search-history", function(context as object) as boolean
                 response = context.response
 
-                SearchHistory.Clear()
+                SearchHistoryUtils.Clear()
                 response.Default(204, "OK")
                 return true
             end function)
