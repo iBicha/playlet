@@ -1,4 +1,6 @@
-const markdownFile = "../playlet.wiki/Home.md"
+const fs = require('fs')
+
+const markdownFile = "./playlet.wiki/Home.md"
 
 const markdownContent = `
 # Playlet stats
