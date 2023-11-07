@@ -1,6 +1,3 @@
-// TODO:P0 handle case where there is no new emails
-// TODO:P0 move processed emails to a trash
-
 const fs = require('fs');
 const path = require('path');
 const Imap = require('imap');
