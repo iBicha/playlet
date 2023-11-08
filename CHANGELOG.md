@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A rare bug that causes the app to crash when displaying video cells
 - A bug where we show error dialogs that happened on screens that are already closed
+- A bug where bookmarks show duplicate videos
 
 ## [0.15.0] - 2023-11-05
 
