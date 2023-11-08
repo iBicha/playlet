@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An option to disable search history
 
+### Fixed
+
+- A rare bug that causes the app to crash when displaying video cells
+
 ## [0.15.0] - 2023-11-05
 
 ### Added

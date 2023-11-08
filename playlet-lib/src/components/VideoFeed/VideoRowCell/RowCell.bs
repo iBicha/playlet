@@ -1,40 +1,49 @@
-function Init()
-    m.videoRowCell = m.top.findNode("VideoRowCell")
-    m.playlistRowCell = m.top.findNode("PlaylistRowCell")
-    m.channelRowCell = m.top.findNode("ChannelRowCell")
-    m.loadingRowCell = m.top.findNode("LoadingRowCell")
-    m.actionRowCell = m.top.findNode("ActionRowCell")
-    m.cells = [m.videoRowCell, m.playlistRowCell, m.channelRowCell, m.loadingRowCell, m.actionRowCell]
-end function
-
+' Note: we use aliases and not references to sub cells that we initialize on Init() because
+'       of a rare bug / race condition where the cells are not initialized
 function OnContentSet() as void
     content = m.top.itemContent
 
+    visibleProperties = {
+        "video": "videoRowCellVisible",
+        "playlist": "playlistRowCellVisible",
+        "channel": "channelRowCellVisible",
+        "loading": "loadingRowCellVisible",
+        "action": "actionRowCellVisible"
+    }
+
+    contentProperties = {
+        "video": "videoRowCellItemContent",
+        "playlist": "playlistRowCellItemContent",
+        "channel": "channelRowCellItemContent",
+        "loading": "loadingRowCellItemContent",
+        "action": "actionRowCellItemContent"
+    }
+
     if content = invalid
-        for each cell in m.cells
-            cell.visible = false
+        for each key in visibleProperties
+            m.top[visibleProperties[key]] = false
         end for
-        m.loadingRowCell.visible = true
+        m.top.loadingRowCellVisible = true
         return
     end if
 
     m.top.type = content.type
 
     visibleSet = false
-    for each cell in m.cells
-        shouldBeVisible = content.type = cell.type
-        cell.visible = shouldBeVisible
+    for each key in visibleProperties
+        shouldBeVisible = content.type = key
+        m.top[visibleProperties[key]] = shouldBeVisible
         if shouldBeVisible
-            cell.itemContent = content
+            m.top[contentProperties[key]] = content
             visibleSet = true
         end if
     end for
 
     if not visibleSet
-        m.loadingRowCell.visible = true
+        m.top.loadingRowCellVisible = true
     end if
 
-    if m.loadingRowCell.visible
-        m.loadingRowCell.index = m.top.index
+    if m.top.loadingRowCellVisible
+        m.top.loadingRowCellIndex = m.top.index
     end if
 end function
