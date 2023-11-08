@@ -70,6 +70,14 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 For everything related to Playlet app development, please see the [documentation](./docs/README.md)
 
+## Analytics and reporting
+
+We do not collect any usage data, anonymous or not. But Roku does, and you can find the data made available to Playlet in the [Wiki](https://github.com/iBicha/playlet/wiki).
+Most software in the wild collect some data to make sure things work, and to prioritize features. 
+Because we don't do that, we wouldn't know if people using Playlet are facing issues, unless these issues get reported.
+Playlet could run on variaty of devices, with different capabilities and screen sizes, and different Invidious instances.
+That's why it's important to report any issues you encouter using Playlet, otherwise it's unlikely that they get addressed.
+
 ## Why Playlet
 
 ```none
