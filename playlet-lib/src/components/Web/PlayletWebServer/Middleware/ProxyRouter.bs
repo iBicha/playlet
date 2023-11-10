@@ -1,0 +1,38 @@
+
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Http
+
+    class ProxyRouter extends HttpRouter
+
+        function new()
+            super()
+
+            m.Post("/api/proxy", function(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                requestArgs = request.Json()
+                if requestArgs = invalid
+                    response.Default(400, "Invalid request body")
+                    return true
+                end if
+
+                httpReq = HttpClient.FromObject(requestArgs)
+                httpRes = httpReq.Await()
+
+                result = {
+                    "status": httpRes.StatusCode(),
+                    "headers": httpRes.Headers(),
+                    "body": httpRes.Text()
+                }
+
+                response.Json(result)
+                return true
+            end function)
+
+        end function
+
+    end class
+
+end namespace

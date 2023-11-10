@@ -4,6 +4,7 @@
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
   import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
+  import { YoutubeJs } from "./Api/YoutubeJs";
 
   let videoModal;
   let channelModal;
@@ -64,45 +65,40 @@
   }
 
   async function processUrlText(dataString: string) {
-    if (isValidHttpUrl(dataString)) {
-      const videoInfo = parseYouTubeUrl(dataString);
-      if (videoInfo.videoId) {
-        searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
-        return;
-      } else {
-        // TODO:P2 make a HEAD request and check for a redirect, then
-        // resolve the redirect url.
-        const urlInfo: any = await invidiousApi.resolveUrl(dataString);
-        if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
-          searchForChannelById(urlInfo.ucid);
-          return;
+    try {
+      isLoading = true;
+
+      if (isValidHttpUrl(dataString)) {
+        let urlInfo = await YoutubeJs.resolveUrl(dataString);
+        if (urlInfo.ucid) {
+          await searchForChannelById(urlInfo.ucid);
+        } else if (urlInfo.videoId) {
+          await searchForVideoById(urlInfo.videoId, urlInfo.timestamp);
+        } else {
+          // If the urls are not from Youtube, they could be from Invidious
+          urlInfo = parseYouTubeLikeUrl(dataString);
+          if (urlInfo.videoId) {
+            await searchForVideoById(urlInfo.videoId, urlInfo.timestamp);
+          }
         }
       }
+    } finally {
+      isLoading = false;
     }
   }
 
   async function searchForVideoById(videoId, timestamp) {
-    try {
-      isLoading = true;
-      videoMetadata = await invidiousApi.getVideoMetadata(videoId);
-      videoStartAtChecked = timestamp !== undefined;
-      if (videoStartAtChecked) {
-        videoStartAtTimestamp = timestamp;
-      }
-      videoModal.show();
-    } finally {
-      isLoading = false;
+    videoMetadata = await invidiousApi.getVideoMetadata(videoId);
+    videoStartAtChecked = timestamp !== undefined;
+    if (videoStartAtChecked) {
+      videoStartAtTimestamp = timestamp;
     }
+    videoModal.show();
   }
 
   async function searchForChannelById(channelId) {
-    try {
-      isLoading = true;
-      channelMetadata = await invidiousApi.getChannelMetadata(channelId);
-      channelModal.show();
-    } finally {
-      isLoading = false;
-    }
+    channelMetadata = await invidiousApi.getChannelMetadata(channelId);
+    channelModal.show();
   }
 
   function onDragOver(event) {
@@ -128,54 +124,16 @@
     return urlObj.protocol === "http:" || urlObj.protocol === "https:";
   }
 
-  function parseYouTubeUrl(url) {
+  function parseYouTubeLikeUrl(url) {
     const urlSearchParams = new URLSearchParams(new URL(url).search);
 
-    function getTimestamp() {
-      const timestamp = urlSearchParams.get("t");
-      if (timestamp) {
-        return timestamp.endsWith("s") ? timestamp.slice(0, -1) : timestamp;
-      }
-    }
-
-    // Share/Short url
-    const YoutubeUrls = [
-      "https://youtu.be/",
-      "http://youtu.be/",
-      "https://www.youtu.be/",
-      "http://www.youtu.be/",
-      "https://youtube.com/shorts/",
-      "http://youtube.com/shorts/",
-      "https://www.youtube.com/shorts/",
-      "http://www.youtube.com/shorts/",
-    ];
-    for (var i in YoutubeUrls) {
-      let youtubeUrl = YoutubeUrls[i];
-      if (url.startsWith(youtubeUrl)) {
-        let videoId = url.replace(youtubeUrl, "");
-        if (videoId.includes("?")) {
-          videoId = videoId.substring(0, videoId.indexOf("?"));
-        }
-        const result: any = {
-          videoId,
-        };
-
-        const timestamp = getTimestamp();
-        if (timestamp) {
-          result.timestamp = timestamp;
-        }
-        return result;
-      }
-    }
-
-    // regular url
     const result: any = {
       videoId: urlSearchParams.get("v"),
+      timestamp: urlSearchParams.get("t"),
     };
 
-    const timestamp = getTimestamp();
-    if (timestamp) {
-      result.timestamp = timestamp;
+    if (result.timestamp && result.timestamp.endsWith("s")) {
+      result.timestamp = result.timestamp.slice(0, -1);
     }
 
     return result;
