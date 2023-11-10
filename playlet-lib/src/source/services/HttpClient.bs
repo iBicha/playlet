@@ -284,18 +284,19 @@ namespace HttpClient
         end function
 
         function Await() as HttpResponse
-            tryCount = m._tryCount
+            triesLeft = m._tryCount
             response = invalid
 
             response = m.AwaitInternal()
             if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
                 return response
             end if
-            tryCount -= 1
+            triesLeft -= 1
 
-            while tryCount > 0
+            while triesLeft > 0
                 backoffMs = 1000 + Rnd(2000)
-                LogInfo("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying:`, m._tryCount - tryCount, "in", backoffMs, "ms")
+                tryNumber = m._tryCount - triesLeft + 1
+                LogInfo("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
 
                 m.urlTransfer = invalid
                 m._cache = invalid
@@ -307,7 +308,7 @@ namespace HttpClient
                 if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
                     return response
                 end if
-                tryCount -= 1
+                triesLeft -= 1
             end while
 
             return response
