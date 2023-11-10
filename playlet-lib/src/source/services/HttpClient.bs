@@ -40,6 +40,20 @@ namespace HttpClient
         return (new HttpRequest()).Method("HEAD").Url(url)
     end function
 
+    function FromObject(obj as object) as HttpRequest
+        request = new HttpRequest()
+
+        for each key in obj
+            if IsFunction(request[key])
+                request[key](obj[key])
+            else
+                throw `Invalid key: "${key}" in object passed to HttpClient.FromObject`
+            end if
+        end for
+
+        return request
+    end function
+
     class HttpRequest
 
         public urlTransfer as object
@@ -235,6 +249,9 @@ namespace HttpClient
             else if m._method = "HEAD"
                 m._sent = m.urlTransfer.AsyncHead()
             else
+                if StringUtils.IsNullOrEmpty(m._method)
+                    throw "Http request method not set"
+                end if
                 m.urlTransfer.SetRequest(m._method)
                 body = m._body
                 if body = invalid
