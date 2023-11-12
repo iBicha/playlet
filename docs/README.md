@@ -143,7 +143,7 @@ That's pretty much it.
 There are a few reasons we made this separation:
 
 - Playlet relies on [Invidious](https://github.com/iv-org/invidious). Invidious tries to keep up with Youtube making changes to their platform, but sometimes, a breaking change happens that requires Playlet to react quickly. Releasing through the Roku Channel store can take days, or a week. During this time, Playlet would be not functional, and that's not acceptable.
-- The ability to roll back: Sometimes an app breaking bug gets released. Allowing users to choose a seperate version is a flexible way to keep things working. Although right now rollbacks are behind a - hidden by default - developer menu, the reasoning still stands.
+- The ability to roll back: Sometimes an app breaking bug gets released. Allowing users to choose a seperate version is a flexible way to keep things working. Fot example, it's possible to choose a different verrsion from the developer settings in the web app.
 - It is simply easier to release: Releasing Playlet Lib on Github, and everyone receives the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
   - I've had instances where I was trying to pass the certfication for Playlet to publish it. One of the criterias is to pass a some automated tests. But the tests were failing because their system could not connect to their Roku test devices (connection keeps timing out). My only option was to keep trying over and over until it worked.
   - It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
