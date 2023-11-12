@@ -1,0 +1,75 @@
+import "pkg:/components/NodeByRef/NodeByRef.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.durationRect = m.top.FindNode("durationRect")
+    m.durationLabel = m.top.FindNode("durationLabel")
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+    content = NodeByRef.Unwrap(content)
+    if content = invalid
+        return
+    end if
+
+    m.top.title = content.title
+    m.top.thumbnailUri = content.thumbnail
+
+    contentType = ValidString(content.type)
+    if contentType = "video" and ValidInt(content.lengthSeconds) <> 0
+        SetDurationText(content.lengthText)
+        m.top.durationRectVisible = true
+    else if contentType = "playlist" and not StringUtils.IsNullOrEmpty(content.videoCountText)
+        SetDurationText(content.videoCountText)
+        m.top.durationRectVisible = true
+    else
+        m.top.durationRectVisible = false
+    end if
+
+    SetHighlight()
+end function
+
+function SetDurationText(text as string) as void
+    m.top.duration = text
+
+    label = m.durationLabel
+    rect = m.durationRect
+
+    if label = invalid or rect = invalid
+        return
+    end if
+
+    rectParent = rect.getParent()
+    size = label.localBoundingRect()
+
+    rect.width = size.width + 16
+    rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+end function
+
+function SetHighlight() as void
+    content = m.top.itemContent
+
+    playQueueContent = content.getParent()
+    if playQueueContent = invalid
+        return
+    end if
+
+    playQueue = playQueueContent.getParent()
+    if playQueue = invalid
+        return
+    end if
+
+    playQueueIndex = playQueue.index
+    index = m.top.index
+
+    if playQueueIndex = index
+        m.top.thumbnailBlendColor = "#FFFFFFFF"
+        m.top.highlightUri = "pkg:/images/focus_grid.9.png"
+    else
+        m.top.thumbnailBlendColor = "#606060FF"
+        m.top.highlightUri = ""
+    end if
+end function

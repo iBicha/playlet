@@ -24,7 +24,7 @@ end function
 
 function OnNodeReady()
     m.list.ObserveField("itemFocused", FuncName(OnItemFocused))
-    InitializeLongPressTimer()
+    InitializeLongPress(["OK"])
 end function
 
 function OnFocusChange() as void
@@ -53,7 +53,9 @@ function OnContentSet() as void
     m.background.uri = content.thumbnailBackground
 
     itemFocused = m.list.itemFocused
-    m.list.content = content
+    if not content.isSameNode(m.list.content)
+        m.list.content = content
+    end if
     if itemFocused > -1 and content.getChildCount() > itemFocused
         m.list.jumpToItem = itemFocused
     end if
@@ -65,7 +67,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
-    if key = LONG_PRESS_KEY and press
+    if key = OK_LONG_PRESS_KEY and press
         OnItemLongPressed(m.list.itemFocused)
         return true
     end if
