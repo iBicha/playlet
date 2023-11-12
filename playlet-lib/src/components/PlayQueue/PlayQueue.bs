@@ -15,13 +15,15 @@ function Init()
     m.pendingLoadTasks = {}
     m.content = m.top.findNode("Content")
     m.top.content = m.content
+    m.content.addField("index", "integer", false)
+    m.content.index = m.top.index
 end function
 
 function Play(node as object, playlistIndex as integer)
     m.top.index += 1
     m.top.playlistIndex = playlistIndex
 
-    node = NodeByRef.Wrap(node)
+    node = WrapWithIndexField(node)
     if m.top.index >= m.content.getChildCount()
         m.content.appendChild(node)
         m.top.index = m.content.getChildCount() - 1
@@ -33,12 +35,21 @@ function Play(node as object, playlistIndex as integer)
 end function
 
 function AddToQueue(node as object)
-    node = NodeByRef.Wrap(node)
+    node = WrapWithIndexField(node)
     m.content.appendChild(node)
     queueNotifications = m.top.preferences["misc.queue_notifications"]
     if queueNotifications
         PlayQueue.ShowNotifcation(m.top.notifications, node)
     end if
+end function
+
+function WrapWithIndexField(node as object) as object
+    node = NodeByRef.Wrap(node)
+    if not node.hasField("index")
+        node.addField("index", "integer", false)
+    end if
+    node.index = m.top.index
+    return node
 end function
 
 ' TODO:P0 better model of the queue (Now playing, etc)
@@ -90,11 +101,13 @@ function PlayNextItem(unused as dynamic) as boolean
         return false
     end if
 
-    if m.top.index <> -1
-        if m.top.index >= childCount
+    index = m.top.index
+    if index <> -1
+        if index >= childCount
             return false
         end if
-        node = m.content.getChild(m.top.index)
+        node = m.content.getChild(index)
+        node = NodeByRef.Unwrap(node)
         if node.type = "playlist"
             m.top.playlistIndex += 1
             if PlayPlaylistAtCurrentIndex(node)
@@ -137,17 +150,18 @@ function PlayItemAtCurrentIndex() as boolean
 end function
 
 function PlayPlaylistAtCurrentIndex(playlist as object) as boolean
+    playlist = NodeByRef.Unwrap(playlist)
     if playlist.videoCount < 0
         LoadPlaylist(playlist)
         return true
     end if
-    index = m.top.playlistIndex
-    if index < 0 or index >= playlist.videoCount
+    playlistIndex = m.top.playlistIndex
+    if playlistIndex < 0 or playlistIndex >= playlist.videoCount
         return false
     end if
 
-    if index < playlist.getChildCount()
-        child = playlist.getChild(index)
+    if playlistIndex < playlist.getChildCount()
+        child = playlist.getChild(playlistIndex)
         VideoUtils.PlayVideo(child)
         return true
     end if
@@ -195,4 +209,13 @@ function OnPlaylistContentTaskResult(output as object) as void
     end if
 
     PlayPlaylistAtCurrentIndex(playlist)
+end function
+
+function OnIndexChange()
+    index = m.top.index
+    m.content.index = index
+    children = m.top.content.getChildren(-1, 0)
+    for each child in children
+        child.index = index
+    end for
 end function
