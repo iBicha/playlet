@@ -9,6 +9,7 @@ function Init()
     m.showAnimation = m.top.findNode("showAnimation")
 
     m.clearButton.ObserveField("buttonSelected", FuncName(OnClearButtonSelected))
+    m.queueList.ObserveField("itemSelected", FuncName(OnItemSelected))
 
     SetNavigation(m.queueList, "up", m.clearButton)
     SetNavigation(m.clearButton, "down", m.queueList)
@@ -59,4 +60,18 @@ end function
 
 function OnClearButtonSelected()
     m.top.playQueue@.Clear(invalid)
+end function
+
+function OnItemSelected() as void
+    content = m.queueList.content
+    if content = invalid
+        return
+    end if
+
+    index = m.queueList.itemSelected
+    if index < 0 or index >= content.getChildCount()
+        return
+    end if
+
+    m.top.playQueue@.PlayItemAtIndex(index)
 end function
