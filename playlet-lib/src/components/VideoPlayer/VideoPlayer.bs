@@ -221,6 +221,7 @@ function PlayNext(recommendedVideos as object) as boolean
     return PlayNextRecommendedVideo(recommendedVideos)
 end function
 
+' TODO:P2 move this to the play queue
 function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
     if m.preferences["playback.autoplay"] <> true
         return false
@@ -240,8 +241,9 @@ function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
         end if
         if not m.container@.watchedVideosContain(videoId)
             LogInfo(`Playing next recommended video (${videoId})`)
-            node = InvidiousContent.ToVideoContentNode(invalid, metadata, invalid)
-            VideoUtils.PlayVideo(node)
+            instance = m.invidious@.GetCurrentInstance(invalid)
+            node = InvidiousContent.ToVideoContentNode(invalid, metadata, instance)
+            m.playQueue@.Play(node, -1)
             return true
         end if
     end for

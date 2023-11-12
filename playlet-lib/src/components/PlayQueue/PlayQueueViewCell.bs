@@ -1,3 +1,5 @@
+import "pkg:/components/NodeByRef/NodeByRef.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -8,17 +10,20 @@ end function
 
 function OnContentSet() as void
     content = m.top.itemContent
-
+    content = NodeByRef.Unwrap(content)
     if content = invalid
         return
     end if
 
     m.top.title = content.title
-    m.top.author = content.author
     m.top.thumbnailUri = content.thumbnail
 
-    if ValidInt(content.lengthSeconds) <> 0
+    contentType = ValidString(content.type)
+    if contentType = "video" and ValidInt(content.lengthSeconds) <> 0
         SetDurationText(content.lengthText)
+        m.top.durationRectVisible = true
+    else if contentType = "playlist" and not StringUtils.IsNullOrEmpty(content.videoCountText)
+        SetDurationText(content.videoCountText)
         m.top.durationRectVisible = true
     else
         m.top.durationRectVisible = false

@@ -1,4 +1,5 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/NodeByRef/NodeByRef.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
 import "pkg:/components/PlayQueue/Notifications/PlayQueueNotificationUtils.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
@@ -9,53 +10,63 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
+' TODO:P0 prevent adding duplicates of the same video/playlist
 function Init()
     m.pendingLoadTasks = {}
-    ' TODO:P1 prevent adding duplicates of the same video/playlist
-    m.queue = CreateObject("roArray", 0, true)
+    m.content = m.top.findNode("Content")
+    m.top.content = m.content
 end function
 
 function Play(node as object, playlistIndex as integer)
     m.top.index += 1
     m.top.playlistIndex = playlistIndex
 
-    if m.top.index >= m.queue.Count()
-        m.queue.push(node)
-        m.top.index = m.queue.Count() - 1
+    node = NodeByRef.Wrap(node)
+    if m.top.index >= m.content.getChildCount()
+        m.content.appendChild(node)
+        m.top.index = m.content.getChildCount() - 1
     else
-        ArrayUtils.Insert(m.queue, node, m.top.index)
+        m.content.insertChild(node, m.top.index)
     end if
 
     PlayItemAtCurrentIndex()
 end function
 
 function AddToQueue(node as object)
-    m.queue.push(node)
+    node = NodeByRef.Wrap(node)
+    m.content.appendChild(node)
     queueNotifications = m.top.preferences["misc.queue_notifications"]
     if queueNotifications
         PlayQueue.ShowNotifcation(m.top.notifications, node)
     end if
 end function
 
-' TODO:P1 better model of the queue (Now playing, etc)
+' TODO:P0 better model of the queue (Now playing, etc)
 function GetQueue(unused as dynamic) as object
+    queueNodes = m.content.getChildren(-1, 0)
     items = []
-    for each item in m.queue
-        if item.type = "video"
+    for each node in queueNodes
+        node = NodeByRef.Unwrap(node)
+        if node = invalid
+            continue for
+        end if
+
+        nodeType = node.type
+        if nodeType = "video"
             items.push({
-                type: item.type,
-                videoId: item.videoId,
-                title: item.title,
-                author: item.author,
-                thumbnail: item.thumbnail
+                type: nodeType,
+                videoId: node.videoId,
+                title: node.title,
+                author: node.author,
+                thumbnail: node.thumbnail
             })
-        else if item.type = "playlist"
+        else if node.type = "playlist"
             items.push({
-                type: item.type,
-                playlistId: item.playlistId,
-                title: item.title,
-                thumbnail: item.thumbnail,
-                videoCountText: item.videoCountText
+                type: nodeType,
+                playlistId: node.playlistId,
+                title: node.title,
+                thumbnail: node.thumbnail,
+                videoCountText: node.videoCountText
             })
         end if
     end for
@@ -68,21 +79,22 @@ function GetQueue(unused as dynamic) as object
 end function
 
 function Clear(unused as dynamic)
-    m.queue.Clear()
+    m.content.removeChildrenIndex(m.content.getChildCount(), 0)
     m.top.index = -1
     m.top.playlistIndex = -1
 end function
 
 function PlayNextItem(unused as dynamic) as boolean
-    if m.queue.Count() = 0
+    childCount = m.content.getChildCount()
+    if childCount = 0
         return false
     end if
 
     if m.top.index <> -1
-        if m.top.index >= m.queue.Count()
+        if m.top.index >= childCount
             return false
         end if
-        node = m.queue[m.top.index]
+        node = m.content.getChild(m.top.index)
         if node.type = "playlist"
             m.top.playlistIndex += 1
             if PlayPlaylistAtCurrentIndex(node)
@@ -93,7 +105,7 @@ function PlayNextItem(unused as dynamic) as boolean
 
     m.top.index += 1
     m.top.playlistIndex = -1
-    if m.top.index >= m.queue.Count()
+    if m.top.index >= childCount
         return false
     end if
 
@@ -101,7 +113,8 @@ function PlayNextItem(unused as dynamic) as boolean
 end function
 
 function PlayItemAtCurrentIndex() as boolean
-    node = m.queue[m.top.index]
+    node = m.content.getChild(m.top.index)
+    node = NodeByRef.Unwrap(node)
     if node = invalid
         return false
     end if
