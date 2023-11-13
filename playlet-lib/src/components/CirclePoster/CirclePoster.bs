@@ -7,17 +7,27 @@ function UpdateMaskSize()
     width = m.top.width
     height = m.top.height
 
-    m.top.maskSize = [width * GetScaleFactor(), height * GetScaleFactor()]
+    m.top.maskSize = [width * GetUIScaleFactor(), height * GetUIScaleFactor()]
 end function
 
 ' MaskGroup component do not scale with with UI resolution
-function GetScaleFactor() as float
-    if m.scaleFactor <> invalid
-        return m.scaleFactor
+function GetUIScaleFactor() as float
+    if m.uiScaleFactor <> invalid
+        return m.uiScaleFactor
     end if
+
+    if m.global.uiScaleFactor <> invalid
+        return m.global.uiScaleFactor
+    end if
+
     deviceInfo = CreateObject("roDeviceInfo")
     uiResolutionWidth = deviceInfo.GetUIResolution().width
     ' divide by 1280 because we have ui_resolutions=hd in manifest
-    m.scaleFactor = uiResolutionWidth / 1280
-    return m.scaleFactor
+    m.uiScaleFactor = uiResolutionWidth / 1280
+
+    if not m.global.hasField("uiScaleFactor")
+        m.global.addField("uiScaleFactor", "float", false)
+    end if
+    m.global.uiScaleFactor = m.uiScaleFactor
+    return m.uiScaleFactor
 end function

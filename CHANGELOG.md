@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - User interface for the Queue: Press and hold `Options (*)` to show the queue
 
+### Fixed
+
+- Crash when video player has no content
+- Execution timeout on cirlce posters
+
 ## [0.15.1] - 2023-11-10
 
 ### Added
