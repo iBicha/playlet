@@ -3,6 +3,7 @@
   import playletLogoLight from "assets/logo-light.svg";
   import UserIcon from "assets/user.svg.svelte";
   import { PlayletApi } from "lib/Api/PlayletApi";
+  import { ExternalControlProtocol } from "lib/Api/ExternalControlProtocol";
   import { appThemeStore, playletStateStore } from "lib/Stores";
   import ThemeSelect from "lib/ThemeToggle.svelte";
 
@@ -12,10 +13,14 @@
   let currentInstance;
   let loggedInInstance;
   let username;
+  let appId = "693751";
 
   playletStateStore.subscribe((value) => {
     version = value?.app?.lib_version ?? "";
-    if (value?.app?.id === "dev") {
+    if (value?.app?.id) {
+      appId = value?.app?.id;
+    }
+    if (appId === "dev") {
       version += "-dev";
     }
     if (
@@ -49,11 +54,13 @@
 
 <div class="navbar bg-base-100 sticky top-0 z-40">
   <div class="flex-1">
-    <img
-      src={$appThemeStore === "dark" ? playletLogoDark : playletLogoLight}
-      class="h-8"
-      alt="Playlet Logo"
-    />
+    <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
+      <img
+        src={$appThemeStore === "dark" ? playletLogoDark : playletLogoLight}
+        class="h-8"
+        alt="Playlet Logo"
+      />
+    </button>
     <h4 class="label brightness-75">{version}</h4>
   </div>
   <div class="flex-none">
