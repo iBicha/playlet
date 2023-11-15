@@ -56,13 +56,9 @@
     "*": BUTTONS.info,
   };
 
-  function pressKey(key) {
-    console.log(`Sending key: ${key}`);
-    ExternalControlProtocol.pressKey(key);
-  }
-
   onMount(() => {
     screen.addEventListener("keydown", onKeyDown);
+    screen.addEventListener("keyup", onKeyUp);
     // TODO:P1 support navigator.mediaSession
     // media buttons, such as play/pause, next, and previous track.
     // metadata, like title, artist, album, artwork
@@ -70,18 +66,36 @@
 
   onDestroy(() => {
     screen.removeEventListener("keydown", onKeyDown);
+    screen.removeEventListener("keyup", onKeyUp);
   });
 
   function onKeyDown(event) {
-    if (!visibility) {
+    if (!visibility || event.repeat) {
       return;
     }
     if (event.key in KEYBOARD_BUTTONS) {
       event.preventDefault();
-      pressKey(KEYBOARD_BUTTONS[event.key]);
+      ExternalControlProtocol.pressKeyDown(KEYBOARD_BUTTONS[event.key]);
     } else {
       event.preventDefault();
-      pressKey("Lit_" + encodeURIComponent(event.key));
+      ExternalControlProtocol.pressKeyDown(
+        "Lit_" + encodeURIComponent(event.key)
+      );
+    }
+  }
+
+  function onKeyUp(event) {
+    if (!visibility || event.repeat) {
+      return;
+    }
+    if (event.key in KEYBOARD_BUTTONS) {
+      event.preventDefault();
+      ExternalControlProtocol.pressKeyUp(KEYBOARD_BUTTONS[event.key]);
+    } else {
+      event.preventDefault();
+      ExternalControlProtocol.pressKeyUp(
+        "Lit_" + encodeURIComponent(event.key)
+      );
     }
   }
 </script>
