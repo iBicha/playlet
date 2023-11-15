@@ -7,4 +7,11 @@ export class ExternalControlProtocol {
             body: '',
         })
     }
+
+    static async pressKey(key) {
+        return fetch(`http://${getIp()}:8060/keypress/${key}`, {
+            method: 'POST',
+            body: '',
+        })
+    }
 }

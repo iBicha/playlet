@@ -4,6 +4,7 @@
   import SearchIcon from "../assets/search-icon.svg.svelte";
   import SettingsIcon from "../assets/settings-icon.svg.svelte";
   import BookmarksIcon from "../assets/star-icon.svg.svelte";
+  import RemoteIcon from "../assets/remote-control.svg.svelte";
 
   import { appStateStore } from "lib/Stores";
   import type { AppState } from "lib/Types";
@@ -53,6 +54,14 @@
   >
     <div class="h-6">
       <SettingsIcon />
+    </div>
+  </button>
+  <button
+    on:click={() => setScreen("remote")}
+    class={$appStateStore.screen === "remote" ? "active" : ""}
+  >
+    <div class="h-6">
+      <RemoteIcon />
     </div>
   </button>
   <button
