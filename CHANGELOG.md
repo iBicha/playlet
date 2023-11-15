@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Playlet logo in web app is clickable, and launches app if not already on
 - Remote control in web app
+  - Clickable buttons and keyboard support
 
 ## [0.16.0] - 2023-11-13
 

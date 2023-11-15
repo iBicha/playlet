@@ -18,8 +18,10 @@
   import VolumeUpIcon from "assets/remote-control/volume-up.svg.svelte";
 
   import RemoteButton from "./RemoteControl/RemoteButton.svelte";
+  import { onDestroy, onMount } from "svelte";
 
   export let visibility: boolean;
+  let screen;
 
   const BUTTONS = {
     home: "Home",
@@ -42,9 +44,49 @@
     volumeUp: "VolumeUp",
     powerOff: "PowerOff",
   };
+
+  const KEYBOARD_BUTTONS = {
+    ArrowRight: BUTTONS.right,
+    ArrowLeft: BUTTONS.left,
+    ArrowUp: BUTTONS.up,
+    ArrowDown: BUTTONS.down,
+    Enter: BUTTONS.select,
+    Backspace: BUTTONS.backspace,
+    Escape: BUTTONS.back,
+    "*": BUTTONS.info,
+  };
+
+  function pressKey(key) {
+    console.log(`Sending key: ${key}`);
+    ExternalControlProtocol.pressKey(key);
+  }
+
+  onMount(() => {
+    screen.addEventListener("keydown", onKeyDown);
+    // TODO:P1 support navigator.mediaSession
+    // media buttons, such as play/pause, next, and previous track.
+    // metadata, like title, artist, album, artwork
+  });
+
+  onDestroy(() => {
+    screen.removeEventListener("keydown", onKeyDown);
+  });
+
+  function onKeyDown(event) {
+    if (!visibility) {
+      return;
+    }
+    if (event.key in KEYBOARD_BUTTONS) {
+      event.preventDefault();
+      pressKey(KEYBOARD_BUTTONS[event.key]);
+    } else {
+      event.preventDefault();
+      pressKey("Lit_" + encodeURIComponent(event.key));
+    }
+  }
 </script>
 
-<div class={visibility ? "" : "hidden"}>
+<div bind:this={screen} tabindex="-1" class={visibility ? "" : "hidden"}>
   <div class="flex flex-col items-center justify-center p-6">
     <div class="flex space-x-2 m-2">
       <RemoteButton key={BUTTONS.back} icon={ArrowBackIcon} />
