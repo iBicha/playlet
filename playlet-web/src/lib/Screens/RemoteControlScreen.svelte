@@ -51,29 +51,29 @@
       <RemoteButton key={BUTTONS.home} icon={HomeIcon} />
     </div>
     <div class="flex space-x-2 m-2">
-      <RemoteButton key={BUTTONS.up} icon={ArrowUpIcon} />
+      <RemoteButton key={BUTTONS.up} icon={ArrowUpIcon} small />
     </div>
     <div class="flex space-x-2 m-2">
-      <RemoteButton key={BUTTONS.left} icon={ArrowLeftIcon} />
-      <RemoteButton key={BUTTONS.select} icon={OkIcon} />
-      <RemoteButton key={BUTTONS.right} icon={ArrowRightIcon} />
+      <RemoteButton key={BUTTONS.left} icon={ArrowLeftIcon} small />
+      <RemoteButton key={BUTTONS.select} icon={OkIcon} small />
+      <RemoteButton key={BUTTONS.right} icon={ArrowRightIcon} small />
     </div>
     <div class="flex space-x-2 m-2">
-      <RemoteButton key={BUTTONS.down} icon={ArrowDownIcon} />
+      <RemoteButton key={BUTTONS.down} icon={ArrowDownIcon} small />
     </div>
     <div class="flex space-x-2 m-2">
       <RemoteButton key={BUTTONS.instantReplay} icon={InstantReplayIcon} />
       <RemoteButton key={BUTTONS.info} icon={OptionsIcon} />
     </div>
     <div class="flex space-x-2 m-2">
-      <RemoteButton key={BUTTONS.rev} icon={FastBackwardIcon} />
-      <RemoteButton key={BUTTONS.play} icon={PlayIcon} />
-      <RemoteButton key={BUTTONS.fwd} icon={FastForwardIcon} />
+      <RemoteButton key={BUTTONS.rev} icon={FastBackwardIcon} small />
+      <RemoteButton key={BUTTONS.play} icon={PlayIcon} small />
+      <RemoteButton key={BUTTONS.fwd} icon={FastForwardIcon} small />
     </div>
     <div class="flex space-x-2 m-2">
-      <RemoteButton key={BUTTONS.volumeMute} icon={VolumeMuteIcon} />
-      <RemoteButton key={BUTTONS.volumeDown} icon={VolumeDownIcon} />
-      <RemoteButton key={BUTTONS.volumeUp} icon={VolumeUpIcon} />
+      <RemoteButton key={BUTTONS.volumeMute} icon={VolumeMuteIcon} small />
+      <RemoteButton key={BUTTONS.volumeDown} icon={VolumeDownIcon} small />
+      <RemoteButton key={BUTTONS.volumeUp} icon={VolumeUpIcon} small />
     </div>
   </div>
 </div>

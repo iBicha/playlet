@@ -3,6 +3,7 @@
 
   export let key: string;
   export let icon;
+  export let small: boolean = false;
 
   function pressKey() {
     console.log(`Sending key: ${key}`);
@@ -12,7 +13,9 @@
 
 <button
   on:click={pressKey}
-  class="w-28 h-11 btn-primary rounded-xl flex items-center justify-center"
+  class="{small
+    ? 'w-16'
+    : 'w-24'} h-11 btn-primary rounded-xl flex items-center justify-center"
 >
   <svelte:component this={icon} />
 </button>
