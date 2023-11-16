@@ -71,14 +71,16 @@
   });
 
   function onKeyDown(event) {
-    if (!visibility || event.repeat) {
+    if (!visibility) {
+      return;
+    }
+    event.preventDefault();
+    if (event.repeat) {
       return;
     }
     if (event.key in KEYBOARD_BUTTONS) {
-      event.preventDefault();
       ExternalControlProtocol.pressKeyDown(KEYBOARD_BUTTONS[event.key]);
     } else {
-      event.preventDefault();
       ExternalControlProtocol.pressKeyDown(
         "Lit_" + encodeURIComponent(event.key)
       );
@@ -86,14 +88,16 @@
   }
 
   function onKeyUp(event) {
-    if (!visibility || event.repeat) {
+    if (!visibility) {
+      return;
+    }
+    event.preventDefault();
+    if (event.repeat) {
       return;
     }
     if (event.key in KEYBOARD_BUTTONS) {
-      event.preventDefault();
       ExternalControlProtocol.pressKeyUp(KEYBOARD_BUTTONS[event.key]);
     } else {
-      event.preventDefault();
       ExternalControlProtocol.pressKeyUp(
         "Lit_" + encodeURIComponent(event.key)
       );
