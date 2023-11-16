@@ -1,1 +1,1 @@
-<span class="font-semibold text-sm">OK</span>
+<span class="font-semibold text-sm select-none">OK</span>
