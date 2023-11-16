@@ -16,6 +16,7 @@
   import VolumeDownIcon from "assets/remote-control/volume-down.svg.svelte";
   import VolumeMuteIcon from "assets/remote-control/volume-mute.svg.svelte";
   import VolumeUpIcon from "assets/remote-control/volume-up.svg.svelte";
+  import PowerIcon from "assets/remote-control/power.svg.svelte";
 
   import RemoteButton from "./RemoteControl/RemoteButton.svelte";
   import { onDestroy, onMount } from "svelte";
@@ -102,6 +103,17 @@
 
 <div bind:this={screen} tabindex="-1" class={visibility ? "" : "hidden"}>
   <div class="flex flex-col items-center justify-center p-6">
+    <div class="flex space-x-2 m-2">
+      <button
+        on:click={() => {
+          ExternalControlProtocol.pressKey(BUTTONS.powerOff);
+        }}
+        class="btn-primary rounded-full flex items-center justify-center bg-red-600 hover:bg-red-400 w-12 h-12"
+      >
+        <PowerIcon />
+      </button>
+    </div>
+
     <div class="flex space-x-2 m-2">
       <RemoteButton key={BUTTONS.back} icon={ArrowBackIcon} />
       <RemoteButton key={BUTTONS.home} icon={HomeIcon} />
