@@ -20,6 +20,7 @@
   import InfoScreen from "lib/Screens/InfoScreen.svelte";
   import LinkDragDrop from "lib/LinkDragDrop.svelte";
   import BookmarksScreen from "lib/Screens/BookmarksScreen.svelte";
+  import RemoteControlScreen from "lib/Screens/RemoteControlScreen.svelte";
   import WebSockets from "lib/Api/WebSockets.svelte";
 
   onMount(async () => {
@@ -72,6 +73,8 @@
     <BookmarksScreen visibility={currentScreen == "bookmarks"} />
 
     <SettingsScreen visibility={currentScreen == "settings"} />
+
+    <RemoteControlScreen visibility={currentScreen == "remote"} />
 
     <InfoScreen visibility={currentScreen == "info"} />
   </div>

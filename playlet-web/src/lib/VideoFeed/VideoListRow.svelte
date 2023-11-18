@@ -99,8 +99,23 @@
       return;
     }
 
-    feedLoadState = FeedLoadState.Loading;
+    if (loadDataTask) {
+      return;
+    }
 
+    try {
+      loadDataTask = loadData();
+      await loadDataTask;
+    } catch (error) {
+      console.error(error);
+    }
+    loadDataTask = undefined;
+  }
+
+  let loadDataTask;
+
+  async function loadData() {
+    feedLoadState = FeedLoadState.Loading;
     let totalFetchedItems = 0;
 
     while (true) {
@@ -152,7 +167,7 @@
 
         if (
           feedSource.state.loadState === FeedLoadState.Loaded &&
-          feedSourcesIndex === feedSources.length - 1
+          feedSourcesIndex >= feedSources.length - 1
         ) {
           feedLoadState = FeedLoadState.Loaded;
         } else {

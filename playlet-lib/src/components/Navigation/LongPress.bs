@@ -1,41 +1,79 @@
-const LONG_PRESS_KEY = "OK_LONG_PRESS"
+const OK_LONG_PRESS_KEY = "OK_LONG_PRESS"
+const OPTIONS_LONG_PRESS_KEY = "OPTIONS_LONG_PRESS"
 
-function InitializeLongPressTimer(duration = 1.0 as float)
+function InitializeLongPress(keys as object, duration = 1.0 as float)
+    longPressKeyMap = {
+        "OK": OK_LONG_PRESS_KEY,
+        "options": OPTIONS_LONG_PRESS_KEY
+    }
+    m._longPressKeyMap = {}
+    for each key in keys
+        m._longPressKeyMap[key] = longPressKeyMap[key]
+    end for
+
+    #if DEBUG
+        ' This is for testing long press using the VSCode extension.
+        ' Using the keyboard:
+        ' - press K to simulate an "OK" long press on the remote.
+        ' - press O to simulate an "options" long press on the remote.
+        simulatedLongPressKeyMap = {
+            "OK": "Lit_k",
+            "options": "Lit_o"
+        }
+
+        m._simulatedLongPressKeyMap = {}
+        for each key in keys
+            m._simulatedLongPressKeyMap[simulatedLongPressKeyMap[key]] = key
+        end for
+    #end if
+
     m._longPressTimer = CreateObject("roSGNode", "Timer")
     m._longPressTimer.duration = duration
     m._longPressFired = false
+    m._pressState = {}
+
     m._longPressTimer.ObserveField("fire", FuncName(LongPressTimerFired))
 end function
 
 function LongPressHandler(key as string, press as boolean) as boolean
     #if DEBUG
-        if key = "Lit_l"
-            LogInfo("Simulating long press using key:", key, "press:", press)
+        if m._simulatedLongPressKeyMap.DoesExist(key)
+            subtype = m.top.subtype()
+            simulatedKey = m._simulatedLongPressKeyMap[key]
+            LogInfo(`[${subtype}] Simulating`, simulatedKey, "long press using key:", key, "press:", press)
+            longPressKey = m._longPressKeyMap[simulatedKey]
             m._longPressFired = true
-            return OnkeyEvent(LONG_PRESS_KEY, press)
+            return OnkeyEvent(longPressKey, press)
         end if
     #end if
-    if key = "OK" and press
+
+    isLongPressKey = m._longPressKeyMap.DoesExist(key)
+    if not isLongPressKey
+        return false
+    end if
+
+    if press
         m._longPressTimer.control = "stop"
         m._longPressTimer.control = "start"
         m._longPressFired = false
-        m._okPressed = true
+        m._longPressKey = key
+        m._pressState[key] = true
         return true
     end if
 
-    if key = "OK" and not press
+    if not press
         m._longPressTimer.control = "stop"
         if m._longPressFired = true
             m._longPressFired = false
-            m._okPressed = false
+            m._pressState[key] = false
             return true
         end if
         ' This case is for handling a dialog: The dialog will be dismissed with the OK down event,
         ' and we would trigger the action with the OK up event. The action should only happen if
         ' we detected both down and up events.
-        wasOkPressed = m._okPressed
-        m._okPressed = false
-        if wasOkPressed <> true
+        wasPressed = m._pressState[key]
+        m._pressState[key] = false
+        if wasPressed <> true
             return true
         end if
     end if
@@ -43,7 +81,11 @@ function LongPressHandler(key as string, press as boolean) as boolean
     return false
 end function
 
-function LongPressTimerFired()
+function LongPressTimerFired() as void
     m._longPressFired = true
-    OnkeyEvent(LONG_PRESS_KEY, true)
+    if StringUtils.IsNullOrEmpty(m._longPressKey) or not m._longPressKeyMap.DoesExist(m._longPressKey)
+        return
+    end if
+
+    OnkeyEvent(m._longPressKeyMap[m._longPressKey], true)
 end function

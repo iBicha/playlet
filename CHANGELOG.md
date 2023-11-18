@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2023-11-17
+
+### Added
+
+- Playlet logo in web app is clickable, and launches app if not already on
+- Remote control in web app
+  - Clickable buttons and keyboard support
+
+## [0.16.0] - 2023-11-13
+
+### Added
+
+- User interface for the Queue: Press and hold `Options (*)` to show the queue
+
+### Fixed
+
+- Crash when video player has no content
+- Execution timeout on cirlce posters
+
+## [0.15.1] - 2023-11-10
+
+### Added
+
+- An option to disable search history
+
+### Fixed
+
+- A rare bug that causes the app to crash when displaying video cells
+- A bug where we show error dialogs that happened on screens that are already closed
+- A bug where bookmarks show duplicate videos
+- A bug where watch history is not always sent to Invidious
+
 ## [0.15.0] - 2023-11-05
 
 ### Added

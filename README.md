@@ -62,13 +62,24 @@ More under [Screenshots](./docs/screenshots/README.md)
 ### Customize Invidious instance
 
 1. Open settings in Playlet
-1. Scan QR Code with Phone
-1. Change the Invidious instance
-1. You can also do this from the settings tab
+1. Select Invidious -> Instance
+1. Set a custom instance, or choose a public one hosted by volunteers (from https://api.invidious.io/)
+1. Optionally, Select `Test instance` to make sure it works
+1. Hit save
+
+> ℹ️ **Note**: If you are logged in when you change the instance, you will remain logged in to the old instance. In this case, Playlet will use the old instance to retrieve your subscriptions and your playlists, but will use the new instance for everything else. After switching to a new instance, you can log out and log in again to use your profile on the new instance.
 
 ## Development
 
 For everything related to Playlet app development, please see the [documentation](./docs/README.md)
+
+## Analytics and reporting
+
+We do not collect any usage data, anonymous or not. But Roku does, and you can find the data made available to Playlet in the [Wiki](https://github.com/iBicha/playlet/wiki).
+Most software in the wild collect some data to make sure things work, and to prioritize features. 
+Because we don't do that, we wouldn't know if people using Playlet are facing issues, unless these issues get reported.
+Playlet could run on variaty of devices, with different capabilities and screen sizes, and different Invidious instances.
+That's why it's important to report any issues you encouter using Playlet, otherwise it's unlikely that they get addressed.
 
 ## Why Playlet
 

@@ -40,6 +40,20 @@ namespace HttpClient
         return (new HttpRequest()).Method("HEAD").Url(url)
     end function
 
+    function FromObject(obj as object) as HttpRequest
+        request = new HttpRequest()
+
+        for each key in obj
+            if IsFunction(request[key])
+                request[key](obj[key])
+            else
+                throw `Invalid key: "${key}" in object passed to HttpClient.FromObject`
+            end if
+        end for
+
+        return request
+    end function
+
     class HttpRequest
 
         public urlTransfer as object
@@ -47,6 +61,7 @@ namespace HttpClient
         function new()
             m._timeoutSeconds = 30
             m._tryCount = 1
+            m._method = "GET"
         end function
 
         function Method(method as string) as HttpRequest
@@ -187,6 +202,8 @@ namespace HttpClient
             return command
         end function
 
+        ' Note: Calling Send() only without Await() will not guarentee a request will be sent.
+        ' If a Task finishes before the request is sent, the request might be dropped.
         function Send() as HttpRequest
             if m.urlTransfer <> invalid or m._cache <> invalid
                 return m
@@ -267,18 +284,19 @@ namespace HttpClient
         end function
 
         function Await() as HttpResponse
-            tryCount = m._tryCount
+            triesLeft = m._tryCount
             response = invalid
 
             response = m.AwaitInternal()
             if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
                 return response
             end if
-            tryCount -= 1
+            triesLeft -= 1
 
-            while tryCount > 0
+            while triesLeft > 0
                 backoffMs = 1000 + Rnd(2000)
-                LogInfo("Request failed with status code:", response.StatusCode(), "ID:", m.urlTransfer.GetIdentity(), `\nRetrying:`, m._tryCount - tryCount, "in", backoffMs, "ms")
+                tryNumber = m._tryCount - triesLeft + 1
+                LogInfo("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
 
                 m.urlTransfer = invalid
                 m._cache = invalid
@@ -290,7 +308,7 @@ namespace HttpClient
                 if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
                     return response
                 end if
-                tryCount -= 1
+                triesLeft -= 1
             end while
 
             return response

@@ -2,9 +2,14 @@ import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
-namespace SearchHistory
-    function Save(q as string, maxItems = 10 as integer)
-        history = GetAllSaved()
+namespace SearchHistoryUtils
+    function Save(preferencesNode as object, q as string, maxItems = 10 as integer) as void
+        seachHistoryEnabled = preferencesNode["search_history.enabled"]
+        if not seachHistoryEnabled
+            return
+        end if
+
+        history = GetAllSaved(preferencesNode)
         index = ArrayUtils.IndexOfString(history, q)
         if index <> -1
             history.Delete(index)
@@ -21,8 +26,8 @@ namespace SearchHistory
         RegistryUtils.Write(RegistryUtils.SEARCH_HISTORY, history)
     end function
 
-    function GetSaved(q as string) as object
-        history = GetAllSaved()
+    function GetSaved(preferencesNode as object, q as string) as object
+        history = GetAllSaved(preferencesNode)
         if history.count() = 0
             return []
         end if
@@ -39,14 +44,18 @@ namespace SearchHistory
         return result
     end function
 
-    function GetAllSaved() as object
+    function GetAllSaved(preferencesNode as object) as object
+        seachHistoryEnabled = preferencesNode["search_history.enabled"]
+        if not seachHistoryEnabled
+            return []
+        end if
+
         history = RegistryUtils.Read(RegistryUtils.SEARCH_HISTORY)
         if history = invalid
             return []
         end if
         return ParseJson(history)
     end function
-
 
     function Clear()
         RegistryUtils.Delete(RegistryUtils.SEARCH_HISTORY)

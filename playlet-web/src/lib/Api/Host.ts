@@ -3,4 +3,9 @@ function getHost() {
     return urlSearchParams.get('host') ?? window.location.host
 }
 
-export { getHost }
+function getIp() {
+    const host = getHost()
+    return host.split(':')[0]
+}
+
+export { getHost, getIp }

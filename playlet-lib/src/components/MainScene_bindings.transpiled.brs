@@ -7,7 +7,8 @@ function InitializeBindings()
         childProps: {
             "AppController": {
                 "root": "./AppRoot", 
-                "stack": "./Stack"
+                "stack": "./Stack", 
+                "playQueue": "./PlayQueue"
             }, 
             "NavBar": {
                 "appController": "/AppController"
@@ -15,6 +16,9 @@ function InitializeBindings()
             "PlayQueue": {
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
+                "preferences": "../Preferences"
+            }, 
+            "SearchHistory": {
                 "preferences": "../Preferences"
             }, 
             "Invidious": {

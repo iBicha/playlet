@@ -1,4 +1,5 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/NodeByRef/NodeByRef.bs"
 import "pkg:/components/PlaylistView/PlaylistContentTask.bs"
 import "pkg:/components/PlayQueue/Notifications/PlayQueueNotificationUtils.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
@@ -9,53 +10,74 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
+' TODO:P1 prevent adding duplicates of the same video/playlist
 function Init()
     m.pendingLoadTasks = {}
-    ' TODO:P1 prevent adding duplicates of the same video/playlist
-    m.queue = CreateObject("roArray", 0, true)
+    m.content = m.top.findNode("Content")
+    m.top.content = m.content
+    m.content.addField("index", "integer", false)
+    m.content.index = m.top.index
 end function
 
 function Play(node as object, playlistIndex as integer)
     m.top.index += 1
     m.top.playlistIndex = playlistIndex
 
-    if m.top.index >= m.queue.Count()
-        m.queue.push(node)
-        m.top.index = m.queue.Count() - 1
+    node = WrapWithIndexField(node)
+    if m.top.index >= m.content.getChildCount()
+        m.content.appendChild(node)
+        m.top.index = m.content.getChildCount() - 1
     else
-        ArrayUtils.Insert(m.queue, node, m.top.index)
+        m.content.insertChild(node, m.top.index)
     end if
 
     PlayItemAtCurrentIndex()
 end function
 
 function AddToQueue(node as object)
-    m.queue.push(node)
+    node = WrapWithIndexField(node)
+    m.content.appendChild(node)
     queueNotifications = m.top.preferences["misc.queue_notifications"]
     if queueNotifications
         PlayQueue.ShowNotifcation(m.top.notifications, node)
     end if
 end function
 
-' TODO:P1 better model of the queue (Now playing, etc)
+function WrapWithIndexField(node as object) as object
+    node = NodeByRef.Wrap(node)
+    if not node.hasField("index")
+        node.addField("index", "integer", false)
+    end if
+    node.index = m.top.index
+    return node
+end function
+
+' TODO:P0 better model of the queue (Now playing, etc)
 function GetQueue(unused as dynamic) as object
+    queueNodes = m.content.getChildren(-1, 0)
     items = []
-    for each item in m.queue
-        if item.type = "video"
+    for each node in queueNodes
+        node = NodeByRef.Unwrap(node)
+        if node = invalid
+            continue for
+        end if
+
+        nodeType = node.type
+        if nodeType = "video"
             items.push({
-                type: item.type,
-                videoId: item.videoId,
-                title: item.title,
-                author: item.author,
-                thumbnail: item.thumbnail
+                type: nodeType,
+                videoId: node.videoId,
+                title: node.title,
+                author: node.author,
+                thumbnail: node.thumbnail
             })
-        else if item.type = "playlist"
+        else if node.type = "playlist"
             items.push({
-                type: item.type,
-                playlistId: item.playlistId,
-                title: item.title,
-                thumbnail: item.thumbnail,
-                videoCountText: item.videoCountText
+                type: nodeType,
+                playlistId: node.playlistId,
+                title: node.title,
+                thumbnail: node.thumbnail,
+                videoCountText: node.videoCountText
             })
         end if
     end for
@@ -68,21 +90,24 @@ function GetQueue(unused as dynamic) as object
 end function
 
 function Clear(unused as dynamic)
-    m.queue.Clear()
+    m.content.removeChildrenIndex(m.content.getChildCount(), 0)
     m.top.index = -1
     m.top.playlistIndex = -1
 end function
 
 function PlayNextItem(unused as dynamic) as boolean
-    if m.queue.Count() = 0
+    childCount = m.content.getChildCount()
+    if childCount = 0
         return false
     end if
 
-    if m.top.index <> -1
-        if m.top.index >= m.queue.Count()
+    index = m.top.index
+    if index <> -1
+        if index >= childCount
             return false
         end if
-        node = m.queue[m.top.index]
+        node = m.content.getChild(index)
+        node = NodeByRef.Unwrap(node)
         if node.type = "playlist"
             m.top.playlistIndex += 1
             if PlayPlaylistAtCurrentIndex(node)
@@ -93,15 +118,22 @@ function PlayNextItem(unused as dynamic) as boolean
 
     m.top.index += 1
     m.top.playlistIndex = -1
-    if m.top.index >= m.queue.Count()
+    if m.top.index >= childCount
         return false
     end if
 
     return PlayItemAtCurrentIndex()
 end function
 
+function PlayItemAtIndex(index as integer) as boolean
+    m.top.index = index
+    m.top.playlistIndex = -1
+    return PlayItemAtCurrentIndex()
+end function
+
 function PlayItemAtCurrentIndex() as boolean
-    node = m.queue[m.top.index]
+    node = m.content.getChild(m.top.index)
+    node = NodeByRef.Unwrap(node)
     if node = invalid
         return false
     end if
@@ -118,17 +150,18 @@ function PlayItemAtCurrentIndex() as boolean
 end function
 
 function PlayPlaylistAtCurrentIndex(playlist as object) as boolean
+    playlist = NodeByRef.Unwrap(playlist)
     if playlist.videoCount < 0
         LoadPlaylist(playlist)
         return true
     end if
-    index = m.top.playlistIndex
-    if index < 0 or index >= playlist.videoCount
+    playlistIndex = m.top.playlistIndex
+    if playlistIndex < 0 or playlistIndex >= playlist.videoCount
         return false
     end if
 
-    if index < playlist.getChildCount()
-        child = playlist.getChild(index)
+    if playlistIndex < playlist.getChildCount()
+        child = playlist.getChild(playlistIndex)
         VideoUtils.PlayVideo(child)
         return true
     end if
@@ -176,4 +209,13 @@ function OnPlaylistContentTaskResult(output as object) as void
     end if
 
     PlayPlaylistAtCurrentIndex(playlist)
+end function
+
+function OnIndexChange()
+    index = m.top.index
+    m.content.index = index
+    children = m.top.content.getChildren(-1, 0)
+    for each child in children
+        child.index = index
+    end for
 end function
