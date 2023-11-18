@@ -1,4 +1,8 @@
 <script lang="ts">
+  // TODO:P1: Changing filters after doing a search should refresh the search restuls
+  // TODO:P1: Investigate potential bug with the same page of search is repeated
+  // TODO:P1: Make search textbox and filters sticky with the top bar
+
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore, searchHistoryStore } from "lib/Stores";
