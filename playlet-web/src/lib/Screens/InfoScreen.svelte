@@ -4,7 +4,7 @@
   export let visibility: boolean;
 
   const displayNames = {
-    version: "Playlet Version",
+    app_version: "Playlet App Version",
     lib_version: "Playlet Library Version",
     lib_version_latest: "Playlet Library Latest Version",
     lib_url: "Playlet Library URL",
@@ -16,7 +16,7 @@
 
   function transformValue(key, value) {
     switch (key) {
-      case "version":
+      case "app_version":
       case "lib_version":
       case "lib_version_latest":
         return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
