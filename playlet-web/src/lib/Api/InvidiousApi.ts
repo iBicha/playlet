@@ -284,12 +284,14 @@ export class InvidiousApi {
         try {
             const cacheData = JSON.parse(cache);
             if (cacheData.timestamp + cacheSeconds * 1000 < Date.now()) {
+                this.deleteCache(url);
                 return null;
             }
             console.log(`Cache hit for ${url}`);
             return cacheData.data;
         } catch (error) {
             console.error(error);
+            this.deleteCache(url);
             return null;
         }
     }
@@ -303,6 +305,11 @@ export class InvidiousApi {
         };
 
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    }
+
+    private deleteCache(url: string) {
+        const cacheKey = this.getCacheKey(url);
+        localStorage.removeItem(cacheKey);
     }
 
     private getCacheKey(url: string) {
