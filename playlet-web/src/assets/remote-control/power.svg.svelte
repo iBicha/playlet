@@ -3,7 +3,6 @@
   width="22"
   height="22"
   fill="currentColor"
-  class="bi bi-power"
   viewBox="0 0 16 16"
 >
   <path d="M7.5 1v7h1V1h-1z" />

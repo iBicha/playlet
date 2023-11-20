@@ -1,6 +1,6 @@
 <svg name="asterisc" width="14px" height="14px" viewBox="0 0 16 17"
   ><g
-    ><g fill="#FFF" transform="translate(-323 -830)"
+    ><g fill="currentColor" transform="translate(-323 -830)"
       ><g transform="translate(111 553)"
         ><g transform="translate(15 49)"
           ><g transform="translate(139.972 216)"

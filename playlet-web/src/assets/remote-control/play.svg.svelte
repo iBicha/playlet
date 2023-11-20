@@ -1,6 +1,6 @@
 <svg name="play" width="14px" height="14px" viewBox="0 0 11 14"
   ><g
-    ><g fill="#FFF" transform="translate(-258 -886)"
+    ><g fill="currentColor" transform="translate(-258 -886)"
       ><g transform="translate(111 553)"
         ><g transform="translate(15 49)"
           ><g transform="translate(92.55 270)"
