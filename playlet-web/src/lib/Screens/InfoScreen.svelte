@@ -46,7 +46,7 @@
         return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
       case "lib_url":
         return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
-      case "git_commit_hash":
+      case "app_git_commit_hash":
       case "lib_git_commit_hash":
         if (value === "unknown") {
           return value;
