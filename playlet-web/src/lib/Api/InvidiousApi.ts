@@ -23,11 +23,12 @@ export class InvidiousApi {
     }
 
     public async searchSuggestions(query: string) {
-        const response = await fetch(`${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`);
-        return await response.json();
+        const url = `${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
+        return await this.cachedFetch(url, 60 * 60 * 24);
     }
 
     public async search(query: string, filters: any, page: number = 1) {
+        // TODO:P2 use a FeedSource similar to brightscript version
         let url = `${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
         for (let filter in filters) {
             if (typeof filters[filter] === 'string') {
@@ -93,6 +94,7 @@ export class InvidiousApi {
         return !!(this.instance && this.endpoints && Object.keys(this.endpoints).length);
     }
 
+    // TODO:P1 handle QueryParamArrayType (CommaSeparated/Repeated)
     public async makeRequest(feedSource: any) {
         if (!feedSource || !this.instance || !this.endpoints) {
             return null;
@@ -236,7 +238,6 @@ export class InvidiousApi {
                 return cache;
             }
         }
-
 
         try {
             tryCount -= 1;

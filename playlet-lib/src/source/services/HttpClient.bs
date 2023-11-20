@@ -8,8 +8,8 @@ import "pkg:/source/utils/Types.bs"
 namespace HttpClient
 
     enum QueryParamArrayType
-        CommaSeparated
-        Repeated
+        CommaSeparated = "CommaSeparated"
+        Repeated = "Repeated"
     end enum
 
     function Get(url as string) as HttpRequest
@@ -95,7 +95,7 @@ namespace HttpClient
 
             m._queryParams[key] = {
                 value: valueArray,
-                __arrayType: arrayType
+                arrayType: arrayType
             }
 
             return m
@@ -423,7 +423,7 @@ namespace HttpClient
 
                     if not IsString(value)
                         if IsAssociativeArray(value) and IsArray(value.value)
-                            if value.__arrayType = HttpClient.QueryParamArrayType.Repeated
+                            if value.arrayType = HttpClient.QueryParamArrayType.Repeated
                                 valueArray = value.value
                                 for each item in valueArray
                                     itemString = item
@@ -437,7 +437,7 @@ namespace HttpClient
                                         hasQueryParams = true
                                     end if
                                 end for
-                            else if value.__arrayType = HttpClient.QueryParamArrayType.CommaSeparated
+                            else if value.arrayType = HttpClient.QueryParamArrayType.CommaSeparated
                                 valueArray = value.value
                                 for i = 0 to valueArray.Count() - 1
                                     itemString = valueArray[i]
