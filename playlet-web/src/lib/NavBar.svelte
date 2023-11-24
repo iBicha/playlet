@@ -1,6 +1,6 @@
 <script lang="ts">
-  import playletLogoDark from "assets/logo-dark.svg";
-  import playletLogoLight from "assets/logo-light.svg";
+  import PlayletLogoDark from "assets/logo-dark.svg.svelte";
+  import PlayletLogoLight from "assets/logo-light.svg.svelte";
   import UserIcon from "assets/user.svg.svelte";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { ExternalControlProtocol } from "lib/Api/ExternalControlProtocol";
@@ -55,11 +55,11 @@
 <div class="navbar bg-base-100 sticky top-0 z-40">
   <div class="flex-1">
     <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
-      <img
-        src={$appThemeStore === "dark" ? playletLogoDark : playletLogoLight}
-        class="h-8"
-        alt="Playlet Logo"
-      />
+      {#if $appThemeStore === "dark"}
+        <PlayletLogoDark />
+      {:else}
+        <PlayletLogoLight />
+      {/if}
     </button>
     <h4 class="label brightness-75">{version}</h4>
   </div>
