@@ -3,39 +3,6 @@ import "pkg:/source/utils/Types.bs"
 namespace Http
 
     class Utils
-
-        function ParseUrlQueryComponents(url as string) as object
-            query = {}
-            index = Instr(0, url, "?")
-            url = Mid(url, index + 1)
-            components = url.split("&")
-            for each component in components
-                key = component
-                value = ""
-                hasValue = false
-                if Instr(0, component, "=")
-                    keyValue = component.split("=")
-                    key = keyValue[0]
-                    value = keyValue[1].DecodeUriComponent()
-                    hasValue = true
-                end if
-
-                if query.DoesExist(key) and hasValue
-                    oldValue = query[key]
-                    if GetInterface(oldValue, "ifArray") = invalid
-                        oldValue = [oldValue]
-                    end if
-                    oldValue.push(value.DecodeUriComponent())
-                    value = oldValue
-                end if
-
-                if key <> ""
-                    query[key] = value
-                end if
-            end for
-            return query
-        end function
-
         function MimeType(uri = "" as string) as string
             map = m.MimeTypes
             if map = invalid
@@ -50,22 +17,22 @@ namespace Http
             end if
         end function
 
-        function GetExtension(fn as string) as string
-            l = fn.tokenize(".")
-            if l.count() > 0
-                return l.GetTail()
+        function GetExtension(filename as string) as string
+            parts = filename.tokenize(".")
+            if parts.count() > 0
+                return parts.GetTail()
             else
                 return ""
             end if
         end function
 
         function HttpTitle(code = 0 as integer) as string
-            hcm = m.HttpTitles
-            if hcm = invalid
-                hcm = ParseJson(ReadAsciiFile("libpkg:/config/http-codes.json5"))
-                m.HttpTitles = hcm
+            map = m.httpCodesMap
+            if map = invalid
+                map = ParseJson(ReadAsciiFile("libpkg:/config/http-codes.json5"))
+                m.httpCodesMap = map
             end if
-            return ValidString(hcm[`${code}`])
+            return ValidString(map[`${code}`])
         end function
 
     end class
