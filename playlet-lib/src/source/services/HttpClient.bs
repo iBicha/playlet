@@ -185,7 +185,12 @@ namespace HttpClient
 
         function ToCurlCommand() as string
             command = `curl "${m.BuildUrl()}"`
-            command += ` \\\n  -X ${m._method}`
+            if m._method = "HEAD"
+                command += ` \\\n  -I`
+            else if m._method <> "GET"
+                command += ` \\\n  -X ${m._method}`
+            end if
+
             command += ` \\\n  --max-time ${m._timeoutSeconds}`
             command += ` \\\n  --compressed`
 
@@ -573,7 +578,7 @@ namespace HttpClient
             return m._headers
         end function
 
-        function ErrorMessage() as string
+        function ErrorMessage(includeBody = true as boolean) as string
             if m._errorMessage <> invalid
                 return m._errorMessage
             end if
@@ -588,7 +593,10 @@ namespace HttpClient
                 else if m.IsCancelled()
                     m._errorMessage = "Request cancelled."
                 else if type(m.event) = "roUrlEvent"
-                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}\nBody: ${m.event.GetString()}`
+                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}`
+                    if includeBody
+                        m._errorMessage += `\nBody: ${m.event.GetString()}`
+                    end if
                 end if
             end if
 

@@ -2,6 +2,7 @@ import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
 @asynctask
 function InvidiousInstanceTestingTask(input as object) as object
@@ -29,6 +30,7 @@ function PrepareTests() as object
     content.AppendChild(CreateTestNode("Fetch video details", CanFetchVideoDetails))
     content.AppendChild(CreateTestNode("Fetch video comments", CanFetchVideoComments))
     content.AppendChild(CreateTestNode("Fetch video captions", CanFetchVideoCaptions))
+    content.AppendChild(CreateTestNode("Fetch video thumbnails", CanFetchVideoThumbails))
     return content
 end function
 
@@ -246,6 +248,64 @@ function CanFetchVideoCaptions(instance as string, testNode as object) as void
 
         testNode.state = "passed"
         testNode.details = `The instance can fetch video ${label} captions for id "${videoId}"`
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function CanFetchVideoThumbails(instance as string, testNode as object) as void
+    try
+        videoId = "jNQXAC9IVRw"
+        url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+        response = HttpClient.Get(url).NoCache().Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = `Invalid json from ${url}`
+            return
+        end if
+
+        videoThumbnails = json.videoThumbnails
+        if not IsArray(videoThumbnails) or videoThumbnails.Count() = 0
+            testNode.state = "failed"
+            testNode.details = `No thumbnails found in json from ${url}`
+            return
+        end if
+
+        contentNode = InvidiousContent.ToVideoContentNode(invalid, json, instance)
+        thumbnail = contentNode.thumbnail
+        if StringUtils.IsNullOrEmpty(thumbnail)
+            testNode.state = "failed"
+            testNode.details = `No thumbnail found in json from ${url}`
+            return
+        end if
+
+        ' Note: we could do a HEAD request, but Invidious returns 200 even for invalid thumbnails
+        ' To make sure we don't get a 200 for an invalid thumbnail, we do a GET request instead
+        response = HttpClient.Get(thumbnail).NoCache().Await()
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = `${thumbnail} is not reachable\n${response.ErrorMessage(false)}`
+            return
+        end if
+
+        contentType = response.Headers()["Content-Type"]
+        if StringUtils.IsNullOrEmpty(contentType) or not contentType.StartsWith("image/")
+            testNode.state = "failed"
+            testNode.details = `Invalid thumbnail data ${thumbnail} (Content-Type is not image/*)`
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = `The instance can fetch video thumbnail for id "${videoId}" (${thumbnail})`
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
