@@ -112,6 +112,7 @@
 
 <div class={visibility ? "" : "hidden"}>
   <div class="m-4">
+    <!-- TODO:P2 use search HTML element -->
     <form
       on:submit={async (e) => {
         e.preventDefault();
