@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - An instance test to make sure thumbnails are reachable
 
+### Fixed
+
+- A rare error when video player is closed but does not have valid content
+
 ## [0.17.0] - 2023-11-17
 
 ### Added
