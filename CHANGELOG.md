@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A rare error when video player is closed but does not have valid content
+- A rare error that can occur with loading indicators causing a crash
 
 ## [0.17.0] - 2023-11-17
 
