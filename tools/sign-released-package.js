@@ -13,16 +13,22 @@ shell.exec('git fetch --tags --force');
 const gitCommitHash = shell.exec('git rev-parse HEAD').stdout.trim();
 
 // get current tag
-const gitTag = shell.exec(`git describe --tags ${gitCommitHash} --abbrev=0`).stdout.trim();
+const gitTags = shell.exec(`git tag --contains ${gitCommitHash}`)
+    .stdout.trim()
+    .split('\n')
+    .map(tag => tag.trim());
 
 const expectedGitTag = `v${require('../package.json').version}`;
-if (gitTag !== expectedGitTag) {
-    console.error(`Expected git tag ${expectedGitTag} but found ${gitTag}. Signing anyway...`);
+if (gitTags.length === 0) {
+    console.error(`No git tag found. Signing anyway...`);
+}
+if (!gitTags.includes(expectedGitTag)) {
+    console.error(`Expected git tag ${expectedGitTag} but found [${gitTags.join(",")}]. Signing anyway...`);
 }
 
 // download playlet.zip from github
-const zipUrl = `https://github.com/iBicha/playlet/releases/download/${gitTag}/playlet.zip`
-shell.exec(`curl -L -o release/playlet.zip "${zipUrl}"`);
+const zipUrl = `https://github.com/iBicha/playlet/releases/download/${expectedGitTag}/playlet.zip`
+shell.exec(`curl --fail -L -o release/playlet.zip "${zipUrl}"`);
 
 // sign the package
 shell.exec('node tools/sign-package.js');
