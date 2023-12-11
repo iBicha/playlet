@@ -428,7 +428,7 @@ myNode = CreateObject("roSGNode", "MyComponent")
 ' Add it to the right parent
 myParentNode.appendChild(myNode)
 ' Trigger the binding manually
-myNode@.BindNode(invalid)
+myNode@.BindNode()
 ```
 
 calling `BindNode` will trigger all the binding steps just for this node. But it is expected that all its dependencies are already in the scene and can be found.
@@ -512,9 +512,11 @@ The logger plugin does some code transformation to log calls, which can add call
 ### How
 
 The logger plugin searches for calls to the predefined functions `LogError`, `LogWarn`, `LogInfo` and `LogDebug`. Once found, it does the following (we take `LogError` as an example):
+
 - It replaces calls of `LogError` with `LogErrorX` where X is the number of arguments.
   - For example, it replaces `LogError("Cannot complete operation:", error)` with `LogError2("Cannot complete operation:", error)`
 - Based on usage, it generates `LogErrorX` functions used. Example:
+
 ```
 function LogError2(arg0, arg1) as void
     logger = m.global.logger
@@ -524,11 +526,12 @@ function LogError2(arg0, arg1) as void
     m.global.logger.logLine = "[ERROR]" + ToString(arg0) + " " + ToString(arg1)
 end function
 ```
+
 - Finally, it adds the caller file and line number to the args.
   - `LogError("Cannot complete operation:", error)` is replaced with `LogError(CALLER, "Cannot complete operation:", error)`
   - `CALLER` would be the full path to the source .bs file and line number, for easier debugging
   - In release mode, `CALLER` would be only the file name and line number, without the full path. This is so that dev directory does not get "leaked" in releases.
- 
+
 This is implemented to make it easy to identify where logs came from, and to generate log functions with the right number of parameters based on usage. This way we do not need all combination of functions (`LogError`, `LogWarn`, `LogInfo` and `LogDebug` multiplied by number of parameters, `LogError1`, `LogError2`, `LogError3`, and so on). Since brightscript does not support function templates or function overloading, it is either this method, or use optional parameters (but then we would have to check which parameter was passed, and which was is using the default value.) and end up with a log function with logs of if's else'es.
 
 To understand more about what's being generated, download `playlet-lib.zip` from [releases](https://github.com/iBicha/playlet/releases), extract, and inspect the file `source/utils/Logging.brs`. You will see it contains log functions in the form `LogVerbX`, that are generated based on usage.
