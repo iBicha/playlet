@@ -247,7 +247,7 @@
 
 <!-- Hide rows that are loaded but have no videos. Typically a 
      disabled feed (like popular) or unauthenticated. 
-     TODO:P0 show action nodes (action to login)
+     TODO:P1 show action nodes (action to login)
 -->
 {#if feedLoadState !== FeedLoadState.Loaded || videos.length !== 0}
   <div class="text-lg font-semibold ml-4">
