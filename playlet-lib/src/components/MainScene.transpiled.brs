@@ -17,6 +17,7 @@ function MainSceneContainerChanged()
     HideLoadingScreen()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
+    CopyLoadingMessagesToCache()
 end function
 
 function StartWebServer()

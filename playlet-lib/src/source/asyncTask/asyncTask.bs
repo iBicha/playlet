@@ -14,7 +14,7 @@ function CreateAsyncTask(taskFunc as object, input as object, callback = invalid
 
     m[`asynctask_${id}`] = task
     m[`asynctask_${id}_callback`] = callback
-    task.ObserveField("state", FuncName(OnTaskState))
+    task.ObserveFieldScoped("state", FuncName(OnTaskState))
 
     return task
 end function
@@ -36,6 +36,8 @@ function OnTaskState(e as object) as void
         return
     end if
 
+    task.UnobserveFieldScoped("state")
+
     id = task.id
     output = task.output
     ' if output is invalid, it means the task was interrupted before the result is ready
@@ -46,6 +48,9 @@ function OnTaskState(e as object) as void
         end if
     end if
 
+
+    task.input = invalid
+    task.output = invalid
     m.delete(`asynctask_${id}`)
     m.delete(`asynctask_${id}_callback`)
 end function

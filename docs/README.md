@@ -256,7 +256,7 @@ The web app uses [Svelte](https://svelte.dev/), [Vite](https://vitejs.dev/) and 
 
 Since modifying the web app code requires building all three projects (Playlet, Playlet lib, and Playlet web app) this makes the iteration speed very slow, and we lose the benefits of web development, such as hot reloads.
 
-For that reason, the recommended iteration when working on the dev app is:
+For that reason, the recommended iteration when working on the web app is:
 
 1. Start `Playlet (dev)` (by selecting `Playlet (dev)` and pressing Play in VS Code)
 1. Once Playlet starts, switch to `Playlet Web (dev)` and press play. Do not stop `Playlet (dev)`

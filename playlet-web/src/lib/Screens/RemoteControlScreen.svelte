@@ -107,7 +107,7 @@
 
 <div bind:this={screen} tabindex="-1" class={visibility ? "" : "hidden"}>
   <div class="flex flex-col items-center justify-center p-6">
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <button
         on:click={() => {
           ExternalControlProtocol.pressKey(BUTTONS.powerOff);
@@ -118,31 +118,31 @@
       </button>
     </div>
 
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.back} icon={ArrowBackIcon} />
       <RemoteButton key={BUTTONS.home} icon={HomeIcon} />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.up} icon={ArrowUpIcon} small />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.left} icon={ArrowLeftIcon} small />
       <RemoteButton key={BUTTONS.select} icon={OkIcon} small />
       <RemoteButton key={BUTTONS.right} icon={ArrowRightIcon} small />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.down} icon={ArrowDownIcon} small />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.instantReplay} icon={InstantReplayIcon} />
       <RemoteButton key={BUTTONS.info} icon={OptionsIcon} />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.rev} icon={FastBackwardIcon} small />
       <RemoteButton key={BUTTONS.play} icon={PlayIcon} small />
       <RemoteButton key={BUTTONS.fwd} icon={FastForwardIcon} small />
     </div>
-    <div class="flex space-x-2 m-2">
+    <div class="flex space-x-2 m-1">
       <RemoteButton key={BUTTONS.volumeMute} icon={VolumeMuteIcon} small />
       <RemoteButton key={BUTTONS.volumeDown} icon={VolumeDownIcon} small />
       <RemoteButton key={BUTTONS.volumeUp} icon={VolumeUpIcon} small />

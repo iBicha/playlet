@@ -56,7 +56,7 @@ namespace Invidious
 
         function DefaultQueryParams() as object
             return {
-                region: m.node.applicationInfo@.GetUserCountryCode(invalid)
+                region: m.node.applicationInfo@.GetUserCountryCode()
             }
         end function
 
@@ -98,11 +98,7 @@ namespace Invidious
             request = HttpClient.Get(url)
             request.QueryParams(m.DefaultQueryParams())
             request.QueryParam("q", q)
-            ' 5 hours cache. Videos should expire in 6 hours, but since we don't
-            ' have the exact expiration time, we'll use 5 hours. Invidious currently
-            ' Does a fresh fetch if the cache is older than 10 minutes.
-            ' https://github.com/iv-org/invidious/blob/069e91d2a609b1df94bdfbb693335969b2a281d8/src/invidious/videos.cr#L349
-            request.CacheSeconds(60 * 60 * 5)
+            request.CacheSeconds(60 * 60 * 24)
 
             request.Cancellation(cancellation)
 
@@ -116,7 +112,11 @@ namespace Invidious
 
             request = HttpClient.Get(url)
             request.QueryParams(m.DefaultQueryParams())
-            request.CacheSeconds(60 * 60 * 6)' 6 hours
+            ' 5 hours cache. Videos should expire in 6 hours, but since we don't
+            ' have the exact expiration time, we'll use 5 hours. Invidious currently
+            ' Does a fresh fetch if the cache is older than 10 minutes.
+            ' https://github.com/iv-org/invidious/blob/069e91d2a609b1df94bdfbb693335969b2a281d8/src/invidious/videos.cr#L349
+            request.CacheSeconds(60 * 60 * 5)
             request.Cancellation(cancellation)
 
             return request.Await()
@@ -228,16 +228,12 @@ namespace Invidious
                     if queryParam.default <> invalid
                         if IsString(queryParam.type) and queryParam.type = "#ISO3166"
                             if queryParam.default = "GetUserCountryCode"
-                                request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode(invalid))
+                                request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode())
                             else
                                 request.QueryParam(queryParamKey, queryParam.default)
                             end if
-                        else if IsArray(queryParam.default)
-                            if queryParam.arrayType = "repeat"
-                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.Repeated)
-                            else if queryParam.arrayType = "comma-separated"
-                                request.QueryParamArray(queryParamKey, queryParam.default, HttpClient.QueryParamArrayType.CommaSeparated)
-                            end if
+                        else if IsArray(queryParam.default) and queryParam.arrayType <> invalid
+                            request.QueryParamArray(queryParamKey, queryParam.default, queryParam.arrayType)
                         else
                             request.QueryParam(queryParamKey, queryParam.default)
                         end if

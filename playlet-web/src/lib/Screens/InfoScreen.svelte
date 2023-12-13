@@ -3,26 +3,50 @@
 
   export let visibility: boolean;
 
-  const displayNames = {
-    version: "Playlet Version",
-    lib_version: "Playlet Library Version",
-    lib_version_latest: "Playlet Library Latest Version",
-    lib_url: "Playlet Library URL",
-    lib_url_type: "Playlet Library URL Type",
-    git_commit_hash: "Playlet Git Commit Hash",
-    lib_git_commit_hash: "Playlet Library Git Commit Hash",
-    id: "App ID",
-  };
+  const displayNames = [
+    {
+      key: "app_version",
+      displayText: "Playlet App Version",
+    },
+    {
+      key: "lib_version",
+      displayText: "Playlet Library Version",
+    },
+    {
+      key: "lib_version_latest",
+      displayText: "Playlet Library Latest Version",
+    },
+    {
+      key: "lib_url",
+      displayText: "Playlet Library URL",
+    },
+    {
+      key: "lib_url_type",
+      displayText: "Playlet Library URL Type",
+    },
+    {
+      key: "app_git_commit_hash",
+      displayText: "Playlet App Git Commit Hash",
+    },
+    {
+      key: "lib_git_commit_hash",
+      displayText: "Playlet Library Git Commit Hash",
+    },
+    {
+      key: "id",
+      displayText: "App ID",
+    },
+  ];
 
   function transformValue(key, value) {
     switch (key) {
-      case "version":
+      case "app_version":
       case "lib_version":
       case "lib_version_latest":
         return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
       case "lib_url":
         return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
-      case "git_commit_hash":
+      case "app_git_commit_hash":
       case "lib_git_commit_hash":
         if (value === "unknown") {
           return value;
@@ -110,10 +134,10 @@ ${JSON.stringify(preferencesInfo, null, 2)}
         </tr>
       </thead>
       <tbody>
-        {#each Object.entries(displayNames) as [key, value]}
+        {#each displayNames as item}
           <tr>
-            <td>{value}</td>
-            <td>{@html transformValue(key, appInfo[key])}</td>
+            <td>{item.displayText}</td>
+            <td>{@html transformValue(item.key, appInfo[item.key])}</td>
           </tr>
         {/each}
       </tbody>

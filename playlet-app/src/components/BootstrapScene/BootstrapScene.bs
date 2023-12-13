@@ -1,12 +1,17 @@
+import "LoadingMessages.bs"
+
 function Init() as void
+    m.scene = m.top.getScene()
     m.top.backgroundColor = "0x242424FF"
     m.top.backgroundURI = ""
 
     m.loadingIndicator = m.top.findNode("LoadingIndicator")
-    m.loadingIndicator.visible = true
     m.global.addFields({
         loadingIndicator: m.loadingIndicator
     })
+
+    m.loadingIndicator.visible = true
+    m.loadingIndicator.message = GetLoadingMessage()
 
     m.playletLibUrls = GetPlayletLibUrls()
     m.playletLibUrlIndex = 0
@@ -42,14 +47,8 @@ function LoadPlayletLib() as void
     end if
 
     RemoveComponentLibrary()
-    m.lib = m.top.getScene().createChild("ComponentLibrary")
-    ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
-    m.lib.observeField("loadStatus", "OnLoadStatusChanged")
-
     uri = m.playletLibUrls[m.playletLibUrlIndex].link
-    ' bs:disable-next-line LINT3012
-    ?"Loading Playlet lib from " uri
-    m.lib.uri = uri
+    LoadComponentLibrary(uri)
 end function
 
 function OnLoadStatusChanged() as void
@@ -58,9 +57,8 @@ function OnLoadStatusChanged() as void
         RemoveComponentLibrary()
         ' bs:disable-next-line LINT3012
         ?"Playlet lib loaded from " libUrl.link
-        scene = m.top.getScene()
-        scene.playletLibLoadedUrl = libUrl
-        container = scene.findNode("MainSceneContainer")
+        m.scene.playletLibLoadedUrl = libUrl
+        container = m.scene.findNode("MainSceneContainer")
         container.createChild("PlayletLib:MainScene")
         return
     end if
@@ -79,9 +77,18 @@ function RemoveComponentLibrary() as void
         return
     end if
 
-    scene = m.top.getScene()
-    scene.removeChild(m.lib)
+    m.lib.unobserveField("loadStatus")
+    m.scene.removeChild(m.lib)
     m.lib = invalid
+end function
+
+function LoadComponentLibrary(uri as string)
+    m.lib = m.scene.createChild("ComponentLibrary")
+    ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
+    m.lib.observeField("loadStatus", "OnLoadStatusChanged")
+    ' bs:disable-next-line LINT3012
+    ?"Loading Playlet lib from " uri
+    m.lib.uri = uri
 end function
 
 function ShowPlayletLibLoadErrorDialog()

@@ -4,13 +4,9 @@ import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 namespace HttpClient
-
-    enum QueryParamArrayType
-        CommaSeparated
-        Repeated
-    end enum
 
     function Get(url as string) as HttpRequest
         return (new HttpRequest()).Method("GET").Url(url)
@@ -85,7 +81,7 @@ namespace HttpClient
             return m
         end function
 
-        function QueryParamArray(key as string, valueArray as dynamic, arrayType as HttpClient.QueryParamArrayType) as HttpRequest
+        function QueryParamArray(key as string, valueArray as dynamic, arrayType as UrlUtils.QueryParamArrayType) as HttpRequest
             if valueArray = invalid
                 return m
             end if
@@ -95,7 +91,7 @@ namespace HttpClient
 
             m._queryParams[key] = {
                 value: valueArray,
-                __arrayType: arrayType
+                arrayType: arrayType
             }
 
             return m
@@ -185,7 +181,12 @@ namespace HttpClient
 
         function ToCurlCommand() as string
             command = `curl "${m.BuildUrl()}"`
-            command += ` \\\n  -X ${m._method}`
+            if m._method = "HEAD"
+                command += ` \\\n  -I`
+            else if m._method <> "GET"
+                command += ` \\\n  -X ${m._method}`
+            end if
+
             command += ` \\\n  --max-time ${m._timeoutSeconds}`
             command += ` \\\n  --compressed`
 
@@ -393,88 +394,12 @@ namespace HttpClient
             return urlTransfer
         end function
 
-        ' TODO:P2 refactor this monstrosity of a function
         function BuildUrl() as string
             if m._fullUrl <> invalid
                 return m._fullUrl
             end if
 
-            url = m._url
-            if m._pathParams <> invalid
-                for each key in m._pathParams
-                    value = m._pathParams[key]
-                    if value = invalid
-                        continue for
-                    end if
-                    if not IsString(value)
-                        value = `${value}`
-                    end if
-
-                    url = url.Replace(`{${key}}`, value.EncodeUriComponent())
-                end for
-            end if
-            if m._queryParams <> invalid
-                hasQueryParams = url.InStr("?") <> -1
-                for each key in m._queryParams
-                    value = m._queryParams[key]
-                    if value = invalid
-                        continue for
-                    end if
-
-                    if not IsString(value)
-                        if IsAssociativeArray(value) and IsArray(value.value)
-                            if value.__arrayType = HttpClient.QueryParamArrayType.Repeated
-                                valueArray = value.value
-                                for each item in valueArray
-                                    itemString = item
-                                    if not IsString(itemString)
-                                        itemString = `${itemString}`
-                                    end if
-                                    if hasQueryParams
-                                        url += "&" + key.EncodeUriComponent() + "=" + itemString.EncodeUriComponent()
-                                    else
-                                        url += "?" + key.EncodeUriComponent() + "=" + itemString.EncodeUriComponent()
-                                        hasQueryParams = true
-                                    end if
-                                end for
-                            else if value.__arrayType = HttpClient.QueryParamArrayType.CommaSeparated
-                                valueArray = value.value
-                                for i = 0 to valueArray.Count() - 1
-                                    itemString = valueArray[i]
-                                    if not IsString(itemString)
-                                        itemString = `${itemString}`
-                                    end if
-                                    itemString = itemString.EncodeUriComponent()
-                                    valueArray[i] = itemString
-                                end for
-                                joined = valueArray.join(",")
-                                if hasQueryParams
-                                    url += "&" + key.EncodeUriComponent() + "=" + joined
-                                else
-                                    url += "?" + key.EncodeUriComponent() + "=" + joined
-                                    hasQueryParams = true
-                                end if
-                            end if
-                        else
-                            value = `${value}`
-                            if hasQueryParams
-                                url += "&" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-                            else
-                                url += "?" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-                                hasQueryParams = true
-                            end if
-                        end if
-                    else
-                        if hasQueryParams
-                            url += "&" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-                        else
-                            url += "?" + key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-                            hasQueryParams = true
-                        end if
-                    end if
-                end for
-            end if
-            m._fullUrl = url
+            m._fullUrl = UrlUtils.BuildUrl(m._url, m._pathParams, m._queryParams)
             return m._fullUrl
         end function
     end class
@@ -573,7 +498,7 @@ namespace HttpClient
             return m._headers
         end function
 
-        function ErrorMessage() as string
+        function ErrorMessage(includeBody = true as boolean) as string
             if m._errorMessage <> invalid
                 return m._errorMessage
             end if
@@ -588,7 +513,10 @@ namespace HttpClient
                 else if m.IsCancelled()
                     m._errorMessage = "Request cancelled."
                 else if type(m.event) = "roUrlEvent"
-                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}\nBody: ${m.event.GetString()}`
+                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}`
+                    if includeBody
+                        m._errorMessage += `\nBody: ${m.event.GetString()}`
+                    end if
                 end if
             end if
 

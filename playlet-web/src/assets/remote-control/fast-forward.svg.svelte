@@ -1,6 +1,6 @@
 <svg name="fast-forward-right" width="14px" height="14px" viewBox="0 0 21 15"
   ><g
-    ><g fill="#FFF" transform="translate(-344 -886)"
+    ><g fill="currentColor" transform="translate(-344 -886)"
       ><g transform="translate(111 553)"
         ><g transform="translate(15 49)"
           ><g transform="translate(185.1 270)"

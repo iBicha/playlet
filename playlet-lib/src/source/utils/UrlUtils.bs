@@ -1,0 +1,144 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace UrlUtils
+    enum QueryParamArrayType
+        CommaSeparated = "CommaSeparated"
+        Repeated = "Repeated"
+    end enum
+
+    function BuildUrl(url as string, pathParams as object, queryParams as object) as string
+        url = SetPathParams(url, pathParams)
+        url = SetQueryParams(url, queryParams)
+        return url
+    end function
+
+    function SetPathParams(url as string, pathParams as object) as string
+        if pathParams = invalid
+            return url
+        end if
+
+        for each key in pathParams
+            value = pathParams[key]
+            if value = invalid
+                continue for
+            end if
+
+            if not IsString(value)
+                value = `${value}`
+            end if
+
+            url = url.Replace(`{${key}}`, value.EncodeUriComponent())
+        end for
+
+        return url
+    end function
+
+    function SetQueryParams(url as string, queryParams as object) as string
+        if queryParams = invalid or queryParams.Count() = 0
+            return url
+        end if
+
+        hasQueryParams = url.InStr("?") <> -1
+
+        for each key in queryParams
+            value = queryParams[key]
+            if value = invalid
+                continue for
+            end if
+
+            if hasQueryParams
+                url += "&" + GetEncodedQueryParam(key, value)
+            else
+                url += "?" + GetEncodedQueryParam(key, value)
+                hasQueryParams = true
+            end if
+        end for
+
+        return url
+    end function
+
+    function GetEncodedQueryParam(key as string, value as dynamic) as string
+        if IsString(value)
+            return key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+        else if IsAssociativeArray(value) and IsArray(value.value)
+            return GetEncodedQueryParamArray(key, value)
+        else
+            value = `${value}`
+            return key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+        end if
+    end function
+
+    function GetEncodedQueryParamArray(key as string, value as object) as string
+        if value.arrayType = UrlUtils.QueryParamArrayType.Repeated
+            return GetEncodedQueryParamArrayRepeated(key, value)
+        else if value.arrayType = UrlUtils.QueryParamArrayType.CommaSeparated
+            return GetEncodedQueryParamArrayCommaSeparated(key, value)
+        else
+            throw "Invalid query param array type"
+        end if
+    end function
+
+    function GetEncodedQueryParamArrayRepeated(key as string, value as object) as string
+        repeatedParams = []
+        valueArray = value.value
+        key = key.EncodeUriComponent()
+
+        for each item in valueArray
+            if not IsString(item)
+                item = `${item}`
+            end if
+
+            repeatedParams.push(key + "=" + item.EncodeUriComponent())
+        end for
+
+        return repeatedParams.join("&")
+    end function
+
+    function GetEncodedQueryParamArrayCommaSeparated(key as string, value as object) as string
+        valueArray = value.value
+        key = key.EncodeUriComponent()
+
+        for i = 0 to valueArray.Count() - 1
+            item = valueArray[i]
+            if not IsString(item)
+                item = `${item}`
+            end if
+
+            valueArray[i] = item.EncodeUriComponent()
+        end for
+
+        return key + "=" + valueArray.join(",")
+    end function
+
+    function ParseQueryComponents(url as string) as object
+        query = {}
+        index = Instr(0, url, "?")
+        url = Mid(url, index + 1)
+        components = url.split("&")
+        for each component in components
+            key = component
+            value = ""
+            hasValue = false
+            if Instr(0, component, "=")
+                keyValue = component.split("=")
+                key = keyValue[0]
+                value = keyValue[1].DecodeUriComponent()
+                hasValue = true
+            end if
+
+            if query.DoesExist(key) and hasValue
+                oldValue = query[key]
+                if GetInterface(oldValue, "ifArray") = invalid
+                    oldValue = [oldValue]
+                end if
+                oldValue.push(value.DecodeUriComponent())
+                value = oldValue
+            end if
+
+            if key <> ""
+                query[key] = value
+            end if
+        end for
+        return query
+    end function
+end namespace

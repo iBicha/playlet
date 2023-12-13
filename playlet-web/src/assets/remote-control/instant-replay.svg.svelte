@@ -1,6 +1,6 @@
 <svg name="repeat" width="15px" height="15px" viewBox="0 0 16 17" version="1.1">
   <g transform="matrix(-1,0,0,1,16.794,0)">
-    <g fill="#FFF" transform="translate(-183,-830)" id="g10">
+    <g fill="currentColor" transform="translate(-183,-830)" id="g10">
       <g transform="translate(111,553)" id="g8">
         <g transform="translate(15,49)" id="g6">
           <g transform="translate(0,216)" id="g4">

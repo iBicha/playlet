@@ -6,6 +6,7 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 function Init()
     m.top.focusable = true
@@ -35,7 +36,7 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.rowlist@.BindNode(invalid)
+    m.rowlist@.BindNode()
     m.keyboard.ObserveField("text", FuncName(OnTextChange))
     m.suggestions.ObserveField("buttonFocused", FuncName(OnSearchButtonFocused))
     m.suggestions.ObserveField("buttonSelected", FuncName(OnSearchButtonSelected))
@@ -150,7 +151,7 @@ function OnFiltersButtonSelected()
     searchFilters = CreateObject("roSGNode", "SearchFilters")
     m.appController@.PushScreen(searchFilters)
     searchFilters.searchScreen = m.top
-    searchFilters@.BindNode(invalid)
+    searchFilters@.BindNode()
 end function
 
 function OnSearchButtonSelected()
@@ -220,11 +221,9 @@ function Search(text as string)
         if IsString(value) and value.len() > 0
             feedSource.queryParams[filter] = value
         else if IsArray(value) and value.Count() > 0
-            ' TODO:P1 this is http client implementation details leaking
-            ' We need a declarative way to set array types
             feedSource.queryParams[filter] = {
                 value: value,
-                __arrayType: HttpClient.QueryParamArrayType.CommaSeparated
+                arrayType: UrlUtils.QueryParamArrayType.CommaSeparated
             }
         end if
     end for

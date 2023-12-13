@@ -21,7 +21,7 @@ function Init()
     m.rowList.focusable = true
     m.rowList.screen = m.top
 
-    DisposableObserveField(m.banner, "loadStatus", FuncName(OnBannerLoadStatus))
+    DisposableObserveFieldScoped(m.banner, "loadStatus", FuncName(OnBannerLoadStatus))
     m.author = ""
     m.authorId = ""
 
@@ -29,13 +29,13 @@ function Init()
 end function
 
 function OnNodeready()
-    m.rowList@.BindNode(invalid)
+    m.rowList@.BindNode()
 
     SetNavigation(m.rowList, "up", m.subscribeButton)
     SetNavigation(m.subscribeButton, "down", m.rowList)
 
     m.subscribeButton.text = "Subscribe"
-    DisposableObserveField(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
+    DisposableObserveFieldScoped(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
 
     SetSubscribeButtonVisibility()
     DisposableObserveFieldScoped(m.invidious, "authToken", FuncName(SetSubscribeButtonVisibility))
@@ -115,13 +115,17 @@ function OnkeyEvent(key as string, press as boolean) as boolean
 end function
 
 function Close()
-    m.appController@.PopScreen(invalid)
+    m.appController@.PopScreen()
     m.top.dispose = true
 end function
 
 function OnDispose()
     m.rowList.dispose = true
     DisposeObservers()
+    if m.subscribeTask <> invalid
+        m.subscribeTask.cancel = true
+        m.subscribeTask = invalid
+    end if
 end function
 
 function OnSubscribeButtonSelected()

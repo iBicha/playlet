@@ -25,7 +25,7 @@
   }
 </script>
 
-<div class="flex flex-row m-3">
+<div class="flex flex-row mr-1">
   <div class="p-2">☀️</div>
   <label class="flex items-center">
     <input

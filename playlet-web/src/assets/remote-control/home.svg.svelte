@@ -5,7 +5,7 @@
   height="14px"
   viewBox="0 0 16 14"
   ><g
-    ><g fill="#FFF" transform="translate(-323 -615)"
+    ><g fill="currentColor" transform="translate(-323 -615)"
       ><g transform="translate(111 553)"
         ><g transform="translate(15 49)"
           ><g transform="translate(139.972)"

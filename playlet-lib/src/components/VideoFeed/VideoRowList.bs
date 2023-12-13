@@ -13,6 +13,8 @@ import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
 ' E.g. NBC News does not return any related chnanels
+' The "Continue Watching" feed source might return nothing. In this case,
+' it should be removed.
 function Init()
     m.pendingLoadTasks = {}
 end function
@@ -109,7 +111,7 @@ function OnRowItemSelected(index as object) as void
     else if rowItem.type = "action"
         if rowItem.action = "LoginDialog"
             dialog = CreateObject("roSGNode", "LoginDialog")
-            dialog@.BindNode(invalid)
+            dialog@.BindNode()
             m.top.getScene().dialog = dialog
         end if
     end if
@@ -316,4 +318,7 @@ end function
 function OnDispose()
     CancelCurrentTasks()
     DisposeObservers()
+    m.top.screen = invalid
+    m.top.content = invalid
+    m.top.itemComponentName = invalid
 end function

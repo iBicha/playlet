@@ -5,7 +5,7 @@ function VideoContentTask(input as object) as object
     contentNode = input.content
     invidiousNode = input.invidious
     preferencesNode = input.preferences
-    playletServerUrl = input.playletServerUrl
+    playletServerPort = input.playletServerPort
 
     if m.top.cancel
         return invalid
@@ -35,7 +35,7 @@ function VideoContentTask(input as object) as object
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
 
-    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, playletServerUrl)
+    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, playletServerPort)
     contentNode.url = streamUrls[0]
 
     SetCaptions(metadata, service, contentNode)
@@ -52,7 +52,7 @@ function VideoContentTask(input as object) as object
     }
 end function
 
-function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, playletServerUrl as string) as object
+function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, playletServerPort as integer) as object
     instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
 
@@ -65,9 +65,9 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
 
         if preferredQuality = "720p"
             AddStreamUrls(streamUrls, metadata, service, proxyVideos)
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerUrl)
+            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
         else
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerUrl)
+            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
             AddStreamUrls(streamUrls, metadata, service, proxyVideos)
         end if
     end if
@@ -84,11 +84,11 @@ function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as str
     AddUrls(streamUrls, hlsUrl, hlsUrlLocal, proxyVideos)
 end function
 
-function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerUrl as string) as void
+function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer) as void
     #if LOCAL_DASH
         ' Redirect to Playet's local web server, where will will be
         ' dynamically generating the DASH manifest.
-        dashUrl = `${playletServerUrl}/api/dash?v=${metadata.videoId}`
+        dashUrl = `http://127.0.0.1:${playletServerPort}/api/dash?v=${metadata.videoId}`
     #else
         if metadata.dashUrl = invalid
             return
@@ -168,4 +168,3 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
     contentNode.ClosedCaptions = True
     contentNode.SubtitleTracks = subtitleTracks
 end function
-

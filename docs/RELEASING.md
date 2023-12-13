@@ -42,7 +42,7 @@ These are mostly the steps when releasing a new version:
 
 For releasing to the store (when needed), this is done following a Playlet lib release:
 
-- Switch to main branch and pull changes - **match commit corresponding to the release.**
+- Switch to main branch and pull changes, **including tags** - **match commit corresponding to the release.**
 - `npm run build:release:ci`
   - This makes sure to have a valid app in the staging folder
 - `npm run sign-released-package`
