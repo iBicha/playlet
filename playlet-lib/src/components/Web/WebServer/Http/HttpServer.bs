@@ -1,8 +1,10 @@
+import "../WebSockets/WebSocketServer.bs"
 import "HttpConnection.bs"
 import "HttpConnectionState.bs"
 import "HttpRouter.bs"
 import "HttpSettings.bs"
 import "HttpUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 namespace Http
 
@@ -23,6 +25,7 @@ namespace Http
         public success as boolean
         public settings as Http.HttpSettings
         public task as object
+        public websocket as Web.WebSocketServer
 
         function new(settings as HttpSettings, task as object)
             m.settings = settings
@@ -71,6 +74,11 @@ namespace Http
             m.sockin = sockin
 
             LogInfo("listening on " + addrin.getAddress())
+
+            if m.settings.WebSocketsEnabled
+                m.websocket = new Web.WebSocketServer(m)
+                LogInfo("WebSocketServer created")
+            end if
             return success
         end function
 
@@ -101,6 +109,10 @@ namespace Http
                     LogError("invalid state")
                 end if
             end for
+
+            if m.settings.WebSocketsEnabled
+                m.websocket.Poll()
+            end if
         end function
 
         function PostWait()
@@ -136,7 +148,7 @@ namespace Http
                     if conn.close
                         conn.socket.close()
                         connections.delete(id)
-                    else if conn.ws_upgrade and m.websocket <> invalid
+                    else if conn.ws_upgrade and m.settings.WebSocketsEnabled
                         LogInfo("upgrading connection to web socket")
                         m.websocket.AddConnection(conn.socket)
                         connections.delete(id)
@@ -170,7 +182,7 @@ namespace Http
                 conn = connections[id]
                 conn.socket.close()
             end for
-            if m.websocket <> invalid
+            if m.settings.WebSocketsEnabled
                 m.websocket.Close()
             end if
             ' final stats

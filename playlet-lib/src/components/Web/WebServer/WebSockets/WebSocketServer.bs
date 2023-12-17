@@ -1,0 +1,100 @@
+import "pkg:/source/utils/Logging.bs"
+import "WebSocketConnection.bs"
+
+namespace Web
+
+    class WebSocketServer
+        private webServer as object
+        private connections = invalid
+        private buffer = invalid
+        private onConnectListeners
+        private onDisconnectListeners
+        private onMessageListeners
+
+        function new(webServer as object)
+            m.connections = CreateObject("roAssociativeArray")
+            m.onConnectListeners = []
+            m.onDisconnectListeners = []
+            m.onMessageListeners = []
+            m.webServer = webServer
+        end function
+
+        function OnConnect(callback as function)
+            m.onConnectListeners.push(callback)
+        end function
+
+        function OnDisconnect(callback as function)
+            m.onDisconnectListeners.push(callback)
+        end function
+
+        function OnMessage(callback as function)
+            m.onMessageListeners.push(callback)
+        end function
+
+        function AddConnection(socket as object)
+            client = new Web.WebSocketConnection(m, socket)
+            m.connections[client.id] = client
+            m.TriggerOnConnect(client)
+        end function
+
+        function TriggerOnConnect(connection as Web.WebSocketConnection)
+            LogInfo("on connect")
+            for each listener in m.onConnectListeners
+                listener({
+                    server: m,
+                    connection: connection
+                })
+            end for
+        end function
+
+        function TriggerOnDisconnect(connection as Web.WebSocketConnection)
+            LogInfo("on disconnect")
+            for each listener in m.onDisconnectListeners
+                listener({
+                    server: m,
+                    connection: connection
+                })
+            end for
+        end function
+
+        function TriggerOnMessage(connection as Web.WebSocketConnection, message as string)
+            for each listener in m.onMessageListeners
+                listener({
+                    server: m,
+                    connection: connection,
+                    message: message
+                })
+            end for
+        end function
+
+        function Poll()
+            connections = m.connections
+            for each id in connections
+                connection = connections[id]
+                if connection.IsClosed()
+                    connections.delete(id)
+                else
+                    connection.Poll()
+                end if
+            end for
+        end function
+
+        function Close()
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.Close()
+            end for
+        end function
+
+        function Send(text as string) as void
+            connections = m.connections
+            for each id in connections
+                conn = connections[id]
+                conn.Send(text)
+            end for
+        end function
+
+    end class
+
+end namespace

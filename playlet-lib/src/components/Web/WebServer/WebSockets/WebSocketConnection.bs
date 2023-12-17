@@ -1,0 +1,83 @@
+import "pkg:/source/utils/Logging.bs"
+import "WebSocketConnectionState.bs"
+import "WebSocketFrame.bs"
+
+namespace Web
+
+    const BUFSIZE = 524288
+
+    class WebSocketConnection
+        private server
+        private socket
+        private frame
+        public id = invalid
+        public state = invalid
+
+        function new(server as WebSocketServer, socket as object)
+            m.server = server
+            m.socket = socket
+            m.socket.SetKeepAlive(true)
+            m.socket.SetNoDelay(true)
+            m.id = Stri(m.socket.getID()).trim()
+
+            m.buffer = CreateObject("roByteArray")
+            m.buffer[Web.BUFSIZE] = 0
+
+            m.frame = new Web.WebSocketFrame()
+
+            m.state = Web.WebSocketConnectionState.OPEN
+        end function
+
+        function Poll() as void
+            if not m.socket.eOK()
+                m.Close()
+                return
+            end if
+            received = m.socket.receive(m.buffer, 0, Web.BUFSIZE)
+            if received = 0
+                m.Close()
+                return
+            else if received > 0
+                if m.frame.ReadFromBuffer(m.buffer, 0, received)
+                    message = m.frame.GetPayloadText()
+                    LogInfo("received message:", message)
+
+                    m.server.TriggerOnMessage(m, message)
+                end if
+            end if
+        end function
+
+        function IsClosed() as boolean
+            return m.state = Web.WebSocketConnectionState.CLOSED
+        end function
+
+        function Close() as void
+            if m.IsClosed()
+                return
+            end if
+            m.socket.Close()
+            m.state = Web.WebSocketConnectionState.CLOSED
+            m.server.TriggerOnDisconnect(m)
+        end function
+
+        function Send(text as string) as void
+            if m.IsClosed()
+                return
+            end if
+            m.frame.SetPayloadText(text)
+            written_bytes = m.frame.WriteToBuffer(m.buffer, 0, Web.BUFSIZE)
+            if written_bytes > 0
+                total_sent = 0
+                ' TODO:P0 buffer instead of a while loop
+                while total_sent < written_bytes
+                    sent = m.socket.Send(m.buffer, total_sent, written_bytes - total_sent)
+                    if sent > 0
+                        total_sent += sent
+                        LogInfo("Sent bytes:", total_sent, "out of:", written_bytes)
+                    end if
+                end while
+            end if
+        end function
+    end class
+
+end namespace
