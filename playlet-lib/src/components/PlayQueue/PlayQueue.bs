@@ -8,6 +8,7 @@ import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RingBuffer.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 prevent adding duplicates of the same video/playlist
@@ -17,6 +18,8 @@ function Init()
     m.top.content = m.content
     m.content.addField("index", "integer", false)
     m.content.index = m.top.index
+    ' TODO:P2 use actual queue nodes instead of internal buffer
+    m.watchedVideos = new RingBuffer(100)
 end function
 
 function Play(node as object, playlistIndex as integer)
@@ -138,7 +141,7 @@ function PlayItemAtCurrentIndex() as boolean
         return false
     end if
     if node.type = "video"
-        VideoUtils.PlayVideo(node)
+        PlayVideo(node)
         return true
     else if node.type = "playlist"
         if m.top.playlistIndex = -1
@@ -162,12 +165,20 @@ function PlayPlaylistAtCurrentIndex(playlist as object) as boolean
 
     if playlistIndex < playlist.getChildCount()
         child = playlist.getChild(playlistIndex)
-        VideoUtils.PlayVideo(child)
+        PlayVideo(child)
         return true
     end if
 
     LoadPlaylist(playlist)
     return true
+end function
+
+function PlayVideo(node as object)
+    videoId = node.videoId
+    if not m.watchedVideos.Contains(videoId)
+        m.watchedVideos.Push(videoId)
+    end if
+    VideoUtils.PlayVideo(node)
 end function
 
 function LoadPlaylist(playlist as object) as void
@@ -218,4 +229,12 @@ function OnIndexChange()
     for each child in children
         child.index = index
     end for
+end function
+
+function watchedVideosContain(videoId as string) as boolean
+    return m.watchedVideos.Contains(videoId)
+end function
+
+function watchedVideosClear(unused as dynamic)
+    m.watchedVideos = new RingBuffer(100)
 end function

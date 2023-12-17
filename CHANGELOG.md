@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- (Regression) Issue where auto-play keeps playing the same videos in a loop
+
+### Removed
+
+- Xmas theme logo - can't publish it before end of year... ([link](https://blog.roku.com/developer/channel-store-blackouts-2023))
+
+## [0.17.3] - 2023-12-13
+
+### Added
+
+- Xmas theme logo
+
 ## [0.17.2] - 2023-12-10
 
 ### Added
