@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - (Regression) Issue where auto-play keeps playing the same videos in a loop
+- Small search box styling bug for Safari
 
 ### Removed
 

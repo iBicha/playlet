@@ -140,7 +140,7 @@
           }}
         />
         <button
-          class="join-item btn"
+          class="join-item btn w-16"
           on:click={async () => {
             page = 1;
             videos = [];
@@ -156,7 +156,7 @@
         class="btn border border-neutral rounded-full mt-1"
         on:click={searchFiltersComponent.open()}
       >
-        <div class="h-6">
+        <div class="h-6 w-8">
           <FiltersIcon />
         </div>
         {searchFiltersLabel}
