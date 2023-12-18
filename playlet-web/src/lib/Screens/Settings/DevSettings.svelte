@@ -2,12 +2,14 @@
   import { onMount } from "svelte";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
+  import { ExternalControlProtocol } from "lib/Api/ExternalControlProtocol";
 
   let selectedRelease = "";
   let releases = [];
 
   let libUrl;
   let libUrlType;
+  let appId = "693751";
 
   onMount(async () => {
     releases = await fetchReleaseTags();
@@ -17,6 +19,9 @@
   playletStateStore.subscribe((value) => {
     libUrl = value?.app?.lib_url;
     libUrlType = value?.app?.lib_url_type;
+    if (value?.app?.id) {
+      appId = value?.app?.id;
+    }
     setCurrentlyUsedRelease();
   });
 
@@ -62,11 +67,12 @@
     }
     if (
       confirm(
-        `Are you sure you want to change the Playlet Library version to "${version}"?`
+        `Are you sure you want to change the Playlet Library version to "${version}"?\nThis will restart Playlet.`
       )
     ) {
       await PlayletApi.setPlayletLibVersion(selectedRelease);
-      alert("Playlet Library version set. Restart playlet to apply changes.");
+      alert("Playlet Library version set. Playlet will now restart.");
+      await ExternalControlProtocol.restartApp(appId);
     }
   }
 </script>

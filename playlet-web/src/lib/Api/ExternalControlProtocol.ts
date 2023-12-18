@@ -8,6 +8,15 @@ export class ExternalControlProtocol {
             body: '',
         })
     }
+
+    static async restartApp(appId) {
+        console.log("Restarting app", appId)
+        return fetch(`http://${getIp()}:8060/launch/${appId}?restart=true`, {
+            method: 'POST',
+            body: '',
+        })
+    }
+
     static async pressKey(key) {
         return fetch(`http://${getIp()}:8060/keypress/${key}`, {
             method: 'POST',
