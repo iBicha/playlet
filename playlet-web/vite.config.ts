@@ -5,11 +5,18 @@ import ip from 'ip';
 import { existsSync, readFileSync } from 'fs'
 import { join as joinPath } from 'path'
 import { parse as dotEnvParse } from 'dotenv'
+import legacy from '@vitejs/plugin-legacy'
 
 const PORT = 5173
 
 const config: UserConfig = {
-  plugins: [tsconfigPaths(), svelte()],
+  plugins: [
+    tsconfigPaths(),
+    svelte(),
+    legacy({
+      targets: ['defaults', 'not IE 11'],
+    })
+  ],
   build: {
     outDir: "../playlet-lib/src/www",
     emptyOutDir: true
