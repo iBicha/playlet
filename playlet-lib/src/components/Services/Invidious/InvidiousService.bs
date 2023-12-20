@@ -22,7 +22,7 @@ namespace Invidious
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
 
-    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,POST:history*,:subscriptions*"
+    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,:history*,:subscriptions*"
 
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_SUBSCRIPTIONS = "/api/v1/auth/subscriptions"
@@ -50,7 +50,8 @@ namespace Invidious
                 ChannelInfoHandler: m.ChannelInfoHandler,
                 ChannelVideosHandler: m.ChannelVideosHandler,
                 ChannelPlaylistsHandler: m.ChannelPlaylistsHandler,
-                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
+                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler,
+                WatchHistoryHandler: m.WatchHistoryHandler
             }
         end function
 
@@ -397,6 +398,31 @@ namespace Invidious
             if IsArray(json.videos)
                 videos.Append(json.videos)
             end if
+
+            return {
+                items: videos
+            }
+        end function
+
+        function WatchHistoryHandler(m as object, feedSource as object, response as object) as object
+            m.DeleteExpiredToken(response)
+
+            if response.StatusCode() <> 200
+                return invalid
+            end if
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            videos = []
+            for each item in json
+                videos.push({
+                    type: "video",
+                    videoId: item
+                })
+            end for
 
             return {
                 items: videos
