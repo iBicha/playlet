@@ -135,10 +135,23 @@ namespace SponsorBlock
                 end if
 
                 if action = "AutoSkip"
-                    m.top.seek = segmentEnd
-                    LogInfo("Skipping section:", segment["category"])
-                    SendSkippedSectionEvent(segment.UUID)
-                    return
+                    duration = m.top.duration
+                    ' Sometimes segmentEnd is greater than duration
+                    if duration > 0 and segmentEnd > duration
+                        segmentEnd = duration
+                    end if
+                    ' If the segment is at the end of the video, skip the video instead of seeking
+                    if duration > 0 and Abs(segmentEnd - duration) < 2
+                        LogInfo("Skipping section:", segment["category"], "at end of video")
+                        SendSkippedSectionEvent(segment.UUID)
+                        OnVideoFinished()
+                        return
+                    else
+                        LogInfo("Skipping section:", segment["category"])
+                        SendSkippedSectionEvent(segment.UUID)
+                        m.top.seek = segmentEnd
+                        return
+                    end if
                 end if
             end if
         end for

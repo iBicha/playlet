@@ -185,23 +185,8 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "finished"
-        if content = invalid
-            m.playQueue@.watchedVideosClear()
-            VideoUtils.CloseVideo()
-            return
-        end if
-
-        metadata = content.metadata
-        if metadata = invalid
-            m.playQueue@.watchedVideosClear()
-            VideoUtils.CloseVideo()
-            return
-        end if
-
-        if not PlayNext(metadata.recommendedVideos)
-            m.playQueue@.watchedVideosClear()
-            VideoUtils.CloseVideo()
-        end if
+        OnVideoFinished()
+        return
     end if
 
     if state = "error"
@@ -221,6 +206,27 @@ function OnVideoPlayerStateChange() as void
         LogError(title, messageLines)
         DialogUtils.ShowDialog(messageLines, title, true)
         ' TODO:P1 play next video in the queue after showing the error dialog
+        VideoUtils.CloseVideo()
+    end if
+end function
+
+function OnVideoFinished() as void
+    content = m.top.content
+    if content = invalid
+        m.playQueue@.watchedVideosClear()
+        VideoUtils.CloseVideo()
+        return
+    end if
+
+    metadata = content.metadata
+    if metadata = invalid
+        m.playQueue@.watchedVideosClear()
+        VideoUtils.CloseVideo()
+        return
+    end if
+
+    if not PlayNext(metadata.recommendedVideos)
+        m.playQueue@.watchedVideosClear()
         VideoUtils.CloseVideo()
     end if
 end function
