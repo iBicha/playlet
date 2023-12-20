@@ -64,6 +64,11 @@ jobs:
           latest_release=$(awk 'BEGIN { RS="## \\[" } NR==2 { print "## ["$0 }' CHANGELOG.md)
           echo -e "\n$latest_release" >> docs/canary-changelog.md
 
+      # A bug in gh cli causes the release to be created as a draft, and not released.
+      # See https://github.com/cli/cli/issues/8458
+      - name: Wait 10 seconds
+        run: sleep 10
+
       - name: Create Canary release
         run: gh release create canary ./release/playlet.zip ./release/playlet-lib.zip --notes-file docs/canary-changelog.md --prerelease --title Canary
         env:
