@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Regression) Issue where auto-play keeps playing the same videos in a loop
 - Small search box styling bug for Safari
 - A bug where the skipping of a sponsored section at the end of a video leads to an infinite loop
+- Small bug when listing Invidious public instances
 
 ### Removed
 
