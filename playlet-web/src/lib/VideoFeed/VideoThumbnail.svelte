@@ -1,4 +1,5 @@
 <script lang="ts">
+  export let videoId: string | undefined = undefined;
   export let title: string | undefined = undefined;
   export let videoThumbnails: any[] | undefined = undefined;
   export let liveNow: boolean = undefined;
@@ -19,6 +20,8 @@
         url = invidiousInstance + url;
       }
       thumbnailUrl = url;
+    } else if (invidiousInstance) {
+      thumbnailUrl = `${invidiousInstance}/vi/${videoId || "--"}/mqdefault.jpg`;
     }
   }
 
