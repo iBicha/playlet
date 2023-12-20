@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Medium video quality in the settings (For most videos, this is 360p)
+- Invidious watch history feed
 
 ### Fixed
 

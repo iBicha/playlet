@@ -86,6 +86,7 @@
     <div class="flex flex-col items-center">
       <div class="w-64">
         <VideoThumbnail
+          bind:videoId
           bind:title
           bind:videoThumbnails
           bind:liveNow
@@ -94,7 +95,7 @@
           bind:invidiousInstance
         />
       </div>
-      <div class="m-4">{title}</div>
+      <div class="m-4">{title || ""}</div>
     </div>
     <div class="flex flex-col">
       <VideoStartAt

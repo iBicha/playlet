@@ -1,4 +1,7 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousUnregisterTokenTask.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
+import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -22,7 +25,7 @@ namespace Invidious
 
     const SEARCH_SUGGEST_ENDPOINT = "/api/v1/search/suggestions"
 
-    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,POST:history*,:subscriptions*"
+    const AUTH_SCOPES = "GET:feed,GET:playlists*,POST:tokens/*,:history*,:subscriptions*"
 
     const AUTH_PLAYLISTS = "/api/v1/auth/playlists"
     const AUTH_SUBSCRIPTIONS = "/api/v1/auth/subscriptions"
@@ -50,7 +53,8 @@ namespace Invidious
                 ChannelInfoHandler: m.ChannelInfoHandler,
                 ChannelVideosHandler: m.ChannelVideosHandler,
                 ChannelPlaylistsHandler: m.ChannelPlaylistsHandler,
-                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
+                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler,
+                WatchHistoryHandler: m.WatchHistoryHandler
             }
         end function
 
@@ -403,6 +407,31 @@ namespace Invidious
             }
         end function
 
+        function WatchHistoryHandler(m as object, feedSource as object, response as object) as object
+            m.DeleteExpiredToken(response)
+
+            if response.StatusCode() <> 200
+                return invalid
+            end if
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            videos = []
+            for each item in json
+                videos.push({
+                    "type": "video",
+                    "videoId": item
+                })
+            end for
+
+            return {
+                items: videos
+            }
+        end function
+
         function DeleteExpiredToken(response as object)
             if response.StatusCode() = 403
                 LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
@@ -422,12 +451,18 @@ namespace Invidious
                 return invalid
             end if
             if not m.VerifyTokenScope(authToken.token)
-                ' TODO:P1 automatically logging out the user is not a good experience
-                ' We can at least show a message to the user on why they are logged out
-                ' TODO:P2 right now we're probably in a UI thread, and we can't unregister the token
-                ' So we're just going to ignore it for now
-                ' m.UnregisterToken(authToken)
+                ' Right now we're probably in a UI thread, and we can't unregister the token
+                ' Without a Task
+                StartAsyncTask(InvidiousUnregisterTokenTask, {
+                    invidious: m.node,
+                    authToken: authToken
+                })
                 RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+                message = `It looks like you are logged in to Invidious, but your access token does not have the required permissions.
+For that reason, we have logged you out. Please log in again.
+This can happen when Playlet is updated with new features.
+We apologize for the inconvenience.`
+                DialogUtils.ShowDialog(message, "User logged out")
                 return invalid
             end if
             return authToken

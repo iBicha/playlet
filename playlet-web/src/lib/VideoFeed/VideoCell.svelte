@@ -142,6 +142,7 @@
 <button class="w-80 p-2" on:click={videoModal.show()}>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <VideoThumbnail
+      bind:videoId
       bind:title
       bind:videoThumbnails
       bind:liveNow
@@ -150,7 +151,7 @@
       bind:invidiousInstance
     />
     <div class="card-body">
-      <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
+      <h3 class="card-title text-base line-clamp-2 min-h-12">{title || ""}</h3>
       <button
         class="font-semibold link"
         on:click={(e) => {
@@ -158,7 +159,7 @@
           channelModal.show();
         }}
       >
-        {author}
+        {author || ""}
       </button>
       <div>{getViewCountDateText()}</div>
     </div>
