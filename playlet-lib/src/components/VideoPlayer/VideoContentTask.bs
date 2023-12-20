@@ -63,12 +63,12 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
     else
         preferredQuality = preferences["playback.preferred_quality"]
 
-        if preferredQuality = "720p"
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos)
+        if preferredQuality = "auto"
             AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
+            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
         else
+            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
             AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos)
         end if
     end if
 
@@ -101,12 +101,33 @@ function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as st
     AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
 end function
 
-function AddStreamUrls(streamUrls as object, metadata as object, service as Invidious.InvidiousService, proxyVideos as string) as void
+function AddStreamUrls(streamUrls as object, metadata as object, service as Invidious.InvidiousService, proxyVideos as string, preferredQuality as string) as void
     if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
         return
     end if
 
-    url = service.GetVideoStreamUrl(metadata.videoId)
+    itag = invalid
+    ' If we prefer medium quality, we check if we have a 360p or 480p streams
+    if preferredQuality = "medium"
+        ' These are roughly the itags for 360p and 480p
+        ' Most videos will hit 18, which is 360p
+        mediumItags = {
+            "18": true,
+            "43": true,
+            "44": true,
+            "82": true,
+            "83": true,
+            "101": true
+        }
+        for each formatStream in metadata.formatStreams
+            if mediumItags[ValidString(formatStream.itag)] = true
+                itag = formatStream.itag
+                exit for
+            end if
+        end for
+    end if
+
+    url = service.GetVideoStreamUrl(metadata.videoId, itag)
     localUrl = AddLocalFlag(url)
 
     AddUrls(streamUrls, url, localUrl, proxyVideos)

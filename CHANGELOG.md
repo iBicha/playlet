@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Medium video quality in the settings (For most videos, this is 360p)
+
 ### Fixed
 
 - (Regression) Issue where auto-play keeps playing the same videos in a loop
