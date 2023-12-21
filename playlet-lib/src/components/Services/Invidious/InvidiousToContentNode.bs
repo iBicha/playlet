@@ -3,7 +3,7 @@ import "pkg:/source/utils/TimeUtils.bs"
 
 namespace InvidiousContent
 
-    function ToRowCellContentNode(item as object, instance as dynamic) as object
+    function ToRowCellContentNode(item as object, instance as dynamic, continueWatchingContent as object) as object
         if item.videoId <> invalid and (item.type = invalid or item.type = "shortVideo")
             item.type = "video"
         end if
@@ -17,9 +17,9 @@ namespace InvidiousContent
         end if
 
         if item.type = "video"
-            return ToVideoContentNode(invalid, item, instance)
+            return ToVideoContentNode(invalid, item, instance, continueWatchingContent)
         else if item.type = "playlist"
-            return ToPlaylistContentNode(invalid, item, instance)
+            return ToPlaylistContentNode(invalid, item, instance, continueWatchingContent)
         else if item.type = "channel"
             return ToChannelContentNode(invalid, item, instance)
         else
@@ -27,7 +27,7 @@ namespace InvidiousContent
         end if
     end function
 
-    function ToVideoContentNode(node as object, item as object, instance as dynamic) as object
+    function ToVideoContentNode(node as object, item as object, instance as dynamic, continueWatchingContent as object) as object
         if node = invalid
             node = CreateObject("roSGNode", "VideoContentNode")
         end if
@@ -47,10 +47,17 @@ namespace InvidiousContent
         node.viewCountText = VideoGetViewCountText(item)
         SetIfExists(node, "index", item, "index")
 
+        if not StringUtils.IsNullOrEmpty(item.videoId)
+            progressNode = continueWatchingContent.findNode(item.videoId)
+            if progressNode <> invalid
+                node.progressNode = progressNode
+            end if
+        end if
+
         return node
     end function
 
-    function ToPlaylistContentNode(node as object, item as object, instance as dynamic) as object
+    function ToPlaylistContentNode(node as object, item as object, instance as dynamic, continueWatchingContent as object) as object
         if node = invalid
             node = CreateObject("roSGNode", "PlaylistContentNode")
             node.loadState = FeedLoadState.None
@@ -75,7 +82,7 @@ namespace InvidiousContent
             newNodes = []
             for each video in item.videos
                 video.type = "video"
-                videoNode = ToVideoContentNode(invalid, video, instance)
+                videoNode = ToVideoContentNode(invalid, video, instance, continueWatchingContent)
                 if videoNode <> invalid
                     index = video.index
                     if index <> invalid and index > -1 and index < childCount

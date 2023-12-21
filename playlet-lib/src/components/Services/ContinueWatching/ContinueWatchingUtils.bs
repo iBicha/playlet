@@ -1,0 +1,33 @@
+namespace ContinueWatching
+
+    function GetNodeForVideo(continueWatchingNode as object, videoId as string) as object
+        node = continueWatchingNode.content.findNode(videoId)
+        if node <> invalid
+            return node
+        end if
+
+        node = CreateObject("roSGNode", "VideoProgressContentNode")
+        node.id = videoId
+        node.videoId = videoId
+        continueWatchingNode.content.appendChild(node)
+        return node
+    end function
+
+    function MarkWatchDate(progressNode as object)
+        date = CreateObject("roDateTime")
+        progressNode.date = date.asSeconds()
+        parent = progressNode.getParent()
+        if parent <> invalid
+            parent.removeChild(progressNode)
+            parent.insertChild(progressNode, 0)
+        end if
+    end function
+
+    function RemoveNodeForVideo(continueWatchingNode as object, videoId as string)
+        node = continueWatchingNode.content.findNode(videoId)
+        if node <> invalid
+            continueWatchingNode.content.removeChild(node)
+        end if
+    end function
+
+end namespace

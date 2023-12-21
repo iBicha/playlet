@@ -3,9 +3,19 @@ import "InvidiousSubscriptionsTask.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
 
 function Init()
-    m.top.apiDefinitions = ParseJson(ReadAsciiFile("libpkg:/config/invidious_video_api.yaml"))
+    apiDefinitions = LoadApiDefinition("libpkg:/config/invidious_video_api.yaml", "Invidious")
+    apiDefinitions.Append(LoadApiDefinition("libpkg:/config/local_video_api.yaml", "Local"))
+    m.top.apiDefinitions = apiDefinitions
     m.service = new Invidious.InvidiousService(m.top)
     m.top.authToken = m.service.GetAuthToken()
+end function
+
+function LoadApiDefinition(path as string, apiType as string) as object
+    apiDefinitions = ParseJson(ReadAsciiFile(path))
+    for each key in apiDefinitions
+        apiDefinitions[key].apiType = apiType
+    end for
+    return apiDefinitions
 end function
 
 function GetCurrentInstance(unused as dynamic) as string

@@ -1,0 +1,70 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.content = m.top.findNode("content")
+    m.continueWatchingString = ""
+    Load()
+end function
+
+function Load() as void
+    continueWatchingString = RegistryUtils.Read(RegistryUtils.CONTINUE_WATCHING)
+    if continueWatchingString = invalid
+        return
+    end if
+
+    m.continueWatchingString = continueWatchingString
+    continueWatching = ParseJson(continueWatchingString)
+    if continueWatching = invalid
+        LogWarn("Failed to parse continue watching json")
+        return
+    end if
+
+    nodes = []
+    for each video in continueWatching.videos
+        node = CreateObject("roSGNode", "VideoProgressContentNode")
+        node.id = video.id
+        node.videoId = video.id
+        node.date = ValidInt(video.date)
+        node.timestamp = ValidInt(video.timestamp)
+        node.duration = ValidInt(video.duration)
+        nodes.push(node)
+    end for
+
+    content = m.top.content
+    content.removeChildrenIndex(content.getChildCount(), 0)
+    content.appendChildren(nodes)
+end function
+
+function Save() as void
+    nodes = m.top.content.getChildren(-1, 0)
+    if nodes.Count() = 0
+        RegistryUtils.Delete(RegistryUtils.CONTINUE_WATCHING)
+        return
+    end if
+
+    videos = []
+    for each node in nodes
+        video = {}
+        video.id = node.videoId
+        video.date = node.date
+        video.timestamp = node.timestamp
+        video.duration = node.duration
+        videos.push(video)
+    end for
+
+    videos.SortBy("date", "r")
+
+    continueWatchingString = FormatJson({
+        "__version": m.top.__version,
+        "videos": videos
+    })
+
+    if m.continueWatchingString = continueWatchingString
+        return
+    end if
+
+    RegistryUtils.Write(RegistryUtils.CONTINUE_WATCHING, continueWatchingString)
+    m.continueWatchingString = continueWatchingString
+end function

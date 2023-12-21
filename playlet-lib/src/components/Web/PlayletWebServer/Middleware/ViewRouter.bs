@@ -12,13 +12,15 @@ namespace Http
             m.Get("/api/view/open", function(context as object) as boolean
                 request = context.request
                 response = context.response
-                appController = context.server.task.appController
+                task = context.server.task
+                appController = task.appController
+                continueWatchingContent = task.continueWatching.content
 
                 playlistId = request.query.playlistId
                 authorId = request.query.authorId
 
                 if not StringUtils.IsNullOrEmpty(playlistId)
-                    contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid)
+                    contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid, continueWatchingContent)
                     PlaylistUtils.Open(contentNode, appController)
                     if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
                         VideoUtils.ToggleVideoPictureInPicture()
