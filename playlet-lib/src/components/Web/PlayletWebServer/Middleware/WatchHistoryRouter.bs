@@ -1,23 +1,21 @@
-import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 namespace Http
 
-    const CONTINUE_WATCHING_PAGE_SIZE = 5
+    const WATCH_HISTORY_PAGE_SIZE = 5
 
-    class ContinueWatchingRouter extends HttpRouter
+    class WatchHistoryRouter extends HttpRouter
 
         function new()
             super()
 
-            m.Get("/api/continue-watching", function(context as object) as boolean
+            m.Get("/api/watch-history", function(context as object) as boolean
                 request = context.request
                 response = context.response
                 router = context.router
                 task = context.server.task
                 invidiousNode = task.invidious
-
-                continueWatchingNode = task.continueWatching
 
                 page = 1
                 if not StringUtils.IsNullOrEmpty(request.query.page)
@@ -25,22 +23,29 @@ namespace Http
                     page = MathUtils.Max(page, 1)
                 end if
 
-                totalCount = continueWatchingNode.content.getChildCount()
-                startIndex = (page - 1) * CONTINUE_WATCHING_PAGE_SIZE
-                if startIndex >= totalCount
+                service = new Invidious.InvidiousService(invidiousNode)
+
+                historyResponse = service.GetWatchHistory(page, WATCH_HISTORY_PAGE_SIZE)
+                if not historyResponse.IsSuccess()
+                    response.http_code = historyResponse.StatusCode()
+                    response.SetBodyDataString(response.ErrorMessage())
+                    response.ContentType("text/plain")
+                    return true
+                end if
+
+                videoIds = historyResponse.Json()
+                if not IsArray(videoIds)
+                    response.http_code = 500
+                    response.SetBodyDataString("Invalid response from Invidious")
+                    response.ContentType("text/plain")
+                    return true
+                end if
+
+                if videoIds.Count() = 0
                     response.Json([])
                     return true
                 end if
 
-                videoCount = MathUtils.Min(CONTINUE_WATCHING_PAGE_SIZE, totalCount - startIndex)
-                nodes = continueWatchingNode.content.getChildren(videoCount, startIndex)
-
-                videoIds = []
-                for each node in nodes
-                    videoIds.push(node.videoId)
-                end for
-
-                service = new Invidious.InvidiousService(invidiousNode)
                 instance = service.GetInstance()
 
                 videoRequests = []
