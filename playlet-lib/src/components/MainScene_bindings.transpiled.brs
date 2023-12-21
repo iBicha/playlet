@@ -16,7 +16,8 @@ function InitializeBindings()
             "PlayQueue": {
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "continueWatching": "../ContinueWatching"
             }, 
             "SearchHistory": {
                 "preferences": "../Preferences"
@@ -32,7 +33,8 @@ function InitializeBindings()
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 
                 "playQueue": "../PlayQueue", 
-                "bookmarks": "../Bookmarks"
+                "bookmarks": "../Bookmarks", 
+                "continueWatching": "../ContinueWatching"
             }
         }
     }
