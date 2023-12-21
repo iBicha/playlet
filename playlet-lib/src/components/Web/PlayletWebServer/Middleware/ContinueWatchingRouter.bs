@@ -1,4 +1,9 @@
+import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
 namespace Http
+
+    const CONTINUE_WATCHING_PAGE_SIZE = 5
 
     class ContinueWatchingRouter extends HttpRouter
 
@@ -6,22 +11,73 @@ namespace Http
             super()
 
             m.Get("/api/continue-watching", function(context as object) as boolean
+                request = context.request
                 response = context.response
+                router = context.router
                 task = context.server.task
+                invidiousNode = task.invidious
+
                 continueWatchingNode = task.continueWatching
 
-                nodes = continueWatchingNode.content.getChildren(-1, 0)
-                videos = []
+                page = 1
+                if not StringUtils.IsNullOrEmpty(request.query.page)
+                    page = request.query.page.ToInt()
+                    page = MathUtils.Max(page, 1)
+                end if
+
+                totalCount = continueWatchingNode.content.getChildCount()
+                startIndex = (page - 1) * CONTINUE_WATCHING_PAGE_SIZE
+                if startIndex >= totalCount
+                    response.Json([])
+                    return true
+                end if
+
+                videoCount = MathUtils.Min(CONTINUE_WATCHING_PAGE_SIZE, totalCount - startIndex)
+                nodes = continueWatchingNode.content.getChildren(videoCount, startIndex)
+
+                videoIds = []
                 for each node in nodes
-                    videos.push({
-                        "type": "video",
-                        "videoId": node.videoId
-                    })
+                    videoIds.push(node.videoId)
+                end for
+
+                service = new Invidious.InvidiousService(invidiousNode)
+                instance = service.GetInstance()
+
+                videoRequests = []
+                for each videoId in videoIds
+                    videoRequests.push(router.GetVideoMetadata(instance, videoId))
+                end for
+
+                videoResponses = []
+                for each videoRequest in videoRequests
+                    videoResponses.push(videoRequest.Await())
+                end for
+
+                videos = []
+                for each videoResponse in videoResponses
+                    if videoResponse.StatusCode() = 200
+                        videoInfo = videoResponse.Json()
+                        videoInfo.type = "video"
+                        videos.push(videoInfo)
+                    end if
                 end for
 
                 response.Json(videos)
                 return true
             end function)
+        end function
+
+        function GetVideoMetadata(instance as string, videoId as string, cancellation = invalid as object) as object
+            ' _playlet_ref=continue-watching so that we give it it's own cache that lasts longer
+            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}?_playlet_ref=continue-watching`
+
+            request = HttpClient.Get(url)
+            ' 7 days of cache
+            request.CacheSeconds(60 * 60 * 24 * 7)
+            request.Cancellation(cancellation)
+
+            ' Send, and not await, since we are launching many requests at once
+            return request.Send()
         end function
 
     end class
