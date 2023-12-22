@@ -133,7 +133,7 @@ playletConfig.categoryList.forEach(categoryId => {
     category.title = englishLocale[`category_${categoryId}`].message
     category.short_title = englishLocale[`category_${categoryId}_short`]?.message ?? category.title;
     category.categorySupport = configExample.categorySupport[categoryId];
-    category.color = getColor(barTypes[categoryId]);
+    category.color = getColor(barTypes[categoryId]).toUpperCase();
 
     playletConfig.categories[categoryId] = category;
 });
