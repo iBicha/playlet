@@ -140,6 +140,37 @@ function MarkVideoWatched(videoContentNode as object)
 end function
 
 function Close(unused as dynamic)
+    HandleProgressBeforeClose()
+    m.top.control = "stop"
+    m.top.content = invalid
+    parent = m.top.getParent()
+    if parent <> invalid
+        parent.RemoveChild(m.top)
+    end if
+    SponsorBlock.RemoveNotifcation(m.notifications)
+end function
+
+function HandleProgressBeforeClose() as void
+    progressNode = m.progressNode
+    if progressNode = invalid
+        return
+    end if
+
+    if not m.videoPlayedToCompletion
+        duration = progressNode.duration
+        timestamp = progressNode.timestamp
+        if duration > 0
+            timeLeft = duration - timestamp
+            percentageLeft = timeLeft / duration
+
+            ' If we are less than 5% away from the end of the video, and the what's left is less than 20 seconds
+            ' then we consider the video to be played to completion, to account for ending credits etc.
+            if percentageLeft < 0.05 and timeLeft < 20
+                m.videoPlayedToCompletion = true
+            end if
+        end if
+    end if
+
     if m.videoPlayedToCompletion
         content = m.top.content
         if content <> invalid
@@ -154,13 +185,7 @@ function Close(unused as dynamic)
     end if
     m.continueWatching.save = true
 
-    m.top.control = "stop"
-    m.top.content = invalid
-    parent = m.top.getParent()
-    if parent <> invalid
-        parent.RemoveChild(m.top)
-    end if
-    SponsorBlock.RemoveNotifcation(m.notifications)
+    m.progressNode = invalid
 end function
 
 function OnControlChange()
