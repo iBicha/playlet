@@ -4,6 +4,7 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
+    m.progressRect = m.top.FindNode("progressRect")
 end function
 
 function OnContentSet() as void
@@ -23,6 +24,8 @@ function OnContentSet() as void
     else
         m.top.durationRectVisible = false
     end if
+
+    SetupProgress(content)
 end function
 
 function SetDurationText(text as string) as void
@@ -40,4 +43,32 @@ function SetDurationText(text as string) as void
 
     rect.width = size.width + 16
     rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+end function
+
+function SetupProgress(content as object)
+    if m.progressNode <> invalid
+        m.progressNode.unobserveFieldScoped("timestamp")
+        m.progressNode = invalid
+    end if
+
+    m.progressNode = content.progressNode
+    if m.progressNode <> invalid
+        m.progressNode.observeFieldScoped("timestamp", FuncName(SetProgress))
+    end if
+    SetProgress()
+end function
+
+function SetProgress() as void
+    if m.progressNode = invalid
+        m.progressRect.scale = [0, 1]
+        return
+    end if
+
+    duration = m.progressNode.duration
+    timestamp = m.progressNode.timestamp
+    progress = 0
+    if duration > 0
+        progress = timestamp / duration
+    end if
+    m.progressRect.scale = [progress, 1]
 end function
