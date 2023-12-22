@@ -1,5 +1,6 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/components/Services/ContinueWatching/ContinueWatchingUtils.bs"
 
 namespace Http
 
@@ -68,6 +69,17 @@ namespace Http
                 end for
 
                 response.Json(videos)
+                return true
+            end function)
+
+            m.Delete("/api/continue-watching", function(context as object) as boolean
+                response = context.response
+                task = context.server.task
+                continueWatchingNode = task.continueWatching
+
+                ContinueWatching.Clear(continueWatchingNode)
+
+                response.Default(204, "OK")
                 return true
             end function)
         end function

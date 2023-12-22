@@ -114,6 +114,10 @@ export class PlayletApi {
         return await fetch(`${PlayletApi.host()}/api/search-history`, { method: "DELETE" });
     }
 
+    static async clearContinueWatching() {
+        return await fetch(`${PlayletApi.host()}/api/continue-watching`, { method: "DELETE" });
+    }
+
     static async getBookmarkFeeds() {
         const response = await fetch(`${PlayletApi.host()}/api/bookmarks/feeds`);
         return await response.json();

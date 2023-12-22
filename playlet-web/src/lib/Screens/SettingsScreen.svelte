@@ -2,7 +2,6 @@
   import DevSettings from "lib/Screens/Settings/DevSettings.svelte";
   import SettingsNode from "lib/Screens/Settings/SettingsNode.svelte";
   import { preferencesModelStore } from "lib/Stores";
-  import { onMount } from "svelte";
 
   export let visibility: boolean;
 </script>
