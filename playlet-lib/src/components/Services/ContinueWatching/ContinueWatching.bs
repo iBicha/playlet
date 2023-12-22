@@ -1,14 +1,14 @@
 ' TODO:P0
-' - Add router that returns videos for continue watching, including watch date and progress (returns them sorted and paginated)
-'   - It would return small page size (like 5) but includes video info?
-' - Add a node for storing videos in memory, and write to registry, with a limit of 100 videos
-'   - Should contain a subnode for each video, so that renderers can observe changes
+' - Add router that returns videos for continue watching, including watch date and progress (returns them sorted and paginated) - DONE
+'   - It would return small page size (like 5) but includes video info? - DONE
+' - Add a node for storing videos in memory, and write to registry, with a limit of 100 videos - DONE
+'   - Should contain a subnode for each video, so that renderers can observe changes - DONE
 ' - Add settings
 '   - Enable/disable continue watching
 '   - Max days to keep videos (videos expire based on last watch date)
 '   - Video count (capped at 100)
 '   - A button to clear all videos
-' - Videos with about 95% progress (capped at 1 minute) should be considered watched
+' - Videos with about 95% progress (capped at 20 seconds) should be considered watched - DONE
 ' - Add progress bar to video cell (this means "progress" is going to be a field in VideoContentNode)
 '   - Also add it to PlaylistViewCell
 ' - Add support for web app
@@ -20,6 +20,8 @@
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/Types.bs"
+
+const MAX_VIDEOS = 100
 
 function Init()
     m.top.content = m.top.findNode("content")
@@ -74,6 +76,12 @@ function Save() as void
     end for
 
     videos.SortBy("date", "r")
+
+    ' The registry has a limit of 32KB, so we need to limit the number of videos
+    ' regardless of user settings
+    while videos.Count() > MAX_VIDEOS
+        videos.pop()
+    end while
 
     continueWatchingString = FormatJson({
         "__version": m.top.__version,
