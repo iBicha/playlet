@@ -7,6 +7,7 @@
     bookmarksStore,
     homeLayoutFileStore,
     invidiousVideoApiStore,
+    localVideoApiStore,
     playletStateStore,
     preferencesModelStore,
     searchHistoryStore,
@@ -33,6 +34,10 @@
 
     PlayletApi.getInvidiousVideoApiFile().then((apiDefinitions) => {
       invidiousVideoApiStore.set(apiDefinitions);
+    });
+
+    PlayletApi.getLocalVideoApiFile().then((apiDefinitions) => {
+      localVideoApiStore.set(apiDefinitions);
     });
 
     PlayletApi.getPreferencesFile().then((value) => {

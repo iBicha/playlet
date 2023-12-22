@@ -23,6 +23,11 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getLocalVideoApiFile() {
+        const response = await fetch(`${PlayletApi.host()}/config/local_video_api.yaml`);
+        return await response.json();
+    }
+
     static async invidiousAuthenticatedRequest(feedSource) {
         const url = PlayletApi.host() + "/invidious/authenticated-request?feed-source=" + encodeURIComponent(JSON.stringify(feedSource));
         const response = await fetch(url);

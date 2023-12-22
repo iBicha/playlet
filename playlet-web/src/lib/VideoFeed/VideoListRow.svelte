@@ -1,6 +1,10 @@
 <script lang="ts">
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
+  import {
+    invidiousVideoApiStore,
+    localVideoApiStore,
+    playletStateStore,
+  } from "lib/Stores";
   import VideoCell from "./VideoCell.svelte";
   import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
@@ -74,9 +78,35 @@
     loadRow();
   });
 
+  let invidiousVideoApiLoaded = false;
+  let localVideoApiLoaded = false;
+
   invidiousVideoApiStore.subscribe((value) => {
-    invidiousApi.endpoints = value;
-    loadRow();
+    for (const key in value) {
+      value[key].apiType = "Invidious";
+    }
+
+    invidiousApi.endpoints = invidiousApi.endpoints || {};
+    invidiousApi.endpoints = { ...invidiousApi.endpoints, ...value };
+    invidiousVideoApiLoaded = Object.keys(value).length > 0;
+
+    if (invidiousVideoApiLoaded && localVideoApiLoaded) {
+      loadRow();
+    }
+  });
+
+  localVideoApiStore.subscribe((value) => {
+    for (const key in value) {
+      value[key].apiType = "Local";
+    }
+
+    invidiousApi.endpoints = invidiousApi.endpoints || {};
+    invidiousApi.endpoints = { ...invidiousApi.endpoints, ...value };
+    localVideoApiLoaded = Object.keys(value).length > 0;
+
+    if (invidiousVideoApiLoaded && localVideoApiLoaded) {
+      loadRow();
+    }
   });
 
   async function loadRow() {
@@ -197,7 +227,8 @@
           videos = [...(videos || []), ...newVideos];
 
           totalFetchedItems += result.items.length;
-          if (totalFetchedItems >= 3) {
+          // Set this to a number that's usually larger than what can fit on the screen.
+          if (totalFetchedItems > 6) {
             break;
           }
         }

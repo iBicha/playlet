@@ -1,4 +1,5 @@
 import { PlayletApi } from "lib/Api/PlayletApi";
+import { getHost } from "./Host";
 
 export class InvidiousApi {
     public instance: string;
@@ -105,7 +106,14 @@ export class InvidiousApi {
             return null;
         }
 
-        let url = this.instance + endpoint.url
+        let url: string;
+        if (endpoint.apiType === "Local") {
+            url = `http://${getHost()}` + endpoint.url
+        }
+        else {
+            url = this.instance + endpoint.url
+        }
+
         let queryParams = {}
 
         if (endpoint.authenticated) {
@@ -113,7 +121,9 @@ export class InvidiousApi {
             if (!this.isLoggedIn) {
                 return null;
             }
-            return await PlayletApi.invidiousAuthenticatedRequest(feedSource);
+            if (endpoint.apiType !== "Local") {
+                return await PlayletApi.invidiousAuthenticatedRequest(feedSource);
+            }
         }
 
         if (endpoint.queryParams !== undefined) {
