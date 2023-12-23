@@ -121,7 +121,9 @@ function OnVideoContentTaskResults(output as object) as void
         m.top.seek = timestamp
     end if
 
-    m.top.observeFieldScoped("position", FuncName(OnPositionChangeVideoProgress))
+    if m.progressNode <> invalid
+        m.top.observeFieldScoped("position", FuncName(OnPositionChangeVideoProgress))
+    end if
 end function
 
 function MarkVideoWatched(videoContentNode as object)
@@ -132,11 +134,15 @@ function MarkVideoWatched(videoContentNode as object)
         })
     end if
 
-    if m.progressNode = invalid
-        m.progressNode = ContinueWatching.GetNodeForVideo(m.continueWatching, videoContentNode.videoId)
+    if m.preferences["continue_watching.enabled"] = true
+        if m.progressNode = invalid
+            m.progressNode = ContinueWatching.GetNodeForVideo(m.continueWatching, videoContentNode.videoId)
+        end if
+        ContinueWatching.MarkWatchDate(m.progressNode)
+        m.continueWatching.save = true
+    else
+        m.progressNode = invalid
     end if
-    ContinueWatching.MarkWatchDate(m.progressNode)
-    m.continueWatching.save = true
 end function
 
 function Close(_unused as dynamic)
@@ -155,6 +161,11 @@ function HandleProgressBeforeClose() as void
     if progressNode = invalid
         return
     end if
+    m.progressNode = invalid
+
+    if m.preferences["continue_watching.enabled"] <> true
+        return
+    end if
 
     if not m.videoPlayedToCompletion
         duration = progressNode.duration
@@ -171,21 +182,31 @@ function HandleProgressBeforeClose() as void
         end if
     end if
 
-    if m.videoPlayedToCompletion
-        content = m.top.content
-        if content <> invalid
-            metadata = content.metadata
-            if metadata <> invalid
-                videoId = metadata.videoId
-                if not StringUtils.IsNullOrEmpty(videoId)
-                    ContinueWatching.RemoveNodeForVideo(m.continueWatching, videoId)
-                end if
-            end if
-        end if
+    if not m.videoPlayedToCompletion
+        m.continueWatching.save = true
+        return
     end if
-    m.continueWatching.save = true
 
-    m.progressNode = invalid
+    content = m.top.content
+    if content = invalid
+        m.continueWatching.save = true
+        return
+    end if
+
+    metadata = content.metadata
+    if metadata = invalid
+        m.continueWatching.save = true
+        return
+    end if
+
+    videoId = metadata.videoId
+    if StringUtils.IsNullOrEmpty(videoId)
+        m.continueWatching.save = true
+        return
+    end if
+
+    ContinueWatching.RemoveNodeForVideo(m.continueWatching, videoId)
+    m.continueWatching.save = true
 end function
 
 function OnControlChange()
