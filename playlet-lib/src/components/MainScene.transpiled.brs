@@ -1,5 +1,6 @@
 'import "pkg:/components/EcpArgs.bs"
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
+'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
 
 function Init()
