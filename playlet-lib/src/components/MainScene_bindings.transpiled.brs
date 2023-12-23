@@ -22,6 +22,9 @@ function InitializeBindings()
             "SearchHistory": {
                 "preferences": "../Preferences"
             }, 
+            "ContinueWatching": {
+                "preferences": "../Preferences"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
