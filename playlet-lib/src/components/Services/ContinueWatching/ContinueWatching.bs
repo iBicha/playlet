@@ -1,16 +1,25 @@
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/MathUtils.bs"
 
 const MAX_VIDEOS = 100
 
 function Init()
     m.top.content = m.top.findNode("content")
     m.continueWatchingString = ""
+end function
+
+function OnNodeReady()
     Load()
 end function
 
 function Load() as void
+    isEnabled = m.preferences["continue_watching.enabled"] = true
+    if not isEnabled
+        return
+    end if
+
     continueWatchingString = RegistryUtils.Read(RegistryUtils.CONTINUE_WATCHING)
     if continueWatchingString = invalid
         return
@@ -23,15 +32,27 @@ function Load() as void
         return
     end if
 
+    expirationDays = ValidInt(m.preferences["continue_watching.expiration"])
+    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), MAX_VIDEOS)
+
     nodes = []
     for each video in continueWatching.videos
+        date = ValidInt(video.date)
+        if IsVideoExpired(date, expirationDays)
+            continue for
+        end if
+
         node = CreateObject("roSGNode", "VideoProgressContentNode")
         node.id = video.id
         node.videoId = video.id
-        node.date = ValidInt(video.date)
+        node.date = date
         node.timestamp = ValidInt(video.timestamp)
         node.duration = ValidInt(video.duration)
         nodes.push(node)
+
+        if nodes.Count() >= maxVideos
+            exit for
+        end if
     end for
 
     content = m.top.content
@@ -59,8 +80,8 @@ function Save() as void
     videos.SortBy("date", "r")
 
     ' The registry has a limit of 32KB, so we need to limit the number of videos
-    ' regardless of user settings
-    while videos.Count() > MAX_VIDEOS
+    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), MAX_VIDEOS)
+    while videos.Count() > maxVideos
         videos.pop()
     end while
 
@@ -75,4 +96,16 @@ function Save() as void
 
     RegistryUtils.Write(RegistryUtils.CONTINUE_WATCHING, continueWatchingString)
     m.continueWatchingString = continueWatchingString
+end function
+
+function IsVideoExpired(watchDateInSeconds as integer, expirationDays as integer) as boolean
+    if watchDateInSeconds = 0 or expirationDays = 0
+        LogWarn("Invalid watch date:", watchDateInSeconds, "or expiration days:", expirationDays)
+        return false
+    end if
+
+    now = CreateObject("roDateTime")
+    nowSeconds = now.AsSeconds()
+
+    return nowSeconds - watchDateInSeconds > expirationDays * 24 * 60 * 60
 end function
