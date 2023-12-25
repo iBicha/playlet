@@ -1,6 +1,8 @@
-namespace ContinueWatching
+namespace ContinueWatchingUtils
 
-    function GetOrCreateNodeForVideo(continueWatchingNode as object, videoId as string) as object
+    const MAX_VIDEOS = 100
+
+    function GetOrCreateNodeForVideo(continueWatchingNode as object, videoId as string, maxVideos = 100 as integer) as object
         content = continueWatchingNode.content
         node = content.findNode(videoId)
         if node <> invalid
@@ -11,6 +13,13 @@ namespace ContinueWatching
         node.id = videoId
         node.videoId = videoId
         content.insertChild(node, 0)
+
+        nodeCount = content.getChildCount()
+        if nodeCount > maxVideos
+            excess = nodeCount - maxVideos
+            content.removeChildrenIndex(excess, maxVideos)
+        end if
+
         return node
     end function
 

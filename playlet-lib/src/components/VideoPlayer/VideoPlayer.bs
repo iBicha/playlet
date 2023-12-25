@@ -9,6 +9,7 @@ import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/asyncTask/asyncTask.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
 
 function Init()
     SetPlayerStyle()
@@ -136,9 +137,10 @@ function MarkVideoWatched(videoContentNode as object)
 
     if m.preferences["continue_watching.enabled"] = true
         if m.progressNode = invalid
-            m.progressNode = ContinueWatching.GetOrCreateNodeForVideo(m.continueWatching, videoContentNode.videoId)
+            maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), ContinueWatchingUtils.MAX_VIDEOS)
+            m.progressNode = ContinueWatchingUtils.GetOrCreateNodeForVideo(m.continueWatching, videoContentNode.videoId, maxVideos)
         end if
-        ContinueWatching.MarkWatchDate(m.progressNode)
+        ContinueWatchingUtils.MarkWatchDate(m.progressNode)
         m.continueWatching.save = true
     else
         m.progressNode = invalid
@@ -205,7 +207,7 @@ function HandleProgressBeforeClose() as void
         return
     end if
 
-    ContinueWatching.RemoveNodeForVideo(m.continueWatching, videoId)
+    ContinueWatchingUtils.RemoveNodeForVideo(m.continueWatching, videoId)
     m.continueWatching.save = true
 end function
 

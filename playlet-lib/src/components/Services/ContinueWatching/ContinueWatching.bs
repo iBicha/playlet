@@ -2,8 +2,7 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/Types.bs"
-
-const MAX_VIDEOS = 100
+import "pkg:/components/Services/ContinueWatching/ContinueWatchingUtils.bs"
 
 function Init()
     m.top.content = m.top.findNode("content")
@@ -33,7 +32,7 @@ function Load() as void
     end if
 
     expirationDays = ValidInt(m.preferences["continue_watching.expiration"])
-    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), MAX_VIDEOS)
+    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), ContinueWatchingUtils.MAX_VIDEOS)
 
     nodes = []
     for each video in continueWatching.videos
@@ -80,7 +79,7 @@ function Save() as void
     videos.SortBy("date", "r")
 
     ' The registry has a limit of 32KB, so we need to limit the number of videos
-    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), MAX_VIDEOS)
+    maxVideos = MathUtils.Min(ValidInt(m.preferences["continue_watching.max_videos"]), ContinueWatchingUtils.MAX_VIDEOS)
     while videos.Count() > maxVideos
         videos.pop()
     end while
