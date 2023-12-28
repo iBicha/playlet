@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.18.0] - 2023-12-28
 
 ### Added
 
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Regression) Issue where auto-play keeps playing the same videos in a loop
 - Small search box styling bug for Safari
 - A bug where the skipping of a sponsored section at the end of a video leads to an infinite loop
-- Small bug when listing Invidious public instances
+- A couple of bugs when listing Invidious public instances
 
 ### Removed
 

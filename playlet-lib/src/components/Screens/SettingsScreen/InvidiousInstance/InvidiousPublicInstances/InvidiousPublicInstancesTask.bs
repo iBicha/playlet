@@ -29,18 +29,10 @@ function InvidiousPublicInstancesTask(input as object) as object
     content = CreateObject("roSGNode", "ContentNode")
 
     for each instance in instances
-        item = CreateObject("roSGNode", "InvidiousPublicInstancesListItemContent")
-        item.setFields({
-            name: instance[0]
-            version: instance[1].stats.software.version
-            users: instance[1].stats.usage.users.total
-            signup: instance[1].stats.openRegistrations ? "Yes" : "No"
-            ' Leave 5 spaces for the flag, just to simplify the layout
-            location: `     ${instance[1].region}`
-            flag: GetFlagUrl(instance[1].flag)
-            health: instance[1].monitor["30dRatio"].ratio
-            uri: instance[1].uri
-        })
+        item = CreateListItemContent(instance)
+        if item = invalid
+            continue for
+        end if
         content.AppendChild(item)
     end for
 
@@ -69,12 +61,52 @@ function FilterInstances(instances as object) as object
     return filtered
 end function
 
+function CreateListItemContent(instance as object) as object
+    if not IsArray(instance) or instance.Count() < 2
+        LogWarn("Invalid instance:", instance)
+        return invalid
+    end if
+
+    item = CreateObject("roSGNode", "InvidiousPublicInstancesListItemContent")
+    item.setFields({
+        name: instance[0]
+        version: DrillIntoObject(instance[1], ["stats", "software", "version"], "N/A")
+        users: DrillIntoObject(instance[1], ["stats", "usage", "users", "total"], "N/A")
+        signup: DrillIntoObject(instance[1], ["stats", "openRegistrations"], false) ? "Yes" : "No"
+        ' Leave 5 spaces for the flag, just to simplify the layout
+        location: `     ${DrillIntoObject(instance[1], ["region"], "N/A")}`
+        flag: GetFlagUrl(DrillIntoObject(instance[1], ["flag"], ""))
+        health: DrillIntoObject(instance[1], ["monitor", "30dRatio", "ratio"], "N/A")
+        uri: instance[1].uri
+    })
+
+    return item
+end function
+
+function DrillIntoObject(obj as object, path as object, defaultValue as dynamic) as dynamic
+    if obj = invalid
+        return defaultValue
+    end if
+
+    for each key in path
+        if obj[key] = invalid
+            return defaultValue
+        end if
+        obj = obj[key]
+    end for
+
+    return obj
+end function
+
 function GetFlagUrl(flag as string) as string
-    codePoint = emojiToCodePoint(flag)
+    if flag = ""
+        return ""
+    end if
+    codePoint = EmojiToCodePoint(flag)
     return `https://github.githubassets.com/images/icons/emoji/unicode/${codePoint}.png?v8`
 end function
 
-function emojiToCodePoint(emoji as string) as string
+function EmojiToCodePoint(emoji as string) as string
     codes = []
     chars = emoji.Split("")
     for i = 0 to chars.count() - 1
