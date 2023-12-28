@@ -119,10 +119,6 @@ export class PlayletApi {
         return await response.json();
     }
 
-    static async updateInstance(instance) {
-        return await PlayletApi.putJson(`${PlayletApi.host()}/api/preferences`, { "invidious.instance": instance });
-    }
-
     static async setPlayletLibVersion(tag) {
         if (tag !== "") {
             const urls = [{
