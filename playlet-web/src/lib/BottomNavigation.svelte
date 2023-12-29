@@ -31,6 +31,7 @@
     <div class="h-6">
       <SearchIcon />
     </div>
+    <span class="text-xs">Search</span>
   </button>
   <button
     on:click={() => setScreen("home")}
@@ -39,6 +40,7 @@
     <div class="h-6">
       <HomeIcon />
     </div>
+    <span class="text-xs">Home</span>
   </button>
   <button
     on:click={() => setScreen("bookmarks")}
@@ -47,6 +49,7 @@
     <div class="h-6">
       <BookmarksIcon />
     </div>
+    <span class="text-xs">Bookmarks</span>
   </button>
   <button
     on:click={() => setScreen("settings")}
@@ -55,6 +58,7 @@
     <div class="h-6">
       <SettingsIcon />
     </div>
+    <span class="text-xs">Settings</span>
   </button>
   <button
     on:click={() => setScreen("remote")}
@@ -63,6 +67,7 @@
     <div class="h-6">
       <RemoteIcon />
     </div>
+    <span class="text-xs">Remote</span>
   </button>
   <button
     on:click={() => setScreen("info")}
@@ -71,5 +76,6 @@
     <div class="h-6">
       <InfoIcon />
     </div>
+    <span class="text-xs">Info</span>
   </button>
 </div>
