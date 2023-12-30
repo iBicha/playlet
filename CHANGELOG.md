@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- A rare bug that causes the app to crash when displaying video cells
 
 ## [0.18.0] - 2023-12-28
 
