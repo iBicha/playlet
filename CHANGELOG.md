@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- A rare bug that causes the app to crash when displaying video cells
+
+### Removed
+
+- `Funny` and `News` from the Home screen.
+  - These are not standard feeds (like `Trending`), and are just search results for `Funny` and `News`. They were added in earlier Playlet versions to have more content in the Home screen.
+  - If you like to add these two feeds to your bookmarks:
+    - Search for `Funny` (or `News`)
+    - Set the `Sort by` filter to `Upload date`
+    - Press and hold the `Ok` button while a video from the search result is selected
+    - Choose the `Add to "Search - Funny"` option
+
 ## [0.18.0] - 2023-12-28
 
 ### Added

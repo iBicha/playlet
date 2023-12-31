@@ -78,7 +78,7 @@ export class BindingsPlugin implements CompilerPlugin {
 
         const program = event.program;
         const scope = program.getFirstScopeForFile(event.file);
-        if (!isXmlScope(scope)) {
+        if (!scope || !isXmlScope(scope)) {
             return;
         }
 
