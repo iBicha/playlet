@@ -3,19 +3,8 @@ import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    FindChildren()
-end function
-
-function FindChildren()
-    ' TODO:P2 use component properties with alias instead of FindNode
-    m.titleLabel = m.top.FindNode("titleLabel")
-    m.authorLabel = m.top.FindNode("authorLabel")
-    m.viewCountDateLabel = m.top.FindNode("viewCountDateLabel")
-    m.liveRect = m.top.FindNode("liveRect")
-    m.upcomingRect = m.top.FindNode("upcomingRect")
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
-    m.thumbnail = m.top.FindNode("thumbnail")
 end function
 
 function OnContentSet() as void
@@ -25,50 +14,51 @@ function OnContentSet() as void
         return
     end if
 
-    if m.titleLabel = invalid
-        FindChildren()
-    end if
-
-    m.titleLabel.text = content.title
-    m.authorLabel.text = content.author
+    m.top.title = content.title
+    m.top.author = content.author
 
     if content.isUpcoming = true
-        m.viewCountDateLabel.text = content.premiereTimestampText
+        m.top.viewCountDate = content.premiereTimestampText
     else if not StringUtils.IsNullOrEmpty(content.publishedText)
         label = content.publishedText
         if not StringUtils.IsNullOrEmpty(content.viewCountText)
             label = `${label} • ${content.viewCountText}`
         end if
-        m.viewCountDateLabel.text = label
+        m.top.viewCountDate = label
     else
-        m.viewCountDateLabel.text = ""
+        m.top.viewCountDate = ""
     end if
 
-    m.thumbnail.uri = content.thumbnail
+    m.top.thumbnailUri = content.thumbnail
 
-    m.durationRect.visible = false
-    m.upcomingRect.visible = false
-    m.liveRect.visible = false
+    m.top.durationRectVisible = false
+    m.top.upcomingRectVisible = false
+    m.top.liveRectVisible = false
 
     if ValidInt(content.lengthSeconds) <> 0
         SetDurationText(content.lengthText)
-        m.durationRect.visible = true
+        m.top.durationRectVisible = true
     else
         if content.isUpcoming = true
-            m.upcomingRect.visible = true
+            m.top.upcomingRectVisible = true
         else if content.liveNow
-            m.liveRect.visible = true
+            m.top.liveRectVisible = true
         end if
     end if
 end function
 
-function SetDurationText(text as string)
+function SetDurationText(text as string) as void
+    m.top.duration = text
+
     label = m.durationLabel
     rect = m.durationRect
 
+    if label = invalid or rect = invalid
+        return
+    end if
+
     rectParent = rect.getParent()
 
-    label.text = text
     size = label.localBoundingRect()
 
     rect.width = size.width + 16

@@ -1,14 +1,8 @@
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    ' TODO:P2 use component properties with alias instead of FindNode
-    m.titleLabel = m.top.FindNode("titleLabel")
-    m.authorLabel = m.top.FindNode("authorLabel")
-    m.updatedLabel = m.top.FindNode("updatedLabel")
     m.videoCountRect = m.top.FindNode("videoCountRect")
     m.videoCountLabel = m.top.FindNode("videoCountLabel")
-    m.thumbnail = m.top.FindNode("thumbnail")
-    m.thumbnail.failedBitmapUri = "pkg:/images/thumbnail-missing.jpg"
 end function
 
 function OnContentSet() as void
@@ -18,23 +12,28 @@ function OnContentSet() as void
         return
     end if
 
-    m.titleLabel.text = content.title
+    m.top.title = content.title
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    m.authorLabel.text = content._author
-    m.updatedLabel.text = content.updatedText
+    m.top.author = content._author
+    m.top.updated = content.updatedText
 
-    m.thumbnail.uri = content.thumbnail
+    m.top.thumbnailUri = content.thumbnail
 
     SetVideoCount(content.videoCountText)
 end function
 
-function SetVideoCount(videoCountText as string)
+function SetVideoCount(videoCountText as string) as void
+    m.top.videoCount = videoCountText
+
     label = m.videoCountLabel
     rect = m.videoCountRect
 
+    if label = invalid or rect = invalid
+        return
+    end if
+
     rectParent = rect.getParent()
 
-    label.text = videoCountText
     size = label.localBoundingRect()
 
     rect.width = size.width + 16
