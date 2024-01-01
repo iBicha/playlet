@@ -35,7 +35,6 @@ function OnNodeReady()
 
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
-    m.top.observeField("control", FuncName(OnControlChange))
 
     SponsorBlock.SetupSponsorBlock()
 end function
@@ -117,6 +116,15 @@ function MarkVideoWatched(videoId as string)
 end function
 
 function Close(_unused as dynamic)
+    if m.videoContentTask <> invalid
+        m.videoContentTask.cancel = true
+        m.videoContentTask = invalid
+    end if
+    if m.sponsorBlockTask <> invalid
+        m.sponsorBlockTask.cancel = true
+        m.sponsorBlockTask = invalid
+    end if
+
     m.top.control = "stop"
     m.top.content = invalid
     parent = m.top.getParent()
@@ -124,19 +132,6 @@ function Close(_unused as dynamic)
         parent.RemoveChild(m.top)
     end if
     SponsorBlock.RemoveNotifcation(m.notifications)
-end function
-
-function OnControlChange()
-    if m.top.control = "stop"
-        if m.videoContentTask <> invalid
-            m.videoContentTask.cancel = true
-            m.videoContentTask = invalid
-        end if
-        if m.sponsorBlockTask <> invalid
-            m.sponsorBlockTask.cancel = true
-            m.sponsorBlockTask = invalid
-        end if
-    end if
 end function
 
 ' TODO:P2 investigate timeouts caused by control="stop" being synchrounous and too slow
