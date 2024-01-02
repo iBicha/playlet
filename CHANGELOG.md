@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A rare bug that causes the app to crash when displaying video cells
 - A rare bug where a long press can cause a crash
 - [Attempt] to fix a crash caused by execution timeout when stopping a video takes too long
+- Unsupported subtitles (subtitles that can be rendered will not be used)
 
 ### Removed
 

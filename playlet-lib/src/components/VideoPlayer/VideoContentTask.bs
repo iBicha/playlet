@@ -164,27 +164,33 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
     if metadata.captions.Count() = 0
         return
     end if
-    ' TODO:P2 we don't need to read and parse this every time
-    ' TODO:P2 filter out languages that can't render properly on Roku
-    ' https://rokudevelopers.slack.com/archives/CD88K1TUJ/p1704139518670619?thread_ts=1704082020.988019&cid=CD88K1TUJ
-    ' https://www.ccfonts.com/cinecav-styles/
-    ' Languages covered
-    ' Albanian, Avar, Basque, Basque, Belarusian, Bosnian, Breton, Bulgarian, Buryat, Catalan,
-    ' Chamorro, Chichewa, Croatian, Cyrillic, Czech, Danish, Dutch, English, Estonian, Faroese,
-    ' Finnish, French, Frisian, Galician, German, Greek, Hungarian, Icelandic, Irish, Italian,
-    ' Kalmyk, Kurdish, Kyrgyz, Latvian, Lithuanian, Macedonian, Malagasy, Maltese, Montenegrin,
-    ' Norwegian, Ossetian, Polish, Portuguese, Romani, Romanian, Russian, Serbian, Slovak, Slovenian,
-    ' Spanish, Tajik, Tatar, Turkish, Ukrainian & Welsh.
 
+    ' TODO:P2 we don't need to read and parse this every time
     isoLanguageList = ParseJson(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json5"))
     instance = service.GetInstance()
 
     subtitleTracks = []
 
     for each caption in metadata.captions
+        code = caption.language_code
+        if StringUtils.IsNullOrEmpty(code)
+            continue for
+        end if
+
+        if code.InStr("-") <> -1
+            code = code.Split("-")[0]
+        end if
+
+        if code.len() = 2
+            if not isoLanguageList.DoesExist(code)
+                continue for
+            end if
+            code = isoLanguageList[code]
+        end if
+
         subtitleTracks.Push({
             Description: caption.label
-            Language: isoLanguageList[caption.language_code] ?? caption.language_code
+            Language: code
             TrackName: instance + caption.url
         })
     end for
