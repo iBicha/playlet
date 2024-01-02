@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A rare bug that causes the app to crash when displaying video cells
+- A rare bug where a long press can cause a crash
 
 ### Removed
 
