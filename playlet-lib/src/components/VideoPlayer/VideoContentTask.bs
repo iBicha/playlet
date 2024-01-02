@@ -177,13 +177,20 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
             continue for
         end if
 
-        if code.len() = 2 and isoLanguageList.DoesExist(code)
+        if code.InStr("-") <> -1
+            code = code.Split("-")[0]
+        end if
+
+        if code.len() = 2
+            if not isoLanguageList.DoesExist(code)
+                continue for
+            end if
             code = isoLanguageList[code]
         end if
 
         subtitleTracks.Push({
             Description: caption.label
-            Language: isoLanguageList[caption.language_code] ?? caption.language_code
+            Language: code
             TrackName: instance + caption.url
         })
     end for
