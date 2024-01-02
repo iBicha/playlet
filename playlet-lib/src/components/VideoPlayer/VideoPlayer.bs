@@ -21,6 +21,16 @@ function Init()
     ' This is used to prevent the video from playing the next video when we are
     ' still trying to find a working stream url
     m.ignoreNextFinishedState = false
+
+    ' asyncStopSemantics available since Roku OS 12.5
+    ' It is set to true because stopping synchronously causes timeout and crash
+    ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
+    ' before considering the video node closed, and creating a new one.
+    ' However, since we have a task to load video details, there should be enough time for the
+    ' video node to close before we create a new one.
+    if m.top.hasField("asyncStopSemantics")
+        m.top.asyncStopSemantics = true
+    end if
 end function
 
 function OnNodeReady()
@@ -134,9 +144,6 @@ function Close(_unused as dynamic)
     SponsorBlock.RemoveNotifcation(m.notifications)
 end function
 
-' TODO:P2 investigate timeouts caused by control="stop" being synchrounous and too slow
-' See if `asyncStopSemantics` would fix this
-' Test if stopping a video asynchrnously and loading another one immediately works or not
 function OnVideoPlayerStateChange() as void
     state = m.top.state
     content = m.top.content
