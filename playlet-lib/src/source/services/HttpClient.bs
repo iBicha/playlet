@@ -8,6 +8,8 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 namespace HttpClient
 
+    const COMPRESSION_ENABLED = true
+
     function Get(url as string) as HttpRequest
         return (new HttpRequest()).Method("GET").Url(url)
     end function
@@ -188,7 +190,10 @@ namespace HttpClient
             end if
 
             command += ` \\\n  --max-time ${m._timeoutSeconds}`
-            command += ` \\\n  --compressed`
+
+            if COMPRESSION_ENABLED
+                command += ` \\\n  --compressed`
+            end if
 
             if m._headers <> invalid
                 for each key in m._headers
@@ -385,7 +390,12 @@ namespace HttpClient
             if urlTransfer = invalid
                 return invalid
             end if
-            urlTransfer.EnableEncodings(true)
+
+            if COMPRESSION_ENABLED
+                ' Enables gzip encoding of transfers
+                urlTransfer.EnableEncodings(true)
+            end if
+
             urlTransfer.RetainBodyOnError(true)
             if LCase(left(m._url, 6)).StartsWith("https:")
                 urlTransfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
