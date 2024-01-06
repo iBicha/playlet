@@ -2,6 +2,13 @@ import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
+    m.typeMapping = {
+        "boolean": "boolean"
+        "string": "string"
+        "radio": "string"
+        "array": "array"
+    }
+
     m.disableSavingToRegistry = false
     LoadPreferencesFile()
     AddNodeFields()
@@ -25,14 +32,7 @@ end function
 
 function AddNodeFieldsFromPreference(pref as object, fields as object)
     if pref.key <> invalid and pref.type <> invalid
-        fieldType = ""
-        if pref.type = "boolean"
-            fieldType = "boolean"
-        else if pref.type = "string"
-            fieldType = "string"
-        else if pref.type = "radio"
-            fieldType = "string"
-        end if
+        fieldType = m.typeMapping[pref.type]
         m.top.addField(pref.key, fieldType, false)
         fields[pref.key] = true
     end if
