@@ -44,13 +44,11 @@
       const refreshUserPrefrences = PlayletApi.getUserPreferences();
       refreshUserPrefrences.then((value) => {
         userPreferencesStore.set(value);
-        console.log("refreshed user preferences");
       });
 
       const refreshHomeLayout = PlayletApi.getHomeLayout();
       refreshHomeLayout.then((value) => {
         homeLayoutStore.set(value);
-        console.log("refreshed home layout");
       });
 
       await Promise.all([refreshUserPrefrences, refreshHomeLayout]);
