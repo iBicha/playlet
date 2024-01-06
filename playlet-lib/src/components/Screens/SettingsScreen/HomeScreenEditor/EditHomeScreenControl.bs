@@ -1,0 +1,58 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+
+function Init()
+    m.top.focusable = true
+    m.top.itemSpacings = [8]
+
+    m.button = m.top.findNode("button")
+    m.button.observeField("buttonSelected", FuncName(OpenHomeScreenEditor))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.button, true)
+end function
+
+function BindPreference(preferences as object, key as string)
+    if m.preferences <> invalid and m.key <> invalid
+        m.preferences.unobserveFieldScoped(m.key)
+    end if
+
+    m.preferences = preferences
+    m.key = key
+
+    if preferences <> invalid and key <> invalid
+        preferences.observeFieldScoped(key, FuncName(OnPreferenceChange))
+        OnPreferenceChange()
+    end if
+end function
+
+function OpenHomeScreenEditor()
+    editor = CreateObject("roSGNode", "HomeScreenEditor")
+    m.appController@.PushScreen(editor)
+    editor@.BindNode()
+    editor.value = m.top.value
+    editor.observeField("save", FuncName(OnSaveHomeScreenEditor))
+end function
+
+function OnSaveHomeScreenEditor(event as object)
+    editor = event.GetRoSGNode()
+    m.top.value = editor.value
+end function
+
+function OnPreferenceChange()
+    m.top.value = m.preferences[m.key]
+end function
+
+function OnValueChange() as void
+    if m.preferences = invalid or m.key = invalid
+        return
+    end if
+
+    m.preferences[m.key] = m.top.value
+end function
