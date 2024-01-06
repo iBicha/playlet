@@ -6,6 +6,7 @@
     appStateStore,
     bookmarksStore,
     homeLayoutFileStore,
+    homeLayoutStore,
     invidiousVideoApiStore,
     localVideoApiStore,
     playletStateStore,
@@ -26,6 +27,10 @@
   onMount(async () => {
     PlayletApi.getState().then((value) => {
       playletStateStore.set(value);
+    });
+
+    PlayletApi.getHomeLayout().then((value) => {
+      homeLayoutStore.set(value);
     });
 
     PlayletApi.getHomeLayoutFile().then((value) => {

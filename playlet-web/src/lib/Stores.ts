@@ -17,6 +17,8 @@ export const invidiousVideoApiStore = writable({} as any);
 
 export const localVideoApiStore = writable({} as any);
 
+export const homeLayoutStore = writable([] as any);
+
 export const homeLayoutFileStore = writable([] as any);
 
 export const bookmarksStore = writable([] as any);

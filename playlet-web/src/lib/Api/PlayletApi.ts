@@ -13,6 +13,12 @@ export class PlayletApi {
         return await response.json();
     }
 
+    // Home layout is the home layout file, but with the user's preferences applied.
+    static async getHomeLayout() {
+        const response = await fetch(`${PlayletApi.host()}/api/home-layout`);
+        return await response.json();
+    }
+
     static async getHomeLayoutFile() {
         const response = await fetch(`${PlayletApi.host()}/config/default_home_layout.yaml`);
         return await response.json();

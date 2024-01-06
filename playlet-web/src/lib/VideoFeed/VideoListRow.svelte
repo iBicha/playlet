@@ -11,7 +11,7 @@
 
   // TODO:P1 figure out why some uncached feeds (e.g. channels/ucid/videos) get hit twice
   export let feed: any = undefined;
-  export let videos = [];
+  let videos = [];
 
   enum FeedLoadState {
     None,
@@ -32,6 +32,8 @@
   let scrollStart = 0;
   let scrollEnd = 0;
 
+  let loadDataTask = undefined;
+
   // w-80|w-60 p-2: 320px|240px + 16px padding on each side
   const videoItemWidth = 320 + 16 * 2;
   const channelItemWidth = 240 + 16 * 2;
@@ -45,6 +47,18 @@
     },
     { threshold: [0] }
   );
+
+  $: {
+    if (feed) {
+      feedSourcesIndex = 0;
+      feedLoadState = FeedLoadState.None;
+      videos = [];
+      itemWidths = [];
+      scrollStart = 0;
+      scrollEnd = 0;
+      loadDataTask = undefined;
+    }
+  }
 
   $: {
     if (
@@ -141,8 +155,6 @@
     }
     loadDataTask = undefined;
   }
-
-  let loadDataTask;
 
   async function loadData() {
     feedLoadState = FeedLoadState.Loading;

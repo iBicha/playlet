@@ -1,0 +1,28 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace HomeScreenUtils
+
+    function GetFeed(feedFileName as string, preferences as object) as object
+        feed = ParseJson(ReadAsciiFile(feedFileName))
+
+        homeLayout = preferences["misc.home_screen_layout"]
+        if not IsArray(homeLayout) or homeLayout.Count() = 0
+            return feed
+        end if
+
+        feedItems = {}
+        for each item in feed
+            feedItems[item["id"]] = item
+        end for
+
+        filteredFeed = []
+        for each item in homeLayout
+            if item.enabled = true
+                filteredFeed.push(feedItems[item.id])
+            end if
+        end for
+
+        return filteredFeed
+    end function
+
+end namespace
