@@ -109,7 +109,6 @@ function OnCheckedStateChange() as void
     m.top.value = value
 end function
 
-' TODO:P0 check if moving items preserves the checked state
 function OnMoveUpButtonSelected() as void
     MoveItem(-1)
 end function
@@ -132,13 +131,21 @@ function MoveItem(offset as integer) as void
         return
     end if
 
+    checkedState = m.checkList.checkedState
     node = content.getChild(index)
     content.insertChild(node, newIndex)
 
+    tmp = checkedState[index]
+    checkedState[index] = checkedState[newIndex]
+    checkedState[newIndex] = tmp
+
     m.checkList.itemFocused = newIndex
+    m.checkList.jumpToItem = newIndex
+    m.checkList.checkedState = checkedState
 end function
 
 function OnSaveButtonSelected()
+    ' TODO:P0 save the new layout does not always work?
     m.top.save = true
     Close()
 end function
