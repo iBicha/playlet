@@ -163,7 +163,7 @@ Playlet lib comes equipped with a web server that runs on port 8888 when the app
   - Allows remotely casting videos, change preferences, etc.
 - Authentication using Invidious
 
-The web server runs on a continiously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serve static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more.
+The web server runs on a continuously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serve static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more.
 
 The server's API enpoints are described through the Open API spec file [playlet-web-api.yml](./playlet-web-api.yml)
 

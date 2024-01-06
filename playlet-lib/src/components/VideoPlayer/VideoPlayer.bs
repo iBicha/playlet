@@ -17,12 +17,22 @@ function Init()
 
     ' videoPlayingSuccess indicates if we started playing a video successfully
     ' We use it to detect if we should try another link for a video, or if another error
-    ' occurred (such as a next work error)
+    ' occurred (such as a network error)
     m.videoPlayingSuccess = false
     ' ignoreNextFinishedState indicates if we should ignore the next finished state
     ' This is used to prevent the video from playing the next video when we are
     ' still trying to find a working stream url
     m.ignoreNextFinishedState = false
+    ' asyncStopSemantics available since Roku OS 12.5
+    ' It is set to true because stopping synchronously causes timeout and crash
+    ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
+    ' before considering the video node closed, and creating a new one.
+    ' However, since we have a task to load video details, there should be enough time for the
+    ' video node to close before we create a new one.
+    if m.top.hasField("asyncStopSemantics")
+        m.top.asyncStopSemantics = true
+    end if
+
     m.videoPlayedToCompletion = false
     m.lastProgressTimestamp = 0
     m.lastSavedProgressTimestamp = 0
@@ -40,7 +50,6 @@ function OnNodeReady()
 
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
-    m.top.observeField("control", FuncName(OnControlChange))
 
     SponsorBlock.SetupSponsorBlock()
 end function
@@ -149,6 +158,16 @@ end function
 
 function Close(_unused as dynamic)
     HandleProgressBeforeClose()
+
+    if m.videoContentTask <> invalid
+        m.videoContentTask.cancel = true
+        m.videoContentTask = invalid
+    end if
+    if m.sponsorBlockTask <> invalid
+        m.sponsorBlockTask.cancel = true
+        m.sponsorBlockTask = invalid
+    end if
+
     m.top.control = "stop"
     m.top.content = invalid
     parent = m.top.getParent()
@@ -209,19 +228,6 @@ function HandleProgressBeforeClose() as void
 
     ContinueWatchingUtils.RemoveNodeForVideo(m.continueWatching, videoId)
     m.continueWatching.save = true
-end function
-
-function OnControlChange()
-    if m.top.control = "stop"
-        if m.videoContentTask <> invalid
-            m.videoContentTask.cancel = true
-            m.videoContentTask = invalid
-        end if
-        if m.sponsorBlockTask <> invalid
-            m.sponsorBlockTask.cancel = true
-            m.sponsorBlockTask = invalid
-        end if
-    end if
 end function
 
 function OnVideoPlayerStateChange() as void

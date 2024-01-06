@@ -1,30 +1,37 @@
 # Screenshots
 
-## Home
+## Playlet
 
-![Home](./home.jpg)
+| Home                | Search                  |
+| ------------------- | ----------------------- |
+| ![Home](./home.jpg) | ![Search](./search.jpg) |
 
-## Search
+| Bookmarks                     | Queue + Picture-in-picture                            |
+| ----------------------------- | ----------------------------------------------------- |
+| ![Bookmarks](./bookmarks.jpg) | ![Queue + Picture-in-picture](./queue-pic-in-pic.jpg) |
 
-![Search](./search.jpg)
+| Channel                   | Playlist                    |
+| ------------------------- | --------------------------- |
+| ![Channel](./channel.jpg) | ![Playlist](./playlist.jpg) |
 
-## Settings
+| Settings                    | Invidious instances                              | Invidious testing                             |
+| --------------------------- | ------------------------------------------------ | --------------------------------------------- |
+| ![Settings](./settings.jpg) | ![Invidious instances](./invidious-settings.jpg) | ![Invidious testing](./invidious-testing.jpg) |
 
-![Settings](./settings.jpg)
+| Link to web app                     | App info                    |
+| ----------------------------------- | --------------------------- |
+| ![Link to web app](./webapp-qr.jpg) | ![App info](./app-info.jpg) |
 
-## Playlist
+## Playlet web app
 
-![Playlist](./playlist.jpg)
-
-## Link to web app
-
-![Link to web app](./webapp-qr.jpg)
-
-## App info
-
-![App info](./app-info.jpg)
-
-## Web app
-
-| ![Web app home](./webapp-home.png) | ![Web app search](./webapp-search.png) | ![Web app settings](./webapp-settings.png) |
+| Home                               | Search                                 | Settings                                   |
 | ---------------------------------- | -------------------------------------- | ------------------------------------------ |
+| ![Web app home](./webapp-home.png) | ![Web app search](./webapp-search.png) | ![Web app settings](./webapp-settings.png) |
+
+| Bookmarks                            | Remote                         | Cast video                       |
+| ------------------------------------ | ------------------------------ | -------------------------------- |
+| ![Bookmarks](./webapp-bookmarks.png) | ![Remote](./webapp-remote.png) | ![Cast video](./webapp-cast.png) |
+
+| App info                       |     |     |
+| ------------------------------ | --- | --- |
+| ![App info](./webapp-info.png) |     |     |

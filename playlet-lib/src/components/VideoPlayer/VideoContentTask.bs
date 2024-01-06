@@ -164,6 +164,7 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
     if metadata.captions.Count() = 0
         return
     end if
+
     ' TODO:P2 we don't need to read and parse this every time
     isoLanguageList = ParseJson(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json5"))
     instance = service.GetInstance()
@@ -171,9 +172,25 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
     subtitleTracks = []
 
     for each caption in metadata.captions
+        code = caption.language_code
+        if StringUtils.IsNullOrEmpty(code)
+            continue for
+        end if
+
+        if code.InStr("-") <> -1
+            code = code.Split("-")[0]
+        end if
+
+        if code.len() = 2
+            if not isoLanguageList.DoesExist(code)
+                continue for
+            end if
+            code = isoLanguageList[code]
+        end if
+
         subtitleTracks.Push({
             Description: caption.label
-            Language: isoLanguageList[caption.language_code] ?? caption.language_code
+            Language: code
             TrackName: instance + caption.url
         })
     end for
