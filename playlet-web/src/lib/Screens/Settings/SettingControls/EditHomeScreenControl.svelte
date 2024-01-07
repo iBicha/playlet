@@ -133,8 +133,9 @@
           </tr>
         {/each}
       </table>
-      <form method="dialog" class="flex justify-center">
+      <form method="dialog" class="flex justify-center space-x-2">
         <button class="btn btn-primary" on:click={save}>Save</button>
+        <button class="btn btn-primary">Close</button>
       </form>
     {/if}
   </div>
