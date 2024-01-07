@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A home screen editor allowing to enable/disable feeds, and change their order.
   - The editor can be accessed from the Settings screen.
 
+### Fixed
+
+- `HTTP/0.9 when not allowed` errors by adding a retry to web requests
+
 ## [0.18.1] - 2024-01-02
 
 ### Fixed

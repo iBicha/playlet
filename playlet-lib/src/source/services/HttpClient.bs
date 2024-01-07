@@ -237,6 +237,11 @@ namespace HttpClient
             return m
         end function
 
+        function RetryCallback(callback as function) as HttpRequest
+            m._retryCallback = callback
+            return m
+        end function
+
         function NoCache() as HttpRequest
             m._noCache = true
             return m
@@ -377,6 +382,19 @@ namespace HttpClient
                 backoffMs = 1000 + Rnd(2000)
                 tryNumber = m._tryCount - triesLeft + 1
                 LogInfo("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
+
+                if m._retryCallback <> invalid
+                    shouldRetry = m._retryCallback({
+                        tryNumber: tryNumber
+                        tryCount: m._tryCount
+                        request: m
+                        response: response
+                    })
+
+                    if IsBool(shouldRetry) and shouldRetry = false
+                        return response
+                    end if
+                end if
 
                 m.urlTransfer = invalid
                 m._cache = invalid
