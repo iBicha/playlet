@@ -44,7 +44,7 @@ namespace Invidious
 
             m.endpoints = node.apiDefinitions
 
-            m.responseHanlders = {
+            m.responseHandlers = {
                 DefaultHandler: m.DefaultHandler
                 AuthFeedHandler: m.AuthFeedHandler
                 PlaylistHandler: m.PlaylistHandler
@@ -291,7 +291,7 @@ namespace Invidious
 
             response = request.Await()
 
-            responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+            responseHandler = endpoint.responseHandler <> invalid ? m.responseHandlers[endpoint.responseHandler] : m.responseHandlers["DefaultHandler"]
 
             result = responseHandler(m, feedSource, response)
 
@@ -351,13 +351,31 @@ namespace Invidious
         end function
 
         function VideoInfoHandler(m as object, feedSource as object, response as object) as object
-            if response.StatusCode() = 200
+            statusCode = response.StatusCode()
+            if statusCode >= 500
+                ' In some cases, such as a video became private, or a live stream ended,
+                ' Invidious returns a 500 error. We can in this case return a valid response
+                ' with just a video id, which will allow us to show a valid thumbnail if possible.
+                ' This is to makes it possible to load a bookmarked video and delete it even if
+                ' it is no longer valid.
+                ' TODO:P2 access to private property
+                response._statusCode = 200
+                return {
+                    items: [{
+                        "videoId": feedSource.pathParams.id
+                        "type": "video"
+                    }]
+                }
+            end if
+
+            if statusCode = 200
                 json = response.Json()
                 json.type = "video"
                 return {
                     items: [json]
                 }
             end if
+
             return invalid
         end function
 
