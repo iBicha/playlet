@@ -1,6 +1,7 @@
 #const DISABLE_CACHE = false
 
 import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -237,6 +238,11 @@ namespace HttpClient
             return m
         end function
 
+        function RetryCallback(callback as function) as HttpRequest
+            m._retryCallback = callback
+            return m
+        end function
+
         function NoCache() as HttpRequest
             m._noCache = true
             return m
@@ -368,7 +374,7 @@ namespace HttpClient
             response = invalid
 
             response = m.AwaitInternal()
-            if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
+            if response.IsSuccess() or response.TimedOut() or response.IsCancelled()
                 return response
             end if
             triesLeft -= 1
@@ -377,6 +383,28 @@ namespace HttpClient
                 backoffMs = 1000 + Rnd(2000)
                 tryNumber = m._tryCount - triesLeft + 1
                 LogInfo("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
+
+                if IsFunction(m._retryCallback)
+                    try
+                        shouldRetry = m._retryCallback({
+                            tryNumber: tryNumber
+                            tryCount: m._tryCount
+                            request: m
+                            response: response
+                        })
+
+                        if IsBool(shouldRetry) and not shouldRetry
+                            LogInfo("Retry callback returned false. Not retrying.")
+                            return response
+                        end if
+                    catch error
+                        #if DEBUG
+                            throw error
+                        #else
+                            LogError("Retry callback failed:", ErrorUtils.Format(error))
+                        #end if
+                    end try
+                end if
 
                 m.urlTransfer = invalid
                 m._cache = invalid
