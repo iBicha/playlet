@@ -363,13 +363,28 @@ namespace Invidious
         end function
 
         function VideoInfoHandler(m as object, feedSource as object, response as object) as object
-            if response.StatusCode() = 200
+            statusCode = response.StatusCode()
+            if statusCode >= 500
+                ' In some cases, such as a video became private, or a live stream ended,
+                ' Invidious returns a 500 error. We can in this case return a valid response
+                ' With just a video id, which will allow us to show a valid thumbnail if possible,
+                ' and makes it possible to load the bookmark and delete it.
+                return {
+                    items: [{
+                        "videoId": feedSource.pathParams.id
+                        "type": "video"
+                    }]
+                }
+            end if
+
+            if statusCode = 200
                 json = response.Json()
                 json.type = "video"
                 return {
                     items: [json]
                 }
             end if
+
             return invalid
         end function
 

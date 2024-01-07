@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `HTTP/0.9 when not allowed` errors by adding a retry to web requests
+- Issue where a bookmarked video is no longer valid (such as a video made private, or a live stream that ended)
 
 ## [0.18.1] - 2024-01-02
 
