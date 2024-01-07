@@ -44,7 +44,7 @@ namespace Invidious
 
             m.endpoints = node.apiDefinitions
 
-            m.responseHanlders = {
+            m.responseHandlers = {
                 DefaultHandler: m.DefaultHandler
                 AuthFeedHandler: m.AuthFeedHandler
                 PlaylistHandler: m.PlaylistHandler
@@ -292,7 +292,7 @@ namespace Invidious
 
             response = request.Await()
 
-            responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+            responseHandler = endpoint.responseHandler <> invalid ? m.responseHandlers[endpoint.responseHandler] : m.responseHandlers["DefaultHandler"]
 
             result = responseHandler(m, feedSource, response)
 
@@ -369,7 +369,9 @@ namespace Invidious
                 ' Invidious returns a 500 error. We can in this case return a valid response
                 ' with just a video id, which will allow us to show a valid thumbnail if possible.
                 ' This is to makes it possible to load a bookmarked video and delete it even if
-                ' is is no longer valid.
+                ' it is no longer valid.
+                ' TODO:P2 access to private property
+                response._statusCode = 200
                 return {
                     items: [{
                         "videoId": feedSource.pathParams.id
