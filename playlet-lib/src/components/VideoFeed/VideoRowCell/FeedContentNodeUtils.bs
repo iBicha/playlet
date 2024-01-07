@@ -1,0 +1,28 @@
+namespace FeedContentNodeUtils
+
+    function Reset(feedContentNode as object, feed as object)
+        feedContentNode.title = feed.title
+        feedContentNode.feedSourcesIndex = 0
+        feedContentNode.loadState = FeedLoadState.None
+        feedSources = feed.feedSources
+        for i = 0 to feedSources.count() - 1
+            feedSources[i].state = {
+                loadState: FeedLoadState.None
+            }
+        end for
+        feedContentNode.feedSources = feedSources
+
+        loadNodes = []
+        for i = 1 to 4
+            loadNodes.push(CreateObject("roSGNode", "LoadingContentNode"))
+        end for
+
+        childCount = feedContentNode.getChildCount()
+        if childCount > 0
+            feedContentNode.removeChildrenIndex(childCount, 0)
+        end if
+
+        feedContentNode.appendChildren(loadNodes)
+    end function
+
+end namespace
