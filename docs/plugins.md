@@ -10,6 +10,7 @@
 - [Async Task Generator](#async-task-generator)
 - [Tracking transpilied files](#tracking-transpilied-files)
 - [Logger](#logger)
+- [Type Gen](#type-gen)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
 
@@ -517,7 +518,7 @@ The logger plugin searches for calls to the predefined functions `LogError`, `Lo
   - For example, it replaces `LogError("Cannot complete operation:", error)` with `LogError2("Cannot complete operation:", error)`
 - Based on usage, it generates `LogErrorX` functions used. Example:
 
-```
+```brs
 function LogError2(arg0, arg1) as void
     logger = m.global.logger
     if logger.logLevel < 0
@@ -537,3 +538,33 @@ This is implemented to make it easy to identify where logs came from, and to gen
 To understand more about what's being generated, download `playlet-lib.zip` from [releases](https://github.com/iBicha/playlet/releases), extract, and inspect the file `source/utils/Logging.brs`. You will see it contains log functions in the form `LogVerbX`, that are generated based on usage.
 
 To give credit where credit is due, some of the ideas here (like adding the source location to the log) came from [roku-log](https://github.com/georgejecook/roku-log)
+
+## Type Gen
+
+**[Source](/tools/bs-plugins/type-gen-plugin.ts)**
+
+### Why
+
+I found myself implementing type checking functions like `IsBool`, `IsInt`, and `IsString`, and functions for getting a valid type, like `ValidBool`, `ValidInt`, and `ValidString`. The implementation is the same, why not generate them?
+
+### How
+
+Simply we declare them in an object describing the type, the interface, and the default value, and generate all corresponding functions.
+
+Sample output:
+
+```brs
+' Returns true if the given object is of type Bool, false otherwise
+function IsBool(obj as dynamic) as boolean
+    return obj <> invalid and GetInterface(obj, "ifBoolean") <> invalid
+end function
+
+' Returns the given object if it is of type Bool, otherwise returns the default value `false`
+function ValidBool(obj as dynamic) as boolean
+    if obj <> invalid and GetInterface(obj, "ifBoolean") <> invalid
+        return obj
+    else
+        return false
+    end if
+end function
+```

@@ -1,3 +1,4 @@
+// This plugin generates a file containing functions for type checking and type casting.
 import { CompilerPlugin, Program, SourceObj } from "brighterscript";
 
 const types = [
