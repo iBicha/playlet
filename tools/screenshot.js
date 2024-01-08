@@ -1,4 +1,5 @@
-// Description: Take a screenshot of the Roku device
+// Description: Take a screenshot of the Roku device.
+// Note that it can only take a screenshot of the dev channel. Production channels are not supported.
 
 const { ArgumentParser } = require('argparse')
 const rokuDeploy = require('roku-deploy');
