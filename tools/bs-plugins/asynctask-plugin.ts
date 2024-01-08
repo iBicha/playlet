@@ -27,6 +27,8 @@ export class AsyncTaskPlugin implements CompilerPlugin {
     beforeProgramValidate(program: Program) {
         this.asyncTaskFunctions = []
         this.duplicatesReporeted = []
+
+        this.generateTaskListEnum(program);
     }
 
     beforeFileValidate(event: BeforeFileValidateEvent) {
@@ -208,6 +210,36 @@ end function
   </interface>
   <script type="text/brightscript" uri="pkg:/${bsFile}" />
 </component>`
+    }
+
+    generateTaskListEnum(program: Program) {
+        const asyncTasks = Object.values(program.files).reduce((acc, file) => {
+            if (!isBrsFile(file)) {
+                return acc
+            }
+
+            file.ast.walk(createVisitor({
+                FunctionExpression: (func) => {
+                    if (!this.isAsyncTask(func.functionStatement)) {
+                        return
+                    }
+
+                    acc.add(func.functionStatement!.name.text)
+                },
+            }), {
+                walkMode: WalkMode.visitExpressionsRecursive
+            });
+
+            return acc
+        }, new Set<string>());
+
+        const enumItems = Array.from(asyncTasks).map((task) => {
+            return `${task} = "${task}"`
+        })
+
+        const content = 'enum Tasks\n    ' + enumItems.join('\n    ') + '\nend enum\n';
+
+        program.setFile('source/asyncTask/Tasks.bs', content);
     }
 }
 

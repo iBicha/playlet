@@ -470,7 +470,10 @@ end function
 And use the function like so
 
 ```brighterscript
-StartAsyncTask(MyBackgroundTask, {myVar: "some input"}, function(output as object) as void
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+
+AsyncTask.Start(Tasks.MyBackgroundTask, {myVar: "some input"}, function(output as object) as void
     if output.success
       print(output.result.value)
     end if
@@ -479,7 +482,7 @@ end function)
 
 The rest will be taken care of by the plugin, which will generate an `xml` file containing the task component, and a script that handles calling the function.
 
-Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `StartAsyncTask` create a new instance of the task every time.
+Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `AsyncTask.Start` create a new instance of the task every time.
 
 ## Tracking transpilied files
 
