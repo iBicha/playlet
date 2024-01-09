@@ -2,10 +2,11 @@ import "pkg:/components/ChannelView/ChannelUtils.bs"
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
-import "pkg:/components/VideoFeed/VideoRowListContentTask.bs"
-import "pkg:/components/VideoFeed/VideoRowListRowContentTask.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -213,7 +214,7 @@ function InitContent() as void
         return
     end if
 
-    task = AsyncTask.Start(VideoRowListContentTask, {
+    task = AsyncTask.Start(Tasks.VideoRowListContentTask, {
         node: m.top
         feeds: m.top.feeds
     }, OnVideoRowListContentTaskResult)
@@ -286,7 +287,7 @@ function LoadRowContent(contentNode as object)
     LogInfo("Loading row content:", contentNode.title)
 
     contentNode.loadState = FeedLoadState.Loading
-    task = AsyncTask.Start(VideoRowListRowContentTask, {
+    task = AsyncTask.Start(Tasks.VideoRowListRowContentTask, {
         rowList: m.top
         feedContentNode: contentNode
         invidious: m.invidious
