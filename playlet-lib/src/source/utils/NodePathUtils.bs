@@ -1,0 +1,35 @@
+namespace NodePathUtils
+
+    function FindNodeFromPath(root as object, path as string) as object
+        node = root
+
+        if path.StartsWith("/")
+            node = node.getScene()
+            path = path.Mid(1)
+        end if
+
+        pathParts = path.Tokenize("/")
+
+        for i = 0 to pathParts.Count() - 1
+            if node = invalid
+                return invalid
+            end if
+            if pathParts[i] = "."
+                continue for
+            end if
+            if pathParts[i] = ".."
+                node = node.getParent()
+                continue for
+            end if
+            node = node.findNode(pathParts[i])
+        end for
+
+        if root.isSameNode(node)
+            ' if a node is referencing itself, it's probably a mistake
+            return invalid
+        end if
+
+        return node
+    end function
+
+end namespace

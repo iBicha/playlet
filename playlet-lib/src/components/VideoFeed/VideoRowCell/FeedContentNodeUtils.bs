@@ -1,3 +1,7 @@
+import "pkg:/source/utils/NodePathUtils.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/Logging.bs"
+
 namespace FeedContentNodeUtils
 
     function Reset(feedContentNode as object, feed as object)
@@ -11,6 +15,7 @@ namespace FeedContentNodeUtils
             }
         end for
         feedContentNode.feedSources = feedSources
+        feedContentNode.reactivity = CreateReactivityArray(feed.reactivity)
 
         loadNodes = []
         for i = 1 to 4
@@ -23,6 +28,53 @@ namespace FeedContentNodeUtils
         end if
 
         feedContentNode.appendChildren(loadNodes)
+    end function
+
+    function ResetSelf(feedContentNode as object)
+        LogInfo("Resetting feed content node")
+        feedSources = feedContentNode.feedSources
+        for i = 0 to feedSources.count() - 1
+            feedSources[i].state = {
+                loadState: FeedLoadState.None
+            }
+        end for
+        feedContentNode.feedSources = feedSources
+
+        feedContentNode.feedSourcesIndex = 0
+        feedContentNode.loadState = FeedLoadState.None
+
+        loadNodes = []
+        for i = 1 to 4
+            loadNodes.push(CreateObject("roSGNode", "LoadingContentNode"))
+        end for
+
+        childCount = feedContentNode.getChildCount()
+        if childCount > 0
+            feedContentNode.removeChildrenIndex(childCount, 0)
+        end if
+
+        feedContentNode.appendChildren(loadNodes)
+    end function
+
+    function CreateReactivityArray(reactivity as object) as object
+        if not IsArray(reactivity)
+            return []
+        end if
+
+        reactivityArray = []
+        for each item in reactivity
+            field = item.field
+            node = NodePathUtils.FindNodeFromPath(m.top, item.node)
+            if node = invalid or not node.hasField(field)
+                continue for
+            end if
+            reactivityArray.push({
+                node: node
+                field: field
+            })
+        end for
+
+        return reactivityArray
     end function
 
 end namespace

@@ -7,6 +7,12 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.top.content = m.top.findNode("content")
     m.continueWatchingString = ""
+    ' For content changes, use a timer of one second to avoid rapid fire of events
+    m.changedEventTimer = CreateObject("roSGNode", "Timer")
+    m.changedEventTimer.duration = 1
+    m.changedEventTimer.ObserveField("fire", FuncName(TriggerChangedEvent))
+
+    m.top.content.observeField("change", FuncName(OnContentChange))
 end function
 
 function OnNodeReady()
@@ -107,4 +113,16 @@ function IsVideoExpired(watchDateInSeconds as integer, expirationDays as integer
     nowSeconds = now.AsSeconds()
 
     return nowSeconds - watchDateInSeconds > expirationDays * 24 * 60 * 60
+end function
+
+function OnContentChange(event as object)
+    change = event.getData()
+    if change.Operation <> "modify"
+        m.changedEventTimer.control = "stop"
+        m.changedEventTimer.control = "start"
+    end if
+end function
+
+function TriggerChangedEvent()
+    m.top.changed = true
 end function
