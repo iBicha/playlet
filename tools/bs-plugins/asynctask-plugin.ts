@@ -18,6 +18,8 @@ export class AsyncTaskPlugin implements CompilerPlugin {
             return
         }
 
+        const program = file.program
+
         file.ast.walk(createVisitor({
             FunctionExpression: (func) => {
                 if (!this.isAsyncTask(func.functionStatement)) {
@@ -34,25 +36,31 @@ export class AsyncTaskPlugin implements CompilerPlugin {
                 const xml = this.generateXmlTask(taskName, bsFile)
                 const xmlFile = `components/AsyncTask/generated/${taskName}.xml`
 
-                if (file.program.hasFile(xmlFile)) {
-                    file.addDiagnostics([{
-                        file: file,
-                        range: func.range,
-                        message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
-                        severity: 1,
-                        code: 'ASYNC_TASK_FILE_EXISTS',
-                    }]);
+                if (program.hasFile(xmlFile)) {
+                    const currentContent = program.getFile(xmlFile).fileContents
+                    if (currentContent !== xml) {
+                        file.addDiagnostics([{
+                            file: file,
+                            range: func.range,
+                            message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
+                            severity: 1,
+                            code: 'ASYNC_TASK_FILE_EXISTS',
+                        }]);
+                    }
                 }
                 file.program.setFile(xmlFile, xml)
 
-                if (file.program.hasFile(bsFile)) {
-                    file.addDiagnostics([{
-                        file: file,
-                        range: func.range,
-                        message: `AsyncTaskPlugin: file ${bsFile} already exists`,
-                        severity: 1,
-                        code: 'ASYNC_TASK_FILE_EXISTS',
-                    }]);
+                if (program.hasFile(bsFile)) {
+                    const currentContent = program.getFile(bsFile).fileContents
+                    if (currentContent !== bs) {
+                        file.addDiagnostics([{
+                            file: file,
+                            range: func.range,
+                            message: `AsyncTaskPlugin: file ${bsFile} already exists`,
+                            severity: 1,
+                            code: 'ASYNC_TASK_FILE_EXISTS',
+                        }]);
+                    }
                 }
                 file.program.setFile(bsFile, bs)
             },
@@ -129,7 +137,6 @@ end function
     <field id="cancel" type="boolean" alwaysNotify="true" />
     <field id="cancellation" type="assocarray" />
   </interface>
-  <script type="text/brightscript" uri="pkg:/${bsFile}" />
 </component>`
     }
 
