@@ -1,5 +1,5 @@
 import "pkg:/source/utils/Logging.bs"
-import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
     m.top.functionName = "LoggerLoop"
@@ -32,12 +32,22 @@ function LoggerLoop()
     port = m.port
 
     buffer = CreateObject("roByteArray")
-    previousLogsFile = m.top.folder + "/" + m.top.filenamePrevious
     logsFile = m.top.folder + "/" + m.top.filename
+    previousLogsFile = m.top.folder + "/" + m.top.filenamePrevious
+    filenameStartup = m.top.filenameStartup
 
     CreateDirectory(m.top.folder)
     DeleteFile(previousLogsFile)
     MoveFile(logsFile, previousLogsFile)
+
+    startUpLogs = ReadAsciiFile(filenameStartup)
+    if not StringUtils.IsNullOrEmpty(startUpLogs)
+        line = `************* Startup Logs *************\n${startUpLogs}*********** End Startup Logs ***********\n`
+        ' bs:disable-next-line LINT3012
+        print line
+        buffer.FromAsciiString(line)
+        buffer.AppendFile(logsFile)
+    end if
 
     while true
         msg = wait(0, port)

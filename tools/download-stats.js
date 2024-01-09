@@ -1,3 +1,7 @@
+// Description: Download stats from Roku (through email) and save them to a local folder.
+// This script is meant to be run daily from Github Actions.
+// It will download the stats from the previous day and update repo wiki.
+
 const fs = require('fs');
 const path = require('path');
 const Imap = require('imap');

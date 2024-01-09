@@ -3,89 +3,24 @@
 import {
     CompilerPlugin,
     BscFile,
-    BeforeFileTranspileEvent,
     isBrsFile,
     WalkMode,
     createVisitor,
-    DiagnosticSeverity,
     Program,
     FunctionStatement,
-    BeforeFileValidateEvent,
 } from 'brighterscript';
-
-declare type FunctionInFile = {
-    functionStatement: FunctionStatement,
-    file: BscFile
-}
 
 export class AsyncTaskPlugin implements CompilerPlugin {
     public name = 'AsyncTaskPlugin';
 
-    private asyncTaskFunctions: FunctionInFile[] = []
-    private duplicatesReporeted: FunctionInFile[] = []
-
-    beforeProgramValidate(program: Program) {
-        this.asyncTaskFunctions = []
-        this.duplicatesReporeted = []
-    }
-
-    beforeFileValidate(event: BeforeFileValidateEvent) {
-        if (!isBrsFile(event.file)) {
-            return
-        }
-        event.file.ast.walk(createVisitor({
-            FunctionExpression: (func) => {
-                if (!this.isAsyncTask(func.functionStatement)) {
-                    return
-                }
-
-                this.asyncTaskFunctions.push({
-                    file: event.file,
-                    functionStatement: func.functionStatement!
-                })
-            },
-        }), {
-            walkMode: WalkMode.visitExpressionsRecursive
-        });
-    }
-
-    afterFileValidate(file: BscFile) {
+    afterFileParse(file: BscFile) {
         if (!isBrsFile(file)) {
             return
         }
 
-        const functionsWithDuplicates = this.getFunctionsWithDuplicatesForFile(file);
+        const program = file.program
 
-        for (let index = 0; index < functionsWithDuplicates.length; index++) {
-            const fn = functionsWithDuplicates[index];
-            if (this.duplicatesReporeted.indexOf(fn) !== -1) {
-                continue
-            }
-            file.addDiagnostics([{
-                code: 6661,
-                message: `Duplicate async task '${fn.functionStatement.name.text}', use a different function name`,
-                range: fn.functionStatement.range,
-                file: fn.file,
-                source: "AsyncTaskPlugin",
-                severity: DiagnosticSeverity.Error,
-            }])
-            this.duplicatesReporeted.push(fn)
-        }
-    }
-
-    beforeFileTranspile(event: BeforeFileTranspileEvent) {
-        if (!isBrsFile(event.file)) {
-            return
-        }
-
-        const functions = this.asyncTaskFunctions
-            .filter((fn) => fn.file === event.file)
-
-        if (functions.length === 0) {
-            return
-        }
-
-        event.file.ast.walk(createVisitor({
+        file.ast.walk(createVisitor({
             FunctionExpression: (func) => {
                 if (!this.isAsyncTask(func.functionStatement)) {
                     return
@@ -93,20 +28,49 @@ export class AsyncTaskPlugin implements CompilerPlugin {
 
                 const functionName = func.functionStatement!.name.text
                 const hasParams = func.functionStatement!.func.parameters.length > 0
-                const taskName = `${functionName}_asynctask`
+                const taskName = `${functionName}_AsyncTask`
 
-                const bs = this.generateBsTask(functionName, hasParams, event.file)
-                const bsFile = `components/asynctasks/generated/${taskName}.bs`
+                const bs = this.generateBsTask(functionName, hasParams, file)
+                const bsFile = `components/AsyncTask/generated/${taskName}.bs`
 
                 const xml = this.generateXmlTask(taskName, bsFile)
-                const xmlFile = `components/asynctasks/generated/${taskName}.xml`
+                const xmlFile = `components/AsyncTask/generated/${taskName}.xml`
 
-                event.program.setFile(xmlFile, xml)
-                event.program.setFile(bsFile, bs)
+                if (program.hasFile(xmlFile)) {
+                    const currentContent = program.getFile(xmlFile).fileContents
+                    if (currentContent !== xml) {
+                        file.addDiagnostics([{
+                            file: file,
+                            range: func.range,
+                            message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
+                            severity: 1,
+                            code: 'ASYNC_TASK_FILE_EXISTS',
+                        }]);
+                    }
+                }
+                file.program.setFile(xmlFile, xml)
+
+                if (program.hasFile(bsFile)) {
+                    const currentContent = program.getFile(bsFile).fileContents
+                    if (currentContent !== bs) {
+                        file.addDiagnostics([{
+                            file: file,
+                            range: func.range,
+                            message: `AsyncTaskPlugin: file ${bsFile} already exists`,
+                            severity: 1,
+                            code: 'ASYNC_TASK_FILE_EXISTS',
+                        }]);
+                    }
+                }
+                file.program.setFile(bsFile, bs)
             },
         }), {
             walkMode: WalkMode.visitExpressionsRecursive
         });
+    }
+
+    beforeProgramValidate(program: Program) {
+        this.generateTaskListEnum(program);
     }
 
     isAsyncTask(functionStatement: FunctionStatement | undefined) {
@@ -123,39 +87,6 @@ export class AsyncTaskPlugin implements CompilerPlugin {
         return false
     }
 
-    getFunctionsWithDuplicatesForFile(filterFile: BscFile) {
-        const fileFunctions = this.asyncTaskFunctions
-            .filter((fn) => fn.file === filterFile)
-
-        if (fileFunctions.length === 0) {
-            return []
-        }
-
-        const uniqueNames: { [name: string]: FunctionInFile | undefined } = {}
-        const duplicatesNames: { [name: string]: boolean } = {}
-        const duplicates: FunctionInFile[] = []
-
-        for (var i = 0; i < this.asyncTaskFunctions.length; i++) {
-            const fnName = this.asyncTaskFunctions[i].functionStatement.name.text.toLowerCase()
-            if (duplicatesNames[fnName]) {
-                duplicates.push(this.asyncTaskFunctions[i])
-                continue
-            }
-
-            if (uniqueNames[fnName]) {
-                duplicates.push(uniqueNames[fnName]!)
-                uniqueNames[fnName] = undefined
-                duplicatesNames[fnName] = true
-                duplicates.push(this.asyncTaskFunctions[i])
-                continue
-            }
-
-            uniqueNames[fnName] = this.asyncTaskFunctions[i]
-        }
-
-        return duplicates
-    }
-
     generateBsTask(functionName: string, hasInput: boolean, file: BscFile): string {
         return `
 import "pkg:/${file.pkgPath}"
@@ -164,8 +95,8 @@ import "pkg:/source/utils/ErrorUtils.bs"
 function Init()
     m.top.functionName = "TaskMain"
     m.top.cancellation = {
-        node: m.top,
-        field: "cancel",
+        node: m.top
+        field: "cancel"
         value: true
     }
 end function
@@ -174,9 +105,9 @@ function TaskMain()
     try
         result = ${functionName}(${(hasInput ? "m.top.input" : "")})
         m.top.setField("output", {
-            success: true,
-            task: m.top,
-            cancelled: m.top.cancel,
+            success: true
+            task: m.top
+            cancelled: m.top.cancel
             result: result
         })
     catch e
@@ -185,9 +116,9 @@ function TaskMain()
             print ErrorUtils.Format(e)
         #end if
         m.top.setField("output", {
-            success: false,
-            task: m.top,
-            cancelled: m.top.cancel,
+            success: false
+            task: m.top
+            cancelled: m.top.cancel
             error: e
         })
     end try
@@ -206,8 +137,37 @@ end function
     <field id="cancel" type="boolean" alwaysNotify="true" />
     <field id="cancellation" type="assocarray" />
   </interface>
-  <script type="text/brightscript" uri="pkg:/${bsFile}" />
 </component>`
+    }
+
+    generateTaskListEnum(program: Program) {
+        const asyncTasks = Object.values(program.files).reduce((acc, file) => {
+            if (!isBrsFile(file)) {
+                return acc
+            }
+
+            file.ast.walk(createVisitor({
+                FunctionExpression: (func) => {
+                    if (!this.isAsyncTask(func.functionStatement)) {
+                        return
+                    }
+
+                    acc.add(func.functionStatement!.name.text)
+                },
+            }), {
+                walkMode: WalkMode.visitExpressionsRecursive
+            });
+
+            return acc
+        }, new Set<string>());
+
+        const enumItems = Array.from(asyncTasks).map((task) => {
+            return `${task} = "${task}_AsyncTask"`
+        })
+
+        const content = 'enum Tasks\n    ' + enumItems.join('\n    ') + '\nend enum\n';
+
+        program.setFile('source/AsyncTask/Tasks.bs', content);
     }
 }
 

@@ -1,7 +1,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
-import "pkg:/components/Services/Invidious/InvidiousUnregisterTokenTask.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
-import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -44,7 +44,7 @@ namespace Invidious
 
             m.endpoints = node.apiDefinitions
 
-            m.responseHanlders = {
+            m.responseHandlers = {
                 DefaultHandler: m.DefaultHandler
                 AuthFeedHandler: m.AuthFeedHandler
                 PlaylistHandler: m.PlaylistHandler
@@ -53,7 +53,6 @@ namespace Invidious
                 ChannelInfoHandler: m.ChannelInfoHandler
                 ChannelVideosHandler: m.ChannelVideosHandler
                 ChannelPlaylistsHandler: m.ChannelPlaylistsHandler
-                ChannelRelatedChannelsHandler: m.ChannelRelatedChannelsHandler
                 WatchHistoryHandler: m.WatchHistoryHandler
             }
         end function
@@ -299,7 +298,7 @@ namespace Invidious
 
             response = request.Await()
 
-            responseHandler = endpoint.responseHandler <> invalid ? m.responseHanlders[endpoint.responseHandler] : m.responseHanlders["DefaultHandler"]
+            responseHandler = endpoint.responseHandler <> invalid ? m.responseHandlers[endpoint.responseHandler] : m.responseHandlers["DefaultHandler"]
 
             result = responseHandler(m, feedSource, response)
 
@@ -358,25 +357,32 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelRelatedChannelsHandler(m as object, feedSource as object, response as object) as object
-            if response.StatusCode() = 200
-                json = response.Json()
+        function VideoInfoHandler(m as object, feedSource as object, response as object) as object
+            statusCode = response.StatusCode()
+            if statusCode >= 500
+                ' In some cases, such as a video became private, or a live stream ended,
+                ' Invidious returns a 500 error. We can in this case return a valid response
+                ' with just a video id, which will allow us to show a valid thumbnail if possible.
+                ' This is to makes it possible to load a bookmarked video and delete it even if
+                ' it is no longer valid.
+                ' TODO:P2 access to private property
+                response._statusCode = 200
                 return {
-                    items: json.relatedChannels
-                    continuation: json.continuation
+                    items: [{
+                        "videoId": feedSource.pathParams.id
+                        "type": "video"
+                    }]
                 }
             end if
-            return invalid
-        end function
 
-        function VideoInfoHandler(m as object, feedSource as object, response as object) as object
-            if response.StatusCode() = 200
+            if statusCode = 200
                 json = response.Json()
                 json.type = "video"
                 return {
                     items: [json]
                 }
             end if
+
             return invalid
         end function
 
@@ -475,7 +481,7 @@ namespace Invidious
             if not m.VerifyTokenScope(authToken.token)
                 ' Right now we're probably in a UI thread, and we can't unregister the token
                 ' Without a Task
-                StartAsyncTask(InvidiousUnregisterTokenTask, {
+                AsyncTask.Start(Tasks.InvidiousUnregisterTokenTask, {
                     invidious: m.node
                     authToken: authToken
                 })

@@ -19,7 +19,6 @@ export class InvidiousApi {
             "ChannelInfoHandler": (requestData, response) => this.ChannelInfoHandler(requestData, response),
             "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response),
             "ChannelPlaylistsHandler": (requestData, response) => this.ChannelPlaylistsHandler(requestData, response),
-            "ChannelRelatedChannelsHandler": (requestData, response) => this.ChannelRelatedChannelsHandler(requestData, response),
         }
     }
 
@@ -217,13 +216,6 @@ export class InvidiousApi {
     private async ChannelPlaylistsHandler(feedSource, responseJson) {
         return {
             items: responseJson.playlists,
-            continuation: responseJson.continuation
-        };
-    }
-
-    private async ChannelRelatedChannelsHandler(feedSource, responseJson) {
-        return {
-            items: responseJson.relatedChannels,
             continuation: responseJson.continuation
         };
     }

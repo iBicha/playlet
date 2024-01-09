@@ -1,12 +1,11 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/ContinueWatching/ContinueWatchingUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
-import "pkg:/components/VideoPlayer/MarkVideoWatchedTask.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
-import "pkg:/components/VideoPlayer/VideoContentTask.bs"
 import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
-import "pkg:/source/asyncTask/asyncTask.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
@@ -85,7 +84,7 @@ function StartVideoContentTask(videoContentNode as object)
 
     m.top.content = videoContentNode
 
-    m.videoContentTask = StartAsyncTask(VideoContentTask, {
+    m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTask, {
         content: videoContentNode
         invidious: m.top.invidious
         preferences: m.top.preferences
@@ -138,7 +137,7 @@ end function
 
 function MarkVideoWatched(videoContentNode as object)
     if m.top.invidious.authToken <> invalid
-        StartAsyncTask(MarkVideoWatchedTask, {
+        AsyncTask.Start(Tasks.MarkVideoWatchedTask, {
             videoId: videoContentNode.videoId
             invidious: m.top.invidious
         })

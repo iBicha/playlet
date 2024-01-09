@@ -1,8 +1,6 @@
 import "LoadingMessages.bs"
+import "pkg:/source/Logger.bs"
 
-' TODO:P2 Add a "logQueue" field to the scene, and push it to the logger later when playlet-lib is loaded
-'         Alternatively, just log to the console and the known log file in cachefs
-' TODO:P2 log the playlet-lib load status and load speed to the log queue
 function Init() as void
     m.scene = m.top.getScene()
     m.top.backgroundColor = "#242424FF"
@@ -24,17 +22,17 @@ end function
 
 function GetPlayletLibUrls() as object
     #if DEBUG
-        debug = { type: "debug", link: ReadManifestValue("playlet_lib_debug_url") }
+        debug = { type: "debug", link: Manifest.ReadValue("playlet_lib_debug_url") }
         return [debug]
     #else
-        savedUrls = GetPlayletLibUrlsFromRegistry()
+        savedUrls = Registry.GetPlayletLibUrlsFromRegistry()
         if savedUrls <> invalid
             m.shouldClearRegistryOnLoadFail = true
             return savedUrls
         end if
 
-        github = { type: "github", link: ReadManifestValue("playlet_lib_remote_url") }
-        embedded = { type: "embedded", link: ReadManifestValue("playlet_lib_embedded_url") }
+        github = { type: "github", link: Manifest.ReadValue("playlet_lib_remote_url") }
+        embedded = { type: "embedded", link: Manifest.ReadValue("playlet_lib_embedded_url") }
         return [github, embedded]
     #end if
 end function
@@ -43,7 +41,7 @@ function LoadPlayletLib() as void
     if m.playletLibUrlIndex >= m.playletLibUrls.Count()
         m.loadingIndicator.visible = false
         if m.shouldClearRegistryOnLoadFail = true
-            DeleteRegistryKey("playlet_lib_urls", "Playlet")
+            Registry.DeleteKey("playlet_lib_urls", "Playlet")
         end if
         ShowPlayletLibLoadErrorDialog()
         return
@@ -58,8 +56,8 @@ function OnLoadStatusChanged() as void
     libUrl = m.playletLibUrls[m.playletLibUrlIndex]
     if m.lib.loadStatus = "ready"
         RemoveComponentLibrary()
-        ' bs:disable-next-line LINT3012
-        ?"Playlet lib loaded from " libUrl.link
+        Logger.Log(`Playlet lib loaded from ${libUrl.link} in ${m.timer.TotalMilliseconds()} ms`)
+        m.timer = invalid
         m.scene.playletLibLoadedUrl = libUrl
         container = m.scene.findNode("MainSceneContainer")
         container.createChild("PlayletLib:MainScene")
@@ -67,8 +65,7 @@ function OnLoadStatusChanged() as void
     end if
 
     if m.lib.loadStatus = "failed"
-        ' bs:disable-next-line LINT3012
-        ?"Playlet lib failed to load from " libUrl.link
+        Logger.Log(`Playlet lib failed to load from ${libUrl.link}`)
         ' Try next url
         m.playletLibUrlIndex += 1
         LoadPlayletLib()
@@ -86,11 +83,14 @@ function RemoveComponentLibrary() as void
 end function
 
 function LoadComponentLibrary(uri as string)
+    m.timer = CreateObject("roTimespan")
+    m.timer.mark()
+
     m.lib = m.scene.createChild("ComponentLibrary")
     ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
     m.lib.observeField("loadStatus", "OnLoadStatusChanged")
-    ' bs:disable-next-line LINT3012
-    ?"Loading Playlet lib from " uri
+
+    Logger.Log(`Loading Playlet lib from ${uri}`)
     m.lib.uri = uri
 end function
 
@@ -109,5 +109,5 @@ function ShowPlayletLibLoadErrorDialog()
         "If the problem persist, contact Playlet authors."
     ]
 
-    ShowErrorDialog(message, bulletText, bottomText)
+    Dialog.ShowError(message, bulletText, bottomText)
 end function

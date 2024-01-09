@@ -7,7 +7,8 @@
   import RemoteIcon from "../assets/remote-control.svg.svelte";
 
   import { appStateStore } from "lib/Stores";
-  import type { AppState } from "lib/Types";
+  import { ScreenNames, type AppState } from "lib/Types";
+  import { onMount } from "svelte";
 
   function setScreen(screen: AppState["screen"]) {
     appStateStore.update((state) => {
@@ -20,6 +21,31 @@
       state.screen = screen;
       return state;
     });
+    setScreenNameInUrl(screen);
+  }
+
+  onMount(() => {
+    const screen = getScreenNameInUrl();
+    if (screen) {
+      setScreen(screen);
+    } else {
+      setScreenNameInUrl("home");
+    }
+  });
+
+  function getScreenNameInUrl(): AppState["screen"] | undefined {
+    const hash = window.location.hash;
+    if (hash) {
+      const screen = hash.substring(1) as AppState["screen"];
+      if (!ScreenNames.includes(screen)) {
+        return;
+      }
+      return screen;
+    }
+  }
+
+  function setScreenNameInUrl(screen: AppState["screen"]) {
+    window.location.hash = screen;
   }
 </script>
 

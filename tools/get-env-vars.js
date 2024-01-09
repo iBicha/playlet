@@ -1,3 +1,5 @@
+// Description: an utility script to read env vars from OS or .env files
+
 const dotenv = require('dotenv');
 const fs = require('fs');
 const path = require('path');

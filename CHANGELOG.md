@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `HTTP/0.9 when not allowed` errors by adding a retry to web requests
+- Issue where a bookmarked video is no longer valid (such as a video made private, or a live stream that ended)
+- [Perf] App loads slightly faster (~500ms)
 
 ## [0.18.1] - 2024-01-02
 
@@ -23,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A rare bug that causes the app to crash when displaying video cells
 - A rare bug where a long press can cause a crash
 - [Attempt] to fix a crash caused by execution timeout when stopping a video takes too long
-- Unsupported subtitles (subtitles that can be rendered will not be used)
+- Unsupported subtitles (subtitles that can't be rendered will not be used)
 
 ### Removed
 
