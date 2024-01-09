@@ -34,8 +34,26 @@ export class AsyncTaskPlugin implements CompilerPlugin {
                 const xml = this.generateXmlTask(taskName, bsFile)
                 const xmlFile = `components/AsyncTask/generated/${taskName}.xml`
 
-                // TODO: check if file already exists
+                if (file.program.hasFile(xmlFile)) {
+                    file.addDiagnostics([{
+                        file: file,
+                        range: func.range,
+                        message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
+                        severity: 1,
+                        code: 'ASYNC_TASK_FILE_EXISTS',
+                    }]);
+                }
                 file.program.setFile(xmlFile, xml)
+
+                if (file.program.hasFile(bsFile)) {
+                    file.addDiagnostics([{
+                        file: file,
+                        range: func.range,
+                        message: `AsyncTaskPlugin: file ${bsFile} already exists`,
+                        severity: 1,
+                        code: 'ASYNC_TASK_FILE_EXISTS',
+                    }]);
+                }
                 file.program.setFile(bsFile, bs)
             },
         }), {
