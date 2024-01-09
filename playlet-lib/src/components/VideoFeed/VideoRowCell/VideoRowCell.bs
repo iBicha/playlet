@@ -1,13 +1,13 @@
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/Logging.bs"
 
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
 end function
 
-' TODO:P0 OnContentSet is called every time the progress changes - this needs to be better
 function OnContentSet() as void
     content = m.top.itemContent
 
@@ -36,25 +36,27 @@ function OnContentSet() as void
 
     m.top.thumbnailUri = content.thumbnail
 
-    m.top.durationRectVisible = false
-    m.top.upcomingRectVisible = false
-    m.top.liveRectVisible = false
+    lengthSeconds = ValidInt(content.lengthSeconds)
+    hasLength = lengthSeconds <> 0
+    isUpcoming = not hasLength and content.isUpcoming = true
+    isLive = not hasLength and not isUpcoming and content.liveNow = true
 
-    if ValidInt(content.lengthSeconds) <> 0
+    m.top.durationRectVisible = hasLength
+    m.top.upcomingRectVisible = isUpcoming
+    m.top.liveRectVisible = isLive
+
+    if hasLength
         SetDurationText(content.lengthText)
-        m.top.durationRectVisible = true
-    else
-        if content.isUpcoming = true
-            m.top.upcomingRectVisible = true
-        else if content.liveNow
-            m.top.liveRectVisible = true
-        end if
     end if
 
     SetupProgress(content)
 end function
 
 function SetDurationText(text as string) as void
+    if m.top.duration = text
+        return
+    end if
+
     m.top.duration = text
 
     label = m.durationLabel

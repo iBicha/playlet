@@ -5,6 +5,7 @@ function Init()
     m.typeMapping = {
         "boolean": "boolean"
         "string": "string"
+        "number": "integer"
         "radio": "string"
         "array": "array"
     }
@@ -114,12 +115,21 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
         if userPrefs.DoesExist("misc.home_screen_layout")
             homeScreenLayout = userPrefs["misc.home_screen_layout"]
             if IsArray(homeScreenLayout)
-                ' continue_watching was added in v2, and should be the first item in the array
-                homeScreenLayout.Unshift({
-                    id: "continue_watching"
-                    enabled: true
-                })
-                userPrefs["misc.home_screen_layout"] = homeScreenLayout
+                containsContinueWatching = false
+                for each item in homeScreenLayout
+                    if item.id = "continue_watching"
+                        containsContinueWatching = true
+                        exit for
+                    end if
+                end for
+                if not containsContinueWatching
+                    ' continue_watching was added in v2, and should be the first item in the array
+                    homeScreenLayout.Unshift({
+                        id: "continue_watching"
+                        enabled: true
+                    })
+                    userPrefs["misc.home_screen_layout"] = homeScreenLayout
+                end if
             end if
         end if
     end if
