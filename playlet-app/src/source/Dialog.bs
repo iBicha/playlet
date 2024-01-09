@@ -1,40 +1,45 @@
-function ShowErrorDialog(message as object, bulletText as object, bottomMessage as object)
-    ' Note: dialog can be null since StandardMessageDialog is only available on 10.0 and later
-    dialog = CreateObject("roSGNode", "StandardMessageDialog")
-    SetPalette(dialog)
-    dialog.message = message
-    dialog.bulletText = bulletText
-    dialog.bottomMessage = bottomMessage
-    dialog.title = "Error loading Playlet"
-    dialog.buttons = ["Exit"]
+namespace Dialog
 
-    ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
-    dialog.observeField("buttonSelected", "OnButtonSelected")
-    ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
-    dialog.observeField("wasClosed", "OnDialogClosed")
+    function ShowError(message as object, bulletText as object, bottomMessage as object)
+        ' Note: dialog can be null since StandardMessageDialog is only available on 10.0 and later
+        msgDialog = CreateObject("roSGNode", "StandardMessageDialog")
+        SetPalette(msgDialog)
+        msgDialog.message = message
+        msgDialog.bulletText = bulletText
+        msgDialog.bottomMessage = bottomMessage
+        msgDialog.title = "Error loading Playlet"
+        msgDialog.buttons = ["Exit"]
 
-    m.top.getScene().dialog = dialog
-end function
+        ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
+        msgDialog.observeField("buttonSelected", "OnButtonSelected")
+        ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
+        msgDialog.observeField("wasClosed", "OnDialogClosed")
 
-function SetPalette(dialog as object)
-    palette = createObject("roSGNode", "RSGPalette")
-    palette.colors = {
-        DialogBackgroundColor: "#242424FF"
-        DialogFocusColor: "#CECECEFF"
-        DialogFocusItemColor: "#202020FF"
-        DialogSecondaryTextColor: "#DBDBDBFF"
-        DialogSecondaryItemColor: "#FF1C30FF"
-        DialogTextColor: "#DBDBDBFF"
-    }
-    dialog.palette = palette
-end function
+        m.top.getScene().dialog = msgDialog
+    end function
 
-function OnButtonSelected()
-    m.top.getScene().dialog.close = true
-end function
+    function SetPalette(msgDialog as object)
+        palette = createObject("roSGNode", "RSGPalette")
+        palette.colors = {
+            DialogBackgroundColor: "#242424FF"
+            DialogFocusColor: "#CECECEFF"
+            DialogFocusItemColor: "#202020FF"
+            DialogSecondaryTextColor: "#DBDBDBFF"
+            DialogSecondaryItemColor: "#FF1C30FF"
+            DialogTextColor: "#DBDBDBFF"
+        }
+        msgDialog.palette = palette
+    end function
 
-function OnDialogClosed()
-    ' TODO:P1 throw an exception to cause a crash report to be generated
-    ' Should include which playlet lib failed to load
-    m.top.getScene().exitChannel = true
-end function
+    function OnButtonSelected()
+        m.top.getScene().dialog.close = true
+    end function
+
+    function OnDialogClosed()
+        ' TODO:P1 throw an exception to cause a crash report to be generated
+        ' Should include which playlet lib failed to load
+        m.top.getScene().exitChannel = true
+    end function
+
+end namespace
+

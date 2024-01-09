@@ -1,29 +1,34 @@
-function ReadRegistryKey(key as string, section as string) as dynamic
-    sec = CreateObject("roRegistrySection", section)
-    if not sec.Exists(key)
-        return invalid
-    end if
-    return sec.Read(key)
-end function
+namespace Registry
 
-function DeleteRegistryKey(key as string, section as string)
-    sec = CreateObject("roRegistrySection", section)
-    sec.Delete(key)
-    sec.Flush()
-end function
+    function ReadKey(key as string, section as string) as dynamic
+        sec = CreateObject("roRegistrySection", section)
+        if not sec.Exists(key)
+            return invalid
+        end if
+        return sec.Read(key)
+    end function
 
-function GetPlayletLibUrlsFromRegistry() as object
-    urlsJson = ReadRegistryKey("playlet_lib_urls", "Playlet")
-    if urlsJson = invalid
-        return invalid
-    end if
-    urls = ParseJson(urlsJson)
-    return urls
-end function
+    function DeleteKey(key as string, section as string)
+        sec = CreateObject("roRegistrySection", section)
+        sec.Delete(key)
+        sec.Flush()
+    end function
 
-function ClearPlayletLibUrlsIfNeeded(launchArgs as object) as void
-    if launchArgs = invalid or launchArgs.clearPlayletLibUrls = invalid
-        return
-    end if
-    DeleteRegistryKey("playlet_lib_urls", "Playlet")
-end function
+    function GetPlayletLibUrlsFromRegistry() as object
+        urlsJson = ReadKey("playlet_lib_urls", "Playlet")
+        if urlsJson = invalid
+            return invalid
+        end if
+        urls = ParseJson(urlsJson)
+        return urls
+    end function
+
+    function ClearPlayletLibUrlsIfNeeded(launchArgs as object) as void
+        if launchArgs = invalid or launchArgs.clearPlayletLibUrls = invalid
+            return
+        end if
+        DeleteKey("playlet_lib_urls", "Playlet")
+        Logger.Log("Cleared key playlet_lib_urls from registry")
+    end function
+
+end namespace
