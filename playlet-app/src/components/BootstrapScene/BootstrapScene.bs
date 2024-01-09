@@ -59,7 +59,8 @@ function OnLoadStatusChanged() as void
     if m.lib.loadStatus = "ready"
         RemoveComponentLibrary()
         ' bs:disable-next-line LINT3012
-        ?"Playlet lib loaded from " libUrl.link
+        ?"Playlet lib loaded from " libUrl.link " in " m.timer.TotalMilliseconds().ToStr() "ms"
+        m.timer = invalid
         m.scene.playletLibLoadedUrl = libUrl
         container = m.scene.findNode("MainSceneContainer")
         container.createChild("PlayletLib:MainScene")
@@ -86,6 +87,9 @@ function RemoveComponentLibrary() as void
 end function
 
 function LoadComponentLibrary(uri as string)
+    m.timer = CreateObject("roTimespan")
+    m.timer.mark()
+
     m.lib = m.scene.createChild("ComponentLibrary")
     ' bs:disable-next-line NO_OBSERVE_STRING_CALLBACK
     m.lib.observeField("loadStatus", "OnLoadStatusChanged")
