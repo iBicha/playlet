@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getHost } from "lib/Api/Host";
   import { playletStateStore } from "lib/Stores";
 
   export let visibility: boolean;
@@ -35,6 +36,26 @@
     {
       key: "id",
       displayText: "App ID",
+    },
+  ];
+
+  const host = `http://${getHost()}`;
+  const internalStateLinks = [
+    {
+      displayText: "App state",
+      link: `${host}/api/state`,
+    },
+    {
+      displayText: "Logs",
+      link: `${host}/logs/app_logs.txt`,
+    },
+    {
+      displayText: "Logs (previous run)",
+      link: `${host}/logs/app_logs_previous.txt`,
+    },
+    {
+      displayText: "Preferences",
+      link: `${host}/api/preferences`,
     },
   ];
 
@@ -138,6 +159,26 @@ ${JSON.stringify(preferencesInfo, null, 2)}
           <tr>
             <td>{item.displayText}</td>
             <td>{@html transformValue(item.key, appInfo[item.key])}</td>
+          </tr>
+        {/each}
+
+        <thead>
+          <tr>
+            <th>App internal state</th>
+          </tr>
+        </thead>
+
+        {#each internalStateLinks as item}
+          <tr>
+            <td>{item.displayText}</td>
+            <td
+              ><a
+                class="link"
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer">link</a
+              ></td
+            >
           </tr>
         {/each}
       </tbody>
