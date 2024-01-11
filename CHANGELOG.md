@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A hint on how to restore video to full screen
+
 ### Changed
 
 - Bookmarks are now added to the top of the list
