@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bookmarks are now added to the top of the list
 - The search screen keyboard to make it easier to clear the search field
 
 ## [0.19.0] - 2024-01-10
