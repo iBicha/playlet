@@ -102,5 +102,6 @@ In any case, I hope you find **Playlet** useful, and pleasant to use.
 
 **Playlet** does not serve or distribute any material from unauthorized sources.<br/>
 **Playlet** is simply a frontend to other systems (such as [Invidious](https://github.com/iv-org/invidious)), bringing the watching experience to the TV, as opposed to the existing frontends that are web and mobile focused.
+**Playlet** authors acknowledge that all trademarks and registered trademarks mentioned in this repository and related pages are the property of their respective owners. The use of these trademarks or trade names is for identification purposes only and does not imply any endorsement, affiliation, or sponsorship by the trademark owner.
 
 <!-- markdownlint-configure-file {"MD024": { "siblings_only": true } } -->
