@@ -77,6 +77,7 @@ namespace Http
             end function)
         end function
 
+        ' TODO:P2 refactor this, since it's similar to continue watching router
         function GetVideoMetadata(instance as string, videoId as string, cancellation = invalid as object) as object
             ' _playlet_ref=video_info so that we give it it's own cache that lasts longer
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}?_playlet_ref=video_info`
@@ -85,6 +86,9 @@ namespace Http
             ' 3 days of cache
             request.CacheSeconds(60 * 60 * 24 * 3)
             request.Cancellation(cancellation)
+            ' Since we're doing multiple requests from the same thread, we might
+            ' benefit from HTTP/2 connection sharing
+            request.UseHttp2()
 
             ' Send, and not await, since we are launching many requests at once
             return request.Send()

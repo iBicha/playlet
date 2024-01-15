@@ -247,6 +247,11 @@ namespace HttpClient
             return m
         end function
 
+        function UseHttp2() as HttpRequest
+            m._useHttp2 = true
+            return m
+        end function
+
         function ToCurlCommand() as string
             command = `curl "${m.BuildUrl()}"`
             if m._method = "HEAD"
@@ -259,6 +264,10 @@ namespace HttpClient
 
             if COMPRESSION_ENABLED
                 command += ` \\\n  --compressed`
+            end if
+
+            if m._useHttp2 = true
+                command += ` \\\n  --http2`
             end if
 
             if m._headers <> invalid
@@ -489,6 +498,11 @@ namespace HttpClient
                 urlTransfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
                 urlTransfer.InitClientCertificates()
             end if
+
+            if m._useHttp2 = true
+                urlTransfer.SetHttpVersion("http2")
+            end if
+
             return urlTransfer
         end function
 
