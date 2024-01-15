@@ -4,65 +4,67 @@ namespace Http
 
     class PlayletLibUrlsRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/playlet-lib-urls", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                scene = task.getScene()
-
-                saved = RegistryUtils.Read(RegistryUtils.PLAYLET_LIB_URLS)
-                if saved <> invalid
-                    saved = ParseJson(saved)
-                end if
-
-                response.Json({
-                    loaded: scene.playletLibLoadedUrl
-                    saved: saved
-                })
-                return true
-            end function)
-
-            m.Post("/api/playlet-lib-urls", function(context as object) as boolean
-                request = context.request
-                response = context.response
-
-                payload = request.Json()
-                if payload = invalid or not IsArray(payload)
-                    response.Default(400, "Invalid payload")
-                    return true
-                end if
-
-                if payload.Count() = 0
-                    response.Default(400, "Payload must contain at least one item")
-                    return true
-                end if
-
-                for each item in payload
-                    if StringUtils.IsNullOrEmpty(item.link) or StringUtils.IsNullOrEmpty(item.type)
-                        response.Default(400, `Invalid item in array (must have "link" and "type" properties)`)
-                        return true
-                    end if
-                end for
-
-                RegistryUtils.Write(RegistryUtils.PLAYLET_LIB_URLS, request.body)
-
-                response.Default(204, "OK")
-                return true
-            end function)
-
-            m.Delete("/api/playlet-lib-urls", function(context as object) as boolean
-                response = context.response
-
-                RegistryUtils.Delete(RegistryUtils.PLAYLET_LIB_URLS)
-
-                response.Default(204, "OK")
-                return true
-            end function)
-
+            task = server.task
+            m.scene = task.getScene()
         end function
 
+        @get("/api/playlet-lib-urls")
+        function GetPlayletLibUrls(context as object) as boolean
+            response = context.response
+
+            saved = RegistryUtils.Read(RegistryUtils.PLAYLET_LIB_URLS)
+            if saved <> invalid
+                saved = ParseJson(saved)
+            end if
+
+            response.Json({
+                loaded: m.scene.playletLibLoadedUrl
+                saved: saved
+            })
+            return true
+        end function
+
+        @post("/api/playlet-lib-urls")
+        function SetPlayletLibUrls(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.Json()
+            if payload = invalid or not IsArray(payload)
+                response.Default(400, "Invalid payload")
+                return true
+            end if
+
+            if payload.Count() = 0
+                response.Default(400, "Payload must contain at least one item")
+                return true
+            end if
+
+            for each item in payload
+                if StringUtils.IsNullOrEmpty(item.link) or StringUtils.IsNullOrEmpty(item.type)
+                    response.Default(400, `Invalid item in array (must have "link" and "type" properties)`)
+                    return true
+                end if
+            end for
+
+            RegistryUtils.Write(RegistryUtils.PLAYLET_LIB_URLS, request.body)
+
+            response.Default(204, "OK")
+            return true
+        end function
+
+        @delete("/api/playlet-lib-urls")
+        function DeletePlayletLibUrls(context as object) as boolean
+            response = context.response
+
+            RegistryUtils.Delete(RegistryUtils.PLAYLET_LIB_URLS)
+
+            response.Default(204, "OK")
+            return true
+        end function
     end class
 
 end namespace

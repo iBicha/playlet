@@ -2,6 +2,7 @@ import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/BookmarksRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/DashRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/HomeLayoutRouter.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/HomeRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/InvidiousRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/PlayletLibUrlsRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/PlayQueueRouter.bs"
@@ -29,28 +30,21 @@ function GetServerAddress(_unused as dynamic) as dynamic
 end function
 
 function SetupRoutes(server as object)
-    homeRouter = new Http.HttpRouter()
-    homeRouter.Get("/", function(context as object) as boolean
-        response = context.response
-        response.Redirect("/index.html")
-        return true
-    end function)
-
     server.UseRouter(new Http.CorsMiddleware())
     if server.settings.WebSocketsEnabled
         server.UseRouter(new Http.WebSocketMiddleware())
     end if
-    server.UseRouter(homeRouter)
-    server.UseRouter(new Http.StateApiRouter())
-    server.UseRouter(new Http.DashRouter())
-    server.UseRouter(new Http.PreferencesRouter())
-    server.UseRouter(new Http.InvidiousRouter())
-    server.UseRouter(new Http.PlayQueueRouter())
-    server.UseRouter(new Http.BookmarksRouter())
-    server.UseRouter(new Http.HomeLayoutRouter())
-    server.UseRouter(new Http.ViewRouter())
-    server.UseRouter(new Http.SearchHistoryRouter())
-    server.UseRouter(new Http.PlayletLibUrlsRouter())
+    server.UseRouter(new Http.HomeRouter())
+    server.UseRouter(new Http.StateApiRouter(server))
+    server.UseRouter(new Http.DashRouter(server))
+    server.UseRouter(new Http.PreferencesRouter(server))
+    server.UseRouter(new Http.InvidiousRouter(server))
+    server.UseRouter(new Http.PlayQueueRouter(server))
+    server.UseRouter(new Http.BookmarksRouter(server))
+    server.UseRouter(new Http.HomeLayoutRouter(server))
+    server.UseRouter(new Http.ViewRouter(server))
+    server.UseRouter(new Http.SearchHistoryRouter(server))
+    server.UseRouter(new Http.PlayletLibUrlsRouter(server))
 
     etags = new Http.EtagUtils()
     server.UseRouter(new Http.HttpStaticFilesRouter("/", "libpkg:/www", etags, { staticFiles: true }))
