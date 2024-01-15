@@ -113,20 +113,6 @@ namespace HttpClient
         return (new HttpRequest()).Method("HEAD").Url(url)
     end function
 
-    function FromObject(obj as object) as HttpRequest
-        request = new HttpRequest()
-
-        for each key in obj
-            if IsFunction(request[key])
-                request[key](obj[key])
-            else
-                throw `Invalid key: "${key}" in object passed to HttpClient.FromObject`
-            end if
-        end for
-
-        return request
-    end function
-
     class HttpRequest
 
         public urlTransfer as object
@@ -374,7 +360,7 @@ namespace HttpClient
             response = invalid
 
             response = m.AwaitInternal()
-            if response.IsSuccess() or response.TimedOut() or response.IsCancelled()
+            if response.IsSuccess() or response.IsTimedOut() or response.IsCancelled()
                 return response
             end if
             triesLeft -= 1
@@ -413,7 +399,7 @@ namespace HttpClient
                 sleep(backoffMs)
 
                 response = m.AwaitInternal()
-                if response.IsSuccess() or response.TimedOut() or response.IsCancelled() or response.StatusCode() < 500
+                if response.IsSuccess() or response.IsTimedOut() or response.IsCancelled() or response.StatusCode() < 500
                     return response
                 end if
                 triesLeft -= 1
@@ -554,7 +540,7 @@ namespace HttpClient
             return m.request._cache <> invalid
         end function
 
-        function TimedOut() as boolean
+        function IsTimedOut() as boolean
             return not m.IsCached() and m.event = invalid
         end function
 
@@ -620,7 +606,7 @@ namespace HttpClient
             else
                 if m.request._sent <> true
                     m._errorMessage = "Request not sent."
-                else if m.TimedOut()
+                else if m.IsTimedOut()
                     m._errorMessage = "Request timed out."
                 else if m.IsCancelled()
                     m._errorMessage = "Request cancelled."

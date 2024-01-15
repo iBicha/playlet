@@ -10,6 +10,24 @@ class DashManifest
     function new(invidiousInstance as string)
         m.utils = new Http.Utils()
         m.invidiousInstance = invidiousInstance
+
+        ' https://github.com/LuanRT/YouTube.js/blob/6082b4a52ee07a622735e6e9128a0531a5ae3bfb/src/utils/StreamingInfo.ts#L332-L349
+        m.colorInfo = {
+            primaries: {
+                "COLOR_PRIMARIES_BT709": "1"
+                "COLOR_PRIMARIES_BT2020": "9"
+            }
+            transferCharacteristics: {
+                "COLOR_TRANSFER_CHARACTERISTICS_BT709": "1"
+                "COLOR_TRANSFER_CHARACTERISTICS_BT2020_10": "14"
+                "COLOR_TRANSFER_CHARACTERISTICS_SMPTEST2084": "16"
+                "COLOR_TRANSFER_CHARACTERISTICS_ARIB_STD_B67": "18"
+            }
+            matrixCoefficients: {
+                "COLOR_MATRIX_COEFFICIENTS_BT709": "1"
+                "COLOR_MATRIX_COEFFICIENTS_BT2020_NCL": "14"
+            }
+        }
     end function
 
     function fromVideoMetadata(metadata as object, local as boolean) as string
@@ -154,6 +172,7 @@ class DashManifest
                             end if
 
                             if xml.Node("Representation", representationAttributes)
+                                m.AddColorInfo(stream, xml)
                                 if xml.Node("BaseURL")
                                     xml.Text(stream.url)
                                     xml.End()
@@ -371,4 +390,50 @@ class DashManifest
         end for
         return result
     end function
+
+    function AddColorInfo(videoStream as object, xml as object) as void
+        if videoStream.colorInfo = invalid
+            return
+        end if
+
+        if videoStream.colorInfo.primaries <> invalid
+            primaries = m.colorInfo.primaries[videoStream.colorInfo.primaries]
+            if primaries <> invalid
+                xml.Node("EssentialProperty", {
+                    "schemeIdUri": "urn:mpeg:mpegB:cicp:ColourPrimaries"
+                    "value": primaries
+                })
+                xml.End()
+            else
+                LogWarn("Unknown colorInfo.primaries:", videoStream.colorInfo.primaries)
+            end if
+        end if
+
+        if videoStream.colorInfo.transferCharacteristics <> invalid
+            transferCharacteristics = m.colorInfo.transferCharacteristics[videoStream.colorInfo.transferCharacteristics]
+            if transferCharacteristics <> invalid
+                xml.Node("EssentialProperty", {
+                    "schemeIdUri": "urn:mpeg:mpegB:cicp:TransferCharacteristics"
+                    "value": transferCharacteristics
+                })
+                xml.End()
+            else
+                LogWarn("Unknown colorInfo.transferCharacteristics:", videoStream.colorInfo.transferCharacteristics)
+            end if
+        end if
+
+        if videoStream.colorInfo.matrixCoefficients <> invalid
+            matrixCoefficients = m.colorInfo.matrixCoefficients[videoStream.colorInfo.matrixCoefficients]
+            if matrixCoefficients <> invalid
+                xml.Node("EssentialProperty", {
+                    "schemeIdUri": "urn:mpeg:mpegB:cicp:MatrixCoefficients"
+                    "value": matrixCoefficients
+                })
+                xml.End()
+            else
+                LogWarn("Unknown colorInfo.matrixCoefficients:", videoStream.colorInfo.matrixCoefficients)
+            end if
+        end if
+    end function
+
 end class

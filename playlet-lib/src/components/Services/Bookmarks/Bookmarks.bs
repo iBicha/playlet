@@ -29,12 +29,15 @@ function Load() as void
         return
     end if
 
-    for each bookmarkGroup in bookmarks.groups
+    groupCount = bookmarks.groups.Count()
+    ' GetOrCreateBookmarkGroup inserts at the beginning of the list, so we need to iterate backwards
+    for i = groupCount - 1 to 0 step -1
+        bookmarkGroup = bookmarks.groups[i]
         bookmarkGroupNode = GetOrCreateBookmarkGroup(bookmarkGroup.title)
         bookmarksCount = bookmarkGroup.bookmarks.Count()
-        ' AddFeedSourceBookmark inserts at the beginning of the list, so we need to iterate backwards
-        for i = bookmarksCount - 1 to 0 step -1
-            bookmark = bookmarkGroup.bookmarks[i]
+        ' AddFeedSourceBookmark also inserts at the beginning of the list, so we need to iterate backwards
+        for j = bookmarksCount - 1 to 0 step -1
+            bookmark = bookmarkGroup.bookmarks[j]
             AddFeedSourceBookmark(bookmark.feedSource, bookmark.id, bookmarkGroupNode)
         end for
     end for
@@ -85,7 +88,7 @@ function GetOrCreateBookmarkGroup(groupName as string) as object
     node = CreateObject("roSGNode", "ContentNode")
     node.id = id
     node.title = groupName
-    m.top.content.appendChild(node)
+    m.top.content.insertChild(node, 0)
     LogInfo("Added bookmark group:", groupName)
     return node
 end function

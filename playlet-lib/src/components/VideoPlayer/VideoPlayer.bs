@@ -13,6 +13,10 @@ import "pkg:/source/utils/MathUtils.bs"
 function Init()
     SetPlayerStyle()
     SetupAnimation()
+    m.fullScreenHint = m.top.findNode("fullScreenHint")
+    m.fullScreenHintLabel = m.top.findNode("fullScreenHintLabel")
+    m.fullScreenHintTimer = m.top.findNode("fullScreenHintTimer")
+    m.fullScreenHintTimer.ObserveField("fire", FuncName(OnFullScreenHintTimer))
 
     ' videoPlayingSuccess indicates if we started playing a video successfully
     ' We use it to detect if we should try another link for a video, or if another error
@@ -38,14 +42,20 @@ function Init()
 end function
 
 function OnNodeReady()
-    rect = m.container.fullscreen ? m.top.maxRect : m.top.minRect
+    minRect = m.top.minRect
+    rect = m.container.fullscreen ? m.top.maxRect : minRect
 
     m.top.width = rect.width
     m.top.height = rect.height
     m.top.translation = [rect.x, rect.y]
 
+    m.fullScreenHint.width = minRect.width
+    m.fullScreenHintLabel.width = minRect.width
+    m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
+
     ' TODO:P2 show a loading spinner if video is loading minimized
     m.top.enableUI = m.container.fullscreen
+    m.top.showFullScreenHint = not m.container.fullscreen
 
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
@@ -406,8 +416,36 @@ function OnFullScreenChange()
     m.minimizeAnimation.control = "start"
 
     m.top.enableUI = m.container.fullscreen
+    m.top.showFullScreenHint = not m.container.fullscreen
 
     SponsorBlock.SetVisible(m.notifications, m.container.fullscreen)
+end function
+
+function OnShowFullScreenHint() as void
+    m.fullScreenHintTimer.control = "stop"
+
+    if m.container.fullscreen
+        m.fullScreenHint.visible = false
+        return
+    end if
+
+    if m.top.showFullScreenHint
+        ' Take 1 second until the shrink animation finishes to show the hint
+        m.fullScreenHintTimer.duration = 1
+    else
+        ' Wait 5 seconds then hide the hint
+        m.fullScreenHintTimer.duration = 5
+    end if
+
+    m.fullScreenHintTimer.control = "start"
+end function
+
+function OnFullScreenHintTimer()
+    showFullScreenHint = m.top.showFullScreenHint
+    m.fullScreenHint.visible = showFullScreenHint
+    if showFullScreenHint
+        m.top.showFullScreenHint = false
+    end if
 end function
 
 function OnPositionChangeVideoProgress() as void
