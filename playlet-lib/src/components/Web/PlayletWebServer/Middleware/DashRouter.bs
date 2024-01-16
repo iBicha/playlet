@@ -5,43 +5,45 @@ import "pkg:/source/utils/Types.bs"
 namespace Http
 
     class DashRouter extends HttpRouter
-
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/dash", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                task = context.server.task
-                invidiousNode = task.invidious
+            m.invidiousNode = server.task.invidious
+            m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
+            ' No need to pass the invidious instance here, we will refresh it for
+            ' each request to make sure we are using the latest one
+            m.dashManifest = new DashManifest("")
+        end function
 
-                v = request.query.v
-                local = request.query.local
+        @get("/api/dash")
+        function GenerateDashManifest(context as object) as boolean
+            request = context.request
+            response = context.response
 
-                if StringUtils.IsNullOrEmpty(v)
-                    response.Default(400, "Missing video id")
-                    return true
-                end if
+            v = request.query.v
+            local = request.query.local
 
-                service = new Invidious.InvidiousService(invidiousNode)
-                metadataRequest = service.GetVideoMetadata(v)
-                if not metadataRequest.IsSuccess()
-                    response.Default(metadataRequest.StatusCode(), metadataRequest.ErrorMessage())
-                    return true
-                end if
-
-                metadata = metadataRequest.Json()
-                instance = service.GetInstance()
-
-                dash = new DashManifest(instance)
-                xmlContent = dash.fromVideoMetadata(metadata, ValidString(local) = "true")
-
-                response.http_code = 200
-                response.SetBodyDataString(xmlContent)
-                response.ContentType("application/dash+xml")
-
+            if StringUtils.IsNullOrEmpty(v)
+                response.Default(400, "Missing video id")
                 return true
-            end function)
+            end if
+
+            metadataRequest = m.invidiousService.GetVideoMetadata(v)
+            if not metadataRequest.IsSuccess()
+                response.Default(metadataRequest.StatusCode(), metadataRequest.ErrorMessage())
+                return true
+            end if
+
+            metadata = metadataRequest.Json()
+            m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
+
+            xmlContent = m.dashManifest.fromVideoMetadata(metadata, ValidString(local) = "true")
+
+            response.http_code = 200
+            response.SetBodyDataString(xmlContent)
+            response.ContentType("application/dash+xml")
+
+            return true
         end function
 
     end class

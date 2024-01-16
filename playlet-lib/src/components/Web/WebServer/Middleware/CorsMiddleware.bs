@@ -11,24 +11,24 @@ namespace Http
             m.origin = origin
             m.headers = headers
             m.methods = methods
-
-            m.All("*", function(context as object) as boolean
-                router = context.router
-                request = context.request
-                response = context.response
-                response.headers["Access-Control-Allow-Origin"] = router.origin
-                response.headers["Access-Control-Allow-Headers"] = router.headers
-                response.headers["Access-Control-Allow-Methods"] = router.methods
-
-                if request.method = "OPTIONS"
-                    response.header_only = true
-                    response.http_code = 200
-                    return true
-                end if
-                return false
-            end function)
         end function
 
+        @all("*")
+        function AddAccessControlHeaders(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            response.headers["Access-Control-Allow-Origin"] = m.origin
+            response.headers["Access-Control-Allow-Headers"] = m.headers
+            response.headers["Access-Control-Allow-Methods"] = m.methods
+
+            if request.method = "OPTIONS"
+                response.header_only = true
+                response.http_code = 200
+                return true
+            end if
+            return false
+        end function
     end class
 
 end namespace

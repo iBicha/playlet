@@ -8,42 +8,43 @@ namespace Http
 
         function new()
             super()
+        end function
 
-            m.Get("*", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                connection = context.connection
+        @get("*")
+        function HandleWebSocketHeaders(context as object) as boolean
+            request = context.request
+            response = context.response
+            connection = context.connection
 
-                if LCase(ValidString(request.headers["Connection"])) <> "upgrade"
-                    return false
-                end if
+            if LCase(ValidString(request.headers["Connection"])) <> "upgrade"
+                return false
+            end if
 
-                if LCase(ValidString(request.headers["Upgrade"])) <> "websocket"
-                    return false
-                end if
+            if LCase(ValidString(request.headers["Upgrade"])) <> "websocket"
+                return false
+            end if
 
-                webSocketKey = request.headers["Sec-WebSocket-Key"]
-                if webSocketKey = invalid
-                    return false
-                end if
+            webSocketKey = request.headers["Sec-WebSocket-Key"]
+            if webSocketKey = invalid
+                return false
+            end if
 
-                sha1Hash = CryptoUtils.GetSha1(webSocketKey + Http.WEB_SOCKET_MAGIC_STRING)
-                buffer = CreateObject("roByteArray")
-                buffer.FromHexString(sha1Hash)
-                webSocketAccept = StringUtils.ToBase64(buffer.ToAsciiString())
+            sha1Hash = CryptoUtils.GetSha1(webSocketKey + Http.WEB_SOCKET_MAGIC_STRING)
+            buffer = CreateObject("roByteArray")
+            buffer.FromHexString(sha1Hash)
+            webSocketAccept = StringUtils.ToBase64(buffer.ToAsciiString())
 
-                response.http_code = 101
-                response.headers["Connection"] = "Upgrade"
-                response.headers["Upgrade"] = "websocket"
-                response.headers["Sec-WebSocket-Accept"] = webSocketAccept
-                response.header_only = true
+            response.http_code = 101
+            response.headers["Connection"] = "Upgrade"
+            response.headers["Upgrade"] = "websocket"
+            response.headers["Sec-WebSocket-Accept"] = webSocketAccept
+            response.header_only = true
 
-                ' We want this connection to be upgraded to a WebSocket connection
-                ' The connection will stop being handled by the HTTP server and will be handled by the WebSocket server
-                connection.ws_upgrade = true
+            ' We want this connection to be upgraded to a WebSocket connection
+            ' The connection will stop being handled by the HTTP server and will be handled by the WebSocket server
+            connection.ws_upgrade = true
 
-                return true
-            end function)
+            return true
         end function
 
     end class

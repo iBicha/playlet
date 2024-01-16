@@ -4,49 +4,50 @@ namespace Http
 
     class SearchHistoryRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/search-history", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
+            m.preferencesNode = server.task.preferences
+        end function
 
-                response.Json(SearchHistoryUtils.GetAllSaved(preferences))
+        @get("/api/search-history")
+        function GetSearchHistory(context as object) as boolean
+            response = context.response
+
+            response.Json(SearchHistoryUtils.GetAllSaved(m.preferencesNode))
+            return true
+        end function
+
+        ' TODO:P1 should be POST
+        @put("/api/search-history")
+        function AddSearchHistory(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.Json()
+            if payload = invalid
+                response.Default(400, `Invalid JSON payload`)
                 return true
-            end function)
+            end if
 
-            m.Put("/api/search-history", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
-
-                payload = request.Json()
-                if payload = invalid
-                    response.Default(400, `Invalid JSON payload`)
-                    return true
-                end if
-
-                query = payload.query
-                if query = invalid
-                    response.Default(400, `missing "query" property in JSON payload`)
-                    return true
-                end if
-
-                SearchHistoryUtils.Save(preferences, query)
-                response.Json(SearchHistoryUtils.GetAllSaved(preferences))
+            query = payload.query
+            if query = invalid
+                response.Default(400, `missing "query" property in JSON payload`)
                 return true
-            end function)
+            end if
 
-            m.Delete("/api/search-history", function(context as object) as boolean
-                response = context.response
+            SearchHistoryUtils.Save(m.preferencesNode, query)
+            response.Json(SearchHistoryUtils.GetAllSaved(m.preferencesNode))
+            return true
+        end function
 
-                SearchHistoryUtils.Clear()
-                response.Default(204, "OK")
-                return true
-            end function)
+        @delete("/api/search-history")
+        function ClearSearchHistory(context as object) as boolean
+            response = context.response
 
+            SearchHistoryUtils.Clear()
+            response.Default(204, "OK")
+            return true
         end function
 
     end class

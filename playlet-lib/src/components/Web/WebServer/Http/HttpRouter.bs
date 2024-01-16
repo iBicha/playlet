@@ -2,48 +2,36 @@ namespace Http
 
     class HttpRouter
 
+        ' [{
+        '     method: "GET"
+        '     path: "/example"
+        '     router: router as HttpRouter
+        '     func: func as string
+        ' }]
         private routes
 
         function new()
             m.routes = []
         end function
 
-        function Get(path as string, handler as function)
-            m.routes.push({ method: "GET", path: path, handler: handler })
-        end function
-
-        function Head(path as string, handler as function)
-            m.routes.push({ method: "HEAD", path: path, handler: handler })
-        end function
-
-        function Post(path as string, handler as function)
-            m.routes.push({ method: "POST", path: path, handler: handler })
-        end function
-
-        function Put(path as string, handler as function)
-            m.routes.push({ method: "PUT", path: path, handler: handler })
-        end function
-
-        function Delete(path as string, handler as function)
-            m.routes.push({ method: "DELETE", path: path, handler: handler })
-        end function
-
-        function All(path as string, handler as function)
-            m.routes.push({ method: "*", path: path, handler: handler })
-        end function
-
         private function OnRequest(request as object, response as HttpResponse, connection as HttpConnection) as boolean
             for each route in m.routes
                 if m.RouteMatchesRequest(route, request)
-                    if route.handler({
-                            router: m
-                            request: request
-                            response: response
-                            connection: connection
-                            server: response.server
-                        }) = true
+                    try
+                        if route.router[route.func]({
+                                request: request
+                                response: response
+                                connection: connection
+                                server: response.server
+                            }) = true
+                            return true
+                        end if
+                    catch error
+                        formattedError = ErrorUtils.Format(error)
+                        LogError(formattedError)
+                        response.Default(500, formattedError)
                         return true
-                    end if
+                    end try
                 end if
             end for
             return false
