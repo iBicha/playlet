@@ -11,6 +11,7 @@
 - [Tracking transpilied files](#tracking-transpilied-files)
 - [Logger](#logger)
 - [Type Gen](#type-gen)
+- [Web Server](#web-server)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
 
@@ -571,3 +572,33 @@ function ValidBool(obj as dynamic) as boolean
     end if
 end function
 ```
+
+## Web Server
+
+**[Source](/tools/bs-plugins/web-server-plugin.ts)**
+
+### Why
+
+Handles routing annotations (e.g. `@get("/api/something")) so that they are handled by the routers/middlewares. It's nicer than having to register things by hand.
+
+### How
+
+Routers need to inherit from `Http.HttpRouter`. Then, once a request handled is annotated, e.g.
+
+```bs
+@get("/")
+function GoHome(context as object) as boolean
+    response = context.response
+    response.Redirect("/index.html")
+    return true
+end function
+```
+
+The route and the handler are added to the router. In this example, the `/` route redirects to `index/html`.
+
+There one special annotation, and one special route:
+
+- `@all` matches all methods
+- `*` matches all paths
+
+So `@all(*)` would be a middleware that will be matched with any request.

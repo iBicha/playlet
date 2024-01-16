@@ -1,5 +1,6 @@
-// TODO:P0 add description
-// TODO:P0 add plugin docs
+// This plugin handles router annotations (@get, @post, etc) and register
+// associated functions with the router.
+
 import {
     BeforeFileTranspileEvent,
     BscFile,
