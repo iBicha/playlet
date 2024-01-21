@@ -2,64 +2,44 @@ namespace Http
 
     class PreferencesRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            ' Get preferences
-            m.Get("/api/preferences", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
+            m.preferencesNode = server.task.preferences
+        end function
 
-                if preferences = invalid
-                    response.Default(500, `Reference to "preferences" object was invalid`)
-                    return true
-                end if
+        @get("/api/preferences")
+        function GetPreferences(context as object) as boolean
+            response = context.response
 
-                userPrefs = preferences@.GetUserPreferences()
-                response.Json(userPrefs)
+            userPrefs = m.preferencesNode@.GetUserPreferences()
+            response.Json(userPrefs)
+            return true
+        end function
+
+        @put("/api/preferences")
+        function UpdatePreferences(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.Json()
+            if payload = invalid
+                response.Default(400, `Invalid JSON payload`)
                 return true
-            end function)
+            end if
 
-            ' Update preferences
-            m.Put("/api/preferences", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
+            m.preferencesNode@.ApplyUserPreferences(payload)
+            response.Default(204, "OK")
+            return true
+        end function
 
-                payload = request.Json()
-                if payload = invalid
-                    response.Default(400, `Invalid JSON payload`)
-                    return true
-                end if
+        @delete("/api/preferences")
+        function ResetPreferences(context as object) as boolean
+            response = context.response
 
-                if preferences = invalid
-                    response.Default(500, `Reference to "preferences" object was invalid`)
-                    return true
-                end if
-
-                preferences@.ApplyUserPreferences(payload)
-                response.Default(204, "OK")
-                return true
-            end function)
-
-            ' Reset default preferences
-            m.Delete("/api/preferences", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
-
-                if preferences = invalid
-                    response.Default(500, `Reference to "preferences" object was invalid`)
-                    return true
-                end if
-
-                preferences@.ClearUserPreferences()
-                response.Default(204, "OK")
-                return true
-            end function)
-
+            m.preferencesNode@.ClearUserPreferences()
+            response.Default(204, "OK")
+            return true
         end function
 
     end class

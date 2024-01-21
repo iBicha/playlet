@@ -177,13 +177,20 @@ function Close(_unused as dynamic)
         m.sponsorBlockTask = invalid
     end if
 
-    m.top.control = "stop"
-    m.top.content = invalid
     parent = m.top.getParent()
     if parent <> invalid
         parent.RemoveChild(m.top)
     end if
     SponsorBlock.RemoveNotifcation(m.notifications)
+
+    ' Stopping a video is slow and synchronous, and can lead to execution timeout crashes.
+    try
+        m.top.control = "stop"
+    catch error
+        DialogUtils.ShowDialog(ErrorUtils.Format(error), "Error closing video", true)
+    end try
+
+    m.top.content = invalid
 end function
 
 function HandleProgressBeforeClose() as void

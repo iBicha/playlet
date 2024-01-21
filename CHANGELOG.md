@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing worth mentioning yet.
+### Fixed
+
+- [Attempt #2] to fix a crash caused by execution timeout when stopping a video takes too long
 
 ## [0.19.1] - 2024-01-13
 

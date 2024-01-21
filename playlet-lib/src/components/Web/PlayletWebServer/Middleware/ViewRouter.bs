@@ -6,39 +6,41 @@ namespace Http
 
     class ViewRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/view/open", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                task = context.server.task
-                appController = task.appController
-                continueWatchingContent = task.continueWatching.content
+            task = server.task
+            m.appController = task.appController
+            m.continueWatchingContent = task.continueWatching.content
+        end function
 
-                playlistId = request.query.playlistId
-                authorId = request.query.authorId
+        @get("/api/view/open")
+        function OpenView(context as object) as boolean
+            request = context.request
+            response = context.response
 
-                if not StringUtils.IsNullOrEmpty(playlistId)
-                    contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid, continueWatchingContent)
-                    PlaylistUtils.Open(contentNode, appController)
-                    if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
-                        VideoUtils.ToggleVideoPictureInPicture()
-                    end if
-                    response.Default(204, "OK")
-                else if not StringUtils.IsNullOrEmpty(authorId)
-                    contentNode = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
-                    ChannelUtils.Open(contentNode, appController)
-                    if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
-                        VideoUtils.ToggleVideoPictureInPicture()
-                    end if
-                    response.Default(204, "OK")
-                else
-                    response.Default(400, "Invalid request")
+            playlistId = request.query.playlistId
+            authorId = request.query.authorId
+
+            if not StringUtils.IsNullOrEmpty(playlistId)
+                contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid, m.continueWatchingContent)
+                PlaylistUtils.Open(contentNode, m.appController)
+                if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
+                    VideoUtils.ToggleVideoPictureInPicture()
                 end if
+                response.Default(204, "OK")
+            else if not StringUtils.IsNullOrEmpty(authorId)
+                contentNode = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+                ChannelUtils.Open(contentNode, m.appController)
+                if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
+                    VideoUtils.ToggleVideoPictureInPicture()
+                end if
+                response.Default(204, "OK")
+            else
+                response.Default(400, "Invalid request")
+            end if
 
-                return true
-            end function)
+            return true
         end function
 
     end class

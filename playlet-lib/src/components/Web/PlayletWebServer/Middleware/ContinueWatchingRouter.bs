@@ -8,86 +8,86 @@ namespace Http
 
     class ContinueWatchingRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/continue-watching", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                router = context.router
-                task = context.server.task
-                invidiousNode = task.invidious
-                preferencesNode = task.preferences
-                continueWatchingNode = task.continueWatching
+            task = server.task
+            m.preferencesNode = task.preferences
+            m.continueWatchingNode = task.continueWatching
+            m.invidiousNode = task.invidious
+            m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
+        end function
 
-                isEnabled = preferencesNode["continue_watching.enabled"] = true
-                if not isEnabled
-                    response.Default(403, "Continue watching is disabled from the settings.")
-                    return true
-                end if
+        @get("/api/continue-watching")
+        function GetContinueWatching(context as object) as boolean
+            request = context.request
+            response = context.response
 
-                page = 1
-                if not StringUtils.IsNullOrEmpty(request.query.page)
-                    page = request.query.page.ToInt()
-                    page = MathUtils.Max(page, 1)
-                end if
-
-                totalCount = continueWatchingNode.content.getChildCount()
-                startIndex = (page - 1) * CONTINUE_WATCHING_PAGE_SIZE
-                if startIndex >= totalCount
-                    response.Json([])
-                    return true
-                end if
-
-                videoCount = MathUtils.Min(CONTINUE_WATCHING_PAGE_SIZE, totalCount - startIndex)
-                nodes = continueWatchingNode.content.getChildren(videoCount, startIndex)
-
-                videoIds = []
-                for each node in nodes
-                    videoIds.push(node.videoId)
-                end for
-
-                service = new Invidious.InvidiousService(invidiousNode)
-                instance = service.GetInstance()
-
-                videoRequests = []
-                for each videoId in videoIds
-                    videoRequests.push(router.GetVideoMetadata(instance, videoId))
-                end for
-
-                videoResponses = []
-                for each videoRequest in videoRequests
-                    videoResponses.push(videoRequest.Await())
-                end for
-
-                videos = []
-                for each videoResponse in videoResponses
-                    if videoResponse.StatusCode() = 200
-                        videoInfo = videoResponse.Json()
-                        videoInfo.type = "video"
-                        ' Remove unnecessary fields, keep payload small
-                        videoInfo.Delete("adaptiveFormats")
-                        videoInfo.Delete("formatStreams")
-                        videoInfo.Delete("storyboards")
-                        videoInfo.Delete("recommendedVideos")
-                        videos.push(videoInfo)
-                    end if
-                end for
-
-                response.Json(videos)
+            isEnabled = m.preferencesNode["continue_watching.enabled"] = true
+            if not isEnabled
+                response.Default(403, "Continue watching is disabled from the settings.")
                 return true
-            end function)
+            end if
 
-            m.Delete("/api/continue-watching", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                continueWatchingNode = task.continueWatching
+            page = 1
+            if not StringUtils.IsNullOrEmpty(request.query.page)
+                page = request.query.page.ToInt()
+                page = MathUtils.Max(page, 1)
+            end if
 
-                ContinueWatchingUtils.Clear(continueWatchingNode)
-
-                response.Default(204, "OK")
+            totalCount = m.continueWatchingNode.content.getChildCount()
+            startIndex = (page - 1) * CONTINUE_WATCHING_PAGE_SIZE
+            if startIndex >= totalCount
+                response.Json([])
                 return true
-            end function)
+            end if
+
+            videoCount = MathUtils.Min(CONTINUE_WATCHING_PAGE_SIZE, totalCount - startIndex)
+            nodes = m.continueWatchingNode.content.getChildren(videoCount, startIndex)
+
+            videoIds = []
+            for each node in nodes
+                videoIds.push(node.videoId)
+            end for
+
+            instance = m.invidiousService.GetInstance()
+
+            videoRequests = []
+            for each videoId in videoIds
+                videoRequests.push(m.GetVideoMetadata(instance, videoId))
+            end for
+
+            videoResponses = []
+            for each videoRequest in videoRequests
+                videoResponses.push(videoRequest.Await())
+            end for
+
+            videos = []
+            for each videoResponse in videoResponses
+                if videoResponse.StatusCode() = 200
+                    videoInfo = videoResponse.Json()
+                    videoInfo.type = "video"
+                    ' Remove unnecessary fields, keep payload small
+                    videoInfo.Delete("adaptiveFormats")
+                    videoInfo.Delete("formatStreams")
+                    videoInfo.Delete("storyboards")
+                    videoInfo.Delete("recommendedVideos")
+                    videos.push(videoInfo)
+                end if
+            end for
+
+            response.Json(videos)
+            return true
+        end function
+
+        @delete("/api/continue-watching")
+        function ClearContinueWatching(context as object) as boolean
+            response = context.response
+
+            ContinueWatchingUtils.Clear(m.continueWatchingNode)
+
+            response.Default(204, "OK")
+            return true
         end function
 
         function GetVideoMetadata(instance as string, videoId as string, cancellation = invalid as object) as object

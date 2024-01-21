@@ -7,74 +7,74 @@ namespace Http
 
     class WatchHistoryRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/watch-history", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                router = context.router
-                task = context.server.task
-                invidiousNode = task.invidious
+            task = server.task
+            m.invidiousNode = task.invidious
+            m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
+        end function
 
-                page = 1
-                if not StringUtils.IsNullOrEmpty(request.query.page)
-                    page = request.query.page.ToInt()
-                    page = MathUtils.Max(page, 1)
-                end if
+        @get("/api/watch-history")
+        function GetWatchHistory(context as object) as boolean
+            request = context.request
+            response = context.response
 
-                service = new Invidious.InvidiousService(invidiousNode)
+            page = 1
+            if not StringUtils.IsNullOrEmpty(request.query.page)
+                page = request.query.page.ToInt()
+                page = MathUtils.Max(page, 1)
+            end if
 
-                historyResponse = service.GetWatchHistory(page, WATCH_HISTORY_PAGE_SIZE)
-                if not historyResponse.IsSuccess()
-                    response.http_code = historyResponse.StatusCode()
-                    response.SetBodyDataString(response.ErrorMessage())
-                    response.ContentType("text/plain")
-                    return true
-                end if
-
-                videoIds = historyResponse.Json()
-                if not IsArray(videoIds)
-                    response.http_code = 500
-                    response.SetBodyDataString("Invalid response from Invidious")
-                    response.ContentType("text/plain")
-                    return true
-                end if
-
-                if videoIds.Count() = 0
-                    response.Json([])
-                    return true
-                end if
-
-                instance = service.GetInstance()
-
-                videoRequests = []
-                for each videoId in videoIds
-                    videoRequests.push(router.GetVideoMetadata(instance, videoId))
-                end for
-
-                videoResponses = []
-                for each videoRequest in videoRequests
-                    videoResponses.push(videoRequest.Await())
-                end for
-
-                videos = []
-                for each videoResponse in videoResponses
-                    if videoResponse.StatusCode() = 200
-                        videoInfo = videoResponse.Json()
-                        videoInfo.type = "video"
-                        ' Remove unnecessary fields, keep payload small
-                        videoInfo.Delete("adaptiveFormats")
-                        videoInfo.Delete("formatStreams")
-                        videoInfo.Delete("storyboards")
-                        videoInfo.Delete("recommendedVideos")
-                        videos.push(videoInfo)
-                    end if
-                end for
-
-                response.Json(videos)
+            historyResponse = m.invidiousService.GetWatchHistory(page, WATCH_HISTORY_PAGE_SIZE)
+            if not historyResponse.IsSuccess()
+                response.http_code = historyResponse.StatusCode()
+                response.SetBodyDataString(response.ErrorMessage())
+                response.ContentType("text/plain")
                 return true
-            end function)
+            end if
+
+            videoIds = historyResponse.Json()
+            if not IsArray(videoIds)
+                response.http_code = 500
+                response.SetBodyDataString("Invalid response from Invidious")
+                response.ContentType("text/plain")
+                return true
+            end if
+
+            if videoIds.Count() = 0
+                response.Json([])
+                return true
+            end if
+
+            instance = m.invidiousService.GetInstance()
+
+            videoRequests = []
+            for each videoId in videoIds
+                videoRequests.push(m.GetVideoMetadata(instance, videoId))
+            end for
+
+            videoResponses = []
+            for each videoRequest in videoRequests
+                videoResponses.push(videoRequest.Await())
+            end for
+
+            videos = []
+            for each videoResponse in videoResponses
+                if videoResponse.StatusCode() = 200
+                    videoInfo = videoResponse.Json()
+                    videoInfo.type = "video"
+                    ' Remove unnecessary fields, keep payload small
+                    videoInfo.Delete("adaptiveFormats")
+                    videoInfo.Delete("formatStreams")
+                    videoInfo.Delete("storyboards")
+                    videoInfo.Delete("recommendedVideos")
+                    videos.push(videoInfo)
+                end if
+            end for
+
+            response.Json(videos)
+            return true
         end function
 
         ' TODO:P2 refactor this, since it's similar to continue watching router

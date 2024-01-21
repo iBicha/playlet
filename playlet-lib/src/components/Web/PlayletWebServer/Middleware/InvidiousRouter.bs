@@ -5,89 +5,88 @@ namespace Http
 
     class InvidiousRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/invidious/login", function(context as object) as boolean
-                response = context.response
-                invidiousNode = context.server.task.invidious
+            m.invidiousNode = server.task.invidious
+            m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
+        end function
 
-                authLink = invidiousNode@.GetAuthorizeTokenLink()
-                response.Redirect(authLink)
+        @get("/invidious/login")
+        function Login(context as object) as boolean
+            response = context.response
+
+            authLink = m.invidiousNode@.GetAuthorizeTokenLink()
+            response.Redirect(authLink)
+            return true
+        end function
+
+        @get("/invidious/logout")
+        function Logout(context as object) as boolean
+            response = context.response
+
+            m.invidiousService.Logout()
+
+            response.Default(204, "OK")
+            return true
+        end function
+
+        @get("/invidious/token_callback")
+        function OnTokenReceived(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            if request.query["token"] <> invalid and request.query["ref"] <> invalid
+                ' Invidious encodes token and username twice
+                token = request.query["token"].DecodeUriComponent().DecodeUriComponent()
+                username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
+                referer = request.query["ref"].DecodeUriComponent()
+
+                m.invidiousNode@.SetAuthToken(token, referer, username)
+            end if
+            response.Redirect("/")
+            return true
+        end function
+
+        ' This is an endpoint allowing the web app to make an authenticated request
+        ' without needing the Invidious token
+        ' This is a GET not a POST for better caching
+        @get("/invidious/authenticated-request")
+        function AuthRequestProxy(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            token = m.invidiousNode.authToken
+            if token = invalid
+                response.Default(403, "No token, not logged in")
                 return true
-            end function)
+            end if
 
-            m.Get("/invidious/logout", function(context as object) as boolean
-                response = context.response
-                invidiousNode = context.server.task.invidious
-
-                service = new Invidious.InvidiousService(invidiousNode)
-                service.Logout()
-
-                response.Default(204, "OK")
+            feedSource = request.query["feed-source"]
+            if feedSource = invalid
+                response.Default(400, "Expected feed-source")
                 return true
-            end function)
+            end if
 
-            m.Get(Invidious.TOKEN_CALLBACK, function(context as object) as boolean
-                request = context.request
-                response = context.response
-                invidiousNode = context.server.task.invidious
-
-                if request.query["token"] <> invalid and request.query["ref"] <> invalid
-                    ' Invidious encodes token and username twice
-                    token = request.query["token"].DecodeUriComponent().DecodeUriComponent()
-                    username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
-                    referer = request.query["ref"].DecodeUriComponent()
-
-                    invidiousNode@.SetAuthToken(token, referer, username)
-                end if
-                response.Redirect("/")
+            feedSource = ParseJson(feedSource)
+            if feedSource = invalid
+                response.Default(400, "Expected valid JSON for feed-source")
                 return true
-            end function)
+            end if
 
-            ' This is an endpoint allowing the web app to make an authenticated request
-            ' without needing the Invidious token
-            ' This is a GET not a POST for better caching
-            m.Get("/invidious/authenticated-request", function(context as object) as boolean
-                request = context.request
-                response = context.response
-                invidiousNode = context.server.task.invidious
+            additionalQueryParams = invalid
+            if feedSource.state <> invalid and feedSource.state.queryParams <> invalid
+                additionalQueryParams = feedSource.state.queryParams
+            end if
 
-                token = invidiousNode.authToken
-                if token = invalid
-                    response.Default(403, "No token, not logged in")
-                    return true
-                end if
-
-                feedSource = request.query["feed-source"]
-                if feedSource = invalid
-                    response.Default(400, "Expected feed-source")
-                    return true
-                end if
-
-                feedSource = ParseJson(feedSource)
-                if feedSource = invalid
-                    response.Default(400, "Expected valid JSON for feed-source")
-                    return true
-                end if
-
-                invService = new Invidious.InvidiousService(invidiousNode)
-
-                additionalQueryParams = invalid
-                if feedSource.state <> invalid and feedSource.state.queryParams <> invalid
-                    additionalQueryParams = feedSource.state.queryParams
-                end if
-
-                invResponse = invService.MakeRequest(feedSource, additionalQueryParams)
-                if not invResponse.success
-                    response.Default(500, `Failed to make request: ${invResponse.error}`)
-                    return true
-                end if
-
-                response.Json(invResponse.result)
+            invResponse = m.invidiousService.MakeRequest(feedSource, additionalQueryParams)
+            if not invResponse.success
+                response.Default(500, `Failed to make request: ${invResponse.error}`)
                 return true
-            end function)
+            end if
 
+            response.Json(invResponse.result)
+            return true
         end function
 
     end class
