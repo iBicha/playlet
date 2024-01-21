@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- [Attempt #2] to fix a crash caused by execution timeout when stopping a video takes too long
+
+## [0.19.1] - 2024-01-13
+
 ### Added
 
 - A hint on how to restore video to full screen
@@ -15,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bookmarks are now added to the top of the list
 - The search screen keyboard to make it easier to clear the search field
+
+### Fixed
+
+- A bug with request retry mechanism introduced in 0.19.0
 
 ## [0.19.0] - 2024-01-10
 

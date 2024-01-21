@@ -4,20 +4,20 @@ namespace Http
 
     class HomeLayoutRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/home-layout", function(context as object) as boolean
-                response = context.response
-                task = context.server.task
-                preferences = task.preferences
+            m.preferencesNode = server.task.preferences
+        end function
 
-                feed = HomeScreenUtils.GetFeed("libpkg:/config/default_home_layout.yaml", preferences)
-                response.Json(feed)
+        @get("/api/home-layout")
+        function GetHomeLayout(context as object) as boolean
+            response = context.response
 
-                return true
-            end function)
+            feed = HomeScreenUtils.GetFeed("libpkg:/config/default_home_layout.yaml", m.preferencesNode)
+            response.Json(feed)
 
+            return true
         end function
 
     end class

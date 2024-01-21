@@ -4,38 +4,40 @@ namespace Http
 
     class BookmarksRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
 
-            m.Get("/api/bookmarks", function(context as object) as boolean
-                response = context.response
+            m.bookmarksNode = server.task.bookmarks
+        end function
 
-                bookmarksString = RegistryUtils.Read(RegistryUtils.BOOKMARKS)
-                if bookmarksString = invalid
-                    response.Json({
-                        groups: []
-                    })
-                    return true
-                end if
+        @get("/api/bookmarks")
+        function GetBookmarks(context as object) as boolean
+            response = context.response
 
-                response.SetBodyDataString(bookmarksString)
-                response.ContentType("application/json")
-                response.http_code = 200
-
+            bookmarksString = RegistryUtils.Read(RegistryUtils.BOOKMARKS)
+            if bookmarksString = invalid
+                response.Json({
+                    groups: []
+                })
                 return true
-            end function)
+            end if
 
-            m.Get("/api/bookmarks/feeds", function(context as object) as boolean
-                response = context.response
-                router = context.router
-                bookmarks = context.server.task.bookmarks
+            response.SetBodyDataString(bookmarksString)
+            response.ContentType("application/json")
+            response.http_code = 200
 
-                feeds = router.BookmarksContentToFeeds(bookmarks.content)
+            return true
+        end function
 
-                response.Json(feeds)
+        @get("/api/bookmarks/feeds")
+        function GetBookmarksFeeds(context as object) as boolean
+            response = context.response
 
-                return true
-            end function)
+            feeds = m.BookmarksContentToFeeds(m.bookmarksNode.content)
+
+            response.Json(feeds)
+
+            return true
         end function
 
         ' TODO:P1 refactor to share code with Bookmarks screen

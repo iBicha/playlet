@@ -30,98 +30,98 @@ namespace Http
             m.fsCheck = ValidBool(options.fsCheck)
             ' staticFiles: if true, Etag tags will be cached to skip reading the file entirely.
             m.staticFiles = ValidBool(options.staticFiles)
-
-            m.Get("*", function(context as object) as boolean
-                router = context.router
-                request = context.request
-                response = context.response
-                server = context.server
-
-                if not request.route.StartsWith(router.route)
-                    return false
-                end if
-
-                path_in_route = request.route.Mid(router.route.Len())
-
-                decoded_path = path_in_route.DecodeUri()
-                full_path = StringUtils.PathJoin(router.root, decoded_path)
-
-                if router.staticFiles
-                    ' Although we have an Etag middleware, having a check here allows us to
-                    ' skip reading the file entirely if the Etag matches.
-                    if router.etags.AddFileEtagFromCache(request, response, full_path)
-                        if router.etags.ClearContentIfNoneMatch(request, response)
-                            return true
-                        end if
-                    end if
-                end if
-
-                if not router.fsCheck
-                    ' libpkg:/ does not work with roFilesystem...
-                    buffer = createObject("roByteArray")
-                    if buffer.ReadFile(full_path) and buffer.count() > 0
-                        mimetype = server.utils.MimeType(decoded_path)
-                        response.SetBodyDataBuffer(buffer)
-                        response.ContentType(mimetype)
-                        response.http_code = 200
-
-                        if router.staticFiles
-                            router.etags.AddEtagFromBody(request, response, full_path)
-                        end if
-                        return true
-                    end if
-                end if
-
-                path = CreateObject("roPath", full_path)
-                fs = CreateObject("roFilesystem")
-
-                if not path.isValid()
-                    ' Skip, let next middleware handle it
-                    return false
-                else if not fs.exists(path)
-                    ' Skip, let next middleware handle it
-                    return false
-                end if
-
-                stat = fs.stat(path)
-                if stat = invalid
-                    response.Default(500, "fstat() failed.")
-                    return true
-                end if
-
-                if stat.type = "directory"
-                    if not router.showDirectories
-                        response.Default(403, "Forbidden")
-                        return true
-                    end if
-                    response.ContentType("text/html")
-                    router.GenerateDirectoryListing(path, router, request, response)
-                    if router.staticFiles
-                        router.etags.AddEtagFromBody(request, response, full_path)
-                    end if
-                    return true
-                else if stat.type = "file"
-                    mimetype = server.utils.MimeType(decoded_path)
-                    response.ContentType(mimetype)
-                    response.SetBodyDataFile(path)
-                    response.http_code = 200
-                    LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", stat.size)
-                    if router.staticFiles
-                        router.etags.AddEtagFromBody(request, response, full_path)
-                    end if
-                    return true
-                else
-                    response.Default(403, "Not a regular file.")
-                    return true
-                end if
-            end function)
         end function
 
-        function GenerateDirectoryListing(path as object, router as object, request as HttpRequest, response as HttpResponse) as boolean
+        @get("*")
+        function GetFileOrFolder(context as object) as boolean
+            request = context.request
+            response = context.response
+            server = context.server
+
+            if not request.route.StartsWith(m.route)
+                return false
+            end if
+
+            path_in_route = request.route.Mid(m.route.Len())
+
+            decoded_path = path_in_route.DecodeUri()
+            full_path = StringUtils.PathJoin(m.root, decoded_path)
+
+            if m.staticFiles
+                ' Although we have an Etag middleware, having a check here allows us to
+                ' skip reading the file entirely if the Etag matches.
+                if m.etags.AddFileEtagFromCache(request, response, full_path)
+                    if m.etags.ClearContentIfNoneMatch(request, response)
+                        return true
+                    end if
+                end if
+            end if
+
+            if not m.fsCheck
+                ' libpkg:/ does not work with roFilesystem...
+                buffer = createObject("roByteArray")
+                if buffer.ReadFile(full_path) and buffer.count() > 0
+                    mimetype = server.utils.MimeType(decoded_path)
+                    response.SetBodyDataBuffer(buffer)
+                    response.ContentType(mimetype)
+                    response.http_code = 200
+
+                    if m.staticFiles
+                        m.etags.AddEtagFromBody(request, response, full_path)
+                    end if
+                    return true
+                end if
+            end if
+
+            path = CreateObject("roPath", full_path)
+            fs = CreateObject("roFilesystem")
+
+            if not path.isValid()
+                ' Skip, let next middleware handle it
+                return false
+            else if not fs.exists(path)
+                ' Skip, let next middleware handle it
+                return false
+            end if
+
+            stat = fs.stat(path)
+            if stat = invalid
+                response.Default(500, "fstat() failed.")
+                return true
+            end if
+
+            if stat.type = "directory"
+                if not m.showDirectories
+                    response.Default(403, "Forbidden")
+                    return true
+                end if
+                response.ContentType("text/html")
+                m.GenerateDirectoryListing(path, request, response)
+                if m.staticFiles
+                    m.etags.AddEtagFromBody(request, response, full_path)
+                end if
+                return true
+            else if stat.type = "file"
+                mimetype = server.utils.MimeType(decoded_path)
+                response.ContentType(mimetype)
+                response.SetBodyDataFile(path)
+                response.http_code = 200
+                LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", stat.size)
+                if m.staticFiles
+                    m.etags.AddEtagFromBody(request, response, full_path)
+                end if
+                return true
+            else
+                response.Default(403, "Not a regular file.")
+                return true
+            end if
+        end function
+
+        function GenerateDirectoryListing(path as object, request as HttpRequest, response as HttpResponse) as boolean
             fs = CreateObject("roFilesystem")
             dirList = fs.GetDirectoryListing(path)
             if dirList = invalid
-                response.default(500, "Couldn't list directory")
+                response.Default(500, "Couldn't list directory")
                 return false
             end if
 
@@ -151,7 +151,7 @@ namespace Http
                 uriDir = uriDir + "/"
             end if
 
-            routeDir = router.route
+            routeDir = m.route
             if routeDir.len() > 0 and routeDir.right(1) <> "/"
                 routeDir = routeDir + "/"
             end if
@@ -162,7 +162,7 @@ namespace Http
             end if
 
             for each item in dirList
-                if router.showHidden or item.left(1) <> "."
+                if m.showHidden or item.left(1) <> "."
                     indicator = invalid
                     stat = fs.stat(dir + item)
                     if stat <> invalid
