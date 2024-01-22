@@ -1,5 +1,6 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -69,9 +70,14 @@ function OnValueChange()
     nodes = []
     checkedState = []
     for each item in value
+        feed = m.homeLayout[item.id]
+        if feed = invalid
+            LogWarn("unknown feed id:", item.id)
+            continue for
+        end if
         node = CreateObject("roSGNode", "ContentNode")
-        node.id = item.id
-        node.title = m.homeLayout[item.id].title
+        node.id = feed.id
+        node.title = feed.title
         nodes.push(node)
         checkedState.push(item.enabled)
     end for
