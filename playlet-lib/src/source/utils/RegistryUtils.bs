@@ -13,24 +13,24 @@ namespace RegistryUtils
     ' "invidious_instances" is deprecated, but we keep for migration purposes
     const INVIDIOUS_INSTANCES = "invidious_instances"
 
-    function Read(key as string, section = DEFAULT_SECTION as string) as dynamic
-        sec = CreateObject("roRegistrySection", section)
-        if sec.Exists(key)
-            return sec.Read(key)
+    function Read(key as string, sectionName = DEFAULT_SECTION as string) as dynamic
+        section = CreateObject("roRegistrySection", sectionName)
+        if section.Exists(key)
+            return section.Read(key)
         end if
         return invalid
     end function
 
-    function Write(key as string, value as string, section = DEFAULT_SECTION as string)
-        sec = CreateObject("roRegistrySection", section)
-        sec.Write(key, value)
-        sec.Flush()
+    function Write(key as string, value as string, sectionName = DEFAULT_SECTION as string)
+        section = CreateObject("roRegistrySection", sectionName)
+        section.Write(key, value)
+        section.Flush()
     end function
 
-    function Delete(key as string, section = DEFAULT_SECTION as string)
-        sec = CreateObject("roRegistrySection", section)
-        sec.Delete(key)
-        sec.Flush()
+    function Delete(key as string, sectionName = DEFAULT_SECTION as string)
+        section = CreateObject("roRegistrySection", sectionName)
+        section.Delete(key)
+        section.Flush()
     end function
 
     function ReadAll() as object
@@ -44,6 +44,24 @@ namespace RegistryUtils
             result[sectionName] = values
         end for
         return result
+    end function
+
+    function WriteAll(values as object) as void
+        DeleteAll()
+        for each sectionName in values
+            section = CreateObject("roRegistrySection", sectionName)
+            section.WriteMulti(values[sectionName])
+            section.Flush()
+        end for
+    end function
+
+    function DeleteAll() as void
+        registry = CreateObject("roRegistry")
+        sectionNames = registry.GetSectionList()
+        for each sectionName in sectionNames
+            registry.Delete(sectionName)
+        end for
+        registry.Flush()
     end function
 
 end namespace

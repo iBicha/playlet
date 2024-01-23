@@ -14,6 +14,7 @@ import "pkg:/components/Web/WebServer/Middleware/CorsMiddleware.bs"
 import "pkg:/components/Web/WebServer/Middleware/EtagMiddleware.bs"
 import "pkg:/components/Web/WebServer/Middleware/HttpStaticFilesRouter.bs"
 import "pkg:/components/Web/WebServer/WebSockets/WebSocketMiddleware.bs"
+import "pkg:/components/Web/PlayletWebServer/Middleware/RegistryRouter.bs"
 
 function Init()
     m.top.packageName = "Playlet"
@@ -51,6 +52,8 @@ function SetupRoutes(server as object)
     server.UseRouter(new Http.HttpStaticFilesRouter("/config", "libpkg:/config", etags, { staticFiles: true }))
     server.UseRouter(new Http.HttpStaticFilesRouter("/logs", "cachefs:/logs", etags, { fsCheck: true }))
     #if DEBUG
+        server.UseRouter(new Http.RegistryRouter())
+
         options = { showDirectories: true, showHidden: true, staticFiles: true }
         server.UseRouter(new Http.HttpStaticFilesRouter("/debug/libpkg", "libpkg:/", etags, options))
         options = { showDirectories: true, showHidden: true, fsCheck: true, staticFiles: true }
