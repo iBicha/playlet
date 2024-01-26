@@ -104,7 +104,7 @@
     }
 
     if (page === 1) {
-      const newSearchHistory = await PlayletApi.putSearchHistory(searchBoxText);
+      const newSearchHistory = await PlayletApi.addSearchHistory(searchBoxText);
       searchHistoryStore.set(newSearchHistory);
     }
   }
