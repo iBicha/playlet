@@ -32,7 +32,11 @@ function InitializeBindings()
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 
                 "playQueue": "../PlayQueue", 
-                "bookmarks": "../Bookmarks"
+                "bookmarks": "../Bookmarks", 
+                "loungeService": "../LoungeService"
+            }, 
+            "DialServer": {
+                "webServer": "../WebServer"
             }
         }
     }

@@ -1,0 +1,159 @@
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/services/ApplicationInfo.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+' TODO:P0
+' - Rate limit responses (a lot of spam)
+
+function Init()
+    m.top.functionName = "DialServerLoop"
+end function
+
+function StartServer(_unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopServer(_unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
+end function
+
+function DialServerLoop() as void
+    webServer = m.top.webServer
+
+    msgPort = createobject("roMessagePort")
+    udp = createobject("roDatagramSocket")
+    udp.setMessagePort(msgPort)
+    addr = createobject("roSocketAddress")
+    addr.setPort(1900)
+    udp.setAddress(addr)
+    addr.SetHostName("239.255.255.250")
+    udp.setSendToAddress(addr)
+    udp.notifyReadable(true)
+
+    ssdpResponse = invalid
+
+    while udp.eOK()
+        if m.top.shouldQuit = true
+            exit while
+        end if
+
+        event = wait(10000, msgPort)
+
+        if type(event) <> "roSocketEvent"
+            continue while
+        end if
+        if event.getSocketID() <> udp.getID()
+            continue while
+        end if
+        if not udp.isReadable()
+            continue while
+        end if
+
+        messageStr = udp.receiveStr(512)
+        ssdpMessage = ParseSsdpMessage(messageStr)
+
+        if not ShouldRespondToMessage(ssdpMessage)
+            continue while
+        end if
+
+        peerAddress = udp.GetReceivedFromAddress()
+        LogInfo(`Received message from ${peerAddress.GetAddress()}:`, ssdpMessage)
+
+        if ssdpResponse = invalid
+            ssdpResponse = CreateSsdpResponse(webServer)
+        end if
+
+        udp.setSendToAddress(peerAddress)
+        udp.sendStr(ssdpResponse)
+    end while
+
+    udp.close()
+    m.top.isRunning = false
+    LogInfo("Server stopped")
+end function
+
+function ParseSsdpMessage(message as string) as object
+    if not IsString(message) or not message.StartsWith("M-SEARCH")
+        return invalid
+    end if
+
+    ssdp = {
+        headers: {}
+    }
+
+    lines = message.split(`\r\n`)
+    operation = lines[0]
+    parts = operation.split(" ")
+    if parts.Count() <> 3
+        return invalid
+    end if
+
+    ssdp["method"] = parts[0]
+    ssdp["uri"] = parts[1]
+    ssdp["protocol"] = parts[2]
+
+    for i = 1 to lines.Count() - 1
+        line = lines[i]
+        if line = ""
+            continue for
+        end if
+
+        if line.InStr(":") = -1
+            continue for
+        end if
+
+        key = line.Left(line.InStr(":")).trim()
+        value = line.Mid(line.InStr(":") + 1).trim()
+        ssdp["headers"][key] = value
+    end for
+
+    return ssdp
+end function
+
+function ShouldRespondToMessage(ssdp as object) as boolean
+    if ssdp = invalid
+        return false
+    end if
+
+    if ssdp["method"] <> "M-SEARCH" or ssdp["uri"] <> "*" or ssdp["protocol"] <> "HTTP/1.1"
+        return false
+    end if
+
+    headers = ssdp["headers"]
+    if headers["MAN"] <> `"ssdp:discover"`
+        return false
+    end if
+
+    if headers["ST"] <> "urn:dial-multiscreen-org:service:dial:1" and headers["ST"] <> "ssdp:all"
+        return false
+    end if
+
+    return true
+end function
+
+function CreateSsdpResponse(webServer as object) as string
+    ' We're supposed to pass the ApplicationInfo node, but since we're not going to use it, we can pass invalid
+    appInfo = new ApplicationInfo(invalid)
+    udn = appInfo.roDeviceInfo.GetChannelClientId()
+    libVersion = appInfo.GetLibVersion()
+    webServerAddress = webServer@.GetServerAddress()
+
+    msg = `HTTP/1.1 200 OK\r\n`
+    msg += `Cache-Control: max-age=3600\r\n`
+    msg += `ST: urn:dial-multiscreen-org:service:dial:1\r\n`
+    msg += `USN: uuid:${udn}::urn:dial-multiscreen-org:service:dial:1\r\n`
+    msg += `Ext:\r\n`
+    msg += `Server: Playlet Lib Dial Server ${libVersion} \r\n`
+    msg += `LOCATION: ${webServerAddress}/dial/dd.xml\r\n`
+    return msg
+end function

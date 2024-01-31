@@ -22,6 +22,10 @@ function MainSceneContainerChanged()
 end function
 
 function StartWebServer()
+    m.loungeService = m.top.findNode("LoungeService")
+    m.loungeService.callfunc("StartService", invalid)
     m.webServer = m.top.findNode("WebServer")
     m.webServer.callfunc("StartServer", invalid)
+    m.dialServer = m.top.findNode("DialServer")
+    m.dialServer.callfunc("StartServer", invalid)
 end function'//# sourceMappingURL=./MainScene.bs.map

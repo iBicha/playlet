@@ -1,0 +1,368 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+
+const COMMAND_TYPE_SET_PLAYLIST = "setPlaylist"
+const COMMAND_TYPE_LOUNGE_STATUS = "loungeStatus"
+const COMMAND_TYPE_REMOTE_CONNECTED = "remoteConnected"
+const COMMAND_TYPE_REMOTE_DISCONNECTED = "remoteDisconnected"
+const COMMAND_TYPE_GET_NOW_PLAYING = "getNowPlaying"
+const COMMAND_TYPE_UPDATE_PLAYLIST = "updatePlaylist"
+const COMMAND_TYPE_NOOP = "noop"
+const COMMAND_TYPE_PLAY = "play"
+const COMMAND_TYPE_PAUSE = "pause"
+const COMMAND_TYPE_NEXT = "next"
+const COMMAND_TYPE_PREVIOUS = "previous"
+const COMMAND_TYPE_SEEK_TO = "seekTo"
+const COMMAND_TYPE_SET_VOLUME = "setVolume"
+const COMMAND_TYPE_STOP_VIDEO = "stopVideo"
+const COMMAND_TYPE_DPAD = "dpadCommand"
+const COMMAND_TYPE_VOICE = "voiceCommand"
+const COMMAND_TYPE_SUBTITLES = "setSubtitlesTrack"
+' Special commands
+const COMMAND_TYPE_SESSION_ID = "c"
+const COMMAND_TYPE_G_SESSION_ID = "S"
+const COMMAND_KEY_UP = "UP"
+const COMMAND_KEY_DOWN = "DOWN"
+const COMMAND_KEY_LEFT = "LEFT"
+const COMMAND_KEY_RIGHT = "RIGHT"
+const COMMAND_KEY_ENTER = "ENTER"
+const COMMAND_KEY_BACK = "BACK"
+
+const POLL_BUFSIZE = 65536
+
+enum HttpResponseState
+    INIT = 0
+    READING_STATUS = 1
+    READING_HEADERS = 2
+    READING_BODY_CHUNK_SIZE = 3
+    READING_BODY_CHUNK = 4
+end enum
+
+class LoungeApi
+
+    public loungeServiceNode
+    public playQueueNode
+    public screenName = "Roku"
+    public deviceId
+    public screenId
+    public loungeToken
+    public sessionId
+    public gSessionId
+
+    private lastCommandIndex = -1
+
+    ' Socket stuff for long polling
+    private socket
+    private socket_buffer
+    private socket_state = HttpResponseState.INIT
+    private socket_chunk_size = 0
+
+    function new(loungeServiceNode as object, playQueueNode as object, deviceId as string)
+        m.loungeServiceNode = loungeServiceNode
+        m.playQueueNode = playQueueNode
+        m.deviceId = deviceId
+    end function
+
+    function GetScreenId() as dynamic
+        if not StringUtils.IsNullOrEmpty(m.screenId)
+            return m.screenId
+        end if
+
+        request = HttpClient.Get("https://www.youtube.com/api/lounge/pairing/generate_screen_id")
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+            return invalid
+        end if
+        id = response.Text()
+        if not IsString(id)
+            return invalid
+        end if
+        m.screenId = id
+        return id
+    end function
+
+    function GetToken() as dynamic
+        if not StringUtils.IsNullOrEmpty(m.loungeToken)
+            return m.loungeToken
+        end if
+
+        form = `screen_ids=${m.screenId}`.EncodeUri()
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", form)
+        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+            return invalid
+        end if
+
+        json = response.Json()
+        screens = json.screens
+        if not IsArray(screens) or screens.Count() <> 1
+            LogError("Unexpected response from get_lounge_token_batch")
+            return invalid
+        end if
+
+        m.loungeToken = screens[0].loungeToken
+        return m.loungeToken
+    end function
+
+    function GetSessionData() as void
+        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
+        queryParams = {
+            "device": "LOUNGE_SCREEN"
+            "theme": "cl"
+            "capabilities": "dsp%2Cmic%2Cdpa"
+            "mdxVersion": "2"
+            "VER": "8"
+            "v": "2"
+            "t": "1"
+            "app": "lb-v4"
+            "AID": "42"
+            "zx": "xxxxxxxxxxxx"
+            "RID": "1337"
+        }
+
+        queryParams["name"] = m.screenName
+        queryParams["id"] = m.deviceId
+        queryParams["loungeIdToken"] = m.loungeToken
+
+        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
+
+        request = HttpClient.Post(url, "count=0")
+        request.Header("Content-Type", "application/x-www-form-urlencoded")
+
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+            return
+        end if
+
+        text = response.Text()
+        ' First line should be a number, which is the length of the JSON payload
+        text = text.Mid(text.instr(`\n`) + 1)
+
+        commands = ParseJson(text)
+        m.ProcessCommands(commands)
+    end function
+
+    function FetchCommandsRpc() as void
+        baseUrl = "/api/lounge/bc/bind"
+        queryParams = {
+            "device": "LOUNGE_SCREEN"
+            "theme": "cl"
+            "capabilities": "dsp%2Cmic%2Cdpa"
+            "mdxVersion": "2"
+            "VER": "8"
+            "v": "2"
+            "t": "1"
+            "app": "lb-v4"
+            "AID": "42"
+            "zx": "xxxxxxxxxxxx"
+            "RID": "rpc"
+            "CI": "0"
+        }
+
+        queryParams["name"] = m.screenName
+        queryParams["id"] = m.deviceId
+        queryParams["loungeIdToken"] = m.loungeToken
+        queryParams["SID"] = m.sessionId
+        queryParams["gsessionid"] = m.gSessionId
+
+        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
+
+        m.StartLongPolling(url)
+    end function
+
+    function StartLongPolling(url as string)
+        ' since roUrlTransfer can't do long polling, we're doing raw socket
+        sendAddress = CreateObject("roSocketAddress")
+        sendAddress.SetAddress("www.youtube.com:80")
+
+        socket = CreateObject("roStreamSocket")
+        socket.setSendToAddress(sendAddress)
+        if socket.Connect()
+            LogInfo("Connected to www.youtube.com")
+        end if
+
+        message = `GET ${url} HTTP/1.1\r\n`
+        message += `Host: www.youtube.com\r\n`
+        message += `\r\n`
+
+        socket.SendStr(message)
+        m.socket = socket
+    end function
+
+    function Poll() as dynamic
+        if m.socket = invalid
+            return invalid
+        end if
+
+        socket = m.socket
+        if not socket.IsConnected()
+            LogError("Socket is not connected")
+            m.socket = invalid
+            m.socket_buffer = invalid
+            m.socket_state = HttpResponseState.INIT
+            return invalid
+        end if
+
+        data = socket.ReceiveStr(POLL_BUFSIZE)
+        if not socket.eSuccess()
+            LogError("Error receiving data:")
+            socket.close()
+            m.socket = invalid
+            m.socket_buffer = invalid
+            m.socket_state = HttpResponseState.INIT
+            return invalid
+        end if
+
+        if m.socket_buffer = invalid
+            m.socket_buffer = ""
+        end if
+
+        m.socket_buffer += data
+
+        if m.socket_state = HttpResponseState.INIT
+            m.socket_state = HttpResponseState.READING_STATUS
+        end if
+
+        if m.socket_state = HttpResponseState.READING_STATUS
+            newLineIndex = m.socket_buffer.InStr(`\r\n`)
+            if newLineIndex > 0
+                operationLine = m.socket_buffer.Left(newLineIndex)
+                LogInfo(operationLine)
+                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
+                m.socket_state = HttpResponseState.READING_HEADERS
+            end if
+        end if
+
+        if m.socket_state = HttpResponseState.READING_HEADERS
+            newLineIndex = m.socket_buffer.InStr(`\r\n\r\n`)
+            if newLineIndex > 0
+                headers = m.socket_buffer.Left(newLineIndex)
+                LogInfo(headers)
+                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 4)
+                m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+            end if
+        end if
+
+        READING_BODY_CHUNK_SIZE:
+        ' Transfer-Encoding: chunked - long polling
+        if m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+            m.ReadNewLines()
+            newLineIndex = m.socket_buffer.InStr(`\r\n`)
+            if newLineIndex > 0
+                chunkSize = m.socket_buffer.Left(newLineIndex)
+                chunkSize = chunkSize.Trim()
+                chunkSize = Val(chunkSize, 16)
+                LogInfo("Chunk size:", chunkSize)
+                m.socket_chunk_size = chunkSize
+                if chunkSize = 0
+                    LogInfo("End of chunked data")
+                    m.socket_state = HttpResponseState.INIT
+                    m.socket_buffer = invalid
+                    return invalid
+                end if
+                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
+                m.socket_state = HttpResponseState.READING_BODY_CHUNK
+            end if
+        end if
+
+        if m.socket_state = HttpResponseState.READING_BODY_CHUNK
+            if m.socket_chunk_size > 0
+                if m.socket_buffer.Len() >= m.socket_chunk_size
+                    chunk = m.socket_buffer.Left(m.socket_chunk_size)
+                    m.socket_buffer = m.socket_buffer.Mid(m.socket_chunk_size)
+                    m.socket_chunk_size = 0
+                    m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+                    m.ProcessChunk(chunk)
+                    goto READING_BODY_CHUNK_SIZE
+                end if
+            end if
+        end if
+
+        return true
+    end function
+
+    function ReadNewLines()
+        CR = `\r`
+        LF = `\n`
+        startIndex = 0
+        while true
+            char = m.socket_buffer.Mid(startIndex, 1)
+            if char = CR or char = LF
+                startIndex += 1
+            else
+                exit while
+            end if
+        end while
+
+        if startIndex > 0
+            m.socket_buffer = m.socket_buffer.Mid(startIndex)
+        end if
+    end function
+
+    function ProcessChunk(chunk as string) as void
+        m.ReadNewLines()
+        newLineIndex = chunk.InStr(`\n`)
+        while newLineIndex > 0
+            payloadSize = chunk.Left(newLineIndex).trim()
+            payloadSize = payloadSize.ToInt()
+            payload = chunk.Mid(newLineIndex + 1, payloadSize)
+            commands = ParseJson(payload)
+            m.ProcessCommands(commands)
+            chunk = chunk.Mid(newLineIndex + payloadSize + 1)
+            newLineIndex = chunk.InStr(`\n`)
+        end while
+    end function
+
+    function ProcessCommands(commands as object) as void
+        if not IsArray(commands)
+            return
+        end if
+
+        for each command in commands
+            if not IsArray(command) or command.Count() <> 2
+                continue for
+            end if
+
+            commandIndex = command[0]
+            if commandIndex <= m.lastCommandIndex
+                LogInfo("Skipping command already processed:", command)
+                continue for
+            end if
+            m.lastCommandIndex = commandIndex
+
+            commandData = command[1]
+            commandType = commandData[0]
+
+            if commandType = COMMAND_TYPE_GET_NOW_PLAYING
+                LogInfo("getPlayingNow; We need to send current status.")
+            else if commandType = COMMAND_TYPE_SESSION_ID
+                m.sessionId = commandData[1]
+                LogInfo("sessionId:", m.sessionId)
+            else if commandType = COMMAND_TYPE_G_SESSION_ID
+                m.gSessionId = commandData[1]
+                LogInfo("gSessionId:", m.gSessionId)
+            else if commandType = COMMAND_TYPE_SET_PLAYLIST
+                commandArgs = commandData[1]
+                videoId = commandArgs["videoId"]
+                payload = {
+                    "videoId": videoId
+                }
+                contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
+                m.playQueueNode@.Play(contentNode, -1)
+                LogInfo("setPlaylist:", videoId)
+            else if commandType = COMMAND_TYPE_NOOP
+                LogInfo("noop")
+            else
+                LogInfo("Unknown command:", commandType)
+            end if
+
+        end for
+
+    end function
+
+end class

@@ -1,0 +1,193 @@
+import "pkg:/source/services/XmlObject.bs"
+
+namespace Http
+
+    class DialRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            task = server.task
+            m.serverAddress = task@.GetServerAddress()
+            m.scene = task.getScene()
+            m.deviceInfo = CreateObject("roDeviceInfo")
+            m.loungeService = task.loungeService
+            m.deviceId = m.loungeService.deviceId
+        end function
+
+        @get("/dial/dd.xml")
+        function GetDialManifest(context as object) as boolean
+            response = context.response
+
+            xmlContent = m.GenerateDialManifest()
+            response.http_code = 200
+            response.SetBodyDataString(xmlContent)
+            response.headers["Cache-Control"] = "no-cache"
+            response.ContentType(`text/xml; charset="utf-8"`)
+            response.headers["Application-URL"] = `${m.serverAddress}/dial`
+
+            return true
+        end function
+
+        @get("/image/device-image.png")
+        function GetDeviceImage(context as object) as boolean
+            response = context.response
+
+            response.http_code = 200
+            response.SetBodyDataFile("libpkg:/images/device-image.png")
+            response.ContentType(`image/png`)
+
+            return true
+        end function
+
+        @get("/dial/YouTube")
+        function GetDialYouTube(context as object) as boolean
+            response = context.response
+
+            xmlContent = m.GenerateDialYouTube()
+            response.http_code = 200
+            response.SetBodyDataString(xmlContent)
+            response.headers["Cache-Control"] = "no-cache"
+            response.ContentType(`text/xml; charset="utf-8"`)
+
+            return true
+        end function
+
+        ' TODO:P0 is this a thing?
+        @post("/dial/YouTube")
+        function PostDialYouTube(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            ' Body looks like this:
+            ' pairingCode=4c8c4a33-69d4-45e9-a04a-d7683a105387&theme=cl&dialLaunch=browse
+            ' Content-Type: text/plain; charset="utf-8"
+            LogInfo(request.body)
+            LogInfo(request.headers)
+
+            m.loungeApi.GetSessionData()
+
+            response.Default(204, "No Content")
+            return true
+        end function
+
+        @delete("/dial/YouTube/run")
+        function CloseChannel(context as object) as boolean
+            response = context.response
+
+            response.Default(200, "Shutting down app...")
+            m.scene.exitChannel = true
+
+            return true
+        end function
+
+        function GenerateDialManifest() as string
+            if m._dialXml <> invalid
+                return m._dialXml
+            end if
+
+            xml = new XmlObject()
+            if xml.Node("root", { "xmlns": "urn:schemas-upnp-org:device-1-0" })
+                if xml.Node("specVersion")
+                    xml.TextNode("major", "1")
+                    xml.TextNode("minor", "0")
+
+                    xml.End()
+                end if
+
+                if xml.Node("device")
+                    xml.TextNode("deviceType", "urn:dial-multiscreen-org:device:dial:1")
+                    xml.TextNode("friendlyName", "Playlet on " + m.deviceInfo.GetFriendlyName())
+                    modelDetails = m.deviceInfo.GetModelDetails()
+                    if IsString(modelDetails.VendorName)
+                        xml.TextNode("manufacturer", modelDetails.VendorName)
+                    end if
+                    if IsString(modelDetails.ModelNumber)
+                        xml.TextNode("modelName", modelDetails.ModelNumber)
+                        xml.TextNode("modelNumber", modelDetails.ModelNumber)
+                    end if
+                    xml.TextNode("modelURL", "http://www.roku.com")
+
+                    xml.TextNode("UDN", "uuid:" + m.deviceId)
+
+                    if xml.Node("iconList")
+                        if xml.Node("icon")
+                            xml.TextNode("mimetype", "image/png")
+                            xml.TextNode("width", "360")
+                            xml.TextNode("height", "219")
+                            xml.TextNode("depth", "32")
+                            xml.TextNode("url", "/image/device-image.png")
+
+                            xml.End()
+                        end if
+
+                        xml.End()
+                    end if
+
+                    if xml.Node("serviceList")
+                        if xml.Node("service")
+                            xml.TextNode("serviceType", "urn:dial-multiscreen-org:service:dial:1")
+                            xml.TextNode("serviceId", "urn:dial-multiscreen-org:serviceId:dial")
+                            xml.TextNode("controlURL", "/dial/notfound")
+                            xml.TextNode("eventSubURL", "/dial/notfound")
+                            xml.TextNode("SCPDURL", "/dial/notfound")
+
+                            xml.End()
+                        end if
+
+                        xml.End()
+                    end if
+
+                    xml.End()
+                end if
+
+                xml.End()
+            end if
+            m._dialXml = xml.ToXmlString()
+            return m._dialXml
+        end function
+
+        function GenerateDialYouTube() as string
+            if m._youtubeDialXml <> invalid
+                return m._youtubeDialXml
+            end if
+
+            hasLoungeToken = false
+            xml = new XmlObject()
+            if xml.Node("service", { "dialVer": "1.7", "xmlns": "urn:dial-multiscreen-org:schemas:dial" })
+                xml.TextNode("name", "YouTube")
+                xml.EmptyNode("options", { "allowStop": "true" })
+                xml.TextNode("state", "running")
+                xml.EmptyNode("link", { "rel": "run", "href": "run" })
+
+                if xml.Node("additionalData")
+                    xml.TextNode("theme", "cl")
+                    xml.TextNode("deviceId", m.deviceId)
+
+                    screenId = m.loungeService.screenId
+                    loungeToken = m.loungeService.loungeToken
+
+                    if not StringUtils.IsNullOrEmpty(screenId)
+                        xml.TextNode("screenId", screenId)
+                    end if
+
+                    if not StringUtils.IsNullOrEmpty(loungeToken)
+                        xml.TextNode("loungeToken", loungeToken)
+                        hasLoungeToken = true
+                    end if
+
+                    xml.End()
+                end if
+
+                xml.End()
+            end if
+            result = xml.ToXmlString()
+            if hasLoungeToken
+                m._youtubeDialXml = result
+            end if
+            return result
+        end function
+
+    end class
+
+end namespace

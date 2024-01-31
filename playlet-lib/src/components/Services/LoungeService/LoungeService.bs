@@ -1,0 +1,48 @@
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/components/Services/LoungeService/LoungeApi.bs"
+
+function Init()
+    m.top.functionName = "LoungeServiceLoop"
+
+    deviceInfo = CreateObject("roDeviceInfo")
+    m.top.deviceId = deviceInfo.GetChannelClientId()
+end function
+
+function StartService(_unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopService(_unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
+end function
+
+function LoungeServiceLoop()
+    api = new LoungeApi(m.top, m.top.playQueue, m.top.deviceId)
+
+    m.top.screenId = api.GetScreenId()
+    m.top.loungeToken = api.GetToken()
+    api.GetSessionData()
+
+    api.FetchCommandsRpc()
+    while true
+        if m.top.shouldQuit = true
+            exit while
+        end if
+
+        response = api.Poll()
+        if response = invalid
+            sleep(3000)
+            api.FetchCommandsRpc()
+        end if
+        sleep(3000)
+    end while
+end function
