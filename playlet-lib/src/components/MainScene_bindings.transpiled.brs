@@ -37,6 +37,9 @@ function InitializeBindings()
             }, 
             "DialServer": {
                 "webServer": "../WebServer"
+            }, 
+            "LoungeService": {
+                "playQueue": "../PlayQueue"
             }
         }
     }
