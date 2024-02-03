@@ -505,14 +505,22 @@ We apologize for the inconvenience.`
         function VerifyTokenScope(token as string) as boolean
             tokenObject = ParseJson(token)
             if tokenObject = invalid
+                LogWarn("Failed to json parse token:", token)
                 return false
             end if
             if not IsArray(tokenObject.scopes)
+                LogWarn("Token scopes are not an array:", tokenObject.scopes)
                 return false
             end if
 
             scopes = tokenObject.scopes.join(",")
-            return scopes = Invidious.AUTH_SCOPES
+            expectedScopes = Invidious.AUTH_SCOPES
+            validScopes = expectedScopes = scopes
+
+            if not validScopes
+                LogWarn(`Token scopes do not match expected scopes. Expected: "${expectedScopes}", got: "${scopes}"`)
+            end if
+            return validScopes
         end function
 
         function DeleteAuthToken()
