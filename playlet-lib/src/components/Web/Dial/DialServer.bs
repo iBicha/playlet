@@ -69,9 +69,7 @@ function DialServerLoop() as void
         peerAddress = udp.GetReceivedFromAddress()
         LogInfo(`Received message from ${peerAddress.GetAddress()}:`, ssdpMessage)
 
-        if ssdpResponse = invalid
-            ssdpResponse = CreateSsdpResponse(webServer)
-        end if
+        ssdpResponse = CreateSsdpResponse(ssdpMessage, webServer)
 
         udp.setSendToAddress(peerAddress)
         udp.sendStr(ssdpResponse)
@@ -141,19 +139,35 @@ function ShouldRespondToMessage(ssdp as object) as boolean
     return true
 end function
 
-function CreateSsdpResponse(webServer as object) as string
+function CreateSsdpResponse(ssdp as object, webServer as object) as string
     ' We're supposed to pass the ApplicationInfo node, but since we're not going to use it, we can pass invalid
     appInfo = new ApplicationInfo(invalid)
-    udn = appInfo.roDeviceInfo.GetChannelClientId()
-    libVersion = appInfo.GetLibVersion()
-    webServerAddress = webServer@.GetServerAddress()
+
+    udn = m._udn
+    if udn = invalid
+        udn = appInfo.roDeviceInfo.GetChannelClientId()
+        m._udn = udn
+    end if
+
+    libVersion = m._libVersion
+    if libVersion = invalid
+        libVersion = appInfo.GetLibVersion()
+        m._libVersion = libVersion
+    end if
+
+    webServerAddress = m._webServerAddress
+    if webServerAddress = invalid
+        webServerAddress = webServer@.GetServerAddress()
+        m._webServerAddress = webServerAddress
+    end if
 
     msg = `HTTP/1.1 200 OK\r\n`
-    msg += `Cache-Control: max-age=3600\r\n`
-    msg += `ST: urn:dial-multiscreen-org:service:dial:1\r\n`
-    msg += `USN: uuid:${udn}::urn:dial-multiscreen-org:service:dial:1\r\n`
-    msg += `Ext:\r\n`
-    msg += `Server: Playlet Lib Dial Server ${libVersion} \r\n`
     msg += `LOCATION: ${webServerAddress}/dial/dd.xml\r\n`
+    msg += `ST: ${ssdp.headers.ST}\r\n`
+    msg += `SERVER: Playlet Lib Dial Server ${libVersion} \r\n`
+    msg += `USN: uuid:${udn}::${ssdp.headers.ST}\r\n`
+    msg += `CACHE-CONTROL: max-age=1800\r\n`
+    msg += `EXT: \r\n`
+    msg += `\r\n`
     return msg
 end function
