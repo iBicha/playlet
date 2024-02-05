@@ -1,3 +1,5 @@
+import "pkg:/source/utils/NodePathUtils.bs"
+
 ' Bind all nodes that registered for auto-binding
 ' Should be called once from a root node
 ' Can be called later to rebind nodes that were added after the first call
@@ -35,7 +37,7 @@ function BindNodeFieldsAndProps(_unused as dynamic) as void
             if node.getField(fieldId) <> invalid
                 continue for
             end if
-            reference = FindNodeFromPath(node, bindings.fields[fieldId])
+            reference = NodePathUtils.FindNodeFromPath(node, bindings.fields[fieldId])
             if reference <> invalid
                 node[fieldId] = reference
             end if
@@ -54,45 +56,13 @@ function BindNodeFieldsAndProps(_unused as dynamic) as void
                 if child.getField(childPropId) <> invalid
                     continue for
                 end if
-                reference = FindNodeFromPath(child, childProps[childPropId])
+                reference = NodePathUtils.FindNodeFromPath(child, childProps[childPropId])
                 if reference <> invalid
                     child[childPropId] = reference
                 end if
             end for
         end for
     end if
-end function
-
-function FindNodeFromPath(root as object, path as string) as object
-    node = root
-
-    if path.StartsWith("/")
-        node = node.getScene()
-        path = path.Mid(1)
-    end if
-
-    pathParts = path.Tokenize("/")
-
-    for i = 0 to pathParts.Count() - 1
-        if node = invalid
-            return invalid
-        end if
-        if pathParts[i] = "."
-            continue for
-        end if
-        if pathParts[i] = ".."
-            node = node.getParent()
-            continue for
-        end if
-        node = node.findNode(pathParts[i])
-    end for
-
-    if root.isSameNode(node)
-        ' if a node is referencing itself, it's probably a mistake
-        return invalid
-    end if
-
-    return node
 end function
 
 ' Create scoped fields (m.fieldName) for all fields in this node
