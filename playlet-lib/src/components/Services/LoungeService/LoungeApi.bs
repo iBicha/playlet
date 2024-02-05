@@ -183,7 +183,7 @@ class LoungeApi
         socket = CreateObject("roStreamSocket")
         socket.setSendToAddress(sendAddress)
         if socket.Connect()
-            LogInfo("Connected to www.youtube.com")
+            LogDebug("Connected")
         end if
 
         message = `GET ${url} HTTP/1.1\r\n`
@@ -242,7 +242,7 @@ class LoungeApi
             newLineIndex = m.socket_buffer.InStr(`\r\n\r\n`)
             if newLineIndex > 0
                 headers = m.socket_buffer.Left(newLineIndex)
-                LogInfo(headers)
+                LogDebug(headers)
                 m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 4)
                 m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
             end if
@@ -257,10 +257,10 @@ class LoungeApi
                 chunkSize = m.socket_buffer.Left(newLineIndex)
                 chunkSize = chunkSize.Trim()
                 chunkSize = Val(chunkSize, 16)
-                LogInfo("Chunk size:", chunkSize)
+                LogDebug("Chunk size:", chunkSize)
                 m.socket_chunk_size = chunkSize
                 if chunkSize = 0
-                    LogInfo("End of chunked data")
+                    LogDebug("End of chunked data")
                     m.socket_state = HttpResponseState.INIT
                     m.socket_buffer = invalid
                     return invalid
@@ -330,7 +330,7 @@ class LoungeApi
 
             commandIndex = command[0]
             if commandIndex <= m.lastCommandIndex
-                LogInfo("Skipping command already processed:", command)
+                LogDebug("Skipping command already processed:", command)
                 continue for
             end if
             m.lastCommandIndex = commandIndex
@@ -356,7 +356,7 @@ class LoungeApi
                 m.playQueueNode@.Play(contentNode, -1)
                 LogInfo("setPlaylist:", videoId)
             else if commandType = COMMAND_TYPE_NOOP
-                LogInfo("noop")
+                LogDebug("noop")
             else
                 LogInfo("Unknown command:", commandType)
             end if

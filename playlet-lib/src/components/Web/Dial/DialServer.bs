@@ -3,9 +3,6 @@ import "pkg:/source/services/ApplicationInfo.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
-' TODO:P0
-' - Rate limit responses (a lot of spam)
-
 function Init()
     m.top.functionName = "DialServerLoop"
 end function
@@ -42,6 +39,13 @@ function DialServerLoop() as void
 
     ssdpResponse = invalid
 
+    ' For each address, we will keep track of the last X times we sent a response.
+    ' If we responded to a message from an address more than X times in the last Y seconds, we will not respond again.
+    timeThreshold = 5000
+    countThreshold = 3
+    timers = {}
+    timer = createobject("roTimespan")
+
     while udp.eOK()
         if m.top.shouldQuit = true
             exit while
@@ -67,7 +71,27 @@ function DialServerLoop() as void
         end if
 
         peerAddress = udp.GetReceivedFromAddress()
-        LogInfo(`Received message from ${peerAddress.GetAddress()}:`, ssdpMessage)
+        address = peerAddress.GetAddress()
+        LogInfo(`Received message from ${address}:`, ssdpMessage)
+
+        if timers[address] = invalid
+            timers[address] = []
+        end if
+        timerForAddress = timers[address]
+
+        now = timer.TotalMilliseconds()
+
+        ' Remove any timers that are older than timeThreshold
+        while timerForAddress.Count() > 0 and now - timerForAddress[0] > timeThreshold
+            timerForAddress.Shift()
+        end while
+
+        if timerForAddress.Count() >= countThreshold
+            LogDebug(`Ignoring message from ${address} - too spammy`)
+            continue while
+        end if
+
+        timerForAddress.Push(now)
 
         ssdpResponse = CreateSsdpResponse(ssdpMessage, webServer)
 
