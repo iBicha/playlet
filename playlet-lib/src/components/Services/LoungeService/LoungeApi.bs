@@ -1,6 +1,12 @@
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/components/VideoPlayer/VideoUtils.bs"
+
+const COMMAND_NOW_PLAYING = "nowPlaying"
+const COMMAND_ON_STATE_CHANGE = "onStateChange"
+const COMMAND_ON_VOLUME_CHANGED = "onVolumeChanged"
+const COMMAND_ON_PREVIOUS_NEXT_CHANGE = "onHasPreviousNextChanged"
 
 const COMMAND_TYPE_SET_PLAYLIST = "setPlaylist"
 const COMMAND_TYPE_LOUNGE_STATUS = "loungeStatus"
@@ -29,7 +35,17 @@ const COMMAND_KEY_RIGHT = "RIGHT"
 const COMMAND_KEY_ENTER = "ENTER"
 const COMMAND_KEY_BACK = "BACK"
 
+enum PlayerStatus
+    IDLE = -1
+    PLAYING = 1
+    PAUSED = 2
+    LOADING = 3
+    STOPPED = 4
+end enum
+
 const POLL_BUFSIZE = 65536
+
+const COMMAND_HANDLER_PREFIX = "_Handle_"
 
 enum HttpResponseState
     INIT = 0
@@ -50,6 +66,7 @@ class LoungeApi
     public sessionId
     public gSessionId
 
+    private ofs
     private lastCommandIndex = -1
 
     ' Socket stuff for long polling
@@ -62,6 +79,20 @@ class LoungeApi
         m.loungeServiceNode = loungeServiceNode
         m.playQueueNode = playQueueNode
         m.deviceId = deviceId
+        m.ofs = 0
+
+        commandHandlers = {}
+        commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
+        commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
+        commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
+        commandHandlers[COMMAND_TYPE_NOOP] = m.HandleNoop
+        commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
+        commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
+        commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
+
+        for each key in commandHandlers
+            m[COMMAND_HANDLER_PREFIX + key] = commandHandlers[key]
+        end for
     end function
 
     function GetScreenId() as dynamic
@@ -143,8 +174,10 @@ class LoungeApi
         ' First line should be a number, which is the length of the JSON payload
         text = text.Mid(text.instr(`\n`) + 1)
 
+        messagesToSend = []
         commands = ParseJson(text)
-        m.ProcessCommands(commands)
+        m.ProcessCommands(commands, messagesToSend)
+        m.SendMessage(messagesToSend)
     end function
 
     function FetchCommandsRpc() as void
@@ -232,6 +265,7 @@ class LoungeApi
             newLineIndex = m.socket_buffer.InStr(`\r\n`)
             if newLineIndex > 0
                 operationLine = m.socket_buffer.Left(newLineIndex)
+                ' TODO:P0 - Parse status line, check for 200
                 LogInfo(operationLine)
                 m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
                 m.socket_state = HttpResponseState.READING_HEADERS
@@ -247,6 +281,8 @@ class LoungeApi
                 m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
             end if
         end if
+
+        messagesToSend = []
 
         READING_BODY_CHUNK_SIZE:
         ' Transfer-Encoding: chunked - long polling
@@ -277,12 +313,13 @@ class LoungeApi
                     m.socket_buffer = m.socket_buffer.Mid(m.socket_chunk_size)
                     m.socket_chunk_size = 0
                     m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
-                    m.ProcessChunk(chunk)
+                    m.ProcessChunk(chunk, messagesToSend)
                     goto READING_BODY_CHUNK_SIZE
                 end if
             end if
         end if
 
+        m.SendMessage(messagesToSend)
         return true
     end function
 
@@ -304,7 +341,7 @@ class LoungeApi
         end if
     end function
 
-    function ProcessChunk(chunk as string) as void
+    function ProcessChunk(chunk as string, messagesToSend as object) as void
         m.ReadNewLines()
         newLineIndex = chunk.InStr(`\n`)
         while newLineIndex > 0
@@ -312,13 +349,13 @@ class LoungeApi
             payloadSize = payloadSize.ToInt()
             payload = chunk.Mid(newLineIndex + 1, payloadSize)
             commands = ParseJson(payload)
-            m.ProcessCommands(commands)
+            m.ProcessCommands(commands, messagesToSend)
             chunk = chunk.Mid(newLineIndex + payloadSize + 1)
             newLineIndex = chunk.InStr(`\n`)
         end while
     end function
 
-    function ProcessCommands(commands as object) as void
+    function ProcessCommands(commands as object, messagesToSend as object) as void
         if not IsArray(commands)
             return
         end if
@@ -335,34 +372,173 @@ class LoungeApi
             end if
             m.lastCommandIndex = commandIndex
 
+            commandId = command[0]
             commandData = command[1]
             commandType = commandData[0]
-
-            if commandType = COMMAND_TYPE_GET_NOW_PLAYING
-                LogInfo("getPlayingNow; We need to send current status.")
-            else if commandType = COMMAND_TYPE_SESSION_ID
-                m.sessionId = commandData[1]
-                LogInfo("sessionId:", m.sessionId)
-            else if commandType = COMMAND_TYPE_G_SESSION_ID
-                m.gSessionId = commandData[1]
-                LogInfo("gSessionId:", m.gSessionId)
-            else if commandType = COMMAND_TYPE_SET_PLAYLIST
+            commandArgs = invalid
+            if commandData.Count() > 1
                 commandArgs = commandData[1]
-                videoId = commandArgs["videoId"]
-                payload = {
-                    "videoId": videoId
-                }
-                contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
-                m.playQueueNode@.Play(contentNode, -1)
-                LogInfo("setPlaylist:", videoId)
-            else if commandType = COMMAND_TYPE_NOOP
-                LogDebug("noop")
-            else
-                LogInfo("Unknown command:", commandType)
             end if
 
+            handler = COMMAND_HANDLER_PREFIX + commandType
+            if m.DoesExist(handler)
+                LogInfo(commandType)
+                m[handler](commandId, commandType, commandArgs, messagesToSend)
+            else
+                LogWarn("Unknown command:", commandType)
+                #if DEBUG
+                    LogDebug(command)
+                #end if
+            end if
         end for
-
     end function
 
+    function HandleNoop(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Noop
+    end function
+
+    function HandleSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        m.sessionId = commandArgs
+        LogInfo("sessionId:", m.sessionId)
+    end function
+
+    function HandleGSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        m.gSessionId = commandArgs
+        LogInfo("gSessionId:", m.gSessionId)
+    end function
+
+    function HandleGetPlayingNow(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        message = {
+            "commandId": commandId
+            "commandType": COMMAND_NOW_PLAYING
+            "cpn": "foo"
+        }
+        player = VideoUtils.GetVideoPlayer()
+        if player = invalid
+            messagesToSend.Push(message)
+            return
+        end if
+
+        message["loadedTime"] = "0"
+        message["currentTime"] = `${player.position}`
+        message["seekableStartTime"] = "0"
+        content = player.content
+        if content <> invalid
+            metadata = content.metadata
+            if metadata <> invalid
+                lengthSeconds = metadata.lengthSeconds
+                if IsInt(lengthSeconds)
+                    length = `${lengthSeconds}`
+                    message["duration"] = length
+                    message["seekableEndTime"] = length
+                end if
+            end if
+        end if
+        message["state"] = m.GetPlayerState(player)
+
+        messagesToSend.Push(message)
+    end function
+
+    function GetPlayerState(player as object) as PlayerStatus
+        if player = invalid
+            return PlayerStatus.IDLE
+        end if
+
+        state = player.state
+        if state = "playing"
+            return PlayerStatus.PLAYING
+        else if state = "paused"
+            return PlayerStatus.PAUSED
+        else if state = "buffering"
+            return PlayerStatus.LOADING
+        else if state = "stopped" or state = "stopping" or state = "finished"
+            return PlayerStatus.STOPPED
+        end if
+
+        return PlayerStatus.IDLE
+    end function
+
+    function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        LogInfo(commandType, commandArgs)
+        videoId = commandArgs["videoId"]
+        payload = {
+            "videoId": videoId
+        }
+        contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
+        m.playQueueNode@.Play(contentNode, -1)
+        LogInfo("setPlaylist:", videoId)
+    end function
+
+    function HandlePause(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        VideoUtils.PauseVideo()
+    end function
+
+    function HandlePlay(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        VideoUtils.ResumeVideo()
+    end function
+
+    function HandleStopVideo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        VideoUtils.CloseVideo()
+    end function
+
+    function SendMessage(messages as object) as void
+        if messages.Count() = 0
+            return
+        end if
+
+        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
+        queryParams = {
+            "device": "LOUNGE_SCREEN"
+            "theme": "cl"
+            "capabilities": "dsp%2Cmic%2Cdpa"
+            "mdxVersion": "2"
+            "VER": "8"
+            "v": "2"
+            "t": "1"
+            "app": "lb-v4"
+            "AID": "42"
+            "zx": "xxxxxxxxxxxx"
+            "RID": "1337"
+        }
+
+        queryParams["name"] = m.screenName
+        queryParams["id"] = m.deviceId
+        queryParams["loungeIdToken"] = m.loungeToken
+        queryParams["SID"] = m.sessionId
+        queryParams["gsessionid"] = m.gSessionId
+        queryParams["AID"] = messages[0].commandId
+
+        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
+
+        postData = {
+            "count": `${messages.Count()}`
+            "ofs": `${m.ofs}`
+        }
+
+        m.ofs += messages.Count()
+
+        for i = 0 to messages.Count() - 1
+            message = messages[i]
+            keyPrefix = `req${i}_`
+            postData[`${keyPrefix}_sc`] = message.commandType
+
+            commandArgs = message.commandArgs
+            if commandArgs <> invalid
+                for each key in commandArgs
+                    postData[`${keyPrefix}${key}`] = commandArgs[key]
+                end for
+            end if
+        end for
+
+        LogDebug("Sending messages:", postData)
+
+        body = UrlUtils.GetUrlEncodedForm(postData)
+        request = HttpClient.Post(url, body)
+        request.Header("Content-Type", "application/x-www-form-urlencoded")
+
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+        end if
+    end function
 end class
