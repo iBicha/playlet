@@ -116,8 +116,8 @@ export class PlayletApi {
         return await response.json();
     }
 
-    static async putSearchHistory(query: string) {
-        const response = await PlayletApi.putJson(`${PlayletApi.host()}/api/search-history`, { query });
+    static async addSearchHistory(query: string) {
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/search-history`, { query });
         return await response.json();
     }
 

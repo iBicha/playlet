@@ -1,8 +1,7 @@
 // Description: Deploys a test app to a Roku device and waits for it to finish
 // This will log the test report to the console and throw an error if the tests fail
 
-const { ArgumentParser } = require('argparse')
-const { BooleanOptionalAction } = require('argparse');
+const { ArgumentParser, BooleanOptionalAction } = require('argparse')
 const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 const path = require('path');

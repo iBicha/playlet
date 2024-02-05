@@ -53,7 +53,7 @@ export class ManifestEditPlugin implements CompilerPlugin {
     }
 
     afterPublish(builder: ProgramBuilder) {
-        this.restoreManifest(builder.program);
+        this.restoreManifest(builder.program!);
     }
 
     beforeProgramDispose(event: BeforeProgramDisposeEvent) {

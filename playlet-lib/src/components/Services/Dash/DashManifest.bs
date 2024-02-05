@@ -73,11 +73,10 @@ class DashManifest
                     end if
 
                     if xml.Node("AdaptationSet", adaptationSetAttributes)
-                        xml.Node("Role", {
+                        xml.EmptyNode("Role", {
                             "schemeIdUri": "urn:mpeg:dash:role:2011"
                             "value": audioSet.acont = "original" ? "main" : "alternate"
                         })
-                        xml.End()
 
                         for i = 0 to audioStreams.Count() - 1
                             stream = audioStreams[i]
@@ -100,31 +99,23 @@ class DashManifest
                                     "bandwidth": stream.bitrate
                                 })
 
-                                xml.Node("AudioChannelConfiguration", {
+                                xml.EmptyNode("AudioChannelConfiguration", {
                                     "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
                                     "value": `${stream.audioChannels}`
                                 })
-                                xml.End()
 
-                                if xml.Node("BaseURL")
-                                    xml.Text(stream.url)
-                                    xml.End()
-                                end if
+                                xml.TextNode("BaseURL", stream.url)
 
-                                if xml.Node("SegmentBase", {
-                                        "indexRange": stream.index
-                                    })
-                                    if xml.Node("Initialization", {
-                                            "range": stream.init
-                                        })
-                                        xml.End()
-                                    end if
+                                if xml.Node("SegmentBase", { "indexRange": stream.index })
+                                    xml.EmptyNode("Initialization", { "range": stream.init })
+
                                     xml.End()
                                 end if
 
                                 xml.End()
                             end if
                         end for
+
                         xml.End()
                     end if
 
@@ -178,14 +169,9 @@ class DashManifest
                                     xml.End()
                                 end if
 
-                                if xml.Node("SegmentBase", {
-                                        "indexRange": stream.index
-                                    })
-                                    if xml.Node("Initialization", {
-                                            "range": stream.init
-                                        })
-                                        xml.End()
-                                    end if
+                                if xml.Node("SegmentBase", { "indexRange": stream.index })
+                                    xml.EmptyNode("Initialization", { "range": stream.init })
+
                                     xml.End()
                                 end if
 
@@ -203,7 +189,7 @@ class DashManifest
                 for each storyboard in storyboards
                     interval = ValidInt(storyboard.interval)
                     if interval = 0
-                        LogWarn("Invalid storyboard interval=0")
+                        LogWarn("Invalid storyboard interval:", storyboard.interval)
                         continue for
                     end if
 
@@ -249,12 +235,11 @@ class DashManifest
                             "mimeType": "image/jpeg"
                             "contentType": "image"
                         })
-                        xml.Node("SegmentTemplate", {
+                        xml.EmptyNode("SegmentTemplate", {
                             "media": url
                             "duration": duration
                             "startNumber": 0
                         })
-                        xml.End()
 
                         if xml.Node("Representation", {
                                 "id": `thumbnails_${id}`
@@ -263,11 +248,10 @@ class DashManifest
                                 "height": storyboardHeightInPixels
                             })
 
-                            xml.Node("EssentialProperty", {
+                            xml.EmptyNode("EssentialProperty", {
                                 "schemeIdUri": "http://dashif.org/guidelines/thumbnail_tile"
                                 "value": `${storyboardWidth}x${storyboardHeight}`
                             })
-                            xml.End()
 
                             xml.End()
                         end if
@@ -399,11 +383,10 @@ class DashManifest
         if videoStream.colorInfo.primaries <> invalid
             primaries = m.colorInfo.primaries[videoStream.colorInfo.primaries]
             if primaries <> invalid
-                xml.Node("EssentialProperty", {
+                xml.EmptyNode("EssentialProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:ColourPrimaries"
                     "value": primaries
                 })
-                xml.End()
             else
                 LogWarn("Unknown colorInfo.primaries:", videoStream.colorInfo.primaries)
             end if
@@ -412,11 +395,10 @@ class DashManifest
         if videoStream.colorInfo.transferCharacteristics <> invalid
             transferCharacteristics = m.colorInfo.transferCharacteristics[videoStream.colorInfo.transferCharacteristics]
             if transferCharacteristics <> invalid
-                xml.Node("EssentialProperty", {
+                xml.EmptyNode("EssentialProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:TransferCharacteristics"
                     "value": transferCharacteristics
                 })
-                xml.End()
             else
                 LogWarn("Unknown colorInfo.transferCharacteristics:", videoStream.colorInfo.transferCharacteristics)
             end if
@@ -425,11 +407,10 @@ class DashManifest
         if videoStream.colorInfo.matrixCoefficients <> invalid
             matrixCoefficients = m.colorInfo.matrixCoefficients[videoStream.colorInfo.matrixCoefficients]
             if matrixCoefficients <> invalid
-                xml.Node("EssentialProperty", {
+                xml.EmptyNode("EssentialProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:MatrixCoefficients"
                     "value": matrixCoefficients
                 })
-                xml.End()
             else
                 LogWarn("Unknown colorInfo.matrixCoefficients:", videoStream.colorInfo.matrixCoefficients)
             end if

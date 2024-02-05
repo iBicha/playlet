@@ -1,0 +1,49 @@
+#if DEBUG
+    import "pkg:/source/utils/RegistryUtils.bs"
+
+    namespace Http
+
+        class RegistryRouter extends HttpRouter
+
+            function new()
+                super()
+            end function
+
+            @get("/debug/registry")
+            function GetRegistry(context as object) as boolean
+                response = context.response
+
+                registryValues = RegistryUtils.ReadAll()
+                response.Json(registryValues)
+                return true
+            end function
+
+            @post("/debug/registry")
+            function SetRegistry(context as object) as boolean
+                request = context.request
+                response = context.response
+
+                payload = request.Json()
+                if payload = invalid
+                    response.Default(400, "Invalid JSON")
+                    return true
+                end if
+
+                RegistryUtils.WriteAll(payload)
+                response.Default(204, "OK")
+                return true
+            end function
+
+            @delete("/debug/registry")
+            function ClearRegistry(context as object) as boolean
+                response = context.response
+
+                RegistryUtils.DeleteAll()
+                response.Default(204, "OK")
+                return true
+            end function
+
+        end class
+
+    end namespace
+#end if
