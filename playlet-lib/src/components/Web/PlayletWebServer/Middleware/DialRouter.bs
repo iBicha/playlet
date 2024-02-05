@@ -10,7 +10,10 @@ namespace Http
             task = server.task
             m.serverAddress = task@.GetServerAddress()
             m.scene = task.getScene()
-            m.deviceInfo = CreateObject("roDeviceInfo")
+            m.deviceFriendlyName = CreateObject("roDeviceInfo").GetFriendlyName()
+            if StringUtils.IsNullOrEmpty(m.deviceFriendlyName)
+                m.deviceFriendlyName = "TV"
+            end if
             m.loungeService = task.loungeService
             m.deviceId = m.loungeService.deviceId
         end function
@@ -22,7 +25,6 @@ namespace Http
             xmlContent = m.GenerateDialManifest()
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
-            response.headers["Cache-Control"] = "no-cache"
             response.ContentType(`text/xml; charset="utf-8"`)
             response.headers["Application-URL"] = `${m.serverAddress}/dial`
 
@@ -85,16 +87,9 @@ namespace Http
 
                 if xml.Node("device")
                     xml.TextNode("deviceType", "urn:dial-multiscreen-org:device:dial:1")
-                    xml.TextNode("friendlyName", "Playlet on " + m.deviceInfo.GetFriendlyName())
-                    modelDetails = m.deviceInfo.GetModelDetails()
-                    if IsString(modelDetails.VendorName)
-                        xml.TextNode("manufacturer", modelDetails.VendorName)
-                    end if
-                    if IsString(modelDetails.ModelNumber)
-                        xml.TextNode("modelName", modelDetails.ModelNumber)
-                        xml.TextNode("modelNumber", modelDetails.ModelNumber)
-                    end if
-                    xml.TextNode("modelURL", "http://www.roku.com")
+                    xml.TextNode("friendlyName", "Playlet on " + m.deviceFriendlyName)
+                    xml.TextNode("manufacturer", "Generic")
+                    xml.TextNode("modelName", "Generic")
 
                     xml.TextNode("UDN", "uuid:" + m.deviceId)
 
