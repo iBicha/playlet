@@ -6,6 +6,11 @@ function Init()
 
     deviceInfo = CreateObject("roDeviceInfo")
     m.top.deviceId = deviceInfo.GetChannelClientId()
+    deviceFriendlyName = deviceInfo.GetFriendlyName()
+    if StringUtils.IsNullOrEmpty(deviceFriendlyName)
+        deviceFriendlyName = "TV"
+    end if
+    m.top.deviceName = "Playlet on " + deviceFriendlyName
 end function
 
 function StartService(_unused as dynamic) as boolean
@@ -26,12 +31,12 @@ function StopService(_unused as dynamic) as void
 end function
 
 function LoungeServiceLoop()
-    api = new LoungeApi(m.top, m.top.playQueue, m.top.deviceId)
+    api = new LoungeApi(m.top, m.top.playQueue)
 
     m.top.screenId = api.GetScreenId()
     m.top.loungeToken = api.GetToken()
-    api.GetSessionData()
 
+    api.GetSessionData()
     api.FetchCommandsRpc()
     while true
         if m.top.shouldQuit = true

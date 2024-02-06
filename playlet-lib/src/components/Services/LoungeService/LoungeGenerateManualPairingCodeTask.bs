@@ -1,0 +1,67 @@
+import "pkg:/components/Services/LoungeService/LoungeApi.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+@asynctask
+function LoungeGenerateManualPairingCodeTask(input as object) as object
+    loungeToken = input.loungeToken
+    screenId = input.screenId
+    screenName = input.screenName
+    deviceId = input.deviceId
+
+    if StringUtils.IsNullOrEmpty(loungeToken)
+        return {
+            "success": false
+            "error": "loungeToken is empty"
+        }
+    end if
+
+    if StringUtils.IsNullOrEmpty(screenId)
+        return {
+            "success": false
+            "error": "screenId is empty"
+        }
+    end if
+
+    if StringUtils.IsNullOrEmpty(screenName)
+        return {
+            "success": false
+            "error": "screenName is empty"
+        }
+    end if
+
+    if StringUtils.IsNullOrEmpty(deviceId)
+        return {
+            "success": false
+            "error": "deviceId is empty"
+        }
+    end if
+
+    baseUrl = "https://www.youtube.com/api/lounge/pairing/get_pairing_code?ctx=pair"
+    bodyParams = {
+        "access_type": "permanent"
+        "app": "Playlet"
+        "lounge_token": loungeToken
+        "screen_id": screenId
+        "screen_name": screenName
+        "device_id": deviceId
+    }
+
+    body = UrlUtils.GetUrlEncodedForm(bodyParams)
+    request = HttpClient.Post(baseUrl, body)
+    request.Header("Content-Type", "application/x-www-form-urlencoded")
+
+    response = request.Await()
+    if not response.IsSuccess()
+        return {
+            "success": false
+            "error": response.ErrorMessage()
+        }
+    end if
+
+    code = response.Text()
+    return {
+        "success": true
+        "code": code
+    }
+end function
