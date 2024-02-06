@@ -10,11 +10,12 @@ namespace Http
             task = server.task
             m.serverAddress = task@.GetServerAddress()
             m.scene = task.getScene()
-            m.deviceFriendlyName = CreateObject("roDeviceInfo").GetFriendlyName()
-            if StringUtils.IsNullOrEmpty(m.deviceFriendlyName)
-                m.deviceFriendlyName = "TV"
-            end if
             m.loungeService = task.loungeService
+            deviceFriendlyName = CreateObject("roDeviceInfo").GetFriendlyName()
+            if StringUtils.IsNullOrEmpty(deviceFriendlyName)
+                deviceFriendlyName = "TV"
+            end if
+            m.deviceName = "Playlet on " + deviceFriendlyName
             m.deviceId = m.loungeService.deviceId
         end function
 
@@ -38,7 +39,6 @@ namespace Http
             xmlContent = m.GenerateDialYouTube()
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
-            response.headers["Cache-Control"] = "no-cache"
             response.ContentType(`text/xml; charset="utf-8"`)
 
             return true
@@ -49,15 +49,42 @@ namespace Http
             request = context.request
             response = context.response
 
-            ' Body looks like this:
-            ' pairingCode=4c8c4a33-69d4-45e9-a04a-d7683a105387&theme=cl&dialLaunch=browse
-            ' Content-Type: text/plain; charset="utf-8"
-            LogInfo(request.body)
-            LogInfo(request.headers)
+            fields = UrlUtils.GetUrlDecodedForm(request.body)
+            pairingCode = fields["pairingCode"]
+            if StringUtils.IsNullOrEmpty(pairingCode)
+                response.Default(400, "Bad Request")
+                return true
+            end if
 
-            ' TODO:P0 register pairing code using /api/lounge/pairing/register_pairing_code
+            theme = fields["theme"]
+            if not IsString(theme) or theme <> "cl"
+                response.Default(400, "Bad Request")
+                return true
+            end if
 
-            response.Default(204, "No Content")
+            ' TODO:P0 avoid joining a lounge on startup.
+            ' Once we get a pairCode, join a lounge if not already joined.
+            registerUrl = "https://www.youtube.com/api/lounge/pairing/register_pairing_code"
+            registerBody = {
+                "access_type": "permanent"
+                "app": "Playlet"
+                "pairing_code": pairingCode
+                "screen_id": m.loungeService.screenId
+                "screen_name": m.deviceName
+                "device_id": m.deviceId
+            }
+
+            body = UrlUtils.GetUrlEncodedForm(registerBody)
+            req = HttpClient.Post(registerUrl, body)
+            req.Header("Content-Type", "application/x-www-form-urlencoded")
+            res = req.Await()
+
+            if not res.IsSuccess()
+                response.Default(500, "Internal Server Error")
+                return true
+            end if
+
+            response.Default(200, "Ok")
             return true
         end function
 
@@ -87,7 +114,7 @@ namespace Http
 
                 if xml.Node("device")
                     xml.TextNode("deviceType", "urn:dial-multiscreen-org:device:dial:1")
-                    xml.TextNode("friendlyName", "Playlet on " + m.deviceFriendlyName)
+                    xml.TextNode("friendlyName", m.deviceName)
                     xml.TextNode("manufacturer", "Generic")
                     xml.TextNode("modelName", "Generic")
 
@@ -117,11 +144,6 @@ namespace Http
         end function
 
         function GenerateDialYouTube() as string
-            if m._youtubeDialXml <> invalid
-                return m._youtubeDialXml
-            end if
-
-            hasLoungeToken = false
             xml = new XmlObject()
             if xml.Node("service", { "dialVer": "1.7", "xmlns": "urn:dial-multiscreen-org:schemas:dial" })
                 xml.TextNode("name", "YouTube")
@@ -129,32 +151,23 @@ namespace Http
                 xml.TextNode("state", "running")
                 xml.EmptyNode("link", { "rel": "run", "href": "run" })
 
-                if xml.Node("additionalData")
-                    xml.TextNode("theme", "cl")
-                    xml.TextNode("deviceId", m.deviceId)
+                screenId = m.loungeService.screenId
+                loungeToken = m.loungeService.loungeToken
 
-                    screenId = m.loungeService.screenId
-                    loungeToken = m.loungeService.loungeToken
-
-                    if not StringUtils.IsNullOrEmpty(screenId)
+                if not StringUtils.IsNullOrEmpty(screenId) and not StringUtils.IsNullOrEmpty(loungeToken)
+                    if xml.Node("additionalData")
+                        xml.TextNode("theme", "cl")
+                        xml.TextNode("deviceId", m.deviceId)
                         xml.TextNode("screenId", screenId)
-                    end if
-
-                    if not StringUtils.IsNullOrEmpty(loungeToken)
                         xml.TextNode("loungeToken", loungeToken)
-                        hasLoungeToken = true
-                    end if
 
-                    xml.End()
+                        xml.End()
+                    end if
                 end if
 
                 xml.End()
             end if
-            result = xml.ToXmlString()
-            if hasLoungeToken
-                m._youtubeDialXml = result
-            end if
-            return result
+            return xml.ToXmlString()
         end function
 
     end class
