@@ -164,19 +164,20 @@ function ShouldRespondToMessage(ssdp as object) as boolean
 end function
 
 function CreateSsdpResponse(ssdp as object, webServer as object) as string
-    ' We're supposed to pass the ApplicationInfo node, but since we're not going to use it, we can pass invalid
-    appInfo = new ApplicationInfo(invalid)
-
     udn = m._udn
-    if udn = invalid
-        udn = appInfo.roDeviceInfo.GetChannelClientId()
-        m._udn = udn
-    end if
-
     libVersion = m._libVersion
-    if libVersion = invalid
-        libVersion = appInfo.GetLibVersion()
-        m._libVersion = libVersion
+
+    if udn = invalid or libVersion = invalid
+        ' We're supposed to pass the ApplicationInfo node, but since we're not going to use it, we can pass invalid
+        appInfo = new ApplicationInfo(invalid)
+        if udn = invalid
+            udn = appInfo.roDeviceInfo.GetChannelClientId()
+            m._udn = udn
+        end if
+        if libVersion = invalid
+            libVersion = appInfo.GetLibVersion()
+            m._libVersion = libVersion
+        end if
     end if
 
     webServerAddress = m._webServerAddress
