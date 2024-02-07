@@ -13,6 +13,8 @@ const COMMAND_TYPE_LOUNGE_STATUS = "loungeStatus"
 const COMMAND_TYPE_REMOTE_CONNECTED = "remoteConnected"
 const COMMAND_TYPE_REMOTE_DISCONNECTED = "remoteDisconnected"
 const COMMAND_TYPE_GET_NOW_PLAYING = "getNowPlaying"
+const COMMAND_TYPE_GET_VOLUME = "getVolume"
+const COMMAND_TYPE_GET_SUBTITLES_TRACK = "getSubtitlesTrack"
 const COMMAND_TYPE_UPDATE_PLAYLIST = "updatePlaylist"
 const COMMAND_TYPE_NOOP = "noop"
 const COMMAND_TYPE_PLAY = "play"
@@ -90,6 +92,11 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleNoop
+        commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
+        commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
+        commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleGetSubtitlesTrack
+        commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleGetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
         commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
@@ -409,7 +416,7 @@ class LoungeApi
     end function
 
     function HandleNoop(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Noop
+        ' Do nothing
     end function
 
     function HandleSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
@@ -473,6 +480,28 @@ class LoungeApi
         return PlayerStatus.IDLE
     end function
 
+    function HandleLoungeStatus(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Do nothing
+    end function
+
+    function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Do nothing
+        ' TODO:P2 show connected device notification
+    end function
+
+    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Do nothing
+    end function
+
+    function HandleGetSubtitlesTrack(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Do nothing
+        ' TODO:P2 send subtitles track?
+    end function
+
+    function HandleGetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        ' Do nothing - volume is not supported anyway
+    end function
+
     function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         LogInfo(commandType, commandArgs)
         videoId = commandArgs["videoId"]
@@ -494,6 +523,17 @@ class LoungeApi
 
     function HandleStopVideo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         VideoUtils.CloseVideo()
+    end function
+
+    function HandleSeekTo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        player = VideoUtils.GetVideoPlayer()
+        if player = invalid
+            return
+        end if
+
+        seekTo = Val(commandArgs["newTime"])
+        LogInfo("Seeking to:", seekTo)
+        player.seek = seekTo
     end function
 
     function HandleDpadCommand(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
