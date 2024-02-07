@@ -97,6 +97,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleGetSubtitlesTrack
         commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleGetVolume
+        commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
         commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
@@ -500,6 +501,20 @@ class LoungeApi
 
     function HandleGetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         ' Do nothing - volume is not supported anyway
+    end function
+
+    function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        player = VideoUtils.GetVideoPlayer()
+        if player = invalid
+            return
+        end if
+
+        volume = Val(commandArgs["volume"])
+        isMute = volume = 0
+        LogInfo("Setting volume is not supported:", volume, "but can mute:", isMute)
+        ' TODO:P0 volume should be set to the lounge state.
+        ' Also the state needs to be separate from the player, since SponsorBlock can mute sections.
+        player.mute = isMute
     end function
 
     function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
