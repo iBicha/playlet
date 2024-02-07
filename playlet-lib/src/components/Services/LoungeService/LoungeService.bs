@@ -31,26 +31,27 @@ function StopService(_unused as dynamic) as void
 end function
 
 function LoungeServiceLoop()
+    messagePort = CreateObject("roMessagePort")
     api = new LoungeApi(m.top, m.top.playQueue)
 
     m.top.screenId = api.GetScreenId()
     m.top.loungeToken = api.GetToken()
 
     api.GetSessionData()
-    api.FetchCommandsRpc()
-    response = api.Poll()
+    api.FetchCommandsRpc(messagePort)
+    isOpen = false
 
     while true
         if m.top.shouldQuit = true
             exit while
         end if
 
-        if response = invalid
-            sleep(3000)
-            api.FetchCommandsRpc()
-        end if
+        msg = wait(60000, messagePort)
+        isOpen = api.Poll(msg)
 
-        sleep(3000)
-        response = api.Poll()
+        if not isOpen
+            sleep(3000)
+            api.FetchCommandsRpc(messagePort)
+        end if
     end while
 end function

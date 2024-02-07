@@ -77,6 +77,7 @@ class LoungeApi
     private socket_buffer
     private socket_state = HttpResponseState.INIT
     private socket_chunk_size = 0
+    private socket_timer
 
     function new(loungeServiceNode as object, playQueueNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -86,6 +87,7 @@ class LoungeApi
         m.deviceName = deviceName
         m.screenName = deviceName
         m.ofs = 0
+        m.socket_timer = CreateObject("roTimespan")
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
@@ -194,8 +196,8 @@ class LoungeApi
         m.SendMessage(messagesToSend)
     end function
 
-    function FetchCommandsRpc() as void
-        baseUrl = "/api/lounge/bc/bind"
+    function FetchCommandsRpc(messagePort as object) as void
+        path = "/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -217,12 +219,12 @@ class LoungeApi
         queryParams["SID"] = m.sessionId
         queryParams["gsessionid"] = m.gSessionId
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
+        path = UrlUtils.BuildUrl(path, invalid, queryParams)
 
-        m.StartLongPolling(url)
+        m.StartLongPolling(path, messagePort)
     end function
 
-    function StartLongPolling(url as string) as void
+    function StartLongPolling(path as string, messagePort as object) as void
         ' since roUrlTransfer can't do long polling, we're doing raw socket
         sendAddress = CreateObject("roSocketAddress")
         sendAddress.SetAddress("www.youtube.com:80")
@@ -234,37 +236,50 @@ class LoungeApi
             return
         end if
 
-        message = `GET ${url} HTTP/1.1\r\n`
+        message = `GET ${path} HTTP/1.1\r\n`
         message += `Host: www.youtube.com\r\n`
         message += `\r\n`
 
         socket.SendStr(message)
+
+        socket.notifyReadable(true)
+        socket.setMessagePort(messagePort)
+
         m.socket = socket
+        m.socket_timer.Mark()
     end function
 
-    function Poll() as dynamic
+    function Poll(message as object) as boolean
         if m.socket = invalid
-            return invalid
+            return false
         end if
 
         socket = m.socket
         if not socket.IsConnected()
             LogError("Socket is not connected")
-            m.socket = invalid
-            m.socket_buffer = invalid
-            m.socket_state = HttpResponseState.INIT
-            return invalid
+            m.CloseSocket()
+            return false
+        end if
+
+        ' Not receiving data for 60 seconds might be a sign of a dead connection
+        if m.socket_timer.TotalMilliseconds() > 60000
+            LogWarn("Timeout")
+            m.CloseSocket()
+            return false
+        end if
+
+        if type(message) <> "roSocketEvent"
+            return true
         end if
 
         data = socket.ReceiveStr(POLL_BUFSIZE)
         if not socket.eSuccess()
-            LogError("Error receiving data:")
-            socket.close()
-            m.socket = invalid
-            m.socket_buffer = invalid
-            m.socket_state = HttpResponseState.INIT
-            return invalid
+            LogError("Error receiving data")
+            m.CloseSocket()
+            return false
         end if
+
+        m.socket_timer.Mark()
 
         if m.socket_buffer = invalid
             m.socket_buffer = ""
@@ -284,11 +299,8 @@ class LoungeApi
                 parts = operationLine.Split(" ")
                 if parts.Count() <> 3 or parts[0] <> "HTTP/1.1" or parts[1] <> "200"
                     LogError("Invalid operation line:", operationLine)
-                    socket.close()
-                    m.socket = invalid
-                    m.socket_state = HttpResponseState.INIT
-                    m.socket_buffer = invalid
-                    return invalid
+                    m.CloseSocket()
+                    return false
                 end if
                 m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
                 m.socket_state = HttpResponseState.READING_HEADERS
@@ -320,9 +332,8 @@ class LoungeApi
                 m.socket_chunk_size = chunkSize
                 if chunkSize = 0
                     LogDebug("End of chunked data")
-                    m.socket_state = HttpResponseState.INIT
-                    m.socket_buffer = invalid
-                    return invalid
+                    m.CloseSocket()
+                    return false
                 end if
                 m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
                 m.socket_state = HttpResponseState.READING_BODY_CHUNK
@@ -344,6 +355,16 @@ class LoungeApi
 
         m.SendMessage(messagesToSend)
         return true
+    end function
+
+    function CloseSocket()
+        if m.socket <> invalid
+            m.socket.notifyReadable(false)
+            m.socket.close()
+            m.socket = invalid
+            m.socket_buffer = invalid
+            m.socket_state = HttpResponseState.INIT
+        end if
     end function
 
     function ReadNewLines()
