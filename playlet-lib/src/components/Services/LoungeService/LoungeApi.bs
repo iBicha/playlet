@@ -75,6 +75,8 @@ class LoungeApi
     private socket_buffer
     private socket_state = HttpResponseState.INIT
     private socket_chunk_size = 0
+    private socket_timer
+    private socket_last_poll_time
 
     function new(loungeServiceNode as object, playQueueNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -231,6 +233,12 @@ class LoungeApi
         message += `\r\n`
 
         socket.SendStr(message)
+
+        if m.socket_timer = invalid
+            m.socket_timer = CreateObject("roTimespan")
+        end if
+        m.socket_timer.Mark()
+
         m.socket = socket
     end function
 
@@ -249,6 +257,8 @@ class LoungeApi
         end if
 
         data = socket.ReceiveStr(POLL_BUFSIZE)
+        LogInfo("Received data:", data)
+
         if not socket.eSuccess()
             LogError("Error receiving data:")
             socket.close()
@@ -263,6 +273,8 @@ class LoungeApi
         end if
 
         m.socket_buffer += data
+
+        m.socket_timer.Mark()
 
         if m.socket_state = HttpResponseState.INIT
             m.socket_state = HttpResponseState.READING_STATUS
