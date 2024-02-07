@@ -214,15 +214,16 @@ class LoungeApi
         m.StartLongPolling(url)
     end function
 
-    function StartLongPolling(url as string)
+    function StartLongPolling(url as string) as void
         ' since roUrlTransfer can't do long polling, we're doing raw socket
         sendAddress = CreateObject("roSocketAddress")
         sendAddress.SetAddress("www.youtube.com:80")
 
         socket = CreateObject("roStreamSocket")
         socket.setSendToAddress(sendAddress)
-        if socket.Connect()
-            LogDebug("Connected")
+        if not socket.Connect()
+            LogError("Failed to connect")
+            return
         end if
 
         message = `GET ${url} HTTP/1.1\r\n`
@@ -271,8 +272,16 @@ class LoungeApi
             newLineIndex = m.socket_buffer.InStr(`\r\n`)
             if newLineIndex > 0
                 operationLine = m.socket_buffer.Left(newLineIndex)
-                ' TODO:P0 - Parse status line, check for 200
                 LogInfo(operationLine)
+                parts = operationLine.Split(" ")
+                if parts.Count() <> 3 or parts[0] <> "HTTP/1.1" or parts[1] <> "200"
+                    LogError("Invalid operation line:", operationLine)
+                    socket.close()
+                    m.socket = invalid
+                    m.socket_state = HttpResponseState.INIT
+                    m.socket_buffer = invalid
+                    return invalid
+                end if
                 m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
                 m.socket_state = HttpResponseState.READING_HEADERS
             end if
