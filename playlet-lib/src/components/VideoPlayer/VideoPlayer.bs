@@ -7,6 +7,8 @@ import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
 
 function Init()
     SetPlayerStyle()
@@ -92,6 +94,10 @@ function StartVideoContentTask(videoContentNode as object)
         preferences: m.top.preferences
         playletServerPort: m.top.webServer.port
     }, OnVideoContentTaskResults)
+
+    ' The player itself is not loading, but we're fetching video details
+    loungeState = LoungeMessages.OnStateChange(m.top, { "state": PlayerStatus.LOADING })
+    m.loungeService.outgoingMessages = [loungeState]
 end function
 
 function OnVideoContentTaskResults(output as object) as void
@@ -161,6 +167,9 @@ function Close(_unused as dynamic)
 end function
 
 function OnVideoPlayerStateChange() as void
+    loungeState = LoungeMessages.OnStateChange(m.top)
+    m.loungeService.outgoingMessages = [loungeState]
+
     state = m.top.state
     content = m.top.content
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).

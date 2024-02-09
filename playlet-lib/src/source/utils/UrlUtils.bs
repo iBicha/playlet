@@ -59,18 +59,43 @@ namespace UrlUtils
 
     function GetUrlEncodedForm(fields as object) as string
         form = ""
-        for each key in fields
-            value = fields[key]
-            if value = invalid
-                continue for
-            end if
+        if IsArray(fields)
+            for each item in fields
+                key = item.key
+                value = item.value
+                if key = invalid or value = invalid
+                    continue for
+                end if
 
-            if form <> ""
-                form += "&"
-            end if
+                if form <> ""
+                    form += "&"
+                end if
 
-            form += key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
-        end for
+                if not IsString(value)
+                    value = `${value}`
+                end if
+
+                form += key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+            end for
+        else if IsAssociativeArray(fields)
+            for each key in fields
+                value = fields[key]
+                if value = invalid
+                    continue for
+                end if
+
+                if form <> ""
+                    form += "&"
+                end if
+
+                if not IsString(value)
+                    value = `${value}`
+                end if
+
+                form += key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+            end for
+        end if
+
         return form
     end function
 

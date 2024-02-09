@@ -2,48 +2,8 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/UrlUtils.bs"
-
-const COMMAND_NOW_PLAYING = "nowPlaying"
-const COMMAND_ON_STATE_CHANGE = "onStateChange"
-const COMMAND_ON_VOLUME_CHANGED = "onVolumeChanged"
-const COMMAND_ON_PREVIOUS_NEXT_CHANGE = "onHasPreviousNextChanged"
-
-const COMMAND_TYPE_SET_PLAYLIST = "setPlaylist"
-const COMMAND_TYPE_LOUNGE_STATUS = "loungeStatus"
-const COMMAND_TYPE_REMOTE_CONNECTED = "remoteConnected"
-const COMMAND_TYPE_REMOTE_DISCONNECTED = "remoteDisconnected"
-const COMMAND_TYPE_GET_NOW_PLAYING = "getNowPlaying"
-const COMMAND_TYPE_GET_VOLUME = "getVolume"
-const COMMAND_TYPE_GET_SUBTITLES_TRACK = "getSubtitlesTrack"
-const COMMAND_TYPE_UPDATE_PLAYLIST = "updatePlaylist"
-const COMMAND_TYPE_NOOP = "noop"
-const COMMAND_TYPE_PLAY = "play"
-const COMMAND_TYPE_PAUSE = "pause"
-const COMMAND_TYPE_NEXT = "next"
-const COMMAND_TYPE_PREVIOUS = "previous"
-const COMMAND_TYPE_SEEK_TO = "seekTo"
-const COMMAND_TYPE_SET_VOLUME = "setVolume"
-const COMMAND_TYPE_STOP_VIDEO = "stopVideo"
-const COMMAND_TYPE_DPAD = "dpadCommand"
-const COMMAND_TYPE_VOICE = "voiceCommand"
-const COMMAND_TYPE_SUBTITLES = "setSubtitlesTrack"
-' Special commands
-const COMMAND_TYPE_SESSION_ID = "c"
-const COMMAND_TYPE_G_SESSION_ID = "S"
-const COMMAND_KEY_UP = "UP"
-const COMMAND_KEY_DOWN = "DOWN"
-const COMMAND_KEY_LEFT = "LEFT"
-const COMMAND_KEY_RIGHT = "RIGHT"
-const COMMAND_KEY_ENTER = "ENTER"
-const COMMAND_KEY_BACK = "BACK"
-
-enum PlayerStatus
-    IDLE = -1
-    PLAYING = 1
-    PAUSED = 2
-    LOADING = 3
-    STOPPED = 4
-end enum
+import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
 
 const POLL_BUFSIZE = 65536
 
@@ -104,6 +64,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
         commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
         commandHandlers[COMMAND_TYPE_STOP_VIDEO] = m.HandleStopVideo
+        commandHandlers[COMMAND_TYPE_SEEK_TO] = m.HandleSeekTo
         commandHandlers[COMMAND_TYPE_DPAD] = m.HandleDpadCommand
 
         for each key in commandHandlers
@@ -193,7 +154,7 @@ class LoungeApi
         messagesToSend = []
         commands = ParseJson(text)
         m.ProcessCommands(commands, messagesToSend)
-        m.SendMessage(messagesToSend)
+        m.SendMessages(messagesToSend)
     end function
 
     function FetchCommandsRpc(messagePort as object) as void
@@ -353,7 +314,7 @@ class LoungeApi
             end if
         end if
 
-        m.SendMessage(messagesToSend)
+        m.SendMessages(messagesToSend)
         return true
     end function
 
@@ -452,54 +413,19 @@ class LoungeApi
     end function
 
     function HandleGetPlayingNow(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        message = {
-            "commandId": commandId
-            "commandType": COMMAND_NOW_PLAYING
-            "cpn": "foo"
-        }
         player = VideoUtils.GetVideoPlayer()
-        if player = invalid
-            messagesToSend.Push(message)
-            return
-        end if
 
-        message["loadedTime"] = "0"
-        message["currentTime"] = `${player.position}`
-        message["seekableStartTime"] = "0"
-        content = player.content
-        if content <> invalid
-            metadata = content.metadata
-            if metadata <> invalid
-                lengthSeconds = metadata.lengthSeconds
-                if IsInt(lengthSeconds)
-                    length = `${lengthSeconds}`
-                    message["duration"] = length
-                    message["seekableEndTime"] = length
-                end if
-            end if
-        end if
-        message["state"] = m.GetPlayerState(player)
-
+        message = LoungeMessages.OnHasPreviousNextChanged()
+        message["commandId"] = commandId
         messagesToSend.Push(message)
-    end function
 
-    function GetPlayerState(player as object) as PlayerStatus
-        if player = invalid
-            return PlayerStatus.IDLE
-        end if
+        message = LoungeMessages.NowPlaying(player)
+        message["commandId"] = commandId
+        messagesToSend.Push(message)
 
-        state = player.state
-        if state = "playing"
-            return PlayerStatus.PLAYING
-        else if state = "paused"
-            return PlayerStatus.PAUSED
-        else if state = "buffering"
-            return PlayerStatus.LOADING
-        else if state = "stopped" or state = "stopping" or state = "finished"
-            return PlayerStatus.STOPPED
-        end if
-
-        return PlayerStatus.IDLE
+        message = LoungeMessages.OnStateChange(player)
+        message["commandId"] = commandId
+        messagesToSend.Push(message)
     end function
 
     function HandleLoungeStatus(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
@@ -576,7 +502,7 @@ class LoungeApi
         LogWarn("Dpad command not supported, since Roku blocks ECP commands from a loopback address")
     end function
 
-    function SendMessage(messages as object) as void
+    function SendMessages(messages as object) as void
         if messages.Count() = 0
             return
         end if
@@ -605,22 +531,23 @@ class LoungeApi
 
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
-        postData = {
-            "count": `${messages.Count()}`
-            "ofs": `${m.ofs}`
-        }
+        postData = [
+            { key: "count", value: `${messages.Count()}` }
+            { key: "ofs", value: `${m.ofs}` }
+        ]
 
         m.ofs += messages.Count()
 
         for i = 0 to messages.Count() - 1
             message = messages[i]
             keyPrefix = `req${i}_`
-            postData[`${keyPrefix}_sc`] = message.commandType
+
+            postData.Push({ key: `${keyPrefix}_sc`, value: message.commandType })
 
             commandArgs = message.commandArgs
             if commandArgs <> invalid
                 for each key in commandArgs
-                    postData[`${keyPrefix}${key}`] = commandArgs[key]
+                    postData.Push({ key: `${keyPrefix}${key}`, value: commandArgs[key] })
                 end for
             end if
         end for

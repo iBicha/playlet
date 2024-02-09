@@ -1,0 +1,113 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace LoungeMessages
+
+    function OnHasPreviousNextChanged() as object
+        return {
+            commandType: COMMAND_ON_PREVIOUS_NEXT_CHANGE
+            commandArgs: {
+                "hasPrevious": false
+                "hasNext": false
+            }
+        }
+    end function
+
+    function OnStateChange(player as object, overrides = invalid as object) as object
+        message = {
+            "commandType": COMMAND_ON_STATE_CHANGE
+        }
+        if player = invalid
+            return message
+        end if
+
+        commandArgs = {}
+
+        commandArgs["loadedTime"] = 0
+        commandArgs["currentTime"] = ValidDouble(player.position)
+        commandArgs["seekableStartTime"] = 0
+
+        content = player.content
+        if content <> invalid
+            metadata = content.metadata
+            if metadata <> invalid
+                lengthSeconds = metadata.lengthSeconds
+                if IsInt(lengthSeconds)
+                    commandArgs["duration"] = lengthSeconds
+                    commandArgs["seekableEndTime"] = lengthSeconds
+                end if
+            end if
+        end if
+        commandArgs["state"] = GetPlayerState(player)
+
+        if overrides <> invalid
+            commandArgs.Append(overrides)
+        end if
+
+        message["commandArgs"] = commandArgs
+
+        return message
+    end function
+
+    function NowPlaying(player as object, overrides = invalid as object) as object
+        message = {
+            "commandType": COMMAND_NOW_PLAYING
+        }
+
+        if player = invalid
+            return message
+        end if
+
+        commandArgs = {}
+
+        commandArgs["loadedTime"] = 0
+        commandArgs["currentTime"] = ValidDouble(player.position)
+        commandArgs["seekableStartTime"] = 0
+        commandArgs["currentIndex"] = 0
+
+        content = player.content
+        if content <> invalid
+            metadata = content.metadata
+            if metadata <> invalid
+                lengthSeconds = metadata.lengthSeconds
+                if IsInt(lengthSeconds)
+                    commandArgs["duration"] = lengthSeconds
+                    commandArgs["seekableEndTime"] = lengthSeconds
+                end if
+                videoId = metadata.videoId
+                if not StringUtils.IsNullOrEmpty(videoId)
+                    commandArgs["videoId"] = videoId
+                end if
+            end if
+        end if
+        commandArgs["state"] = GetPlayerState(player)
+
+        if overrides <> invalid
+            commandArgs.Append(overrides)
+        end if
+
+        message["commandArgs"] = commandArgs
+        return message
+    end function
+
+    function GetPlayerState(player as object) as PlayerStatus
+        if player = invalid
+            return PlayerStatus.IDLE
+        end if
+
+        state = player.state
+        if state = "playing"
+            return PlayerStatus.PLAYING
+        else if state = "paused"
+            return PlayerStatus.PAUSED
+        else if state = "buffering"
+            return PlayerStatus.LOADING
+        else if state = "stopped" or state = "stopping" or state = "finished"
+            return PlayerStatus.STOPPED
+        end if
+
+        return PlayerStatus.IDLE
+    end function
+
+end namespace

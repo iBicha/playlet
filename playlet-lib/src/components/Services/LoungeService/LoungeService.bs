@@ -37,6 +37,8 @@ function LoungeServiceLoop()
     m.top.screenId = api.GetScreenId()
     m.top.loungeToken = api.GetToken()
 
+    m.top.observeFieldScoped("outgoingMessages", messagePort)
+
     api.GetSessionData()
     api.FetchCommandsRpc(messagePort)
     isOpen = false
@@ -47,6 +49,16 @@ function LoungeServiceLoop()
         end if
 
         msg = wait(60000, messagePort)
+        msgType = type(msg)
+
+        if msgType = "roSGNodeEvent"
+            field = msg.GetField()
+            if field = "outgoingMessages"
+                messages = msg.GetData()
+                api.SendMessages(messages)
+            end if
+        end if
+
         isOpen = api.Poll(msg)
 
         if not isOpen
