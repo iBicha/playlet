@@ -5,18 +5,19 @@ import "pkg:/source/utils/Types.bs"
 namespace LoungeMessages
 
     function OnHasPreviousNextChanged() as object
-        return {
-            commandType: COMMAND_ON_PREVIOUS_NEXT_CHANGE
-            commandArgs: {
-                "hasPrevious": false
-                "hasNext": false
-            }
+        message = {
+            commandType: COMMAND_ON_STATE_CHANGE
         }
+        commandArgs = {}
+        commandArgs[FIELD_HAS_PREVIOUS] = false
+        commandArgs[FIELD_HAS_NEXT] = false
+        message.commandArgs = commandArgs
+        return message
     end function
 
     function OnStateChange(player as object, overrides = invalid as object) as object
         message = {
-            "commandType": COMMAND_ON_STATE_CHANGE
+            commandType: COMMAND_ON_STATE_CHANGE
         }
         if player = invalid
             return message
@@ -24,9 +25,9 @@ namespace LoungeMessages
 
         commandArgs = {}
 
-        commandArgs["loadedTime"] = 0
-        commandArgs["currentTime"] = ValidDouble(player.position)
-        commandArgs["seekableStartTime"] = 0
+        commandArgs[FIELD_STATE] = GetPlayerState(player)
+        commandArgs[FIELD_CURRENT_TIME] = ValidDouble(player.position)
+        commandArgs[FIELD_SEEKABLE_START_TIME] = 0
 
         content = player.content
         if content <> invalid
@@ -34,25 +35,28 @@ namespace LoungeMessages
             if metadata <> invalid
                 lengthSeconds = metadata.lengthSeconds
                 if IsInt(lengthSeconds)
-                    commandArgs["duration"] = lengthSeconds
-                    commandArgs["seekableEndTime"] = lengthSeconds
+                    commandArgs[FIELD_DURATION] = lengthSeconds
+                    commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
+
+                    if commandArgs[FIELD_STATE] = PlayerStatus.PLAYING or commandArgs[FIELD_STATE] = PlayerStatus.PAUSED or commandArgs[FIELD_STATE] = PlayerStatus.LOADING
+                        commandArgs[FIELD_LOADED_TIME] = lengthSeconds
+                    end if
                 end if
             end if
         end if
-        commandArgs["state"] = GetPlayerState(player)
 
         if overrides <> invalid
             commandArgs.Append(overrides)
         end if
 
-        message["commandArgs"] = commandArgs
+        message.commandArgs = commandArgs
 
         return message
     end function
 
     function NowPlaying(player as object, overrides = invalid as object) as object
         message = {
-            "commandType": COMMAND_NOW_PLAYING
+            commandType: COMMAND_NOW_PLAYING
         }
 
         if player = invalid
@@ -61,10 +65,11 @@ namespace LoungeMessages
 
         commandArgs = {}
 
-        commandArgs["loadedTime"] = 0
-        commandArgs["currentTime"] = ValidDouble(player.position)
-        commandArgs["seekableStartTime"] = 0
-        commandArgs["currentIndex"] = 0
+        commandArgs[FIELD_CURRENT_TIME] = ValidDouble(player.position)
+        commandArgs[FIELD_SEEKABLE_START_TIME] = 0
+        commandArgs[FIELD_CURRENT_INDEX] = 0
+
+        commandArgs[FIELD_STATE] = GetPlayerState(player)
 
         content = player.content
         if content <> invalid
@@ -72,22 +77,25 @@ namespace LoungeMessages
             if metadata <> invalid
                 lengthSeconds = metadata.lengthSeconds
                 if IsInt(lengthSeconds)
-                    commandArgs["duration"] = lengthSeconds
-                    commandArgs["seekableEndTime"] = lengthSeconds
+                    commandArgs[FIELD_DURATION] = lengthSeconds
+                    commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
+
+                    if commandArgs[FIELD_STATE] = PlayerStatus.PLAYING or commandArgs[FIELD_STATE] = PlayerStatus.PAUSED or commandArgs[FIELD_STATE] = PlayerStatus.LOADING
+                        commandArgs[FIELD_LOADED_TIME] = lengthSeconds
+                    end if
                 end if
                 videoId = metadata.videoId
                 if not StringUtils.IsNullOrEmpty(videoId)
-                    commandArgs["videoId"] = videoId
+                    commandArgs[FIELD_VIDEO_ID] = videoId
                 end if
             end if
         end if
-        commandArgs["state"] = GetPlayerState(player)
 
         if overrides <> invalid
             commandArgs.Append(overrides)
         end if
 
-        message["commandArgs"] = commandArgs
+        message.commandArgs = commandArgs
         return message
     end function
 

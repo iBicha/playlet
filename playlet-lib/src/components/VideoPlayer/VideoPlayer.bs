@@ -1,7 +1,6 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
-import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
-import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/components/VideoPlayer/Lounge.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
 import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
@@ -77,6 +76,7 @@ function PlayWithContent(contentNode as object)
     end if
 
     StartVideoContentTask(videoContentNode)
+    Lounge.SendNowPlayingLoading(contentNode.videoId)
 end function
 
 function StartVideoContentTask(videoContentNode as object)
@@ -94,10 +94,6 @@ function StartVideoContentTask(videoContentNode as object)
         preferences: m.top.preferences
         playletServerPort: m.top.webServer.port
     }, OnVideoContentTaskResults)
-
-    ' The player itself is not loading, but we're fetching video details
-    loungeState = LoungeMessages.OnStateChange(m.top, { "state": PlayerStatus.LOADING })
-    m.loungeService.outgoingMessages = [loungeState]
 end function
 
 function OnVideoContentTaskResults(output as object) as void
@@ -167,8 +163,7 @@ function Close(_unused as dynamic)
 end function
 
 function OnVideoPlayerStateChange() as void
-    loungeState = LoungeMessages.OnStateChange(m.top)
-    m.loungeService.outgoingMessages = [loungeState]
+    Lounge.SendOnStateChange()
 
     state = m.top.state
     content = m.top.content

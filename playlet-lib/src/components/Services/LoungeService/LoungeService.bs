@@ -42,24 +42,45 @@ function LoungeServiceLoop()
     api.GetSessionData()
     api.FetchCommandsRpc(messagePort)
     isOpen = false
+    outgoingLoungeMessages = []
+    portMessages = []
 
     while true
         if m.top.shouldQuit = true
             exit while
         end if
 
-        msg = wait(60000, messagePort)
-        msgType = type(msg)
+        message = wait(60000, messagePort)
+        portMessages.Clear()
+        portMessages.Push(message)
 
-        if msgType = "roSGNodeEvent"
-            field = msg.GetField()
-            if field = "outgoingMessages"
-                messages = msg.GetData()
-                api.SendMessages(messages)
+        ' There's a chance messages were piling up while we were sending messages to the lounge
+        ' This could happen if we were sending things to the lounge and the player state
+        ' changed many times.
+        while messagePort.PeekMessage() <> invalid
+            portMessages.Push(messagePort.GetMessage())
+        end while
+
+        pollMessage = invalid
+        outgoingLoungeMessages.Clear()
+
+        for each portMessage in portMessages
+            messageType = type(portMessage)
+            if messageType = "roSocketEvent"
+                pollMessage = portMessage
+                continue for
+            else if messageType = "roSGNodeEvent"
+                field = portMessage.GetField()
+                if field = "outgoingMessages"
+                    messages = portMessage.GetData()
+                    outgoingLoungeMessages.Append(messages)
+                end if
             end if
-        end if
+        end for
 
-        isOpen = api.Poll(msg)
+        api.SendMessages(outgoingLoungeMessages)
+
+        isOpen = api.Poll(pollMessage)
 
         if not isOpen
             sleep(3000)
