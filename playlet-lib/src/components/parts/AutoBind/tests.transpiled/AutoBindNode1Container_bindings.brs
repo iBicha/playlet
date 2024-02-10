@@ -8,4 +8,5 @@ function InitializeBindings()
     
         }
     }
-end function'//# sourceMappingURL=./AutoBindNode1Container_bindings.bs.map
+end function
+'//# sourceMappingURL=./AutoBindNode1Container_bindings.brs.map
