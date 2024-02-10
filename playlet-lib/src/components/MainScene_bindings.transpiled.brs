@@ -36,4 +36,5 @@ function InitializeBindings()
             }
         }
     }
-end function'//# sourceMappingURL=./MainScene_bindings.bs.map
+end function
+'//# sourceMappingURL=./MainScene_bindings.brs.map

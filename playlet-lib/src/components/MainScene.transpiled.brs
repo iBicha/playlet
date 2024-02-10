@@ -24,4 +24,5 @@ end function
 function StartWebServer()
     m.webServer = m.top.findNode("WebServer")
     m.webServer.callfunc("StartServer", invalid)
-end function'//# sourceMappingURL=./MainScene.bs.map
+end function
+'//# sourceMappingURL=./MainScene.brs.map
