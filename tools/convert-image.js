@@ -5,7 +5,7 @@ const { convertFile } = require('convert-svg-to-png');
 
 (async () => {
     const parser = new ArgumentParser({
-        description: 'Sync Youtube profile with Invidious'
+        description: 'Sync YouTube profile with Invidious'
     });
 
     parser.add_argument('--input', { help: 'Input file path' });

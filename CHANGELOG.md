@@ -355,7 +355,7 @@ This version went through a major refactor, which resulted in a different arcite
   - Dark mode
   - Also includes a dev menu
     - Hidden by default, use `dev=1` in the browser to show it
-  - Improved drag and drop functionality (drag and drop a link from Youtube into the web app)
+  - Improved drag and drop functionality (drag and drop a link from YouTube into the web app)
 - New settings page, available on TV and web app
 - New preferences system
   - Unified settings between TV and web app
@@ -412,7 +412,7 @@ This version went through a major refactor, which resulted in a different arcite
 
 ### Added
 
-- A script to sync between Youtube profile and and Invidious profile
+- A script to sync between YouTube profile and and Invidious profile
 - Moved most of Playlet logic to Playlet Lib
 - Support for multiple caption languages
 
@@ -460,7 +460,7 @@ This version went through a major refactor, which resulted in a different arcite
 - Loading spinner
 - Picture in picture support
 - [Deep linking support](https://developer.roku.com/en-ca/docs/developer-program/discovery/implementing-deep-linking.md)
-  - Both Launch arguments and Input arguments are supported, using the "contentId" key as the Youtube video id
+  - Both Launch arguments and Input arguments are supported, using the "contentId" key as the YouTube video id
 - Error and Exit dialogs
 
 ### Fixed
