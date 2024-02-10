@@ -44,9 +44,19 @@ function OnFocusChange() as void
     if not m.top.focus
         return
     end if
-    NodeSetFocus(m.webAppButton, true)
-    m.webAppPanel.visible = true
-    m.linkWithTvPanel.visible = false
+
+    if m.currentNavigtionNode = invalid
+        m.currentNavigtionNode = m.webAppButton
+    end if
+
+    NodeSetFocus(m.currentNavigtionNode, true)
+    if m.currentNavigtionNode.isSameNode(m.linkWithTvButton)
+        m.linkWithTvPanel.visible = true
+        m.webAppPanel.visible = false
+    else
+        m.webAppPanel.visible = true
+        m.linkWithTvPanel.visible = false
+    end if
 end function
 
 function OnUrlSet()
@@ -67,6 +77,7 @@ end function
 function OnkeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
+        m.currentNavigtionNode = navigation.node
         if navigation.node.isSameNode(m.linkWithTvButton)
             m.linkWithTvPanel.visible = true
             m.webAppPanel.visible = false
@@ -81,6 +92,7 @@ end function
 
 function OnVisibleChanged()
     if not m.top.visible
+        m.currentNavigtionNode = invalid
         m.linkWithTvPanel.visible = false
         m.webAppPanel.visible = true
     end if

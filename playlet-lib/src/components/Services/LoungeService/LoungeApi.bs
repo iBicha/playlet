@@ -97,7 +97,7 @@ class LoungeApi
             return m.loungeToken
         end if
 
-        form = `screen_ids=${m.screenId}`.EncodeUri()
+        form = UrlUtils.GetUrlEncodedForm({ "screen_ids": m.screenId })
         request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", form)
         request.Header("Content-Type", "application/x-www-form-urlencoded")
         response = request.Await()
@@ -113,6 +113,7 @@ class LoungeApi
             return invalid
         end if
 
+        ' TODO:P0 cache all lounge info
         m.loungeToken = screens[0].loungeToken
         return m.loungeToken
     end function
@@ -319,14 +320,15 @@ class LoungeApi
         return true
     end function
 
-    function CloseSocket()
-        if m.socket <> invalid
-            m.socket.notifyReadable(false)
-            m.socket.close()
-            m.socket = invalid
-            m.socket_buffer = invalid
-            m.socket_state = HttpResponseState.INIT
+    function CloseSocket() as void
+        if m.socket = invalid
+            return
         end if
+        m.socket.notifyReadable(false)
+        m.socket.close()
+        m.socket = invalid
+        m.socket_buffer = invalid
+        m.socket_state = HttpResponseState.INIT
     end function
 
     function ReadNewLines()
@@ -391,10 +393,7 @@ class LoungeApi
                 LogInfo(commandType)
                 m[handler](commandId, commandType, commandArgs, messagesToSend)
             else
-                LogWarn("Unknown command:", commandType)
-                #if DEBUG
-                    LogDebug(command)
-                #end if
+                LogWarn("Unknown command type:", commandType, "command:", command)
             end if
         end for
     end function
@@ -494,7 +493,7 @@ class LoungeApi
             return
         end if
 
-        seekTo = Val(commandArgs["newTime"])
+        seekTo = Val(commandArgs[FIELD_NEW_TIME])
         LogInfo("Seeking to:", seekTo)
         player.seek = seekTo
     end function

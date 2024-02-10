@@ -109,10 +109,6 @@ function ParseSsdpMessage(message as string) as object
         return invalid
     end if
 
-    ssdp = {
-        headers: {}
-    }
-
     lines = message.split(`\r\n`)
     operation = lines[0]
     parts = operation.split(" ")
@@ -120,25 +116,29 @@ function ParseSsdpMessage(message as string) as object
         return invalid
     end if
 
+    ssdp = {}
     ssdp["method"] = parts[0]
     ssdp["uri"] = parts[1]
     ssdp["protocol"] = parts[2]
 
+    headers = {}
     for i = 1 to lines.Count() - 1
         line = lines[i]
         if line = ""
             continue for
         end if
 
-        if line.InStr(":") = -1
+        colonIndex = line.InStr(":")
+        if colonIndex = -1
             continue for
         end if
 
-        key = line.Left(line.InStr(":")).trim()
-        value = line.Mid(line.InStr(":") + 1).trim()
-        ssdp["headers"][key] = value
+        key = line.Left(colonIndex).trim()
+        value = line.Mid(colonIndex + 1).trim()
+        headers[key] = value
     end for
 
+    ssdp["headers"] = headers
     return ssdp
 end function
 
