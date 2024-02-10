@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [Attempt #2] to fix a crash caused by execution timeout when stopping a video takes too long
+- Wrong hint on the "added to queue" notification when in fullscreen
 
 ## [0.19.1] - 2024-01-13
 
