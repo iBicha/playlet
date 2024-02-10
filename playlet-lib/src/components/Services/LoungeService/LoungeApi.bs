@@ -61,6 +61,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleGetVolume
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
+        commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
         commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
         commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
         commandHandlers[COMMAND_TYPE_STOP_VIDEO] = m.HandleStopVideo
@@ -466,13 +467,26 @@ class LoungeApi
 
     function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         LogInfo(commandType, commandArgs)
-        videoId = commandArgs["videoId"]
+
+        videoId = commandArgs[FIELD_VIDEO_ID]
         payload = {
             "videoId": videoId
         }
+
+        timestamp = commandArgs[FIELD_CURRENT_TIME]
+        if not StringUtils.IsNullOrEmpty(timestamp)
+            timestamp = CInt(Val(timestamp))
+            if timestamp > 0
+                payload["timestamp"] = timestamp
+            end if
+        end if
+
         contentNode = InvidiousContent.ToRowCellContentNode(payload, invalid)
         m.playQueueNode@.Play(contentNode, -1)
-        LogInfo("setPlaylist:", videoId)
+    end function
+
+    function HandleUpdatePlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        LogInfo(commandType, commandArgs)
     end function
 
     function HandlePause(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
