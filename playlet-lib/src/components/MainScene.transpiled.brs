@@ -28,4 +28,5 @@ function StartWebServer()
     m.webServer.callfunc("StartServer", invalid)
     m.dialServer = m.top.findNode("DialServer")
     m.dialServer.callfunc("StartServer", invalid)
-end function'//# sourceMappingURL=./MainScene.bs.map
+end function
+'//# sourceMappingURL=./MainScene.brs.map
