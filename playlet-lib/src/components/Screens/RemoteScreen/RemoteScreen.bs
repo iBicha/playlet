@@ -10,17 +10,22 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
-    m.linkCodeLabel = m.top.findNode("LinkCodeLabel")
-    m.linkWithTvButton = m.top.findNode("LinkWithTvButton")
     m.webAppButton = m.top.findNode("WebAppButton")
-    m.linkWithTvPanel = m.top.findNode("LinkWithTvPanel")
+    m.linkWithWifiButton = m.top.findNode("LinkWithWiFiButton")
+    m.linkWithTvButton = m.top.findNode("LinkWithTvButton")
+
     m.webAppPanel = m.top.findNode("WebAppPanel")
+    m.linkWithWifiPanel = m.top.findNode("LinkWithWiFiPanel")
+    m.linkWithTvPanel = m.top.findNode("LinkWithTvPanel")
+
+    m.linkCodeLabel = m.top.findNode("LinkCodeLabel")
 end function
 
 function OnNodeReady()
-    SetNavigation(m.webAppButton, "left", m.navBar)
-    SetNavigation(m.webAppButton, "right", m.linkWithTvButton)
-    SetNavigation(m.linkWithTvButton, "left", m.webAppButton)
+    SetNavigation(m.webAppButton, "down", m.linkWithWifiButton)
+    SetNavigation(m.linkWithWifiButton, "down", m.linkWithTvButton)
+    SetNavigation(m.linkWithTvButton, "up", m.linkWithWifiButton)
+    SetNavigation(m.linkWithWifiButton, "up", m.webAppButton)
 
     SetNavigation(invalid, "back", m.navBar)
     SetNavigation(invalid, "left", m.navBar)
@@ -36,6 +41,7 @@ function OnNodeReady()
 
     m.top.observeField("visible", FuncName(OnVisibleChanged))
 
+    m.linkWithWifiPanel.visible = false
     m.linkWithTvPanel.observeField("visible", FuncName(OnLinkWithTvPanelVisibleChanged))
     m.linkWithTvPanel.visible = false
 end function
@@ -50,13 +56,7 @@ function OnFocusChange() as void
     end if
 
     NodeSetFocus(m.currentNavigtionNode, true)
-    if m.currentNavigtionNode.isSameNode(m.linkWithTvButton)
-        m.linkWithTvPanel.visible = true
-        m.webAppPanel.visible = false
-    else
-        m.webAppPanel.visible = true
-        m.linkWithTvPanel.visible = false
-    end if
+    ShowTab(m.currentNavigtionNode)
 end function
 
 function OnUrlSet()
@@ -77,24 +77,37 @@ end function
 function OnkeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
-        m.currentNavigtionNode = navigation.node
-        if navigation.node.isSameNode(m.linkWithTvButton)
-            m.linkWithTvPanel.visible = true
-            m.webAppPanel.visible = false
-        else if navigation.node.isSameNode(m.webAppButton)
-            m.linkWithTvPanel.visible = false
-            m.webAppPanel.visible = true
-        end if
+        ShowTab(navigation.node)
         return true
     end if
     return false
 end function
 
+function ShowTab(button as object)
+    if button.isSameNode(m.webAppButton)
+        m.webAppPanel.visible = true
+        m.linkWithWifiPanel.visible = false
+        m.linkWithTvPanel.visible = false
+        m.currentNavigtionNode = button
+    else if button.isSameNode(m.linkWithWifiButton)
+        m.linkWithWifiPanel.visible = true
+        m.webAppPanel.visible = false
+        m.linkWithTvPanel.visible = false
+        m.currentNavigtionNode = button
+    else if button.isSameNode(m.linkWithTvButton)
+        m.linkWithTvPanel.visible = true
+        m.webAppPanel.visible = false
+        m.linkWithWifiPanel.visible = false
+        m.currentNavigtionNode = button
+    end if
+end function
+
 function OnVisibleChanged()
     if not m.top.visible
         m.currentNavigtionNode = invalid
-        m.linkWithTvPanel.visible = false
         m.webAppPanel.visible = true
+        m.linkWithWifiPanel.visible = false
+        m.linkWithTvPanel.visible = false
     end if
 end function
 
