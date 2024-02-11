@@ -50,15 +50,20 @@ class LoungeApi
         m.socket_timer = CreateObject("roTimespan")
 
         commandHandlers = {}
+        commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_SET_SUBTITLES] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
+
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
-        commandHandlers[COMMAND_TYPE_NOOP] = m.HandleNoop
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
         commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
-        commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleGetSubtitlesTrack
-        commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleGetVolume
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -66,8 +71,6 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_PLAY] = m.HandlePlay
         commandHandlers[COMMAND_TYPE_STOP_VIDEO] = m.HandleStopVideo
         commandHandlers[COMMAND_TYPE_SEEK_TO] = m.HandleSeekTo
-        commandHandlers[COMMAND_TYPE_DPAD] = m.HandleDpadCommand
-        commandHandlers[COMMAND_TYPE_VOICE] = m.HandleVoiceCommand
 
         for each key in commandHandlers
             m[COMMAND_HANDLER_PREFIX + key] = commandHandlers[key]
@@ -399,8 +402,8 @@ class LoungeApi
         end for
     end function
 
-    function HandleNoop(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing
+    function HandleIgnoreCommand(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+        LogDebug("Ignoring command:", commandType, "args:", commandArgs)
     end function
 
     function HandleSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
@@ -440,15 +443,6 @@ class LoungeApi
 
     function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         ' Do nothing
-    end function
-
-    function HandleGetSubtitlesTrack(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing
-        ' TODO:P2 send subtitles track?
-    end function
-
-    function HandleGetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing - volume is not supported anyway
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
@@ -512,14 +506,6 @@ class LoungeApi
         player.seek = seekTo
     end function
 
-    function HandleDpadCommand(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogWarn("Dpad command not supported, since Roku blocks ECP commands from a loopback address. Args:", commandArgs)
-    end function
-
-    function HandleVoiceCommand(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogWarn("Voice commands not yet supported. Args:", commandArgs)
-    end function
-
     function SendMessages(messages as object) as void
         if messages.Count() = 0
             return
@@ -560,7 +546,7 @@ class LoungeApi
             message = messages[i]
             keyPrefix = `req${i}_`
 
-            postData.Push({ key: `${keyPrefix}_sc`, value: message.commandType })
+            postData.Push({ key: `${keyPrefix}${FIELD_COMMAND_NAME}`, value: message.commandType })
 
             commandArgs = message.commandArgs
             if commandArgs <> invalid
