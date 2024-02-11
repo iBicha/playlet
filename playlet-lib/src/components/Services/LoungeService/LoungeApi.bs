@@ -1,21 +1,13 @@
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/Services/LoungeService/LongPoller.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
 import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
-const POLL_BUFSIZE = 65536
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
-
-enum HttpResponseState
-    INIT = 0
-    READING_STATUS = 1
-    READING_HEADERS = 2
-    READING_BODY_CHUNK_SIZE = 3
-    READING_BODY_CHUNK = 4
-end enum
 
 class LoungeApi
 
@@ -31,13 +23,7 @@ class LoungeApi
 
     private ofs
     private lastCommandIndex = -1
-
-    ' Socket stuff for long polling
-    private socket
-    private socket_buffer
-    private socket_state = HttpResponseState.INIT
-    private socket_chunk_size = 0
-    private socket_timer
+    private poller
 
     function new(loungeServiceNode as object, playQueueNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -47,7 +33,7 @@ class LoungeApi
         m.deviceName = deviceName
         m.screenName = deviceName
         m.ofs = 0
-        m.socket_timer = CreateObject("roTimespan")
+        m.poller = invalid
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
@@ -164,7 +150,8 @@ class LoungeApi
     end function
 
     function FetchCommandsRpc(messagePort as object) as void
-        path = "/api/lounge/bc/bind"
+        ' Note we're not using https, not supported by LongPoller
+        baseUrl = "http://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -186,175 +173,32 @@ class LoungeApi
         queryParams["SID"] = m.sessionId
         queryParams["gsessionid"] = m.gSessionId
 
-        path = UrlUtils.BuildUrl(path, invalid, queryParams)
+        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
-        m.StartLongPolling(path, messagePort)
+        m.StartLongPolling(url, messagePort)
     end function
 
-    function StartLongPolling(path as string, messagePort as object) as void
-        ' since roUrlTransfer can't do long polling, we're doing raw socket
-        sendAddress = CreateObject("roSocketAddress")
-        sendAddress.SetAddress("www.youtube.com:80")
-
-        socket = CreateObject("roStreamSocket")
-        socket.setSendToAddress(sendAddress)
-        if not socket.Connect()
-            LogError("Failed to connect")
-            return
+    function StartLongPolling(url as string, messagePort as object) as void
+        if m.poller = invalid
+            m.poller = new LongPoller(url)
         end if
 
-        message = `GET ${path} HTTP/1.1\r\n`
-        message += `Host: www.youtube.com\r\n`
-        message += `\r\n`
-
-        socket.SendStr(message)
-
-        socket.notifyReadable(true)
-        socket.setMessagePort(messagePort)
-
-        m.socket = socket
-        m.socket_timer.Mark()
+        m.poller.SendRequest(messagePort)
     end function
 
-    function Poll(message as object) as boolean
-        if m.socket = invalid
-            return false
+    function Poll(socketMessages as object, messagesToSend as object) as boolean
+        chunks = m.poller.Poll(socketMessages)
+        if IsArray(chunks)
+            for each chunk in chunks
+                m.ProcessChunk(chunk, messagesToSend)
+            end for
         end if
 
-        socket = m.socket
-        if not socket.IsConnected()
-            LogError("Socket is not connected")
-            m.CloseSocket()
-            return false
-        end if
-
-        ' Not receiving data for 60 seconds might be a sign of a dead connection
-        if m.socket_timer.TotalMilliseconds() > 60000
-            LogWarn("Timeout")
-            m.CloseSocket()
-            return false
-        end if
-
-        if type(message) <> "roSocketEvent"
-            return true
-        end if
-
-        data = socket.ReceiveStr(POLL_BUFSIZE)
-        if not socket.eSuccess()
-            LogError("Error receiving data")
-            m.CloseSocket()
-            return false
-        end if
-
-        m.socket_timer.Mark()
-
-        if m.socket_buffer = invalid
-            m.socket_buffer = ""
-        end if
-
-        m.socket_buffer += data
-
-        if m.socket_state = HttpResponseState.INIT
-            m.socket_state = HttpResponseState.READING_STATUS
-        end if
-
-        if m.socket_state = HttpResponseState.READING_STATUS
-            newLineIndex = m.socket_buffer.InStr(`\r\n`)
-            if newLineIndex > 0
-                operationLine = m.socket_buffer.Left(newLineIndex)
-                LogInfo(operationLine)
-                parts = operationLine.Split(" ")
-                if parts.Count() <> 3 or parts[0] <> "HTTP/1.1" or parts[1] <> "200"
-                    LogError("Invalid operation line:", operationLine)
-                    m.CloseSocket()
-                    return false
-                end if
-                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
-                m.socket_state = HttpResponseState.READING_HEADERS
-            end if
-        end if
-
-        if m.socket_state = HttpResponseState.READING_HEADERS
-            newLineIndex = m.socket_buffer.InStr(`\r\n\r\n`)
-            if newLineIndex > 0
-                headers = m.socket_buffer.Left(newLineIndex)
-                LogDebug(headers)
-                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 4)
-                m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
-            end if
-        end if
-
-        messagesToSend = []
-
-        READING_BODY_CHUNK_SIZE:
-        ' Transfer-Encoding: chunked - long polling
-        if m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
-            m.ReadNewLines()
-            newLineIndex = m.socket_buffer.InStr(`\r\n`)
-            if newLineIndex > 0
-                chunkSize = m.socket_buffer.Left(newLineIndex)
-                chunkSize = chunkSize.Trim()
-                chunkSize = Val(chunkSize, 16)
-                LogDebug("Chunk size:", chunkSize)
-                m.socket_chunk_size = chunkSize
-                if chunkSize = 0
-                    LogDebug("End of chunked data")
-                    m.CloseSocket()
-                    return false
-                end if
-                m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
-                m.socket_state = HttpResponseState.READING_BODY_CHUNK
-            end if
-        end if
-
-        if m.socket_state = HttpResponseState.READING_BODY_CHUNK
-            if m.socket_chunk_size > 0
-                if m.socket_buffer.Len() >= m.socket_chunk_size
-                    chunk = m.socket_buffer.Left(m.socket_chunk_size)
-                    m.socket_buffer = m.socket_buffer.Mid(m.socket_chunk_size)
-                    m.socket_chunk_size = 0
-                    m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
-                    m.ProcessChunk(chunk, messagesToSend)
-                    goto READING_BODY_CHUNK_SIZE
-                end if
-            end if
-        end if
-
-        m.SendMessages(messagesToSend)
-        return true
-    end function
-
-    function CloseSocket() as void
-        if m.socket = invalid
-            return
-        end if
-        m.socket.notifyReadable(false)
-        m.socket.close()
-        m.socket = invalid
-        m.socket_buffer = invalid
-        m.socket_state = HttpResponseState.INIT
-    end function
-
-    function ReadNewLines()
-        CR = `\r`
-        LF = `\n`
-        startIndex = 0
-        while true
-            char = m.socket_buffer.Mid(startIndex, 1)
-            if char = CR or char = LF
-                startIndex += 1
-            else
-                exit while
-            end if
-        end while
-
-        if startIndex > 0
-            m.socket_buffer = m.socket_buffer.Mid(startIndex)
-        end if
+        return m.poller.IsOpen()
     end function
 
     function ProcessChunk(chunk as string, messagesToSend as object) as void
-        m.ReadNewLines()
+        chunk = m.ConsumeNewLines(chunk)
         newLineIndex = chunk.InStr(`\n`)
         while newLineIndex > 0
             payloadSize = chunk.Left(newLineIndex).trim()
@@ -365,6 +209,26 @@ class LoungeApi
             chunk = chunk.Mid(newLineIndex + payloadSize + 1)
             newLineIndex = chunk.InStr(`\n`)
         end while
+    end function
+
+    function ConsumeNewLines(chunk as string) as string
+        CR = `\r`
+        LF = `\n`
+        startIndex = 0
+        while true
+            char = chunk.Mid(startIndex, 1)
+            if char = CR or char = LF
+                startIndex += 1
+            else
+                exit while
+            end if
+        end while
+
+        if startIndex > 0
+            return chunk.Mid(startIndex)
+        end if
+
+        return chunk
     end function
 
     function ProcessCommands(commands as object, messagesToSend as object) as void

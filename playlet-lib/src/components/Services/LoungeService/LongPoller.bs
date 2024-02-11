@@ -1,0 +1,289 @@
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+const LONG_POLL_BUFSIZE = 65536
+const LONG_POLL_TIMEOUT_MS = 60000
+
+enum HttpResponseState
+    INIT = 0
+    READING_STATUS = 1
+    READING_HEADERS = 2
+    READING_BODY_CHUNK_SIZE = 3
+    READING_BODY_CHUNK = 4
+end enum
+
+class LongPoller
+
+    private urlObject
+
+    ' Socket stuff for long polling
+    private socket
+    private socket_buffer
+    private socket_state = HttpResponseState.INIT
+    private socket_chunk_size = 0
+    private socket_timer
+
+    private status_code = 0
+    private headers
+
+    function new(url as string)
+        urlObject = UrlUtils.ParseUrl(url)
+        if urlObject.protocol <> "http"
+            throw `Invalid protocol: ${urlObject.protocol}`
+        end if
+        m.urlObject = urlObject
+        m.socket_timer = CreateObject("roTimespan")
+    end function
+
+    function SendRequest(messagePort as object) as boolean
+        sendAddress = CreateObject("roSocketAddress")
+        sendAddress.SetAddress(`${m.urlObject.host}:${m.urlObject.port}`)
+
+        socket = CreateObject("roStreamSocket")
+        socket.setSendToAddress(sendAddress)
+        if not socket.Connect()
+            LogError("Failed to connect")
+            return false
+        end if
+
+        message = `GET ${m.urlObject.path} HTTP/1.1\r\n`
+        message += `Host: ${m.urlObject.host}\r\n`
+        message += `\r\n`
+
+        socket.SendStr(message)
+
+        socket.notifyReadable(true)
+        socket.setMessagePort(messagePort)
+
+        m.socket = socket
+        m.socket_timer.Mark()
+
+        return true
+    end function
+
+    ' Returns:
+    '   - false if we're no longer returning data - socket is closed
+    '   - true if we're still waiting for data
+    '   - array we've received chunk(s) of data
+    function Poll(socketMessages as object) as dynamic
+        if m.socket = invalid
+            return false
+        end if
+
+        socket = m.socket
+        if not socket.IsConnected()
+            LogError("Socket is not connected")
+            m.CloseSocket()
+            return false
+        end if
+
+        ' Not receiving data for LONG_POLL_TIMEOUT_MS seconds might be a sign of a dead connection
+        if m.socket_timer.TotalMilliseconds() > LONG_POLL_TIMEOUT_MS
+            LogWarn("Timeout after", LONG_POLL_TIMEOUT_MS, "ms")
+            m.CloseSocket()
+            return false
+        end if
+
+        if socketMessages.Count() = 0
+            return true
+        end if
+
+        hasDataToReceive = false
+        for each socketMessage in socketMessages
+            if socketMessage.GetSocketID() = socket.GetID()
+                hasDataToReceive = true
+                exit for
+            end if
+        end for
+
+        if not hasDataToReceive
+            return true
+        end if
+
+        data = socket.ReceiveStr(LONG_POLL_BUFSIZE)
+        if not socket.eSuccess()
+            LogError("Error receiving data")
+            m.CloseSocket()
+            return false
+        end if
+
+        m.socket_timer.Mark()
+
+        if m.socket_buffer = invalid
+            m.socket_buffer = ""
+        end if
+
+        m.socket_buffer += data
+
+        return m.ParseData()
+    end function
+
+    function IsOpen() as boolean
+        return m.socket <> invalid and m.socket.IsConnected()
+    end function
+
+    function CloseSocket() as void
+        if m.socket = invalid
+            return
+        end if
+        m.socket.notifyReadable(false)
+        m.socket.close()
+        m.socket = invalid
+        m.socket_buffer = invalid
+        m.socket_state = HttpResponseState.INIT
+    end function
+
+    function ParseData() as dynamic
+        if m.socket_state = HttpResponseState.INIT
+            m.socket_state = HttpResponseState.READING_STATUS
+        end if
+
+        if m.socket_state = HttpResponseState.READING_STATUS
+            if not m.ParseOpration()
+                return false
+            end if
+        end if
+
+        if m.socket_state = HttpResponseState.READING_HEADERS
+            if not m.ParseHeaders()
+                return false
+            end if
+        end if
+
+        chunks = []
+        READING_BODY_CHUNK_SIZE:
+        if m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+            if not m.ParseChunkSize()
+                return chunks
+            end if
+        end if
+
+        if m.socket_state = HttpResponseState.READING_BODY_CHUNK
+            chunk = m.ParseChunk()
+            if IsBool(chunk)
+                if not chunk
+                    return chunks
+                end if
+            else
+                chunks.Push(chunk)
+                goto READING_BODY_CHUNK_SIZE
+            end if
+        end if
+
+        return chunks
+    end function
+
+    function ParseOpration() as boolean
+        newLineIndex = m.socket_buffer.InStr(`\r\n`)
+        if newLineIndex > 0
+            operationLine = m.socket_buffer.Left(newLineIndex)
+            parts = operationLine.Split(" ")
+            if parts.Count() <> 3 or parts[0] <> "HTTP/1.1"
+                LogError("Invalid operation line:", operationLine)
+                m.CloseSocket()
+                return false
+            end if
+
+            m.status_code = Val(parts[1])
+            if not m.status_code = 200
+                LogError("Http status code:", m.status_code)
+                LogError("Response data:", m.socket_buffer)
+                m.CloseSocket()
+                return false
+            end if
+
+            m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
+            m.socket_state = HttpResponseState.READING_HEADERS
+        end if
+
+        return true
+    end function
+
+    function ParseHeaders() as boolean
+        newLineIndex = m.socket_buffer.InStr(`\r\n\r\n`)
+        if newLineIndex > 0
+            headersStr = m.socket_buffer.Left(newLineIndex)
+
+            headers = {}
+            headerLines = headersStr.Split(`\r\n`)
+            for each headerLine in headerLines
+                colonIndex = headerLine.InStr(":")
+                key = headerLine.Left(colonIndex).Trim()
+                value = headerLine.Mid(colonIndex + 1).Trim()
+                headers[key] = value
+            end for
+            m.headers = headers
+
+            LogDebug("Headers:", headers)
+
+            if headers["Transfer-Encoding"] <> "chunked"
+                LogError("Invalid transfer encoding:", headers["Transfer-Encoding"])
+                m.CloseSocket()
+                return false
+            end if
+
+            m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 4)
+            m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+        end if
+        return true
+    end function
+
+    function ParseChunkSize() as boolean
+        m.ConsumeNewLines()
+        newLineIndex = m.socket_buffer.InStr(`\r\n`)
+        if newLineIndex > 0
+            chunkSize = m.socket_buffer.Left(newLineIndex)
+            chunkSize = chunkSize.Trim()
+            chunkSize = Val(chunkSize, 16)
+            LogDebug("Chunk size:", chunkSize)
+            m.socket_chunk_size = chunkSize
+            if chunkSize = 0
+                LogDebug("End of chunked data")
+                m.CloseSocket()
+                return false
+            end if
+            m.socket_buffer = m.socket_buffer.Mid(newLineIndex + 2)
+            m.socket_state = HttpResponseState.READING_BODY_CHUNK
+        end if
+
+        return true
+    end function
+
+    function ParseChunk() as dynamic
+        if m.socket_chunk_size > 0
+            if m.socket_buffer.Len() >= m.socket_chunk_size
+                chunk = m.socket_buffer.Left(m.socket_chunk_size)
+                m.socket_buffer = m.socket_buffer.Mid(m.socket_chunk_size)
+                m.socket_chunk_size = 0
+                m.socket_state = HttpResponseState.READING_BODY_CHUNK_SIZE
+                return chunk
+            end if
+        else
+            LogError("Invalid chunk size")
+            m.CloseSocket()
+            return false
+        end if
+
+        return true
+    end function
+
+    function ConsumeNewLines()
+        CR = `\r`
+        LF = `\n`
+        startIndex = 0
+        while true
+            char = m.socket_buffer.Mid(startIndex, 1)
+            if char = CR or char = LF
+                startIndex += 1
+            else
+                exit while
+            end if
+        end while
+
+        if startIndex > 0
+            m.socket_buffer = m.socket_buffer.Mid(startIndex)
+        end if
+    end function
+
+
+end class

@@ -1,7 +1,6 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 ' TODO:P0
-' 1. Move long polling to a separate file
 ' 2. Only create a lounge when the first device connects
 '   - Also create a lounge when the tv code is generated
 ' 3. Cache the lounge token to registry
@@ -68,6 +67,7 @@ function LoungeServiceLoop()
     isOpen = false
     outgoingLoungeMessages = []
     portMessages = []
+    socketMessages = []
 
     while true
         if m.top.shouldQuit = true
@@ -85,14 +85,17 @@ function LoungeServiceLoop()
             portMessages.Push(messagePort.GetMessage())
         end while
 
-        pollMessage = invalid
+        ' At this point:
+        ' - We check if we need to send messages to the lounge based on player state
+        ' - We check the lounge for new commands, which might need responding to
+        ' - Finally, we send the outgoing messages to the lounge in one go
         outgoingLoungeMessages.Clear()
+        socketMessages.Clear()
 
         for each portMessage in portMessages
             messageType = type(portMessage)
             if messageType = "roSocketEvent"
-                pollMessage = portMessage
-                continue for
+                socketMessages.Push(portMessage)
             else if messageType = "roSGNodeEvent"
                 field = portMessage.GetField()
                 if field = "outgoingMessages"
@@ -102,9 +105,9 @@ function LoungeServiceLoop()
             end if
         end for
 
-        api.SendMessages(outgoingLoungeMessages)
+        isOpen = api.Poll(socketMessages, outgoingLoungeMessages)
 
-        isOpen = api.Poll(pollMessage)
+        api.SendMessages(outgoingLoungeMessages)
 
         if not isOpen
             sleep(3000)

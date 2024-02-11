@@ -195,4 +195,47 @@ namespace UrlUtils
         end for
         return query
     end function
+
+    ' Parses the URL into protocol, host, port, and path
+    function ParseUrl(url as string) as object
+        protocol = invalid
+        port = invalid
+        path = "/"
+
+        index = url.InStr("://")
+        if index > 0
+            protocol = url.Left(index)
+            url = url.Mid(index + 3)
+        else
+            protocol = "http"
+        end if
+
+        index = url.InStr("/")
+        if index > 0
+            host = url.Left(index)
+            path = url.Mid(index)
+        else
+            host = url
+        end if
+
+        index = host.InStr(":")
+        if index > 0
+            port = host.Mid(index + 1)
+            host = host.Left(index)
+        else
+            if protocol = "http"
+                port = "80"
+            else if protocol = "https"
+                port = "443"
+            end if
+        end if
+
+        return {
+            protocol: protocol
+            host: host
+            port: port
+            path: path
+        }
+    end function
+
 end namespace
