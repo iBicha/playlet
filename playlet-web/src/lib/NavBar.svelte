@@ -95,7 +95,7 @@
               class="tooltip tooltip-left"
               data-tip={`Login using ${currentInstance}`}
             >
-              <button on:click={login}>Login</button>
+              <button on:click={login}>Login to Invidious</button>
             </div>
           </li>
         {/if}

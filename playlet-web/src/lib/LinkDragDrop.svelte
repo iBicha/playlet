@@ -195,7 +195,7 @@
     : 'hidden'} fixed w-full h-full bg-base-100/80 z-50 flex justify-center items-center"
 >
   {#if isDragging}
-    <div class="text-2xl font-bold">Drop a Youtube link here</div>
+    <div class="text-2xl font-bold">Drop a YouTube link here</div>
   {:else if isLoading}
     <span class="loading loading-spinner loading-md" />
   {/if}

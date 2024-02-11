@@ -1,4 +1,4 @@
-// Description: Read recommendations, subscriptions, watch later, liked, and history from Youtube
+// Description: Read recommendations, subscriptions, watch later, liked, and history from YouTube
 // and import them into invidious. Requires yt-dlp to be installed.
 
 const { ArgumentParser } = require('argparse')
@@ -11,7 +11,7 @@ const fetch = require('cross-fetch');
 
 function getArgumentParser() {
     const parser = new ArgumentParser({
-        description: 'Sync Youtube profile with Invidious'
+        description: 'Sync YouTube profile with Invidious'
     });
 
     parser.add_argument('--browser', { help: 'Use cookies from browser' });
@@ -26,7 +26,7 @@ function getArgumentParser() {
 const config = getEnvVars();
 const PLAYLEY_SERVER = `http://${config.ROKU_DEV_TARGET}:8888`;
 
-const PLAYLIST_DESCRIPTION = "[Automatically imported from Youtube using profile-sync script]"
+const PLAYLIST_DESCRIPTION = "[Automatically imported from YouTube using profile-sync script]"
 
 const INVIDIOUS_SCOPES = "POST:tokens/unregister,POST:import/invidious,GET:playlists,DELETE:playlists*"
 
