@@ -19,7 +19,7 @@
 
 # Playlet
 
-Playlet is an unofficial Youtube client for Roku 📺
+Playlet is an unofficial YouTube client for Roku 📺
 
 ## Screenshots
 
@@ -44,7 +44,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
 - 📱 Browse, search, and cast from phone using the web app
 - 🔮 Picture-in-picture mode
-- ⚡ Fast! [Check out how we compare with the official Youtube app](https://youtu.be/qmSvA-QQW20)
+- ⚡ Fast! [Check out how we compare with the official YouTube app](https://youtu.be/qmSvA-QQW20)
 
 ### Cast from phone
 
@@ -76,7 +76,7 @@ For everything related to Playlet app development, please see the [documentation
 ## Analytics and reporting
 
 We do not collect any usage data, anonymous or not. But Roku does, and you can find the data made available to Playlet in the [Wiki](https://github.com/iBicha/playlet/wiki).
-Most software in the wild collect some data to make sure things work, and to prioritize features. 
+Most software in the wild collect some data to make sure things work, and to prioritize features.
 Because we don't do that, we wouldn't know if people using Playlet are facing issues, unless these issues get reported.
 Playlet could run on variaty of devices, with different capabilities and screen sizes, and different Invidious instances.
 That's why it's important to report any issues you encouter using Playlet, otherwise it's unlikely that they get addressed.
@@ -89,10 +89,10 @@ play•let /ˈplālət/
 : a short play
 ```
 
-**Playlet** is about keeping the time you spend on Youtube short and useful. It values your time, so it does not show you ads, and allows you to skip sponsored sections and other irrelevant information that's designed to monitize you and/or waste your time.
+**Playlet** is about keeping the time you spend on YouTube short and useful. It values your time, so it does not show you ads, and allows you to skip sponsored sections and other irrelevant information that's designed to monitize you and/or waste your time.
 
 There's a cliché about how a lot of open source software is **`"Made with ♡"`**. This project in particular is **not**.<br/>
-**Playlet** was created out of **spite**, because I believe I have watched enough back-to-back, unskippable Youtube ads for a lifetime.
+**Playlet** was created out of **spite**, because I believe I have watched enough back-to-back, unskippable YouTube ads for a lifetime.
 
 By removing all the bloat, the ads, the tracking, we could end up with an even faster app than the official one.
 
