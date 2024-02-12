@@ -1,0 +1,50 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' TODO:P2 a lot of shared logic with the SponsorBlock notification, should be refactored into a common notification
+function Init()
+    m.translationAnimation = m.top.findNode("translationAnimation")
+    m.translationAnimationInterpolator = m.top.findNode("translationAnimationInterpolator")
+    m.animationTimer = m.top.findNode("animationTimer")
+
+    m.top.translation = [1280, 20]
+    m.translationAnimation.observeField("state", FuncName(OnAnimationState))
+    m.animationTimer.observeField("fire", FuncName(OnAnimationTimer))
+end function
+
+function OnShow()
+    AnimateIn()
+end function
+
+function OnAnimationTimer()
+    AnimateOut()
+end function
+
+function AnimateIn()
+    m.translationAnimation.unobserveField("state")
+    m.animationTimer.control = "stop"
+    m.animationTimer.control = "start"
+    m.translationAnimation.observeField("state", FuncName(OnAnimationState))
+
+    Animate(false)
+end function
+
+function AnimateOut()
+    Animate(true)
+end function
+
+function Animate(reverse as boolean) as void
+    ' We are already animating in the requested direction
+    if m.translationAnimationInterpolator.reverse = reverse and m.translationAnimation.control <> "none"
+        return
+    end if
+
+    m.translationAnimationInterpolator.reverse = reverse
+    m.translationAnimation.control = "start"
+end function
+
+function OnAnimationState()
+    if m.translationAnimation.state = "stopped" and m.translationAnimationInterpolator.reverse = true
+        m.top.getParent().removeChild(m.top)
+    end if
+end function

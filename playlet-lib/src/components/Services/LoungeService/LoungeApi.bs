@@ -2,10 +2,10 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/Services/LoungeService/LongPoller.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
 import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/UrlUtils.bs"
-
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
 
@@ -25,9 +25,10 @@ class LoungeApi
     private lastCommandIndex = -1
     private poller
 
-    function new(loungeServiceNode as object, playQueueNode as object)
+    function new(loungeServiceNode as object, playQueueNode as object, notificationsNode as object)
         m.loungeServiceNode = loungeServiceNode
         m.playQueueNode = playQueueNode
+        m.notificationsNode = notificationsNode
         m.deviceId = loungeServiceNode.deviceId
         deviceName = loungeServiceNode.deviceName
         m.deviceName = deviceName
@@ -292,17 +293,72 @@ class LoungeApi
         messagesToSend.Push(message)
     end function
 
-    function HandleLoungeStatus(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing
+    function HandleLoungeStatus(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        LogInfo(commandType, FormatJson(commandArgs))
+        devices = commandArgs["devices"]
+        if not IsString(devices)
+            return
+        end if
+        devices = ParseJson(devices)
+        if devices = invalid
+            return
+        end if
+
+        devicesDict = {}
+        for each device in devices
+            devicesDict[device.id] = device
+        end for
+
+        m.loungeServiceNode.devices = devicesDict
     end function
 
-    function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing
-        ' TODO:P2 show connected device notification
+    function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        LogInfo(commandType, FormatJson(commandArgs))
+        newDevice = commandArgs
+        id = newDevice.id
+        if StringUtils.IsNullOrEmpty(id)
+            return
+        end if
+
+        devices = m.loungeServiceNode.devices
+        if devices = invalid
+            devices = {}
+        end if
+
+        if devices.DoesExist(id)
+            device = devices[id]
+            device.Append(newDevice)
+            newDevice = device
+        end if
+
+        devices[id] = newDevice
+        m.loungeServiceNode.devices = devices
+
+        userName = newDevice.user
+        if StringUtils.IsNullOrEmpty(userName)
+            userName = newDevice.name
+        end if
+        userAvatarUri = newDevice.userAvatarUri
+
+        LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, userName, userAvatarUri)
     end function
 
-    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        ' Do nothing
+    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        LogInfo(commandType, FormatJson(commandArgs))
+        device = commandArgs
+        id = device.id
+        if StringUtils.IsNullOrEmpty(id)
+            return
+        end if
+
+        devices = m.loungeServiceNode.devices
+        if devices = invalid
+            devices = {}
+        end if
+        if devices.Delete(id)
+            m.loungeServiceNode.devices = devices
+        end if
+        ' TODO:P1 disconnect notification
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void

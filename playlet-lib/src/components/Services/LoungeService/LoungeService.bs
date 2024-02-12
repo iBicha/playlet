@@ -4,12 +4,7 @@ import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 ' 3. Cache the lounge token to registry
 ' 4. Add a way to refresh the lounge token
 ' 5. Add a way to leave the lounge
-' 6. Add connected remotes count
-' 7. Only send player events when we have connected remotes
 ' 8. Handle rpc commands
-'   - loungeStatus => restore connected remotes
-'   - remoteConnected
-'   - remoteDisconnected
 '   - setPlaylist
 '   - updatePlaylist
 '   - next => has no args
@@ -57,11 +52,15 @@ function LoungeServiceLoop()
     ' We do not join a lounge until something asks us to like
     ' - A remote connects through DIAL
     ' - Generating a TV link code
-    m.top.observeField("join", messagePort)
-    wait(0, messagePort)
-    m.top.unobserveField("join")
 
-    api = new LoungeApi(m.top, m.top.playQueue)
+    ' TODO:P0 there's an issue with devices trying to join existing lounges...
+    ' We either need to figure out temporary lounges, or persist the lounge token
+
+    ' m.top.observeField("join", messagePort)
+    ' wait(0, messagePort)
+    ' m.top.unobserveField("join")
+
+    api = new LoungeApi(m.top, m.top.playQueue, m.top.notifications)
 
     ' TODO:P1 need error handling on lounge requests
     m.top.screenId = api.GetScreenId()
