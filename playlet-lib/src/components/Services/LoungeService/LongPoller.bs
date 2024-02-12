@@ -14,6 +14,7 @@ end enum
 
 class LongPoller
 
+    private url
     private urlObject
 
     ' Socket stuff for long polling
@@ -27,6 +28,7 @@ class LongPoller
     private headers
 
     function new(url as string)
+        m.url = url
         urlObject = UrlUtils.ParseUrl(url)
         if urlObject.protocol <> "http"
             throw `Invalid protocol: ${urlObject.protocol}`
@@ -45,6 +47,12 @@ class LongPoller
             LogError("Failed to connect")
             return false
         end if
+
+        LogInfo(`Sending long polling GET ${m.url}`, "ID:", socket.GetID())
+
+        #if DEBUG
+            ? `════════ curl command ════════\n${m.ToCurlCommand()}\n══════════════════════════════`
+        #end if
 
         message = `GET ${m.urlObject.path} HTTP/1.1\r\n`
         message += `Host: ${m.urlObject.host}\r\n`
@@ -285,5 +293,8 @@ class LongPoller
         end if
     end function
 
+    function ToCurlCommand() as string
+        return `curl "${m.url}"`
+    end function
 
 end class
