@@ -140,6 +140,15 @@ namespace Http
         end function
 
         function GenerateDialYouTube() as string
+            screenId = m.loungeService.screenId
+            loungeToken = m.loungeService.loungeToken
+
+            if m._dialYouTubeXml <> invalid
+                if m._dialYoutubeScreenId = screenId and m._dialYoutubeLoungeToken = loungeToken
+                    return m._dialYouTubeXml
+                end if
+            end if
+
             xml = new XmlObject()
             if xml.Node("service", { "dialVer": "1.7", "xmlns": "urn:dial-multiscreen-org:schemas:dial" })
                 xml.TextNode("name", "YouTube")
@@ -147,8 +156,6 @@ namespace Http
                 xml.TextNode("state", "running")
                 xml.EmptyNode("link", { "rel": "run", "href": "run" })
 
-                screenId = m.loungeService.screenId
-                loungeToken = m.loungeService.loungeToken
 
                 if not StringUtils.IsNullOrEmpty(screenId) and not StringUtils.IsNullOrEmpty(loungeToken)
                     if xml.Node("additionalData")
@@ -163,7 +170,11 @@ namespace Http
 
                 xml.End()
             end if
-            return xml.ToXmlString()
+
+            m._dialYouTubeXml = xml.ToXmlString()
+            m._dialYoutubeScreenId = screenId
+            m._dialYoutubeLoungeToken = loungeToken
+            return m._dialYouTubeXml
         end function
 
     end class
