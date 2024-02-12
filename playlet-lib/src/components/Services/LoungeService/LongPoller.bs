@@ -13,10 +13,6 @@ enum HttpResponseState
 end enum
 
 class LongPoller
-
-    private url
-    private urlObject
-
     ' Socket stuff for long polling
     private socket
     private socket_buffer
@@ -27,19 +23,20 @@ class LongPoller
     private status_code = 0
     private headers
 
-    function new(url as string)
+    function new()
+        m.socket_timer = CreateObject("roTimespan")
+    end function
+
+    function SendRequest(url as string, messagePort as object) as boolean
         m.url = url
+
         urlObject = UrlUtils.ParseUrl(url)
         if urlObject.protocol <> "http"
             throw `Invalid protocol: ${urlObject.protocol}`
         end if
-        m.urlObject = urlObject
-        m.socket_timer = CreateObject("roTimespan")
-    end function
 
-    function SendRequest(messagePort as object) as boolean
         sendAddress = CreateObject("roSocketAddress")
-        sendAddress.SetAddress(`${m.urlObject.host}:${m.urlObject.port}`)
+        sendAddress.SetAddress(`${urlObject.host}:${urlObject.port}`)
 
         socket = CreateObject("roStreamSocket")
         socket.setSendToAddress(sendAddress)
@@ -48,14 +45,14 @@ class LongPoller
             return false
         end if
 
-        LogInfo(`Sending long polling GET ${m.url}`, "ID:", socket.GetID())
+        LogInfo(`Sending long polling GET ${url}`, "ID:", socket.GetID())
 
         #if DEBUG
             ? `════════ curl command ════════\n${m.ToCurlCommand()}\n══════════════════════════════`
         #end if
 
-        message = `GET ${m.urlObject.path} HTTP/1.1\r\n`
-        message += `Host: ${m.urlObject.host}\r\n`
+        message = `GET ${urlObject.path} HTTP/1.1\r\n`
+        message += `Host: ${urlObject.host}\r\n`
         message += `\r\n`
 
         socket.SendStr(message)
