@@ -39,7 +39,8 @@ function InitializeBindings()
                 "webServer": "../WebServer"
             }, 
             "LoungeService": {
-                "playQueue": "../PlayQueue"
+                "playQueue": "../PlayQueue", 
+                "notifications": "../Notifications"
             }
         }
     }
