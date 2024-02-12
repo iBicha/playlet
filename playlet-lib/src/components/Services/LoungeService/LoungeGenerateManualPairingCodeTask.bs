@@ -4,6 +4,25 @@ import "pkg:/source/utils/StringUtils.bs"
 
 @asynctask
 function LoungeGenerateManualPairingCodeTask(input as object) as object
+    loungeService = input.loungeService
+
+    if StringUtils.IsNullOrEmpty(input.loungeToken)
+        messagePort = CreateObject("roMessagePort")
+        loungeService.observeFieldScoped("loungeToken", messagePort)
+        loungeService.join = true
+        message = wait(30000, messagePort)
+        loungeService.unobserveFieldScoped("loungeToken")
+        if message = invalid or StringUtils.IsNullOrEmpty(message.GetData())
+            return {
+                "success": false
+                "error": "Couldn't join lounge"
+            }
+        end if
+
+        input.screenId = loungeService.screenId
+        input.loungeToken = loungeService.loungeToken
+    end if
+
     bodyParams = {
         "lounge_token": input.loungeToken
         "screen_id": input.screenId

@@ -58,8 +58,19 @@ namespace Http
                 return true
             end if
 
-            ' TODO:P0 avoid joining a lounge on startup.
-            ' Once we get a pairCode, join a lounge if not already joined.
+            loungeToken = m.loungeService.loungeToken
+            if StringUtils.IsNullOrEmpty(loungeToken)
+                messagePort = CreateObject("roMessagePort")
+                m.loungeService.observeFieldScoped("loungeToken", messagePort)
+                m.loungeService.join = true
+                message = wait(30000, messagePort)
+                m.loungeService.unobserveFieldScoped("loungeToken")
+                if message = invalid or StringUtils.IsNullOrEmpty(message.GetData())
+                    response.Default(500, "Couldn't join lounge")
+                    return true
+                end if
+            end if
+
             registerUrl = "https://www.youtube.com/api/lounge/pairing/register_pairing_code"
             registerBody = {
                 "access_type": "permanent"
@@ -155,7 +166,6 @@ namespace Http
                 xml.EmptyNode("options", { "allowStop": "true" })
                 xml.TextNode("state", "running")
                 xml.EmptyNode("link", { "rel": "run", "href": "run" })
-
 
                 if not StringUtils.IsNullOrEmpty(screenId) and not StringUtils.IsNullOrEmpty(loungeToken)
                     if xml.Node("additionalData")

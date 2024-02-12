@@ -4,7 +4,11 @@ import "pkg:/source/utils/StringUtils.bs"
 
 namespace Lounge
 
-    function SendNowPlayingLoading(videoId as dynamic)
+    function SendNowPlayingLoading(videoId as dynamic) as void
+        if StringUtils.IsNullOrEmpty(m.loungeService.loungeToken)
+            return
+        end if
+
         overrides = {}
         overrides[FIELD_STATE] = PlayerStatus.LOADING
         loungeStateMsg = LoungeMessages.OnStateChange(m.top, overrides)
@@ -15,7 +19,11 @@ namespace Lounge
         m.loungeService.outgoingMessages = [nowPlayingMsg, loungeStateMsg]
     end function
 
-    function SendOnStateChange()
+    function SendOnStateChange() as void
+        if StringUtils.IsNullOrEmpty(m.loungeService.loungeToken)
+            return
+        end if
+
         loungeStateMsg = LoungeMessages.OnStateChange(m.top)
         m.loungeService.outgoingMessages = [loungeStateMsg]
     end function

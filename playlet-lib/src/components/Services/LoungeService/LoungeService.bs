@@ -1,8 +1,6 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 ' TODO:P0
-' 2. Only create a lounge when the first device connects
-'   - Also create a lounge when the tv code is generated
 ' 3. Cache the lounge token to registry
 ' 4. Add a way to refresh the lounge token
 ' 5. Add a way to leave the lounge
@@ -55,12 +53,21 @@ end function
 
 function LoungeServiceLoop()
     messagePort = CreateObject("roMessagePort")
+
+    ' We do not join a lounge until something asks us to like
+    ' - A remote connects through DIAL
+    ' - Generating a TV link code
+    m.top.observeField("join", messagePort)
+    wait(0, messagePort)
+    m.top.unobserveField("join")
+
     api = new LoungeApi(m.top, m.top.playQueue)
 
+    ' TODO:P1 need error handling on lounge requests
     m.top.screenId = api.GetScreenId()
     m.top.loungeToken = api.GetToken()
 
-    m.top.observeFieldScoped("outgoingMessages", messagePort)
+    m.top.observeField("outgoingMessages", messagePort)
 
     api.GetSessionData()
     api.FetchCommandsRpc(messagePort)
@@ -114,4 +121,7 @@ function LoungeServiceLoop()
             api.FetchCommandsRpc(messagePort)
         end if
     end while
+
+    m.top.unobserveField("outgoingMessages", messagePort)
+    m.top.isRunning = false
 end function
