@@ -73,26 +73,30 @@ function DialServerLoop() as void
 
         peerAddress = udp.GetReceivedFromAddress()
         address = peerAddress.GetAddress()
-        LogInfo(`Received message from ${address}:`, ssdpMessage)
+        host = peerAddress.GetHostName()
 
-        if timers[address] = invalid
-            timers[address] = []
+        if timers[host] = invalid
+            timers[host] = []
+            LogInfo(`Received message from ${address}:`, ssdpMessage)
+            LogInfo(`No further messages from ${host} will be logged at info level. If you need to debug, please enable debug logging.`)
+        else
+            LogDebug(`Received message from ${address}:`, ssdpMessage)
         end if
-        timerForAddress = timers[address]
+        timerForHost = timers[host]
 
         now = timer.TotalMilliseconds()
 
         ' Remove any timers that are older than timeThreshold
-        while timerForAddress.Count() > 0 and now - timerForAddress[0] > timeThreshold
-            timerForAddress.Shift()
+        while timerForHost.Count() > 0 and now - timerForHost[0] > timeThreshold
+            timerForHost.Shift()
         end while
 
-        if timerForAddress.Count() >= countThreshold
+        if timerForHost.Count() >= countThreshold
             LogDebug(`Ignoring message from ${address} - too spammy`)
             continue while
         end if
 
-        timerForAddress.Push(now)
+        timerForHost.Push(now)
 
         ssdpResponse = CreateSsdpResponse(ssdpMessage, webServer)
 
