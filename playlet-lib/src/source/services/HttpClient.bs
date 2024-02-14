@@ -343,6 +343,8 @@ namespace HttpClient
 
             if m._sent <> true
                 LogError("Failed to send request")
+            else
+                m._timer = CreateObject("roTimeSpan")
             end if
 
             return m
@@ -480,6 +482,27 @@ namespace HttpClient
 
             HttpClientCache.Set(response)
             return response
+        end function
+
+        function IsCompleted() as boolean
+            if m.urlTransfer = invalid
+                return false
+            end if
+
+            messagePort = m.urlTransfer.GetMessagePort()
+            message = messagePort.PeekMessage()
+            if message <> invalid
+                return true
+            end if
+
+            if m._timer <> invalid
+                elapsedMs = m._timer.TotalMilliseconds()
+                if elapsedMs > m._timeoutSeconds * 1000
+                    return true
+                end if
+            end if
+
+            return false
         end function
 
         private function CreateRoUrlTransfer() as object

@@ -25,6 +25,7 @@ class LoungeApi
     private ofs
     private lastCommandIndex = -1
     private poller
+    private outgoingMessagesRequests
 
     function new(loungeServiceNode as object, playQueueNode as object, notificationsNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -36,6 +37,7 @@ class LoungeApi
         m.screenName = deviceName
         m.ofs = 0
         m.poller = invalid
+        m.outgoingMessagesRequests = {}
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
@@ -483,12 +485,27 @@ class LoungeApi
         body = UrlUtils.GetUrlEncodedForm(postData)
         request = HttpClient.Post(url, body)
         request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request.Send()
 
-        ' TODO:P0 we do not need to await here - we can check on results in the next iteration
-        response = request.Await()
-        if not response.IsSuccess()
-            LogError(response.ErrorMessage())
-        end if
+        ' we do not need to wait for requests to finish, we check on them later
+        ' to avoid blocking the thread.
+        ' This is specific to sent lounge messages, since we're not waiting for a response.
+        requestId = request.urlTransfer.GetIdentity().ToStr()
+        m.outgoingMessagesRequests[requestId] = request
+    end function
+
+    function ProcessPendingOutgoingMessages()
+        for each key in m.outgoingMessagesRequests
+            request = m.outgoingMessagesRequests[key]
+            if request.IsCompleted()
+                response = request.Await()
+                if not response.IsSuccess()
+                    LogError(response.ErrorMessage())
+                end if
+
+                m.outgoingMessagesRequests.Delete(key)
+            end if
+        end for
     end function
 
     function SaveCurrentLoungeData() as void
