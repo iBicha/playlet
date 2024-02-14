@@ -458,11 +458,11 @@ class LoungeApi
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
         postData = [
-            { key: "count", value: `${messages.Count()}` }
-            { key: "ofs", value: `${m.ofs}` }
+            { key: "count", value: messages.Count() }
+            { key: "ofs", value: loungeData.ofs }
         ]
 
-        m.ofs += messages.Count()
+        loungeData.ofs += messages.Count()
 
         for i = 0 to messages.Count() - 1
             message = messages[i]
@@ -531,6 +531,13 @@ class LoungeApi
             "commandType": COMMAND_LOUNGE_SCREEN_DISCONNECTED
         }]
 
+        LogInfo("Disconnecting from last lounge")
+        ' Every time we send messages, we need to increment the ofs.
+        ' This is so that the server recognizes old messages and doesn't process them.
+        ' But we're currently disconnecting from a previous session, and since
+        ' we didn't keep track of the ofs, so we'll just set it to a large number.
+        ' This is the last message we'll be sending to this lounge.
+        loungeData.ofs = 99999999
         m.SendMessages(messages, loungeData)
         RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
     end function
