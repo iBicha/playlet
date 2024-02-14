@@ -36,7 +36,8 @@ function InitializeBindings()
                 "loungeService": "../LoungeService"
             }, 
             "DialServer": {
-                "webServer": "../WebServer"
+                "webServer": "../WebServer", 
+                "loungeService": "../LoungeService"
             }, 
             "LoungeService": {
                 "playQueue": "../PlayQueue", 
