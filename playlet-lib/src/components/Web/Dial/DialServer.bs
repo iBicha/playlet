@@ -28,9 +28,9 @@ function DialServerLoop() as void
     webServer = m.top.webServer
     m.deviceId = m.top.loungeService.deviceId
 
-    msgPort = createobject("roMessagePort")
+    messagePort = createobject("roMessagePort")
     udp = createobject("roDatagramSocket")
-    udp.setMessagePort(msgPort)
+    udp.setMessagePort(messagePort)
     addr = createobject("roSocketAddress")
     addr.setPort(1900)
     udp.setAddress(addr)
@@ -46,20 +46,25 @@ function DialServerLoop() as void
     countThreshold = 3
     timers = {}
     timer = createobject("roTimespan")
+
     m.top.shouldQuit = false
+    m.top.observeField("shouldQuit", messagePort)
 
     while udp.eOK()
-        ' TODO:P2 listen to changes to `shouldQuit` on the messagePort instead of this checks
-        if m.top.shouldQuit = true
-            exit while
+        message = wait(10000, messagePort)
+        messageType = type(message)
+
+        if messageType = "roSGNodeEvent"
+            field = message.GetField()
+            if field = "shouldQuit"
+                exit while
+            end if
         end if
 
-        event = wait(10000, msgPort)
-
-        if type(event) <> "roSocketEvent"
+        if messageType <> "roSocketEvent"
             continue while
         end if
-        if event.getSocketID() <> udp.getID()
+        if message.getSocketID() <> udp.getID()
             continue while
         end if
         if not udp.isReadable()
