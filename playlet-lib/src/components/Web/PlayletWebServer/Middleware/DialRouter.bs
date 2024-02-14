@@ -13,9 +13,14 @@ namespace Http
             m.loungeService = task.loungeService
             m.deviceId = m.loungeService.deviceId
             m.deviceName = m.loungeService.deviceName
+
+            m.routes.push({ method: "GET", path: `/dial/${m.deviceId}/device-description.xml`, router: m, func: "GetDialManifest" })
+            m.routes.push({ method: "GET", path: `/dial/${m.deviceId}/YouTube`, router: m, func: "GetDialYouTube" })
+            m.routes.push({ method: "POST", path: `/dial/${m.deviceId}/YouTube`, router: m, func: "PostDialYouTube" })
+            m.routes.push({ method: "DELETE", path: `/dial/${m.deviceId}/YouTube/run`, router: m, func: "CloseChannel" })
         end function
 
-        @get("/dial/device-description.xml")
+        ' @get("/dial/device-description.xml")
         function GetDialManifest(context as object) as boolean
             response = context.response
 
@@ -23,12 +28,12 @@ namespace Http
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
             response.ContentType(`text/xml; charset="utf-8"`)
-            response.headers["Application-URL"] = `${m.serverAddress}/dial`
-
+            response.headers["Application-URL"] = `${m.serverAddress}/dial/${m.deviceId}`
+            response.headers["Cache-Control"] = "no-cache, no-store, max-age=0, must-revalidate"
             return true
         end function
 
-        @get("/dial/YouTube")
+        ' @get("/dial/YouTube")
         function GetDialYouTube(context as object) as boolean
             response = context.response
 
@@ -36,11 +41,12 @@ namespace Http
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
             response.ContentType(`text/xml; charset="utf-8"`)
+            response.headers["Cache-Control"] = "no-cache, no-store, max-age=0, must-revalidate"
 
             return true
         end function
 
-        @post("/dial/YouTube")
+        ' @post("/dial/YouTube")
         function PostDialYouTube(context as object) as boolean
             request = context.request
             response = context.response
@@ -73,7 +79,6 @@ namespace Http
 
             registerUrl = "https://www.youtube.com/api/lounge/pairing/register_pairing_code"
             registerBody = {
-                "access_type": "permanent"
                 "app": "Playlet"
                 "pairing_code": pairingCode
                 "screen_id": m.loungeService.screenId
@@ -95,7 +100,7 @@ namespace Http
             return true
         end function
 
-        @delete("/dial/YouTube/run")
+        ' @delete("/dial/YouTube/run")
         function CloseChannel(context as object) as boolean
             response = context.response
 

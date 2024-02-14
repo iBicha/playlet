@@ -5,6 +5,7 @@ import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
 import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
@@ -422,7 +423,7 @@ class LoungeApi
         player.seek = seekTo
     end function
 
-    function SendMessages(messages as object) as void
+    function SendMessages(messages as object, loungeData = invalid as object) as void
         if messages.Count() = 0
             return
         end if
@@ -437,17 +438,22 @@ class LoungeApi
             "v": "2"
             "t": "1"
             "app": "Playlet"
-            "AID": "42"
             "zx": "xxxxxxxxxxxx"
             "RID": "1337"
         }
 
-        queryParams["name"] = m.screenName
-        queryParams["id"] = m.deviceId
-        queryParams["loungeIdToken"] = m.loungeToken
-        queryParams["SID"] = m.sessionId
-        queryParams["gsessionid"] = m.gSessionId
-        queryParams["AID"] = messages[0].commandId
+        if loungeData = invalid
+            loungeData = m
+        end if
+
+        queryParams["name"] = loungeData.screenName
+        queryParams["id"] = loungeData.deviceId
+        queryParams["loungeIdToken"] = loungeData.loungeToken
+        queryParams["SID"] = loungeData.sessionId
+        queryParams["gsessionid"] = loungeData.gSessionId
+        if messages[0].commandId <> invalid
+            queryParams["AID"] = messages[0].commandId
+        end if
 
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
@@ -478,9 +484,55 @@ class LoungeApi
         request = HttpClient.Post(url, body)
         request.Header("Content-Type", "application/x-www-form-urlencoded")
 
+        ' TODO:P0 we do not need to await here - we can check on results in the next iteration
         response = request.Await()
         if not response.IsSuccess()
             LogError(response.ErrorMessage())
         end if
     end function
+
+    function SaveCurrentLoungeData() as void
+        loungeData = {}
+        fields = ["screenName", "deviceId", "loungeToken", "sessionId", "gSessionId"]
+        for each field in fields
+            if StringUtils.IsNullOrEmpty(m[field])
+                LogWarn("Lounge data will not be saved. missing field:", field)
+                return
+            end if
+
+            loungeData[field] = m[field]
+        end for
+
+        loungeData = FormatJson(loungeData)
+        RegistryUtils.Write(RegistryUtils.LAST_LOUNGE_DATA, loungeData)
+    end function
+
+    function DisconnectFromLastLounge() as void
+        loungeData = RegistryUtils.Read(RegistryUtils.LAST_LOUNGE_DATA)
+        if loungeData = invalid
+            return
+        end if
+
+        loungeData = ParseJson(loungeData)
+        if not IsAssociativeArray(loungeData)
+            RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
+            return
+        end if
+
+        fields = ["screenName", "deviceId", "loungeToken", "sessionId", "gSessionId"]
+        for each field in fields
+            if StringUtils.IsNullOrEmpty(loungeData[field])
+                LogWarn("Can't disconnect from lounge. Missing field:", field)
+                return
+            end if
+        end for
+
+        messages = [{
+            "commandType": COMMAND_LOUNGE_SCREEN_DISCONNECTED
+        }]
+
+        m.SendMessages(messages, loungeData)
+        RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
+    end function
+
 end class

@@ -1,9 +1,7 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 ' TODO:P0
-' 3. Cache the lounge token to registry
-' 4. Add a way to refresh the lounge token
-' 5. Add a way to leave the lounge
+' 1. Find a way to invalidate a lounge (force a phone to leave it)
 ' 8. Handle rpc commands
 '   - setPlaylist
 '   - updatePlaylist
@@ -21,7 +19,7 @@ function Init()
     m.top.functionName = "LoungeServiceLoop"
 
     deviceInfo = CreateObject("roDeviceInfo")
-    m.top.deviceId = deviceInfo.GetChannelClientId()
+    m.top.deviceId = deviceInfo.GetRandomUUID()
     deviceFriendlyName = deviceInfo.GetFriendlyName()
     if StringUtils.IsNullOrEmpty(deviceFriendlyName)
         deviceFriendlyName = "TV"
@@ -47,20 +45,21 @@ function StopService(_unused as dynamic) as void
 end function
 
 function LoungeServiceLoop()
+    api = new LoungeApi(m.top, m.top.playQueue, m.top.notifications)
+    ' Mobile app can remain connected to devices even after restarts.
+    ' Since we create a new lounge every time, we signal to the last lounge
+    ' that we're no longer there.
+    api.DisconnectFromLastLounge()
+
     messagePort = CreateObject("roMessagePort")
 
     ' We do not join a lounge until something asks us to like
     ' - A remote connects through DIAL
     ' - Generating a TV link code
+    m.top.observeField("join", messagePort)
+    wait(0, messagePort)
+    m.top.unobserveField("join")
 
-    ' TODO:P0 there's an issue with devices trying to join existing lounges...
-    ' We either need to figure out temporary lounges, or persist the lounge token
-
-    ' m.top.observeField("join", messagePort)
-    ' wait(0, messagePort)
-    ' m.top.unobserveField("join")
-
-    api = new LoungeApi(m.top, m.top.playQueue, m.top.notifications)
 
     ' TODO:P1 need error handling on lounge requests
     m.top.screenId = api.GetScreenId()
@@ -69,6 +68,7 @@ function LoungeServiceLoop()
     m.top.observeField("outgoingMessages", messagePort)
 
     api.GetSessionData()
+    api.SaveCurrentLoungeData()
     api.FetchCommandsRpc(messagePort)
 
     m.top.shouldQuit = false
