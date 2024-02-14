@@ -509,7 +509,9 @@ class LoungeApi
     end function
 
     function SaveCurrentLoungeData() as void
-        loungeData = {}
+        loungeData = {
+            "__version": 1
+        }
         fields = ["screenName", "deviceId", "loungeToken", "sessionId", "gSessionId"]
         for each field in fields
             if StringUtils.IsNullOrEmpty(m[field])
@@ -530,9 +532,16 @@ class LoungeApi
             return
         end if
 
+        RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
+
         loungeData = ParseJson(loungeData)
         if not IsAssociativeArray(loungeData)
-            RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
+            LogWarn("Can't disconnect from lounge. Invalid data:", loungeData)
+            return
+        end if
+
+        if ValidInt(loungeData.__version) <> 1
+            LogWarn("Can't disconnect from lounge. Unknown version:", loungeData.__version)
             return
         end if
 
@@ -556,7 +565,6 @@ class LoungeApi
         ' This is the last message we'll be sending to this lounge.
         loungeData.ofs = 99999999
         m.SendMessages(messages, loungeData)
-        RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
     end function
 
 end class
