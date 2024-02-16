@@ -1,0 +1,72 @@
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+function OnLoungeSetPlaylist()
+    setPlaylistData = m.top.loungeSetPlaylist
+    HandleLoungePlaylist(setPlaylistData)
+end function
+
+function OnLoungeUpdatePlaylist()
+    updatePlaylistData = m.top.loungeUpdatePlaylist
+    HandleLoungePlaylist(updatePlaylistData)
+end function
+
+function HandleLoungePlaylist(playlistData as object)
+    content = m.top.content
+    service = new Invidious.InvidiousService(m.top.invidious)
+    instance = service.GetInstance()
+
+    videoIds = playlistData[FIELD_VIDEO_IDS]
+    currentIndex = playlistData[FIELD_CURRENT_INDEX]
+    videoId = playlistData[FIELD_VIDEO_ID]
+    timestamp = playlistData[FIELD_CURRENT_TIME]
+
+    if not StringUtils.IsNullOrEmpty(videoIds)
+        videoIds = videoIds.Split(",")
+
+        currentContentNodes = content.getChildren(-1, 0)
+        wrappedNodes = {}
+        for each node in currentContentNodes
+            wrappedNodes[node.id] = node
+        end for
+
+        newContentNodes = []
+        for each vId in videoIds
+            refId = vId + NodeByRef.NODE_REF_SUFFIX
+            if wrappedNodes.DoesExist(refId)
+                newContentNodes.Push(wrappedNodes[refId])
+            else
+                payload = {
+                    "type": "video"
+                    "videoId": vId
+                }
+
+                contentNode = InvidiousContent.ToVideoContentNode(invalid, payload, instance)
+                wrappedNode = WrapWithIndexField(contentNode)
+                newContentNodes.Push(wrappedNode)
+            end if
+        end for
+
+        content.removeChildrenIndex(currentContentNodes.Count(), 0)
+        content.appendChildren(newContentNodes)
+    end if
+
+    if IsString(currentIndex)
+        currentIndex = CInt(Val(currentIndex))
+        m.top.index = currentIndex
+    end if
+
+    if not StringUtils.IsNullOrEmpty(videoId)
+        if not StringUtils.IsNullOrEmpty(timestamp)
+            timestamp = CInt(Val(timestamp))
+            if timestamp > 0
+                node = content.getChild(currentIndex)
+                node = NodeByRef.Unwrap(node)
+                node.timestamp = timestamp
+            end if
+        end if
+
+        PlayItemAtCurrentIndex()
+    end if
+end function
