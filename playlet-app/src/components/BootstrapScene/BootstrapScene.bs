@@ -23,7 +23,12 @@ end function
 function GetPlayletLibUrls() as object
     #if DEBUG
         debug = { type: "debug", link: Manifest.ReadValue("playlet_lib_debug_url") }
-        return [debug]
+        embedded = { type: "embedded", link: Manifest.ReadValue("playlet_lib_embedded_url") }
+        #if DEBUG_FALLBACK_TO_EMBEDDED
+            return [debug, embedded]
+        #else
+            return [debug]
+        #end if
     #else
         savedUrls = Registry.GetPlayletLibUrlsFromRegistry()
         if savedUrls <> invalid

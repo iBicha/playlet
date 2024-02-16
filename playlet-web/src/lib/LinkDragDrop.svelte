@@ -148,6 +148,10 @@
       "http://youtube.com/shorts/",
       "https://www.youtube.com/shorts/",
       "http://www.youtube.com/shorts/",
+      "https://youtube.com/live/",
+      "http://youtube.com/live/",
+      "https://www.youtube.com/live/",
+      "http://www.youtube.com/live/",
     ];
     for (var i in YoutubeUrls) {
       let youtubeUrl = YoutubeUrls[i];

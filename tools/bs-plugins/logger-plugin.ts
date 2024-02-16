@@ -166,7 +166,7 @@ function ${newFunctionName}(${args.join(', ')}) as void
     if logger.logLevel < ${func.level}
         return
     end if
-    m.global.logger.logLine = "[${func.stringLevel}]" + ${msg}
+    logger.logLine = "[${func.stringLevel}]" + ${msg}
 end function
 `;
     }
