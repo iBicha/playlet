@@ -23,7 +23,7 @@ class LoungeApi
     public gSessionId
 
     private ofs
-    private lastCommandIndex = -1
+    private lastProcessedCommandIndex = -1
     private poller
     private outgoingMessagesRequests
 
@@ -240,11 +240,11 @@ class LoungeApi
             end if
 
             commandIndex = command[0]
-            if commandIndex <= m.lastCommandIndex
+            if commandIndex <= m.lastProcessedCommandIndex
                 LogDebug("Skipping command already processed:", command)
                 continue for
             end if
-            m.lastCommandIndex = commandIndex
+            m.lastProcessedCommandIndex = commandIndex
 
             commandId = command[0]
             commandData = command[1]
@@ -314,7 +314,7 @@ class LoungeApi
     end function
 
     function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType, FormatJson(commandArgs))
+        LogInfo(commandType)
         newDevice = commandArgs
         id = newDevice.id
         if StringUtils.IsNullOrEmpty(id)
@@ -345,7 +345,7 @@ class LoungeApi
     end function
 
     function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType, FormatJson(commandArgs))
+        LogInfo(commandType)
         device = commandArgs
         id = device.id
         if StringUtils.IsNullOrEmpty(id)
