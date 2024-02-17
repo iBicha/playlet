@@ -19,11 +19,14 @@ namespace LoungeMessages
         message = {
             commandType: COMMAND_ON_STATE_CHANGE
         }
-        if player = invalid
-            return message
-        end if
 
         commandArgs = {}
+
+        if player = invalid
+            commandArgs[FIELD_STATE] = PlayerState.UNSTARTED
+            message.commandArgs = commandArgs
+            return message
+        end if
 
         commandArgs[FIELD_STATE] = GetPlayerState(player)
         commandArgs[FIELD_CURRENT_TIME] = ValidDouble(player.position)
@@ -38,7 +41,7 @@ namespace LoungeMessages
                     commandArgs[FIELD_DURATION] = lengthSeconds
                     commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
 
-                    if commandArgs[FIELD_STATE] = PlayerStatus.PLAYING or commandArgs[FIELD_STATE] = PlayerStatus.PAUSED or commandArgs[FIELD_STATE] = PlayerStatus.LOADING
+                    if commandArgs[FIELD_STATE] = PlayerState.PLAYING or commandArgs[FIELD_STATE] = PlayerState.PAUSED or commandArgs[FIELD_STATE] = PlayerState.BUFFERING
                         commandArgs[FIELD_LOADED_TIME] = lengthSeconds
                     end if
                 end if
@@ -80,7 +83,7 @@ namespace LoungeMessages
                     commandArgs[FIELD_DURATION] = lengthSeconds
                     commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
 
-                    if commandArgs[FIELD_STATE] = PlayerStatus.PLAYING or commandArgs[FIELD_STATE] = PlayerStatus.PAUSED or commandArgs[FIELD_STATE] = PlayerStatus.LOADING
+                    if commandArgs[FIELD_STATE] = PlayerState.PLAYING or commandArgs[FIELD_STATE] = PlayerState.PAUSED or commandArgs[FIELD_STATE] = PlayerState.BUFFERING
                         commandArgs[FIELD_LOADED_TIME] = lengthSeconds
                     end if
                 end if
@@ -99,23 +102,25 @@ namespace LoungeMessages
         return message
     end function
 
-    function GetPlayerState(player as object) as PlayerStatus
+    function GetPlayerState(player as object) as PlayerState
         if player = invalid
-            return PlayerStatus.IDLE
+            return PlayerState.UNSTARTED
         end if
 
         state = player.state
         if state = "playing"
-            return PlayerStatus.PLAYING
+            return PlayerState.PLAYING
         else if state = "paused"
-            return PlayerStatus.PAUSED
+            return PlayerState.PAUSED
         else if state = "buffering"
-            return PlayerStatus.LOADING
-        else if state = "stopped" or state = "stopping" or state = "finished"
-            return PlayerStatus.STOPPED
+            return PlayerState.BUFFERING
+        else if state = "finished"
+            return PlayerState.ENDED
+        else if state = "stopped" or state = "stopping"
+            return PlayerState.STOPPED
         end if
 
-        return PlayerStatus.IDLE
+        return PlayerState.UNSTARTED
     end function
 
 end namespace
