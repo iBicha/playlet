@@ -3,7 +3,7 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
 import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
@@ -115,7 +115,7 @@ function OnVideoContentTaskResults(output as object) as void
         message = `Failed to load video information for ${videoId}\n${error}`
         DialogUtils.ShowDialog(message, "Video load fail", true)
         ' TODO:P1 play next video in the queue after showing the error dialog
-        VideoUtils.CloseVideo()
+        m.videoQueue.closePlayer = true
         Lounge.SendOnStateChange()
         return
     end if
@@ -232,67 +232,14 @@ function OnVideoPlayerStateChange() as void
         LogError(title, messageLines)
         DialogUtils.ShowDialog(messageLines, title, true)
         ' TODO:P1 play next video in the queue after showing the error dialog
-        VideoUtils.CloseVideo()
+        m.videoQueue.closePlayer = true
     end if
 end function
 
 function OnVideoFinished() as void
-    content = m.top.content
-    if content = invalid
-        m.playQueue@.watchedVideosClear()
-        VideoUtils.CloseVideo()
-        return
+    if not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
+        m.videoQueue.closePlayer = true
     end if
-
-    metadata = content.metadata
-    if metadata = invalid
-        m.playQueue@.watchedVideosClear()
-        VideoUtils.CloseVideo()
-        return
-    end if
-
-    if not PlayNext(metadata.recommendedVideos)
-        m.playQueue@.watchedVideosClear()
-        VideoUtils.CloseVideo()
-    end if
-end function
-
-function PlayNext(recommendedVideos as object) as boolean
-    if m.playQueue@.PlayNextItem()
-        return true
-    end if
-
-    return PlayNextRecommendedVideo(recommendedVideos)
-end function
-
-' TODO:P2 move this to the play queue
-function PlayNextRecommendedVideo(recommendedVideos as object) as boolean
-    if m.preferences["playback.autoplay"] <> true
-        return false
-    end if
-
-    if recommendedVideos = invalid or recommendedVideos.Count() = 0
-        return false
-    end if
-
-    for each metadata in recommendedVideos
-        if metadata = invalid
-            continue for
-        end if
-        videoId = metadata.videoId
-        if videoId = invalid
-            continue for
-        end if
-        if not m.playQueue@.watchedVideosContain(videoId)
-            LogInfo(`Playing next recommended video (${videoId})`)
-            instance = m.invidious@.GetCurrentInstance()
-            node = InvidiousContent.ToVideoContentNode(invalid, metadata, instance)
-            m.playQueue@.Play(node, -1)
-            return true
-        end if
-    end for
-
-    return false
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -303,14 +250,13 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
     ' Because of that, the button "down" is used to shrink the video for picture in picture mode
     if key = "down"
-        if VideoUtils.ToggleVideoPictureInPicture()
+        if VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
             return true
         end if
     end if
 
     if key = "back"
-        m.playQueue@.watchedVideosClear()
-        VideoUtils.CloseVideo()
+        m.videoQueue.closePlayer = true
         return true
     end if
     return false

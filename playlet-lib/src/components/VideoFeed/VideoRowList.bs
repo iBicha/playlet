@@ -4,7 +4,6 @@ import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
@@ -100,7 +99,7 @@ function OnRowItemSelected(index as object) as void
     if rowItem.type = "video"
         videoId = rowItem.videoId
         LogInfo("Play video: " + videoId)
-        m.playQueue@.Play(rowItem, -1)
+        m.videoQueue.playVideo = rowItem
     else if rowItem.type = "playlist"
         playlistId = rowItem.playlistId
         LogInfo("Open playlist: " + playlistId)
@@ -151,8 +150,8 @@ end function
 function GetContextMenuOptionsForItem(rowItem as object) as object
     options = []
 
-    playAction = ContextMenuUtils.CreateOption("Play", m.playQueue, "Play", [rowItem, -1])
-    queueAction = ContextMenuUtils.CreateOption("Queue", m.playQueue, "AddToQueue", [rowItem])
+    playAction = ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayVideo", [rowItem])
+    queueAction = ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueueVideo", [rowItem])
 
     if rowItem.type = "video"
         options.push(playAction)

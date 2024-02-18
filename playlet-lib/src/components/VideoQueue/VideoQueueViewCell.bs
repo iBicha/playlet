@@ -1,4 +1,3 @@
-import "pkg:/components/NodeByRef/NodeByRef.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -10,7 +9,6 @@ end function
 
 function OnContentSet() as void
     content = m.top.itemContent
-    content = NodeByRef.Unwrap(content)
     if content = invalid
         return
     end if
@@ -18,17 +16,17 @@ function OnContentSet() as void
     m.top.title = content.title
     m.top.thumbnailUri = content.thumbnail
 
-    contentType = ValidString(content.type)
-    if contentType = "video" and ValidInt(content.lengthSeconds) <> 0
+    if ValidInt(content.lengthSeconds) <> 0
         SetDurationText(content.lengthText)
-        m.top.durationRectVisible = true
-    else if contentType = "playlist" and not StringUtils.IsNullOrEmpty(content.videoCountText)
-        SetDurationText(content.videoCountText)
         m.top.durationRectVisible = true
     else
         m.top.durationRectVisible = false
     end if
 
+    SetHighlight()
+end function
+
+function OnIndexSet() as void
     SetHighlight()
 end function
 
@@ -51,21 +49,14 @@ end function
 
 function SetHighlight() as void
     content = m.top.itemContent
-
-    playQueueContent = content.getParent()
-    if playQueueContent = invalid
+    if content = invalid
         return
     end if
 
-    playQueue = playQueueContent.getParent()
-    if playQueue = invalid
-        return
-    end if
-
-    playQueueIndex = playQueue.index
+    contentIndex = content.queueIndex
     index = m.top.index
 
-    if playQueueIndex = index
+    if contentIndex = index
         ' bs:disable-next-line LINT3023
         m.top.thumbnailBlendColor = "#FFFFFFFF"
         m.top.highlightUri = "pkg:/images/focus_grid.9.png"

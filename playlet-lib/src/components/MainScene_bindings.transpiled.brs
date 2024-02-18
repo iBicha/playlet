@@ -8,12 +8,14 @@ function InitializeBindings()
             "AppController": {
                 "root": "./AppRoot", 
                 "stack": "./Stack", 
-                "playQueue": "./PlayQueue"
+                "videoQueue": "./VideoQueue"
             }, 
             "NavBar": {
                 "appController": "/AppController"
             }, 
-            "PlayQueue": {
+            "VideoQueue": {
+                "appController": "/AppController", 
+                "videoContainer": "../VideoContainer", 
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
                 "preferences": "../Preferences"
@@ -31,7 +33,7 @@ function InitializeBindings()
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 
-                "playQueue": "../PlayQueue", 
+                "videoQueue": "../VideoQueue", 
                 "bookmarks": "../Bookmarks", 
                 "loungeService": "../LoungeService"
             }, 
@@ -40,7 +42,7 @@ function InitializeBindings()
                 "loungeService": "../LoungeService"
             }, 
             "LoungeService": {
-                "playQueue": "../PlayQueue", 
+                "videoQueue": "../VideoQueue", 
                 "notifications": "../Notifications"
             }
         }

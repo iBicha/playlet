@@ -4,7 +4,6 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
@@ -117,7 +116,10 @@ function OnItemSelected(index as integer) as void
     videoId = video.videoId
     if not StringUtils.IsNullOrEmpty(videoId)
         LogInfo("Play playlist:", playlistId, "video:", videoId)
-        m.playQueue@.Play(playlist, index)
+        m.videoQueue.playPlaylist = {
+            playlistNode: playlist
+            playlistIndex: index
+        }
     end if
 end function
 
@@ -165,10 +167,10 @@ function GetContextMenuOptionsForItem(video as object) as object
     end if
 
     options = [
-        ContextMenuUtils.CreateOption("Play", m.playQueue, "Play", [playlist, index]),
-        ContextMenuUtils.CreateOption("Queue", m.playQueue, "AddToQueue", [playlist])
-        ContextMenuUtils.CreateOption("Play video", m.playQueue, "Play", [video, -1]),
-        ContextMenuUtils.CreateOption("Queue video", m.playQueue, "AddToQueue", [video]),
+        ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayPlaylist", [playlist, index]),
+        ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueuePlaylist", [playlist])
+        ContextMenuUtils.CreateOption("Play video", m.videoQueue, "FuncPlayVideo", [video]),
+        ContextMenuUtils.CreateOption("Queue video", m.videoQueue, "FuncAddToQueueVideo", [video]),
     ]
 
     if not StringUtils.IsNullOrEmpty(playlist.authorId)

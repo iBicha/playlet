@@ -1,15 +1,16 @@
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 
 namespace Http
 
-    class PlayQueueRouter extends HttpRouter
+    ' TODO:P0 validate all endpoints with web app
+    class VideoQueueRouter extends HttpRouter
 
         function new(server as object)
             super()
 
             task = server.task
-            m.playQueueNode = task.playQueue
+            m.videoQueueNode = task.videoQueue
             m.invidiousNode = task.invidious
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
         end function
@@ -18,7 +19,7 @@ namespace Http
         function GetQueue(context as object) as boolean
             response = context.response
 
-            queue = m.playQueueNode@.GetQueue()
+            queue = VideoQueueUtils.GetQueueDto(m.videoQueueNode)
             response.Json(queue)
             return true
         end function
@@ -46,7 +47,7 @@ namespace Http
             contentNode = InvidiousContent.ToRowCellContentNode(payload, instance)
             m.playQueueNode@.AddToQueue(contentNode)
 
-            queue = m.playQueueNode@.GetQueue()
+            queue = VideoQueueUtils.GetQueueDto(m.videoQueueNode)
             response.Json(queue)
             return true
         end function

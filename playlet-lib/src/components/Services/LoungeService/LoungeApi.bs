@@ -2,8 +2,8 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/Services/LoungeService/LongPoller.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
 import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/components/Services/LoungeService/LoungeVideoQueue.bs"
 import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
@@ -13,7 +13,10 @@ const COMMAND_HANDLER_PREFIX = "_Handle_"
 class LoungeApi
 
     public loungeServiceNode
-    public playQueueNode
+    public videoQueueNode
+    public notificationsNode
+    public invService
+
     public deviceId
     public deviceName
     public screenId
@@ -27,10 +30,11 @@ class LoungeApi
     private poller
     private outgoingMessagesRequests
 
-    function new(loungeServiceNode as object, playQueueNode as object, notificationsNode as object)
+    function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
         m.loungeServiceNode = loungeServiceNode
-        m.playQueueNode = playQueueNode
+        m.videoQueueNode = videoQueueNode
         m.notificationsNode = notificationsNode
+        m.invService = new Invidious.InvidiousService(invidiousNode)
         m.deviceId = loungeServiceNode.deviceId
         deviceName = loungeServiceNode.deviceName
         m.deviceName = deviceName
@@ -107,7 +111,7 @@ class LoungeApi
             return invalid
         end if
 
-        ' TODO:P0 cache all lounge info
+        ' payload contains more information, but we only need the token
         m.loungeToken = screens[0].loungeToken
         return m.loungeToken
     end function
@@ -279,7 +283,7 @@ class LoungeApi
     end function
 
     function HandleGetPlayingNow(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        player = VideoUtils.GetVideoPlayer()
+        player = m.videoQueueNode.player
 
         message = LoungeMessages.OnHasPreviousNextChanged()
         message["commandId"] = commandId
@@ -363,7 +367,7 @@ class LoungeApi
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        player = VideoUtils.GetVideoPlayer()
+        player = m.videoQueueNode.player
         if player = invalid
             return
         end if
@@ -371,35 +375,35 @@ class LoungeApi
         volume = Val(commandArgs["volume"])
         isMute = volume = 0
         LogInfo("Setting volume is not supported:", volume, "but can mute:", isMute)
-        ' TODO:P0 volume should be set to the lounge state.
+        ' TODO:P2 volume should be set to the lounge state.
         ' Also the state needs to be separate from the player, since SponsorBlock can mute sections.
         player.mute = isMute
     end function
 
     function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         LogDebug(commandType, commandArgs)
-        m.playQueueNode.loungeSetPlaylist = commandArgs
+        LoungeVideoQueue.SetPlaylist(m.videoQueueNode, m.invService, commandArgs)
     end function
 
     function HandleUpdatePlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
         LogDebug(commandType, commandArgs)
-        m.playQueueNode.loungeUpdatePlaylist = commandArgs
+        LoungeVideoQueue.UpdatePlaylist(m.videoQueueNode, m.invService, commandArgs)
     end function
 
     function HandlePause(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        VideoUtils.PauseVideo()
+        m.videoQueueNode.pause = true
     end function
 
     function HandlePlay(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        VideoUtils.ResumeVideo()
+        m.videoQueueNode.play = true
     end function
 
     function HandleStopVideo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
-        VideoUtils.CloseVideo()
+        m.videoQueueNode.closePlayer = true
     end function
 
     function HandleSeekTo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        player = VideoUtils.GetVideoPlayer()
+        player = m.videoQueueNode.player
         if player = invalid
             return
         end if
