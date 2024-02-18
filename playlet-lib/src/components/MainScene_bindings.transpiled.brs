@@ -43,7 +43,8 @@ function InitializeBindings()
             }, 
             "LoungeService": {
                 "videoQueue": "../VideoQueue", 
-                "notifications": "../Notifications"
+                "notifications": "../Notifications", 
+                "invidious": "../Invidious"
             }
         }
     }

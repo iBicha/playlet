@@ -216,42 +216,5 @@ function LoadPlaylistIfNeeded() as void
         return
     end if
 
-    LoadPlaylist()
-end function
-
-function LoadPlaylist() as void
-    if m.playlistLoadTask <> invalid
-        m.playlistLoadTask.cancel = true
-    end if
-
-    m.top.content.loadState = FeedLoadState.Loading
-    m.playlistLoadTask = AsyncTask.Start(Tasks.PlaylistContentTask, {
-        content: m.top.content
-        invidious: m.top.invidious
-    }, OnPlaylistContentTaskResult)
-end function
-
-function OnPlaylistContentTaskResult(output as object) as void
-    m.playlistLoadTask = invalid
-
-    if output.cancelled
-        return
-    end if
-
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-        playlistId = output.task.input.content.playlistId
-        message = `Failed to load playlist ${playlistId}\n${error}`
-        DialogUtils.ShowDialog(message, "Playlist load fail", true)
-        return
-    end if
-
-    LoadPlaylistIfNeeded()
+    m.top.content@.LoadPlaylistPage(m.top.invidious)
 end function
