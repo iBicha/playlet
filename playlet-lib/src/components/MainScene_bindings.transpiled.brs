@@ -18,7 +18,8 @@ function InitializeBindings()
                 "videoContainer": "../VideoContainer", 
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "loungeService": "../LoungeService"
             }, 
             "SearchHistory": {
                 "preferences": "../Preferences"
