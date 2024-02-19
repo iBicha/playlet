@@ -3,7 +3,36 @@ import "pkg:/source/utils/FocusManagement.bs"
 namespace VideoQueueUtils
 
     function GetQueueDto(videoQueue as object) as object
-        throw "Not implemented"
+        items = []
+        nowPlaying = invalid
+
+        queueNodes = videoQueue.content.getChildren(-1, 0)
+        for each node in queueNodes
+            items.push({
+                type: node.type
+                videoId: node.videoId
+                title: node.title
+                author: node.author
+                thumbnail: node.thumbnail
+            })
+        end for
+
+        nowPlayingNode = videoQueue.nowPlaying
+        if nowPlayingNode <> invalid
+            nowPlaying = {
+                type: nowPlayingNode.type
+                videoId: nowPlayingNode.videoId
+                title: nowPlayingNode.title
+                author: nowPlayingNode.author
+                thumbnail: nowPlayingNode.thumbnail
+            }
+        end if
+
+        return {
+            items: items
+            nowPlaying: nowPlaying
+            index: videoQueue.index
+        }
     end function
 
     function PlayPlaylist(videoQueue as object, playlistContentNode as object, index as integer)
