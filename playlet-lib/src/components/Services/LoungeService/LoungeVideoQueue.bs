@@ -1,6 +1,7 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/components/VideoQueue/Notifications/VideoQueueNotificationUtils.bs"
 
 namespace LoungeVideoQueue
     function SetPlaylist(videoQueueNode as object, invService as object, playlistData as object)
@@ -73,6 +74,36 @@ namespace LoungeVideoQueue
             end if
 
             videoQueueNode.play = true
+        end if
+
+        if StringUtils.IsNullOrEmpty(videoId)
+            eventDetails = playlistData[FIELD_EVENT_DETAILS]
+            if IsString(eventDetails)
+                eventDetails = ParseJson(eventDetails)
+            end if
+            if eventDetails <> invalid and eventDetails["eventType"] = "VIDEO_ADDED"
+                eventVideoId = eventDetails[FIELD_VIDEO_ID]
+                if not StringUtils.IsNullOrEmpty(eventVideoId)
+                    preferences = videoQueueNode.preferences
+                    queueNotifications = preferences["misc.queue_notifications"]
+                    if queueNotifications
+                        payload = {
+                            "type": "video"
+                            "videoId": eventVideoId
+                        }
+
+                        if instance = invalid
+                            instance = invService.GetInstance()
+                        end if
+
+                        node = InvidiousContent.ToVideoContentNode(invalid, payload, instance)
+
+                        notifications = videoQueueNode.notifications
+                        hintVisible = videoQueueNode.player = invalid or not videoQueueNode.videoContainer.fullscreen
+                        VideoQueue.ShowNotifcation(notifications, node, hintVisible)
+                    end if
+                end if
+            end if
         end if
     end function
 

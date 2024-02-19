@@ -6,6 +6,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
 import "VideoQueueFunctions.bs"
+import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 
 function Init()
     m.content = m.top.findNode("Content")
@@ -301,10 +302,21 @@ function OnSetQueueAndIndex() as void
 end function
 
 function UpdateHasPreviousNext()
-    index = m.top.index
     queueCount = m.content.getChildCount()
+    index = MathUtils.Clamp(m.top.index, 0, queueCount - 1)
     m.top.hasPrevious = index > 0
     m.top.hasNext = index < queueCount - 1
+end function
+
+function OnHasPrevious()
+    message = LoungeMessages.OnHasPreviousNextChanged(m.top.hasPrevious, m.top.hasNext)
+    m.top.loungeService.outgoingMessages = [message]
+end function
+
+function OnHasNext()
+    ' TODO:P1 the hasNext currently does not account for autoplay.
+    message = LoungeMessages.OnHasPreviousNextChanged(m.top.hasPrevious, m.top.hasNext)
+    m.top.loungeService.outgoingMessages = [message]
 end function
 
 function CreateVideoPlayer() as object
