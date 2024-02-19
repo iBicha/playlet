@@ -2,7 +2,6 @@ import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 ' TODO:P0
 ' 1. Add a section about the lounge in the privacy policy
-' 2. Add error handling for all lounge requests
 
 function Init()
     m.top.functionName = "LoungeServiceLoop"
@@ -33,7 +32,7 @@ function StopService(_unused as dynamic) as void
     m.top.shouldQuit = true
 end function
 
-function LoungeServiceLoop()
+function LoungeServiceLoop() as void
     api = new LoungeApi(m.top, m.top.videoQueue, m.top.notifications, m.top.invidious)
     ' Mobile app can remain connected to devices even after restarts.
     ' Since we create a new lounge every time, we signal to the last lounge
@@ -50,13 +49,28 @@ function LoungeServiceLoop()
     m.top.unobserveField("join")
 
 
-    ' TODO:P1 need error handling on lounge requests
-    m.top.screenId = api.GetScreenId()
-    m.top.loungeToken = api.GetToken()
+    screenId = api.GetScreenId()
+    if StringUtils.IsNullOrEmpty(screenId)
+        m.top.isRunning = false
+        return
+    end if
+    m.top.screenId = screenId
+
+    loungeToken = api.GetToken()
+    if StringUtils.IsNullOrEmpty(loungeToken)
+        m.top.isRunning = false
+        return
+    end if
+    m.top.loungeToken = loungeToken
 
     m.top.observeField("outgoingMessages", messagePort)
 
-    api.GetSessionData()
+    if not api.GetSessionData()
+        m.top.unobserveField("outgoingMessages", messagePort)
+        m.top.isRunning = false
+        return
+    end if
+
     api.SaveCurrentLoungeData()
     api.FetchCommandsRpc(messagePort)
 

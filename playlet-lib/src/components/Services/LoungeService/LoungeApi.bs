@@ -1,3 +1,4 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/Services/LoungeService/LongPoller.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
@@ -5,7 +6,9 @@ import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 import "pkg:/components/Services/LoungeService/LoungeVideoQueue.bs"
 import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
@@ -79,11 +82,16 @@ class LoungeApi
         request = HttpClient.Get("https://www.youtube.com/api/lounge/pairing/generate_screen_id")
         response = request.Await()
         if not response.IsSuccess()
-            LogError(response.ErrorMessage())
+            error = `Failed to get screen id. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            LogError(error)
+            DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
         id = response.Text()
         if not IsString(id)
+            error = `Failed to get screen id. Please restart playlet to use the cast function.\nNot a valid screen id: ${id}`
+            LogError(error)
+            DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
         m.screenId = id
@@ -100,14 +108,18 @@ class LoungeApi
         request.Header("Content-Type", "application/x-www-form-urlencoded")
         response = request.Await()
         if not response.IsSuccess()
-            LogError(response.ErrorMessage())
+            error = `Failed to get lounge token. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            LogError(error)
+            DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
 
         json = response.Json()
         screens = json.screens
         if not IsArray(screens) or screens.Count() <> 1
-            LogError("Unexpected response from get_lounge_token_batch")
+            error = `Failed to get lounge token. Please restart playlet to use the cast function.\nInvalid response: ${json}`
+            LogError(error)
+            DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
 
@@ -116,7 +128,7 @@ class LoungeApi
         return m.loungeToken
     end function
 
-    function GetSessionData() as void
+    function GetSessionData() as boolean
         baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
@@ -142,8 +154,10 @@ class LoungeApi
 
         response = request.Await()
         if not response.IsSuccess()
-            LogError(response.ErrorMessage())
-            return
+            error = `Failed to get session data. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            LogError(error)
+            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            return false
         end if
 
         text = response.Text()
@@ -154,6 +168,7 @@ class LoungeApi
         commands = ParseJson(text)
         m.ProcessCommands(commands, messagesToSend)
         m.SendMessages(messagesToSend)
+        return true
     end function
 
     function FetchCommandsRpc(messagePort as object) as void
