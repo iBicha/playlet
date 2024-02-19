@@ -1,0 +1,326 @@
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/components/VideoQueue/Notifications/VideoQueueNotificationUtils.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
+import "VideoQueueFunctions.bs"
+
+function Init()
+    m.content = m.top.findNode("Content")
+    m.top.content = m.content
+    m.content.addField("index", "integer", false)
+    m.content.index = m.top.index
+end function
+
+function OnIndexChange()
+    index = m.top.index
+    m.content.index = index
+    nodes = m.content.getChildren(-1, 0)
+    for each node in nodes
+        node.queueIndex = index
+    end for
+    UpdateHasPreviousNext()
+end function
+
+function OnPlay() as void
+    videoNode = m.content.getChild(m.top.index)
+    if videoNode = invalid
+        m.top.nowPlaying = invalid
+        return
+    end if
+
+    player = m.top.player
+    if player <> invalid
+        content = player.content
+        if content <> invalid and content.videoId = videoNode.videoId
+            if player.state = "paused"
+                player.control = "resume"
+            else
+                player.control = "play"
+            end if
+            return
+        end if
+
+        m.top.closePlayer = true
+    end if
+
+    player = CreateVideoPlayer()
+    player@.PlayWithContent(videoNode)
+    m.top.player = player
+    m.top.nowPlaying = videoNode
+end function
+
+function OnPause() as void
+    player = m.top.player
+    if player = invalid
+        return
+    end if
+    player.control = "pause"
+end function
+
+function OnPrevious() as void
+    if not m.top.hasPrevious
+        return
+    end if
+
+    m.top.closePlayer = true
+    m.top.index -= 1
+    m.top.play = true
+end function
+
+function OnNext() as void
+    if not m.top.hasNext
+        return
+    end if
+
+    m.top.closePlayer = true
+    m.top.index += 1
+    m.top.play = true
+end function
+
+function OnClosePlayer() as void
+    m.top.nowPlaying = invalid
+    player = m.top.player
+    if player = invalid
+        return
+    end if
+
+    player@.Close()
+    m.top.player = invalid
+
+    m.top.appController@.FocusTopScreen()
+end function
+
+function OnPlayVideo() as void
+    videoNode = m.top.playVideo
+    if videoNode = invalid
+        return
+    end if
+
+    m.top.playVideo = invalid
+
+    nodeParent = videoNode.getParent()
+    if not m.content.isSameNode(nodeParent)
+        videoNode = videoNode.clone(false)
+    end if
+
+    queueCount = m.content.getChildCount()
+    index = m.top.index
+    index += 1
+    if index >= queueCount
+        m.content.appendChild(videoNode)
+        index = m.content.getChildCount() - 1
+    else
+        m.content.insertChild(videoNode, index)
+    end if
+    m.top.index = index
+
+    m.top.closePlayer = true
+    m.top.play = true
+end function
+
+function OnPlayPlaylist() as void
+    playPlaylist = m.top.playPlaylist
+    if playPlaylist = invalid
+        return
+    end if
+
+    m.top.playPlaylist = invalid
+
+    if m.loadingPlaylist <> invalid
+        m.loadingPlaylist.UnobserveFieldScoped("loadState")
+        m.loadingPlaylist = invalid
+    end if
+
+    playlistNode = playPlaylist.playlistNode
+    playlistIndex = playPlaylist.playlistIndex
+
+    if playlistNode = invalid or playlistIndex < 0
+        return
+    end if
+
+    m.loadingPlaylist = playlistNode
+    m.loadingPlaylistIndex = playlistIndex
+    m.loadingPlaylistOp = "play"
+
+    if playlistNode.loadState = FeedLoadState.Loaded
+        OnPlaylistLoadStateChange()
+        return
+    end if
+
+    playlistNode.ObserveFieldScoped("loadState", FuncName(OnPlaylistLoadStateChange))
+    playlistNode@.LoadPlaylistAll(m.top.invidious)
+end function
+
+function OnPlaylistLoadStateChange() as void
+    if m.loadingPlaylist = invalid
+        return
+    end if
+
+    loadState = m.loadingPlaylist.loadState
+    if loadState = FeedLoadState.None or loadState = FeedLoadState.Error
+        m.loadingPlaylist.UnobserveFieldScoped("loadState")
+        m.loadingPlaylist = invalid
+        return
+    end if
+
+    if loadState <> FeedLoadState.Loaded
+        return
+    end if
+
+    playlistNode = m.loadingPlaylist
+    playlistIndex = m.loadingPlaylistIndex
+    playlistOp = m.loadingPlaylistOp
+
+    m.loadingPlaylist.UnobserveFieldScoped("loadState")
+    m.loadingPlaylist = invalid
+
+    videoNodes = playlistNode.getChildren(-1, 0)
+    if videoNodes.Count() = 0
+        return
+    end if
+
+    LogInfo("Adding", videoNodes.Count(), "videos to the queue")
+
+    for i = 0 to videoNodes.Count() - 1
+        videoNodes[i] = videoNodes[i].clone(false)
+    end for
+
+    if playlistOp = "play"
+        queueCount = m.content.getChildCount()
+        index = m.top.index
+        index += 1
+        if index >= queueCount
+            m.content.appendChildren(videoNodes)
+        else
+            m.content.insertChildren(videoNodes, index)
+        end if
+
+        playlistIndex = MathUtils.Clamp(playlistIndex, 0, videoNodes.Count() - 1)
+        index = index + playlistIndex
+        m.top.index = index
+
+        m.top.closePlayer = true
+        m.top.play = true
+    else if playlistOp = "queue"
+        m.content.appendChildren(videoNodes)
+        UpdateHasPreviousNext()
+
+        queueNotifications = m.top.preferences["misc.queue_notifications"]
+        if queueNotifications
+            hintVisible = m.top.player = invalid or not m.top.videoContainer.fullscreen
+            VideoQueue.ShowNotifcation(m.top.notifications, playlistNode, hintVisible)
+        end if
+    end if
+end function
+
+function OnClearQueue()
+    queueCount = m.content.getChildCount()
+    if queueCount > 0
+        m.content.removeChildrenIndex(queueCount, 0)
+    end if
+
+    m.top.closePlayer = true
+    m.top.index = -1
+end function
+
+function OnAddToQueue() as void
+    videoNodes = m.top.addToQueue
+    if videoNodes = invalid
+        return
+    end if
+
+    m.top.addToQueue = invalid
+    if videoNodes.Count() = 0
+        return
+    end if
+
+    for i = 0 to videoNodes.Count() - 1
+        videoNodes[i] = videoNodes[i].clone(false)
+    end for
+
+    m.content.appendChildren(videoNodes)
+    UpdateHasPreviousNext()
+
+    queueNotifications = m.top.preferences["misc.queue_notifications"]
+    if queueNotifications
+        node = videoNodes[0]
+        hintVisible = m.top.player = invalid or not m.top.videoContainer.fullscreen
+        VideoQueue.ShowNotifcation(m.top.notifications, node, hintVisible)
+    end if
+end function
+
+function OnAddToQueuePlaylist() as void
+    playlistNode = m.top.addToQueuePlaylist
+    if playlistNode = invalid
+        return
+    end if
+
+    m.top.addToQueuePlaylist = invalid
+
+    if m.loadingPlaylist <> invalid
+        m.loadingPlaylist.UnobserveFieldScoped("loadState")
+        m.loadingPlaylist = invalid
+    end if
+
+    m.loadingPlaylist = playlistNode
+    m.loadingPlaylistOp = "queue"
+
+    if playlistNode.loadState = FeedLoadState.Loaded
+        OnPlaylistLoadStateChange()
+        return
+    end if
+
+    playlistNode.ObserveFieldScoped("loadState", FuncName(OnPlaylistLoadStateChange))
+    playlistNode@.LoadPlaylistAll(m.top.invidious)
+end function
+
+function OnSetQueueAndIndex() as void
+    setQueueAndIndex = m.top.setQueueAndIndex
+    if setQueueAndIndex = invalid
+        return
+    end if
+
+    m.top.setQueueAndIndex = invalid
+
+    videoNodes = setQueueAndIndex.videoNodes
+    index = setQueueAndIndex.index
+
+    queueCount = m.content.getChildCount()
+    if queueCount > 0
+        m.content.removeChildrenIndex(queueCount, 0)
+    end if
+
+    if videoNodes.Count() > 0
+        m.content.appendChildren(videoNodes)
+    end if
+
+    m.top.index = index
+end function
+
+function UpdateHasPreviousNext()
+    index = m.top.index
+    queueCount = m.content.getChildCount()
+    m.top.hasPrevious = index > 0
+    m.top.hasNext = index < queueCount - 1
+end function
+
+function CreateVideoPlayer() as object
+    container = m.top.videoContainer
+    videoPlayer = container.createChild("VideoPlayer")
+    videoPlayer.id = "VideoPlayer"
+    videoPlayer@.BindNode()
+
+    if container.fullscreen
+        NodeSetFocus(videoPlayer, true)
+
+        dialog = m.top.getScene().dialog
+        if dialog <> invalid
+            dialog.close = true
+        end if
+    end if
+
+    return videoPlayer
+end function

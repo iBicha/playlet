@@ -1,0 +1,162 @@
+import "pkg:/source/utils/FocusManagement.bs"
+
+namespace VideoQueueUtils
+
+    function GetQueueDto(videoQueue as object) as object
+        items = []
+        nowPlaying = invalid
+
+        queueNodes = videoQueue.content.getChildren(-1, 0)
+        for each node in queueNodes
+            items.push({
+                type: node.type
+                videoId: node.videoId
+                title: node.title
+                author: node._author
+                thumbnail: node.thumbnail
+            })
+        end for
+
+        nowPlayingNode = videoQueue.nowPlaying
+        if nowPlayingNode <> invalid
+            nowPlaying = {
+                type: nowPlayingNode.type
+                videoId: nowPlayingNode.videoId
+                title: nowPlayingNode.title
+                author: nowPlayingNode._author
+                thumbnail: nowPlayingNode.thumbnail
+            }
+        end if
+
+        return {
+            items: items
+            nowPlaying: nowPlaying
+            index: videoQueue.index
+        }
+    end function
+
+    function IsVideoPlayerFullScreen(videoQueue as object) as boolean
+        return videoQueue.videoContainer.fullscreen
+    end function
+
+    function ToggleVideoPictureInPicture(videoQueue as object) as boolean
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+        videoContainer = videoQueue.videoContainer
+        videoContainer.fullscreen = not videoContainer.fullscreen
+        if videoContainer.fullscreen
+            NodeSetFocus(player, true)
+        else
+            videoQueue.appController@.FocusTopScreen()
+        end if
+        return true
+    end function
+
+    function IsVideoPlayerOpen(videoQueue as object) as boolean
+        return videoQueue.player <> invalid
+    end function
+
+    function Play(videoQueue as object) as boolean
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+        videoQueue.play = true
+        return true
+    end function
+
+    function Pause(videoQueue as object) as boolean
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+        videoQueue.pause = true
+        return true
+    end function
+
+    function Resume(videoQueue as object) as boolean
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+        videoQueue.play = true
+        return true
+    end function
+
+    function TogglePause(videoQueue as object) as boolean
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+        if player.state = "playing"
+            player.control = "pause"
+            return true
+        else if player.state = "paused"
+            player.control = "resume"
+            return true
+        end if
+        return false
+    end function
+
+    function PlayNext(videoQueue as object, invidiousNode as object, preferences as object) as boolean
+        if videoQueue.hasNext
+            videoQueue.next = true
+            return true
+        end if
+
+        if preferences["playback.autoplay"] <> true
+            return false
+        end if
+
+        player = videoQueue.player
+        if player = invalid
+            return false
+        end if
+
+        content = player.content
+        if content = invalid
+            return false
+        end if
+
+        metadata = content.metadata
+        if metadata = invalid
+            return false
+        end if
+
+        recommendedVideos = metadata.recommendedVideos
+        if recommendedVideos = invalid
+            return false
+        end if
+
+        if recommendedVideos = invalid or recommendedVideos.Count() = 0
+            return false
+        end if
+
+        queueContent = videoQueue.content
+        for each recommendedVideo in recommendedVideos
+            if recommendedVideo = invalid
+                continue for
+            end if
+            videoId = recommendedVideo.videoId
+            if videoId = invalid
+                continue for
+            end if
+
+            existingVideo = queueContent.findNode(videoId)
+            if existingVideo <> invalid
+                continue for
+            end if
+
+            LogInfo(`Playing next recommended video (${videoId})`)
+            instance = invidiousNode@.GetCurrentInstance()
+            node = InvidiousContent.ToVideoContentNode(invalid, recommendedVideo, instance)
+            videoQueue.playVideo = node
+            return true
+        end for
+
+        return false
+    end function
+
+end namespace

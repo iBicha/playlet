@@ -9,7 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The queue no longer contains playlists. When a playlist is added to the queue, the entire playlist is loaded.
+  - It can take a few seconds to load large playlist before it can be added to the queue
+  - This is done to be more compatible more the lounge, which does not contain "Playlists in the queue" concept.
 - Removed `fields` from Invidious requests, as per [https://github.com/iv-org/invidious/pull/4276](https://github.com/iv-org/invidious/pull/4276)
+- The `POST /api/queue/` no longer returns the current queue. Instead it returns a 204.
 
 ## [0.19.2] - 2024-02-11
 

@@ -1,0 +1,79 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+
+namespace LoungeVideoQueue
+    function SetPlaylist(videoQueueNode as object, invService as object, playlistData as object)
+        HandleLoungePlaylist(videoQueueNode, invService, playlistData)
+    end function
+
+    function UpdatePlaylist(videoQueueNode as object, invService as object, playlistData as object)
+        HandleLoungePlaylist(videoQueueNode, invService, playlistData)
+    end function
+
+    function HandleLoungePlaylist(videoQueueNode as object, invService as object, playlistData as object) as void
+        videoIds = playlistData[FIELD_VIDEO_IDS]
+        if StringUtils.IsNullOrEmpty(videoIds)
+            videoQueueNode.clearQueue = true
+            return
+        end if
+
+        videoIds = videoIds.Split(",")
+        queueContent = videoQueueNode.content
+        currentQueueNodes = queueContent.getChildren(-1, 0)
+        queueNodesDict = {}
+        for each node in currentQueueNodes
+            queueNodesDict[node.id] = node
+        end for
+
+        instance = invalid
+        newQueueNodes = []
+        for each vId in videoIds
+            if queueNodesDict.DoesExist(vId)
+                newQueueNodes.Push(queueNodesDict[vId])
+            else
+                payload = {
+                    "type": "video"
+                    "videoId": vId
+                }
+
+                if instance = invalid
+                    instance = invService.GetInstance()
+                end if
+
+                contentNode = InvidiousContent.ToVideoContentNode(invalid, payload, instance)
+                newQueueNodes.Push(contentNode)
+            end if
+        end for
+
+        index = -1
+        currentIndex = playlistData[FIELD_CURRENT_INDEX]
+        if IsString(currentIndex)
+            currentIndex = CInt(Val(currentIndex))
+            index = currentIndex
+        else
+            index = videoQueueNode.index
+        end if
+
+        videoQueueNode.setQueueAndIndex = {
+            videoNodes: newQueueNodes
+            index: index
+        }
+
+        videoId = playlistData[FIELD_VIDEO_ID]
+        timestamp = playlistData[FIELD_CURRENT_TIME]
+
+        if not StringUtils.IsNullOrEmpty(videoId)
+            if not StringUtils.IsNullOrEmpty(timestamp)
+                timestamp = CInt(Val(timestamp))
+                if timestamp > 0
+                    node = newQueueNodes[index]
+                    node.timestamp = timestamp
+                end if
+            end if
+
+            videoQueueNode.play = true
+        end if
+    end function
+
+end namespace

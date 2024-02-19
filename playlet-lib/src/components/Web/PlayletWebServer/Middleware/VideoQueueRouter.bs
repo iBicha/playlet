@@ -1,15 +1,16 @@
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
-import "pkg:/components/VideoPlayer/VideoUtils.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/source/utils/MathUtils.bs"
 
 namespace Http
 
-    class PlayQueueRouter extends HttpRouter
+    class VideoQueueRouter extends HttpRouter
 
         function new(server as object)
             super()
 
             task = server.task
-            m.playQueueNode = task.playQueue
+            m.videoQueueNode = task.videoQueue
             m.invidiousNode = task.invidious
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
         end function
@@ -18,7 +19,7 @@ namespace Http
         function GetQueue(context as object) as boolean
             response = context.response
 
-            queue = m.playQueueNode@.GetQueue()
+            queue = VideoQueueUtils.GetQueueDto(m.videoQueueNode)
             response.Json(queue)
             return true
         end function
@@ -44,10 +45,15 @@ namespace Http
             instance = m.invidiousService.GetInstance()
 
             contentNode = InvidiousContent.ToRowCellContentNode(payload, instance)
-            m.playQueueNode@.AddToQueue(contentNode)
 
-            queue = m.playQueueNode@.GetQueue()
-            response.Json(queue)
+            nodeType = contentNode.type
+            if nodeType = "playlist"
+                m.videoQueueNode.addToQueuePlaylist = contentNode
+            else if nodeType = "video"
+                m.videoQueueNode.addToQueue = [contentNode]
+            end if
+
+            response.Default(204, "OK")
             return true
         end function
 
@@ -76,13 +82,18 @@ namespace Http
             instance = m.invidiousService.GetInstance()
 
             contentNode = InvidiousContent.ToRowCellContentNode(payload, instance)
-            playlistIndex = IsInt(payload.playlistIndex) ? payload.playlistIndex : -1
-            if contentNode.type = "playlist" and playlistIndex = -1
-                playlistIndex = 0
-            end if
+            nodeType = contentNode.type
 
-            'TODO:P1 play existing item by index instead of new item inserted
-            m.playQueueNode@.Play(contentNode, playlistIndex)
+            if nodeType = "playlist"
+                playlistIndex = MathUtils.Max(0, ValidInt(payload.playlistIndex))
+
+                m.videoQueueNode.playPlaylist = {
+                    playlistNode: contentNode
+                    playlistIndex: playlistIndex
+                }
+            else if nodeType = "video"
+                m.videoQueueNode.playVideo = contentNode
+            end if
 
             response.Default(204, "OK")
             return true
@@ -92,7 +103,8 @@ namespace Http
         function ClearQueue(context as object) as boolean
             response = context.response
 
-            m.playQueueNode@.Clear()
+            m.videoQueueNode.clearQueue = true
+
             response.Default(204, "OK")
             return true
         end function

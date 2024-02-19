@@ -5,7 +5,15 @@ import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 
-function LoadChannel(invidiousNode as object) as void
+function LoadPlaylistPage(invidiousNode as object) as void
+    LoadPlaylist(invidiousNode, true)
+end function
+
+function LoadPlaylistAll(invidiousNode as object) as void
+    LoadPlaylist(invidiousNode, false)
+end function
+
+function LoadPlaylist(invidiousNode as object, singlePage as boolean) as void
     if m.contentTask <> invalid
         m.contentTask.cancel = true
     end if
@@ -16,13 +24,14 @@ function LoadChannel(invidiousNode as object) as void
     end if
 
     m.top.loadState = FeedLoadState.Loading
-    m.contentTask = AsyncTask.Start(Tasks.ChannelContentTask, {
+    m.contentTask = AsyncTask.Start(Tasks.PlaylistContentTask, {
         content: m.top
         invidious: invidiousNode
-    }, OnChannelContentTaskResult)
+        singlePage: singlePage
+    }, OnPlaylistContentTaskResult)
 end function
 
-function OnChannelContentTaskResult(output as object) as void
+function OnPlaylistContentTaskResult(output as object) as void
     m.contentTask = invalid
 
     if output.cancelled
@@ -38,9 +47,9 @@ function OnChannelContentTaskResult(output as object) as void
         end if
         error = ErrorUtils.Format(error)
         LogError(error)
-        authorId = output.task.input.content.authorId
-        message = `Failed to load channel ${authorId}\n${error}`
-        DialogUtils.ShowDialog(message, "Channel load fail", true)
+        playlistId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
         return
     end if
 end function
