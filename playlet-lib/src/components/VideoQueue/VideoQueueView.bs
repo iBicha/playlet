@@ -1,19 +1,24 @@
 import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
-' TODO:P0: Add job that loads video details for each item in the queue that is missing details
 function Init()
     m.queueList = m.top.findNode("queueList")
     m.queueLabel = m.top.findNode("queueLabel")
     m.clearButton = m.top.findNode("clearButton")
     m.showAnimation = m.top.findNode("showAnimation")
 
-    m.clearButton.ObserveField("buttonSelected", FuncName(OnClearButtonSelected))
-    m.queueList.ObserveField("itemSelected", FuncName(OnItemSelected))
+    DisposableObserveField(m.clearButton, "buttonSelected", FuncName(OnClearButtonSelected))
+    DisposableObserveField(m.queueList, "itemSelected", FuncName(OnItemSelected))
 
     SetNavigation(m.queueList, "up", m.clearButton)
     SetNavigation(m.clearButton, "down", m.queueList)
+
+    m.videosToLoadDetails = []
 end function
 
 function Show(unsued as dynamic)
@@ -30,6 +35,10 @@ end function
 function OnContentSet() as void
     content = m.top.content
     if content = invalid
+        if m.loadDetailsTask <> invalid
+            m.loadDetailsTask.cancel = true
+            m.loadDetailsTask = invalid
+        end if
         return
     end if
 
@@ -43,6 +52,8 @@ function OnContentSet() as void
     else
         m.queueLabel.text = `Queue (${content.getChildCount()})`
     end if
+
+    LoadVideoDetailsIfNeeded()
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -63,6 +74,7 @@ end function
 
 function Close()
     m.top.appController@.PopScreen()
+    m.top.dispose = true
 end function
 
 function OnClearButtonSelected()
@@ -83,4 +95,60 @@ function OnItemSelected() as void
     videoQueue = m.top.videoQueue
     videoQueue.index = index
     videoQueue.play = true
+end function
+
+function LoadVideoDetailsIfNeeded() as void
+    content = m.queueList.content
+    if content = invalid
+        return
+    end if
+
+    videoNodes = content.getChildren(-1, 0)
+
+    index = m.top.videoQueue.index
+    indexInLoadingArray = -1
+
+    m.videosToLoadDetails.Clear()
+    for i = 0 to videoNodes.Count() - 1
+        videoNode = videoNodes[i]
+        ' If the title is empty, it is likely that the details have not been loaded yet
+        if videoNode.title = ""
+            m.videosToLoadDetails.Push(videoNode)
+        end if
+
+        if index = i
+            indexInLoadingArray = m.videosToLoadDetails.Count() - 1
+        end if
+    end for
+
+    for each videoNode in videoNodes
+        if videoNode.title = ""
+            m.videosToLoadDetails.Push(videoNode)
+        end if
+    end for
+
+    if m.videosToLoadDetails.Count() = 0
+        return
+    end if
+
+    LogInfo("Loading video details for", m.videosToLoadDetails.Count(), "videos")
+
+    if m.loadDetailsTask <> invalid
+        m.loadDetailsTask.cancel = true
+    end if
+
+    m.loadDetailsTask = AsyncTask.Start(Tasks.VideoQueueViewContentTask, {
+        videoNodes: m.videosToLoadDetails
+        invidious: m.top.invidious
+        index: indexInLoadingArray
+    })
+end function
+
+function OnDispose()
+    m.queueList.content = invalid
+    DisposeObservers()
+    if m.loadDetailsTask <> invalid
+        m.loadDetailsTask.cancel = true
+        m.loadDetailsTask = invalid
+    end if
 end function
