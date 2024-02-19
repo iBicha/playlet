@@ -8,15 +8,18 @@ function InitializeBindings()
             "AppController": {
                 "root": "./AppRoot", 
                 "stack": "./Stack", 
-                "playQueue": "./PlayQueue"
+                "videoQueue": "./VideoQueue"
             }, 
             "NavBar": {
                 "appController": "/AppController"
             }, 
-            "PlayQueue": {
+            "VideoQueue": {
+                "appController": "/AppController", 
+                "videoContainer": "../VideoContainer", 
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "loungeService": "../LoungeService"
             }, 
             "SearchHistory": {
                 "preferences": "../Preferences"
@@ -31,8 +34,18 @@ function InitializeBindings()
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
                 "preferences": "../Preferences", 
-                "playQueue": "../PlayQueue", 
-                "bookmarks": "../Bookmarks"
+                "videoQueue": "../VideoQueue", 
+                "bookmarks": "../Bookmarks", 
+                "loungeService": "../LoungeService"
+            }, 
+            "DialServer": {
+                "webServer": "../WebServer", 
+                "loungeService": "../LoungeService"
+            }, 
+            "LoungeService": {
+                "videoQueue": "../VideoQueue", 
+                "notifications": "../Notifications", 
+                "invidious": "../Invidious"
             }
         }
     }

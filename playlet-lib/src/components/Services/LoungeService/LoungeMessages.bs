@@ -1,0 +1,126 @@
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace LoungeMessages
+
+    function OnHasPreviousNextChanged(hasPrevious as boolean, hasNext as boolean) as object
+        message = {
+            commandType: COMMAND_ON_PREVIOUS_NEXT_CHANGE
+        }
+        commandArgs = {}
+        commandArgs[FIELD_HAS_PREVIOUS] = hasPrevious
+        commandArgs[FIELD_HAS_NEXT] = hasNext
+        message.commandArgs = commandArgs
+        return message
+    end function
+
+    function OnStateChange(player as object, overrides = invalid as object) as object
+        message = {
+            commandType: COMMAND_ON_STATE_CHANGE
+        }
+
+        commandArgs = {}
+
+        if player = invalid
+            commandArgs[FIELD_STATE] = PlayerState.UNSTARTED
+            message.commandArgs = commandArgs
+            return message
+        end if
+
+        commandArgs[FIELD_STATE] = GetPlayerState(player)
+        commandArgs[FIELD_CURRENT_TIME] = ValidDouble(player.position)
+        commandArgs[FIELD_SEEKABLE_START_TIME] = 0
+
+        content = player.content
+        if content <> invalid
+            metadata = content.metadata
+            if metadata <> invalid
+                lengthSeconds = metadata.lengthSeconds
+                if IsInt(lengthSeconds)
+                    commandArgs[FIELD_DURATION] = lengthSeconds
+                    commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
+
+                    if commandArgs[FIELD_STATE] = PlayerState.PLAYING or commandArgs[FIELD_STATE] = PlayerState.PAUSED or commandArgs[FIELD_STATE] = PlayerState.BUFFERING
+                        commandArgs[FIELD_LOADED_TIME] = lengthSeconds
+                    end if
+                end if
+            end if
+        end if
+
+        if overrides <> invalid
+            commandArgs.Append(overrides)
+        end if
+
+        message.commandArgs = commandArgs
+
+        return message
+    end function
+
+    function NowPlaying(player as object, overrides = invalid as object) as object
+        message = {
+            commandType: COMMAND_NOW_PLAYING
+        }
+
+        if player = invalid
+            return message
+        end if
+
+        commandArgs = {}
+
+        commandArgs[FIELD_CURRENT_TIME] = ValidDouble(player.position)
+        commandArgs[FIELD_SEEKABLE_START_TIME] = 0
+        commandArgs[FIELD_CURRENT_INDEX] = 0
+
+        commandArgs[FIELD_STATE] = GetPlayerState(player)
+
+        content = player.content
+        if content <> invalid
+            metadata = content.metadata
+            if metadata <> invalid
+                lengthSeconds = metadata.lengthSeconds
+                if IsInt(lengthSeconds)
+                    commandArgs[FIELD_DURATION] = lengthSeconds
+                    commandArgs[FIELD_SEEKABLE_END_TIME] = lengthSeconds
+
+                    if commandArgs[FIELD_STATE] = PlayerState.PLAYING or commandArgs[FIELD_STATE] = PlayerState.PAUSED or commandArgs[FIELD_STATE] = PlayerState.BUFFERING
+                        commandArgs[FIELD_LOADED_TIME] = lengthSeconds
+                    end if
+                end if
+                videoId = metadata.videoId
+                if not StringUtils.IsNullOrEmpty(videoId)
+                    commandArgs[FIELD_VIDEO_ID] = videoId
+                end if
+            end if
+        end if
+
+        if overrides <> invalid
+            commandArgs.Append(overrides)
+        end if
+
+        message.commandArgs = commandArgs
+        return message
+    end function
+
+    function GetPlayerState(player as object) as PlayerState
+        if player = invalid
+            return PlayerState.UNSTARTED
+        end if
+
+        state = player.state
+        if state = "playing"
+            return PlayerState.PLAYING
+        else if state = "paused"
+            return PlayerState.PAUSED
+        else if state = "buffering"
+            return PlayerState.BUFFERING
+        else if state = "finished"
+            return PlayerState.ENDED
+        else if state = "stopped" or state = "stopping"
+            return PlayerState.STOPPED
+        end if
+
+        return PlayerState.UNSTARTED
+    end function
+
+end namespace

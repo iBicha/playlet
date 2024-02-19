@@ -1,0 +1,132 @@
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/components/Services/LoungeService/LoungeApi.bs"
+' TODO:P0
+' 1. Add a section about the lounge in the privacy policy
+
+function Init()
+    m.top.functionName = "LoungeServiceLoop"
+
+    deviceInfo = CreateObject("roDeviceInfo")
+    m.top.deviceId = deviceInfo.GetRandomUUID()
+    deviceFriendlyName = deviceInfo.GetFriendlyName()
+    if StringUtils.IsNullOrEmpty(deviceFriendlyName)
+        deviceFriendlyName = "TV"
+    end if
+    m.top.deviceName = "Playlet on " + deviceFriendlyName
+end function
+
+function StartService(_unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopService(_unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
+end function
+
+function LoungeServiceLoop() as void
+    api = new LoungeApi(m.top, m.top.videoQueue, m.top.notifications, m.top.invidious)
+    ' Mobile app can remain connected to devices even after restarts.
+    ' Since we create a new lounge every time, we signal to the last lounge
+    ' that we're no longer there, and we're not coming back.
+    api.DisconnectFromLastLounge()
+
+    messagePort = CreateObject("roMessagePort")
+
+    ' We do not join a lounge until something asks us to like
+    ' - A remote connects through DIAL
+    ' - Generating a TV link code
+    m.top.observeField("join", messagePort)
+    wait(0, messagePort)
+    m.top.unobserveField("join")
+
+
+    screenId = api.GetScreenId()
+    if StringUtils.IsNullOrEmpty(screenId)
+        m.top.isRunning = false
+        return
+    end if
+    m.top.screenId = screenId
+
+    loungeToken = api.GetToken()
+    if StringUtils.IsNullOrEmpty(loungeToken)
+        m.top.isRunning = false
+        return
+    end if
+    m.top.loungeToken = loungeToken
+
+    m.top.observeField("outgoingMessages", messagePort)
+
+    if not api.GetSessionData()
+        m.top.unobserveField("outgoingMessages", messagePort)
+        m.top.isRunning = false
+        return
+    end if
+
+    api.SaveCurrentLoungeData()
+    api.FetchCommandsRpc(messagePort)
+
+    m.top.shouldQuit = false
+    isOpen = false
+    outgoingLoungeMessages = []
+    portMessages = []
+    socketMessages = []
+
+    while true
+        if m.top.shouldQuit = true
+            exit while
+        end if
+
+        message = wait(60000, messagePort)
+        portMessages.Clear()
+        portMessages.Push(message)
+
+        ' There's a chance messages were piling up while we were sending messages to the lounge
+        ' This could happen if we were sending things to the lounge and the player state
+        ' changed many times.
+        while messagePort.PeekMessage() <> invalid
+            portMessages.Push(messagePort.GetMessage())
+        end while
+
+        ' At this point:
+        ' - We check if we need to send messages to the lounge based on player state
+        ' - We check the lounge for new commands, which might need responding to
+        ' - Finally, we send the outgoing messages to the lounge in one go
+        outgoingLoungeMessages.Clear()
+        socketMessages.Clear()
+
+        for each portMessage in portMessages
+            messageType = type(portMessage)
+            if messageType = "roSocketEvent"
+                socketMessages.Push(portMessage)
+            else if messageType = "roSGNodeEvent"
+                field = portMessage.GetField()
+                if field = "outgoingMessages"
+                    messages = portMessage.GetData()
+                    outgoingLoungeMessages.Append(messages)
+                end if
+            end if
+        end for
+
+        isOpen = api.Poll(socketMessages, outgoingLoungeMessages)
+
+        api.SendMessages(outgoingLoungeMessages)
+        api.ProcessPendingOutgoingMessages()
+
+        if not isOpen
+            sleep(3000)
+            api.FetchCommandsRpc(messagePort)
+        end if
+    end while
+
+    m.top.unobserveField("outgoingMessages", messagePort)
+    m.top.isRunning = false
+end function

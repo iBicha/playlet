@@ -41,26 +41,16 @@ namespace Invidious
 
         function new(node as object)
             m.node = node
-
-            m.endpoints = node.apiDefinitions
-
-            m.responseHandlers = {
-                DefaultHandler: m.DefaultHandler
-                AuthFeedHandler: m.AuthFeedHandler
-                PlaylistHandler: m.PlaylistHandler
-                VideoInfoHandler: m.VideoInfoHandler
-                PlaylistInfoHandler: m.PlaylistInfoHandler
-                ChannelInfoHandler: m.ChannelInfoHandler
-                ChannelVideosHandler: m.ChannelVideosHandler
-                ChannelPlaylistsHandler: m.ChannelPlaylistsHandler
-                WatchHistoryHandler: m.WatchHistoryHandler
-            }
         end function
 
         function DefaultQueryParams() as object
-            return {
-                region: m.node.applicationInfo@.GetUserCountryCode()
-            }
+            if m._defaultQueryParams = invalid
+                m._defaultQueryParams = {
+                    "region": m.node.applicationInfo@.GetUserCountryCode()
+                }
+            end if
+
+            return m._defaultQueryParams
         end function
 
         function GetAuthenticationHeaders(token as string) as object
@@ -187,6 +177,10 @@ namespace Invidious
 
             feedSource = feedSources[feedSourcesIndex]
 
+            if m.endpoints = invalid
+                m.endpoints = m.node.apiDefinitions
+            end if
+
             endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid or StringUtils.IsNullOrEmpty(endpoint.paginationType)
                 return feedSource
@@ -220,6 +214,10 @@ namespace Invidious
         end function
 
         function MakeRequest(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
+            if m.endpoints = invalid
+                m.endpoints = m.node.apiDefinitions
+            end if
+
             endpoint = m.endpoints[feedSource.endpoint]
             if endpoint = invalid
                 return {
@@ -290,6 +288,20 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
+
+            if m.responseHandlers = invalid
+                m.responseHandlers = {
+                    DefaultHandler: m.DefaultHandler
+                    AuthFeedHandler: m.AuthFeedHandler
+                    PlaylistHandler: m.PlaylistHandler
+                    VideoInfoHandler: m.VideoInfoHandler
+                    PlaylistInfoHandler: m.PlaylistInfoHandler
+                    ChannelInfoHandler: m.ChannelInfoHandler
+                    ChannelVideosHandler: m.ChannelVideosHandler
+                    ChannelPlaylistsHandler: m.ChannelPlaylistsHandler
+                    WatchHistoryHandler: m.WatchHistoryHandler
+                }
+            end if
 
             responseHandler = endpoint.responseHandler <> invalid ? m.responseHandlers[endpoint.responseHandler] : m.responseHandlers["DefaultHandler"]
 

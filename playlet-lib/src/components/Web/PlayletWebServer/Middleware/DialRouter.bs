@@ -1,0 +1,197 @@
+import "pkg:/source/services/XmlObject.bs"
+
+namespace Http
+
+    class DialRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            task = server.task
+            m.serverAddress = task@.GetServerAddress()
+            m.scene = task.getScene()
+            m.loungeService = task.loungeService
+            m.deviceId = m.loungeService.deviceId
+            m.deviceName = m.loungeService.deviceName
+
+            m.routes.push({ method: "GET", path: `/dial/${m.deviceId}/device-description.xml`, router: m, func: "GetDialManifest" })
+            m.routes.push({ method: "GET", path: `/dial/${m.deviceId}/YouTube`, router: m, func: "GetDialYouTube" })
+            m.routes.push({ method: "POST", path: `/dial/${m.deviceId}/YouTube`, router: m, func: "PostDialYouTube" })
+            m.routes.push({ method: "DELETE", path: `/dial/${m.deviceId}/YouTube/run`, router: m, func: "CloseChannel" })
+        end function
+
+        ' @get("/dial/device-description.xml")
+        function GetDialManifest(context as object) as boolean
+            response = context.response
+
+            xmlContent = m.GenerateDialManifest()
+            response.http_code = 200
+            response.SetBodyDataString(xmlContent)
+            response.ContentType(`text/xml; charset="utf-8"`)
+            response.headers["Application-URL"] = `${m.serverAddress}/dial/${m.deviceId}`
+            response.headers["Cache-Control"] = "no-cache, no-store, max-age=0, must-revalidate"
+            return true
+        end function
+
+        ' @get("/dial/YouTube")
+        function GetDialYouTube(context as object) as boolean
+            response = context.response
+
+            xmlContent = m.GenerateDialYouTube()
+            response.http_code = 200
+            response.SetBodyDataString(xmlContent)
+            response.ContentType(`text/xml; charset="utf-8"`)
+            response.headers["Cache-Control"] = "no-cache, no-store, max-age=0, must-revalidate"
+
+            return true
+        end function
+
+        ' @post("/dial/YouTube")
+        function PostDialYouTube(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            fields = UrlUtils.GetUrlDecodedForm(request.body)
+            pairingCode = fields["pairingCode"]
+            if StringUtils.IsNullOrEmpty(pairingCode)
+                response.Default(400, "Bad Request")
+                return true
+            end if
+
+            theme = fields["theme"]
+            if not IsString(theme) or theme <> "cl"
+                response.Default(400, "Bad Request")
+                return true
+            end if
+
+            loungeToken = m.loungeService.loungeToken
+            if StringUtils.IsNullOrEmpty(loungeToken)
+                messagePort = CreateObject("roMessagePort")
+                m.loungeService.observeFieldScoped("loungeToken", messagePort)
+                m.loungeService.join = true
+                message = wait(30000, messagePort)
+                m.loungeService.unobserveFieldScoped("loungeToken")
+                if message = invalid or StringUtils.IsNullOrEmpty(message.GetData())
+                    response.Default(500, "Couldn't join lounge")
+                    return true
+                end if
+            end if
+
+            registerUrl = "https://www.youtube.com/api/lounge/pairing/register_pairing_code"
+            registerBody = {
+                "app": "Playlet"
+                "pairing_code": pairingCode
+                "screen_id": m.loungeService.screenId
+                "screen_name": m.deviceName
+                "device_id": m.deviceId
+            }
+
+            body = UrlUtils.GetUrlEncodedForm(registerBody)
+            req = HttpClient.Post(registerUrl, body)
+            req.Header("Content-Type", "application/x-www-form-urlencoded")
+            res = req.Await()
+
+            if not res.IsSuccess()
+                response.Default(500, "Internal Server Error")
+                return true
+            end if
+
+            response.Default(200, "Ok")
+            return true
+        end function
+
+        ' @delete("/dial/YouTube/run")
+        function CloseChannel(context as object) as boolean
+            response = context.response
+
+            response.Default(200, "Shutting down app...")
+            m.scene.exitChannel = true
+
+            return true
+        end function
+
+        function GenerateDialManifest() as string
+            if m._dialXml <> invalid
+                return m._dialXml
+            end if
+
+            xml = new XmlObject()
+            if xml.Node("root", { "xmlns": "urn:schemas-upnp-org:device-1-0" })
+                if xml.Node("specVersion")
+                    xml.TextNode("major", "1")
+                    xml.TextNode("minor", "0")
+
+                    xml.End()
+                end if
+
+                if xml.Node("device")
+                    xml.TextNode("deviceType", "urn:dial-multiscreen-org:device:dial:1")
+                    xml.TextNode("friendlyName", m.deviceName)
+                    xml.TextNode("manufacturer", "Generic")
+                    xml.TextNode("modelName", "Generic")
+
+                    xml.TextNode("UDN", "uuid:" + m.deviceId)
+
+                    if xml.Node("serviceList")
+                        if xml.Node("service")
+                            xml.TextNode("serviceType", "urn:dial-multiscreen-org:service:dial:1")
+                            xml.TextNode("serviceId", "urn:dial-multiscreen-org:serviceId:dial")
+                            xml.EmptyNode("controlURL")
+                            xml.EmptyNode("eventSubURL")
+                            xml.EmptyNode("SCPDURL")
+
+                            xml.End()
+                        end if
+
+                        xml.End()
+                    end if
+
+                    xml.End()
+                end if
+
+                xml.End()
+            end if
+            m._dialXml = xml.ToXmlString()
+            return m._dialXml
+        end function
+
+        function GenerateDialYouTube() as string
+            screenId = m.loungeService.screenId
+            loungeToken = m.loungeService.loungeToken
+
+            if m._dialYouTubeXml <> invalid
+                if m._dialYoutubeScreenId = screenId and m._dialYoutubeLoungeToken = loungeToken
+                    return m._dialYouTubeXml
+                end if
+            end if
+
+            xml = new XmlObject()
+            if xml.Node("service", { "dialVer": "1.7", "xmlns": "urn:dial-multiscreen-org:schemas:dial" })
+                xml.TextNode("name", "YouTube")
+                xml.EmptyNode("options", { "allowStop": "true" })
+                xml.TextNode("state", "running")
+                xml.EmptyNode("link", { "rel": "run", "href": "run" })
+
+                if not StringUtils.IsNullOrEmpty(screenId) and not StringUtils.IsNullOrEmpty(loungeToken)
+                    if xml.Node("additionalData")
+                        xml.TextNode("theme", "cl")
+                        xml.TextNode("deviceId", m.deviceId)
+                        xml.TextNode("screenId", screenId)
+                        xml.TextNode("loungeToken", loungeToken)
+
+                        xml.End()
+                    end if
+                end if
+
+                xml.End()
+            end if
+
+            m._dialYouTubeXml = xml.ToXmlString()
+            m._dialYoutubeScreenId = screenId
+            m._dialYoutubeLoungeToken = loungeToken
+            return m._dialYouTubeXml
+        end function
+
+    end class
+
+end namespace

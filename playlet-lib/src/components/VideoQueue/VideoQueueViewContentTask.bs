@@ -1,0 +1,65 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/MathUtils.bs"
+
+@asynctask
+function VideoQueueViewContentTask(input as object) as object
+    videoNodes = input.videoNodes
+    invidiousNode = input.invidious
+    service = new Invidious.InvidiousService(invidiousNode)
+    instance = service.GetInstance()
+    cancellation = m.top.cancellation
+
+    index = MathUtils.Clamp(input.index - 2, 0, videoNodes.Count() - 1)
+
+    for i = index to videoNodes.Count() - 1
+        videoNode = videoNodes[i]
+        LoadVideoDetail(videoNode, service, instance, cancellation)
+        ' Sleep for a bit to avoid creating too much traffic
+        sleep(500)
+
+        if m.top.cancel = true
+            return invalid
+        end if
+    end for
+
+    for i = index - 1 to 0 step -1
+        videoNode = videoNodes[i]
+        LoadVideoDetail(videoNode, service, instance, cancellation)
+        ' Sleep for a bit to avoid creating too much traffic
+        sleep(1000)
+
+        if m.top.cancel = true
+            return invalid
+        end if
+    end for
+
+    return invalid
+end function
+
+function LoadVideoDetail(videoNode as object, service as object, instance as string, cancellation as object) as void
+    videoId = videoNode.videoId
+    url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+    request = HttpClient.Get(url)
+    request.QueryParams(service.DefaultQueryParams())
+    ' A large cache interval, since we don't care about the video detail accuracy
+    request.CacheSeconds(8640000)
+    request.Cancellation(cancellation)
+
+    response = request.Await()
+    metadata = response.Json()
+
+    if not response.IsSuccess() or metadata = invalid
+        LogError("Failed to load video metadata", response.ErrorMessage())
+        if response.StatusCode() = 500
+            ' The video is likely not available.
+            ' We set the title to make sure we don't try to load it again
+            videoNode.title = "Video not available"
+        end if
+        return
+    end if
+
+    InvidiousContent.ToVideoContentNode(videoNode, metadata, instance)
+end function

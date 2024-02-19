@@ -57,6 +57,60 @@ namespace UrlUtils
         return url
     end function
 
+    function GetUrlEncodedForm(fields as object) as string
+        form = ""
+        if IsArray(fields)
+            for each item in fields
+                key = item.key
+                value = item.value
+                if key = invalid or value = invalid
+                    continue for
+                end if
+
+                if form <> ""
+                    form += "&"
+                end if
+
+                if not IsString(value)
+                    value = `${value}`
+                end if
+
+                form += key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+            end for
+        else if IsAssociativeArray(fields)
+            for each key in fields
+                value = fields[key]
+                if value = invalid
+                    continue for
+                end if
+
+                if form <> ""
+                    form += "&"
+                end if
+
+                if not IsString(value)
+                    value = `${value}`
+                end if
+
+                form += key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
+            end for
+        end if
+
+        return form
+    end function
+
+    function GetUrlDecodedForm(body as string) as object
+        fields = {}
+        components = body.split("&")
+        for each component in components
+            keyValue = component.split("=")
+            key = keyValue[0].DecodeUriComponent()
+            value = keyValue[1].DecodeUriComponent()
+            fields[key] = value
+        end for
+        return fields
+    end function
+
     function GetEncodedQueryParam(key as string, value as dynamic) as string
         if IsString(value)
             return key.EncodeUriComponent() + "=" + value.EncodeUriComponent()
@@ -141,4 +195,47 @@ namespace UrlUtils
         end for
         return query
     end function
+
+    ' Parses the URL into protocol, host, port, and path
+    function ParseUrl(url as string) as object
+        protocol = invalid
+        port = invalid
+        path = "/"
+
+        index = url.InStr("://")
+        if index > 0
+            protocol = url.Left(index)
+            url = url.Mid(index + 3)
+        else
+            protocol = "http"
+        end if
+
+        index = url.InStr("/")
+        if index > 0
+            host = url.Left(index)
+            path = url.Mid(index)
+        else
+            host = url
+        end if
+
+        index = host.InStr(":")
+        if index > 0
+            port = host.Mid(index + 1)
+            host = host.Left(index)
+        else
+            if protocol = "http"
+                port = "80"
+            else if protocol = "https"
+                port = "443"
+            end if
+        end if
+
+        return {
+            protocol: protocol
+            host: host
+            port: port
+            path: path
+        }
+    end function
+
 end namespace

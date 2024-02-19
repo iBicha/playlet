@@ -1,6 +1,7 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 
 namespace Http
 
@@ -9,7 +10,9 @@ namespace Http
         function new(server as object)
             super()
 
-            m.appController = server.task.appController
+            task = server.task
+            m.appController = task.appController
+            m.videoQueue = task.videoQueue
         end function
 
         @get("/api/view/open")
@@ -23,15 +26,15 @@ namespace Http
             if not StringUtils.IsNullOrEmpty(playlistId)
                 contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid)
                 PlaylistUtils.Open(contentNode, m.appController)
-                if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
-                    VideoUtils.ToggleVideoPictureInPicture()
+                if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
+                    VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
                 end if
                 response.Default(204, "OK")
             else if not StringUtils.IsNullOrEmpty(authorId)
                 contentNode = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
                 ChannelUtils.Open(contentNode, m.appController)
-                if VideoUtils.IsVideoPlayerOpen() and VideoUtils.IsVideoPlayerFullScreen()
-                    VideoUtils.ToggleVideoPictureInPicture()
+                if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
+                    VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
                 end if
                 response.Default(204, "OK")
             else

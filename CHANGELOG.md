@@ -7,9 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for casting from the YouTube app (also known as Lounge API, or LeanBack)
+  - Connect to Playlet from the YouTube mobile app or from certain browsers (such as Chrome)
+  - Connect to Playlet from local network, or through the TV code.
+  - On the cast dialog in your YouTube mobile app, you might see two listings for the same device. E.g. `Roku TV` and `Playlet on Roku TV`. Use the `Playlet on` one to cast to Playlet, and the other one to cast to the regular YouTube TV app.
+  - The functionality is still experiemntal, and has some limitations. To name a few:
+    - The queue does not perfectly sync between the mobile app and Playlet, espeically if it gets modified by the web app or in Playlet.
+    - Many functions (such as d-pad controls, setting volume) are not working due to OS limitations
+    - Many functions (such as changing the subtitle settings) are not currently implemented
+  - **ATTENTION**: This feature is not very privacy friendly. When connected to a lounge, all network traffic (videos played, queued, etc) go through YouTube servers. For this reason, certain measures are taken:
+    - While Playlet broadcasts its casting capabilities to the local network, it does not connect to a network for the first time until:
+      - A device connects to Playlet (using DIAL/Connect using Wi-Fi)
+      - A `Link with TV code` is generated, by visiting the `Remote` -> `Link with TV code` tab.
+    - Playlet disconnects from previous lounge sessions on start, and joins a new one instead of one continous session. In other words, restarting Playlet will disconnect your second device. This is a feature, not a bug.
+    - Playlet does not expose device details, and uses a randomly generated id on each start, instead of consistent device id.
+
 ### Changed
 
+- The queue no longer contains playlists. When a playlist is added to the queue, the entire playlist is loaded.
+  - It can take a few seconds to load large playlist before it can be added to the queue
+  - This is done to be more compatible more the lounge, which does not contain "Playlists in the queue" concept.
+- The `Web App` tab is now called `Remote`. It can be used to open the web app, or connect using Lounge (cast from YouTube)
 - Removed `fields` from Invidious requests, as per [https://github.com/iv-org/invidious/pull/4276](https://github.com/iv-org/invidious/pull/4276)
+- The `POST /api/queue/` no longer returns the current queue. Instead it returns a 204.
 
 ## [0.19.2] - 2024-02-11
 

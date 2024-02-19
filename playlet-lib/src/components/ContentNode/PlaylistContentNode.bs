@@ -1,0 +1,55 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+
+function LoadPlaylistPage(invidiousNode as object) as void
+    LoadPlaylist(invidiousNode, true)
+end function
+
+function LoadPlaylistAll(invidiousNode as object) as void
+    LoadPlaylist(invidiousNode, false)
+end function
+
+function LoadPlaylist(invidiousNode as object, singlePage as boolean) as void
+    if m.contentTask <> invalid
+        m.contentTask.cancel = true
+    end if
+
+    loadState = m.top.loadState
+    if loadState = FeedLoadState.Loading or loadState = FeedLoadState.Loaded
+        return
+    end if
+
+    m.top.loadState = FeedLoadState.Loading
+    m.contentTask = AsyncTask.Start(Tasks.PlaylistContentTask, {
+        content: m.top
+        invidious: invidiousNode
+        singlePage: singlePage
+    }, OnPlaylistContentTaskResult)
+end function
+
+function OnPlaylistContentTaskResult(output as object) as void
+    m.contentTask = invalid
+
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        LogError(error)
+        playlistId = output.task.input.content.playlistId
+        message = `Failed to load playlist ${playlistId}\n${error}`
+        DialogUtils.ShowDialog(message, "Playlist load fail", true)
+        return
+    end if
+end function

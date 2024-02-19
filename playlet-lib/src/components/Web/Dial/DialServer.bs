@@ -1,0 +1,205 @@
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/services/ApplicationInfo.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.functionName = "DialServerLoop"
+end function
+
+function StartServer(_unused as dynamic) as boolean
+    if m.top.isRunning = true
+        return true
+    end if
+
+    m.top.control = "run"
+    return true
+end function
+
+function StopServer(_unused as dynamic) as void
+    if m.top.isRunning = false
+        return
+    end if
+
+    m.top.shouldQuit = true
+end function
+
+function DialServerLoop() as void
+    webServer = m.top.webServer
+    m.deviceId = m.top.loungeService.deviceId
+
+    messagePort = createobject("roMessagePort")
+    udp = createobject("roDatagramSocket")
+    udp.setMessagePort(messagePort)
+    addr = createobject("roSocketAddress")
+    addr.setPort(1900)
+    udp.setAddress(addr)
+    addr.SetHostName("239.255.255.250")
+    udp.setSendToAddress(addr)
+    udp.notifyReadable(true)
+
+    ssdpResponse = invalid
+
+    ' For each address, we will keep track of the last X times we sent a response.
+    ' If we responded to a message from an address more than X times in the last Y seconds, we will not respond again.
+    timeThreshold = 5000
+    countThreshold = 3
+    timers = {}
+    timer = createobject("roTimespan")
+
+    m.top.shouldQuit = false
+    m.top.observeField("shouldQuit", messagePort)
+
+    while udp.eOK()
+        message = wait(10000, messagePort)
+        messageType = type(message)
+
+        if messageType = "roSGNodeEvent"
+            field = message.GetField()
+            if field = "shouldQuit"
+                exit while
+            end if
+        end if
+
+        if messageType <> "roSocketEvent"
+            continue while
+        end if
+        if message.getSocketID() <> udp.getID()
+            continue while
+        end if
+        if not udp.isReadable()
+            continue while
+        end if
+
+        messageStr = udp.receiveStr(512)
+        ssdpMessage = ParseSsdpMessage(messageStr)
+
+        if not ShouldRespondToMessage(ssdpMessage)
+            continue while
+        end if
+
+        peerAddress = udp.GetReceivedFromAddress()
+        address = peerAddress.GetAddress()
+        host = peerAddress.GetHostName()
+
+        if timers[host] = invalid
+            timers[host] = []
+            LogInfo(`Received message from ${address}:`, ssdpMessage)
+            LogInfo(`No further messages from ${host} will be logged at info level. If you need to debug, please enable debug logging.`)
+        else
+            LogDebug(`Received message from ${address}:`, ssdpMessage)
+        end if
+        timerForHost = timers[host]
+
+        now = timer.TotalMilliseconds()
+
+        ' Remove any timers that are older than timeThreshold
+        while timerForHost.Count() > 0 and now - timerForHost[0] > timeThreshold
+            timerForHost.Shift()
+        end while
+
+        if timerForHost.Count() >= countThreshold
+            LogDebug(`Ignoring message from ${address} - too spammy`)
+            continue while
+        end if
+
+        timerForHost.Push(now)
+
+        ssdpResponse = CreateSsdpResponse(ssdpMessage, webServer)
+
+        udp.setSendToAddress(peerAddress)
+        udp.sendStr(ssdpResponse)
+    end while
+
+    udp.close()
+    m.top.isRunning = false
+    LogInfo("Server stopped")
+end function
+
+function ParseSsdpMessage(message as string) as object
+    if not IsString(message) or not message.StartsWith("M-SEARCH")
+        return invalid
+    end if
+
+    lines = message.split(`\r\n`)
+    operation = lines[0]
+    parts = operation.split(" ")
+    if parts.Count() <> 3
+        return invalid
+    end if
+
+    ssdp = {}
+    ssdp["method"] = parts[0]
+    ssdp["uri"] = parts[1]
+    ssdp["protocol"] = parts[2]
+
+    headers = {}
+    for i = 1 to lines.Count() - 1
+        line = lines[i]
+        if line = ""
+            continue for
+        end if
+
+        colonIndex = line.InStr(":")
+        if colonIndex = -1
+            continue for
+        end if
+
+        key = line.Left(colonIndex).trim()
+        value = line.Mid(colonIndex + 1).trim()
+        headers[key] = value
+    end for
+
+    ssdp["headers"] = headers
+    return ssdp
+end function
+
+function ShouldRespondToMessage(ssdp as object) as boolean
+    if ssdp = invalid
+        return false
+    end if
+
+    if ssdp["method"] <> "M-SEARCH" or ssdp["uri"] <> "*" or ssdp["protocol"] <> "HTTP/1.1"
+        return false
+    end if
+
+    headers = ssdp["headers"]
+    if headers["MAN"] <> `"ssdp:discover"`
+        return false
+    end if
+
+    if headers["ST"] <> "urn:dial-multiscreen-org:service:dial:1" and headers["ST"] <> "ssdp:all"
+        return false
+    end if
+
+    return true
+end function
+
+function CreateSsdpResponse(ssdp as object, webServer as object) as string
+    libVersion = m._libVersion
+
+    if libVersion = invalid
+        ' We're supposed to pass the ApplicationInfo node, but since we're not going to use it, we can pass invalid
+        appInfo = new ApplicationInfo(invalid)
+        if libVersion = invalid
+            libVersion = appInfo.GetLibVersion()
+            m._libVersion = libVersion
+        end if
+    end if
+
+    webServerAddress = m._webServerAddress
+    if webServerAddress = invalid
+        webServerAddress = webServer@.GetServerAddress()
+        m._webServerAddress = webServerAddress
+    end if
+
+    msg = `HTTP/1.1 200 OK\r\n`
+    msg += `LOCATION: ${webServerAddress}/dial/${m.deviceId}/device-description.xml\r\n`
+    msg += `ST: ${ssdp.headers.ST}\r\n`
+    msg += `SERVER: Playlet Lib Dial Server ${libVersion} \r\n`
+    msg += `USN: uuid:${m.deviceId}::${ssdp.headers.ST}\r\n`
+    msg += `CACHE-CONTROL: no-cache, no-store, max-age=0, must-revalidate\r\n`
+    msg += `EXT: \r\n`
+    msg += `\r\n`
+    return msg
+end function

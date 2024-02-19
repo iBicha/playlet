@@ -1,0 +1,57 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+import "pkg:/components/VideoFeed/FeedLoadState.bs"
+
+@asynctask
+function PlaylistContentTask(input as object) as object
+    contentNode = input.content
+    invidiousNode = input.invidious
+    singlePage = input.singlePage
+
+    if m.top.cancel
+        contentNode.loadState = FeedLoadState.None
+        return invalid
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+    instance = service.GetInstance()
+
+    while true
+        index = contentNode.getChildCount()
+        response = service.GetPlaylist(contentNode.playlistId, index, m.top.cancellation)
+
+        if m.top.cancel
+            contentNode.loadState = FeedLoadState.None
+            return invalid
+        end if
+
+        metadata = response.Json()
+
+        if not response.IsSuccess() or metadata = invalid
+            contentNode.loadState = FeedLoadState.Error
+            return {
+                success: false
+                error: response.ErrorMessage()
+            }
+        end if
+
+        InvidiousContent.ToPlaylistContentNode(contentNode, metadata, instance)
+        childCount = contentNode.getChildCount()
+
+        if metadata.videos.Count() = 0 or childCount >= metadata.videoCount
+            contentNode.loadState = FeedLoadState.Loaded
+            return {
+                success: true
+            }
+        else
+            contentNode.loadState = FeedLoadState.LoadedPage
+            if singlePage
+                return {
+                    success: true
+                }
+            end if
+        end if
+    end while
+
+    return invalid
+end function
