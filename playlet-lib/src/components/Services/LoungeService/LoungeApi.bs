@@ -38,6 +38,7 @@ class LoungeApi
         m.videoQueueNode = videoQueueNode
         m.notificationsNode = notificationsNode
         m.invService = new Invidious.InvidiousService(invidiousNode)
+        m.dateTime = CreateObject("roDateTime")
         m.deviceId = loungeServiceNode.deviceId
         deviceName = loungeServiceNode.deviceName
         m.deviceName = deviceName
@@ -72,6 +73,17 @@ class LoungeApi
         for each key in commandHandlers
             m[COMMAND_HANDLER_PREFIX + key] = commandHandlers[key]
         end for
+    end function
+
+    function Zx() as string
+        ' Math.floor(2147483648 * Math.random()).toString(36) + Math.abs(Math.floor(2147483648 * Math.random()) ^ Date.now()).toString(36)
+        rnd1% = rnd(2147483647)
+        rnd2& = rnd(2147483647)
+        m.dateTime.mark()
+        now& = m.dateTime.AsSeconds()
+        now& = now& * 1000 + m.dateTime.GetMilliseconds()
+        rnd2xor& = (rnd2& or now&) and not (rnd2& and now&)
+        return StrI(rnd1%, 36) + StrI(Abs(rnd2xor&), 36)
     end function
 
     function GetScreenId() as dynamic
@@ -138,7 +150,6 @@ class LoungeApi
             "VER": "8"
             "v": "2"
             "t": "1"
-            "zx": "xxxxxxxxxxxx"
             "app": "lb-v4"
             "RID": "1337"
         }
@@ -146,6 +157,7 @@ class LoungeApi
         queryParams["name"] = m.screenName
         queryParams["id"] = m.deviceId
         queryParams["loungeIdToken"] = m.loungeToken
+        queryParams["zx"] = m.Zx()
 
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
@@ -182,7 +194,6 @@ class LoungeApi
             "VER": "8"
             "v": "2"
             "t": "1"
-            "zx": "xxxxxxxxxxxx"
             "app": "lb-v4"
             "RID": "rpc"
             "CI": "0"
@@ -193,6 +204,7 @@ class LoungeApi
         queryParams["loungeIdToken"] = m.loungeToken
         queryParams["SID"] = m.sessionId
         queryParams["gsessionid"] = m.gSessionId
+        queryParams["zx"] = m.Zx()
 
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
@@ -442,7 +454,6 @@ class LoungeApi
             "VER": "8"
             "v": "2"
             "t": "1"
-            "zx": "xxxxxxxxxxxx"
             "app": "lb-v4"
             "RID": "1337"
         }
@@ -456,6 +467,7 @@ class LoungeApi
         queryParams["loungeIdToken"] = loungeData.loungeToken
         queryParams["SID"] = loungeData.sessionId
         queryParams["gsessionid"] = loungeData.gSessionId
+        queryParams["zx"] = m.Zx()
         if messages[0].commandId <> invalid
             queryParams["AID"] = messages[0].commandId
         end if
