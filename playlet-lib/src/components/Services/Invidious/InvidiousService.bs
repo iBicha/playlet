@@ -43,14 +43,11 @@ namespace Invidious
             m.node = node
         end function
 
-        function DefaultQueryParams() as object
-            if m._defaultQueryParams = invalid
-                m._defaultQueryParams = {
-                    "region": m.node.applicationInfo@.GetUserCountryCode()
-                }
+        function GetUserRegion() as string
+            if m._userRegion = invalid
+                m._userRegion = m.node.applicationInfo@.GetUserCountryCode()
             end if
-
-            return m._defaultQueryParams
+            return m._userRegion
         end function
 
         function GetAuthenticationHeaders(token as string) as object
@@ -89,7 +86,7 @@ namespace Invidious
             url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
             request = HttpClient.Get(url)
-            request.QueryParams(m.DefaultQueryParams())
+            request.QueryParam("region", m.GetUserRegion())
             request.QueryParam("q", q)
             request.CacheSeconds(60 * 60 * 24)
 
@@ -99,33 +96,59 @@ namespace Invidious
             return response.Json()
         end function
 
-        function GetVideoMetadata(videoId as string, cancellation = invalid as object) as object
-            instance = m.GetInstance()
-            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-
-            request = HttpClient.Get(url)
-            request.QueryParams(m.DefaultQueryParams())
+        function GetVideoMetadata(videoId as string, options = invalid as object) as object
+            region = true
             ' 5 hours cache. Videos should expire in 6 hours, but since we don't
             ' have the exact expiration time, we'll use 5 hours. Invidious currently
             ' Does a fresh fetch if the cache is older than 10 minutes.
             ' https://github.com/iv-org/invidious/blob/069e91d2a609b1df94bdfbb693335969b2a281d8/src/invidious/videos.cr#L349
-            request.CacheSeconds(60 * 60 * 5)
+            cacheSeconds = 18000 ' 5 hours
+            cancellation = invalid
+            tryCount = 2
+
+            if options <> invalid
+                if options.DoesExist("region")
+                    region = options.region
+                end if
+                if options.DoesExist("cacheSeconds")
+                    cacheSeconds = options.cacheSeconds
+                end if
+                if options.DoesExist("cancellation")
+                    cancellation = options.cancellation
+                end if
+                if options.DoesExist("tryCount")
+                    tryCount = options.tryCount
+                end if
+            end if
+
+            instance = m.GetInstance()
+            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+            request = HttpClient.Get(url)
+
+            if region = true
+                request.QueryParam("region", m.GetUserRegion())
+            end if
+
+            request.CacheSeconds(cacheSeconds)
             request.Cancellation(cancellation)
 
-            request.TryCount(2)
-            request.RetryCallback(function(context as object) as boolean
-                response = context.response
-                ' In some cases, video info requests return "HTTP/0.9 when not allowed" errors.
-                ' Retrying should usually fix the issue.
-                if response.StatusCode() = HttpClient.CurlErrors.CURLE_UNSUPPORTED_PROTOCOL
-                    errorMessage = response.ErrorMessage()
-                    if errorMessage.InStr("HTTP/0.9") <> -1
-                        return true
+            if tryCount > 1
+                request.TryCount(tryCount)
+                request.RetryCallback(function(context as object) as boolean
+                    response = context.response
+                    ' In some cases, video info requests return "HTTP/0.9 when not allowed" errors.
+                    ' Retrying should usually fix the issue.
+                    if response.StatusCode() = HttpClient.CurlErrors.CURLE_UNSUPPORTED_PROTOCOL
+                        errorMessage = response.ErrorMessage()
+                        if errorMessage.InStr("HTTP/0.9") <> -1
+                            return true
+                        end if
                     end if
-                end if
 
-                return false
-            end function)
+                    return false
+                end function)
+            end if
 
             return request.Await()
         end function
@@ -142,7 +165,6 @@ namespace Invidious
                 request.Headers(m.GetAuthenticationHeaders(authToken.token))
             end if
 
-            request.QueryParams(m.DefaultQueryParams())
             request.QueryParam("index", index)
             request.Cancellation(cancellation)
 
@@ -154,7 +176,6 @@ namespace Invidious
             url = `${instance}${Invidious.CHANNELS_ENDPOINT}/${authorId}`
 
             request = HttpClient.Get(url)
-            request.QueryParams(m.DefaultQueryParams())
             request.Cancellation(cancellation)
             request.CacheSeconds(60 * 60 * 24)' 24 hours
             request.TryCount(3)

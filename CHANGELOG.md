@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Web App` tab is now called `Remote`. It can be used to open the web app, or connect using Lounge (cast from YouTube)
 - Removed `fields` from Invidious requests, as per [https://github.com/iv-org/invidious/pull/4276](https://github.com/iv-org/invidious/pull/4276)
 - The `POST /api/queue/` no longer returns the current queue. Instead it returns a 204.
+- [Perf] improved some caching of videos in the queue
 
 ## [0.19.2] - 2024-02-11
 

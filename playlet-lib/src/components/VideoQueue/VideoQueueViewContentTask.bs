@@ -13,11 +13,22 @@ function VideoQueueViewContentTask(input as object) as object
 
     index = MathUtils.Clamp(input.index - 2, 0, videoNodes.Count() - 1)
 
+    requestOptions = {
+        ' Not providing a region should lead to a better DB hit rate
+        ' When the region is provided, the video will be fetched fresh every time
+        ' and will not be saved to the database.
+        region: false
+        cacheSeconds: 8640000 ' 100 days
+        cancellation: cancellation
+        tryCount: 1
+    }
+
     for i = index to videoNodes.Count() - 1
         videoNode = videoNodes[i]
-        LoadVideoDetail(videoNode, service, instance, cancellation)
-        ' Sleep for a bit to avoid creating too much traffic
-        sleep(500)
+        if not LoadVideoDetail(videoNode, service, instance, requestOptions)
+            ' Sleep for a bit to avoid creating too much traffic
+            sleep(500)
+        end if
 
         if m.top.cancel = true
             return invalid
@@ -26,9 +37,10 @@ function VideoQueueViewContentTask(input as object) as object
 
     for i = index - 1 to 0 step -1
         videoNode = videoNodes[i]
-        LoadVideoDetail(videoNode, service, instance, cancellation)
-        ' Sleep for a bit to avoid creating too much traffic
-        sleep(1000)
+        if not LoadVideoDetail(videoNode, service, instance, requestOptions)
+            ' Sleep for a bit to avoid creating too much traffic
+            sleep(1000)
+        end if
 
         if m.top.cancel = true
             return invalid
@@ -38,17 +50,10 @@ function VideoQueueViewContentTask(input as object) as object
     return invalid
 end function
 
-function LoadVideoDetail(videoNode as object, service as object, instance as string, cancellation as object) as void
+' Returns true if the video was loaded from cache.
+function LoadVideoDetail(videoNode as object, service as object, instance as string, requestOptions as object) as boolean
     videoId = videoNode.videoId
-    url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-
-    request = HttpClient.Get(url)
-    request.QueryParams(service.DefaultQueryParams())
-    ' A large cache interval, since we don't care about the video detail accuracy
-    request.CacheSeconds(8640000)
-    request.Cancellation(cancellation)
-
-    response = request.Await()
+    response = service.GetVideoMetadata(videoId, requestOptions)
     metadata = response.Json()
 
     if not response.IsSuccess() or metadata = invalid
@@ -58,8 +63,9 @@ function LoadVideoDetail(videoNode as object, service as object, instance as str
             ' We set the title to make sure we don't try to load it again
             videoNode.title = "Video not available"
         end if
-        return
+        return false
     end if
 
     InvidiousContent.ToVideoContentNode(videoNode, metadata, instance)
+    return response.IsCached()
 end function
