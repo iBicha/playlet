@@ -97,7 +97,6 @@ namespace Invidious
         end function
 
         function GetVideoMetadata(videoId as string, options = invalid as object) as object
-            region = true
             ' 5 hours cache. Videos should expire in 6 hours, but since we don't
             ' have the exact expiration time, we'll use 5 hours. Invidious currently
             ' Does a fresh fetch if the cache is older than 10 minutes.
@@ -107,9 +106,6 @@ namespace Invidious
             tryCount = 2
 
             if options <> invalid
-                if options.DoesExist("region")
-                    region = options.region
-                end if
                 if options.DoesExist("cacheSeconds")
                     cacheSeconds = options.cacheSeconds
                 end if
@@ -125,10 +121,6 @@ namespace Invidious
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
             request = HttpClient.Get(url)
-
-            if region = true
-                request.QueryParam("region", m.GetUserRegion())
-            end if
 
             request.CacheSeconds(cacheSeconds)
             request.Cancellation(cancellation)
