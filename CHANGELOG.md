@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Many functions (such as d-pad controls or setting the volume) are not working due to OS limitations
     - Many functions (such as changing the subtitle settings) are not currently implemented
   - **ATTENTION**: This feature is not very privacy friendly. When connected to a lounge, all network traffic (videos played, queued, etc) go through YouTube servers. For this reason, certain measures are taken:
-    - While Playlet broadcasts its casting capabilities to the local network, it does not connect to a network for the first time until:
+    - While Playlet broadcasts its casting capabilities to the local network, it does not connect to a lounge for the first time until:
       - A device connects to Playlet (using DIAL/Connect using Wi-Fi)
       - A `Link with TV code` is generated, by visiting the `Remote` -> `Link with TV code` tab.
     - Playlet disconnects from previous lounge sessions on start, and joins a new one instead of one continous session. In other words, restarting Playlet will disconnect your second device. This is a feature, not a bug.
