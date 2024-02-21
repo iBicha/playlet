@@ -121,7 +121,17 @@ function OnVideoContentTaskResults(output as object) as void
         return
     end if
 
-    SponsorBlock.FetchSponsorBlock(m.top.content.metadata)
+    content = m.top.content
+    SponsorBlock.FetchSponsorBlock(content.metadata)
+
+    if content.Live = true
+        duration = m.top.duration
+        if duration > 0
+            SeekToEndOfStream()
+        else
+            m.top.ObserveField("duration", FuncName(SeekToEndOfStream))
+        end if
+    end if
 
     m.top.control = "play"
     if ValidInt(m.top.content.timestamp) > 0
@@ -234,6 +244,15 @@ function OnVideoPlayerStateChange() as void
         DialogUtils.ShowDialog(messageLines, title, true)
         ' TODO:P1 play next video in the queue after showing the error dialog
         m.videoQueue.closePlayer = true
+    end if
+end function
+
+function SeekToEndOfStream()
+    m.top.UnobserveField("duration")
+    duration = m.top.duration
+    if duration > 0
+        LogInfo("Seeking to end of live stream", duration)
+        m.top.seek = duration
     end if
 end function
 
