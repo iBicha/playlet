@@ -27,6 +27,7 @@ class LoungeApi
     public loungeToken
     public sessionId
     public gSessionId
+    public devices
 
     private ofs
     private lastProcessedCommandIndex = -1
@@ -46,6 +47,7 @@ class LoungeApi
         m.ofs = 0
         m.poller = invalid
         m.outgoingMessagesRequests = {}
+        m.devices = {}
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
@@ -55,13 +57,13 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
-        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -336,12 +338,9 @@ class LoungeApi
             return
         end if
 
-        devicesDict = {}
         for each device in devices
-            devicesDict[device.id] = device
+            m.devices[device.id] = device
         end for
-
-        m.loungeServiceNode.devices = devicesDict
     end function
 
     function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
@@ -352,43 +351,19 @@ class LoungeApi
             return
         end if
 
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-
-        if devices.DoesExist(id)
-            device = devices[id]
+        if m.devices.DoesExist(id)
+            device = m.devices[id]
             device.Append(newDevice)
             newDevice = device
         end if
 
-        devices[id] = newDevice
-        m.loungeServiceNode.devices = devices
+        m.devices[id] = newDevice
 
         userName = newDevice.user
         deviceName = newDevice.name
         userAvatarUri = newDevice.userAvatarUri
 
         LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
-    end function
-
-    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
-        device = commandArgs
-        id = device.id
-        if StringUtils.IsNullOrEmpty(id)
-            return
-        end if
-
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-        if devices.Delete(id)
-            m.loungeServiceNode.devices = devices
-        end if
-        ' TODO:P1 disconnect notification
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
