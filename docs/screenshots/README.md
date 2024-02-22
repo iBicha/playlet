@@ -18,9 +18,9 @@
 | --------------------------- | ------------------------------------------------ | --------------------------------------------- |
 | ![Settings](./settings.jpg) | ![Invidious instances](./invidious-settings.jpg) | ![Invidious testing](./invidious-testing.jpg) |
 
-| Link to web app                     | App info                    |
-| ----------------------------------- | --------------------------- |
-| ![Link to web app](./webapp-qr.jpg) | ![App info](./app-info.jpg) |
+| Remote                  | App info                    |
+| ----------------------- | --------------------------- |
+| ![Remote](./remote.jpg) | ![App info](./app-info.jpg) |
 
 ## Playlet web app
 
