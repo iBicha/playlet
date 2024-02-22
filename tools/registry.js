@@ -38,19 +38,28 @@ const getEnvVars = require('./get-env-vars');
             }
         }
 
-        await fetch(playletServer, {
+        const response = await fetch(playletServer, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(registry),
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to write registry: ${response.status} ${response.statusText}`);
+        }
     }
     else if (output) {
         if (fs.existsSync(output)) {
             throw new Error(`File "${output}" already exists`);
         }
         const response = await fetch(playletServer);
+
+        if (!response.ok) {
+            throw new Error(`Failed to read registry: ${response.status} ${response.statusText}`);
+        }
+
         const registry = await response.json();
 
         for (const section in registry) {
@@ -64,9 +73,13 @@ const getEnvVars = require('./get-env-vars');
         fs.writeFileSync(output, JSON.stringify(registry, null, 4));
     }
     else if (clear) {
-        await fetch(playletServer, {
+        const response = await fetch(playletServer, {
             method: 'DELETE',
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to clear registry: ${response.status} ${response.statusText}`);
+        }
     }
     else {
         console.error('No action specified');
