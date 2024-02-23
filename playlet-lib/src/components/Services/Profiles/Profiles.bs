@@ -1,0 +1,76 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/ArrayUtils.bs"
+
+function Init()
+    LoadProfilesFromRegistry()
+end function
+
+function LoadProfilesFromRegistry()
+    ' Step 1: Load user profiles from registry
+    userProfiles = RegistryUtils.Read(RegistryUtils.USER_PROFILES)
+
+    if userProfiles = invalid
+        userProfiles = []
+    else
+        userProfiles = ParseJson(userProfiles)
+    end if
+
+    ' Step 2: Migrate existing profiles to new format (if needed)
+    isDirty = MigrateExistingProfiles(userProfiles)
+
+    profileNodes = []
+    for each profile in userProfiles.profiles
+        profileNode = CreateObject("roSGNode", "ProfileContentNode")
+        profileNode.type = profile.type
+        profileNode.username = profile.username
+        profileNode.serverUrl = profile.serverUrl
+        profileNode.accessToken = profile.accessToken
+
+        profileNodes.Push(profileNode)
+    end for
+
+    m.top.appendChildren(profileNodes)
+
+    if userProfiles.currentProfileIndex >= 0 and userProfiles.currentProfileIndex < profileNodes.Count()
+        m.top.currentProfile = profileNodes[userProfiles.currentProfileIndex]
+    end if
+
+    ' Step 3: Save user preferences (if needed)
+    if isDirty
+        SaveUserProfilesToRegistry()
+    end if
+end function
+
+function MigrateExistingProfiles(userProfiles as object) as boolean
+    ' TODO:P0
+    ' read RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
+    ' copy the profile from there to the new format
+    ' delete the old registry key
+    ' if no current profile, set the first profile as current
+    return false
+end function
+
+function SaveUserProfilesToRegistry()
+    userProfiles = {
+        profiles: []
+        currentProfileIndex: -1
+    }
+
+    profileNodes = m.top.getChildren(-1, 0)
+
+    for each profileNode in profileNodes
+        profile = {
+            type: profileNode.type
+            username: profileNode.username
+            serverUrl: profileNode.serverUrl
+            accessToken: profileNode.accessToken
+        }
+
+        userProfiles.profiles.Push(profile)
+    end for
+
+    userProfiles.currentProfileIndex = ArrayUtils.IndexOfNode(profileNodes, m.top.currentProfile)
+
+    userProfiles.__version = m.top.__version
+    RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
+end function
