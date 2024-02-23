@@ -57,13 +57,13 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
-        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -344,7 +344,7 @@ class LoungeApi
     end function
 
     function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
+        LogInfo(commandType, FormatJson(commandArgs))
         newDevice = commandArgs
         id = newDevice.id
         if StringUtils.IsNullOrEmpty(id)
@@ -364,6 +364,10 @@ class LoungeApi
         userAvatarUri = newDevice.userAvatarUri
 
         LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
+    end function
+
+    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+        LogInfo(commandType, FormatJson(commandArgs))
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
