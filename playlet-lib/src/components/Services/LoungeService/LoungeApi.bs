@@ -339,6 +339,9 @@ class LoungeApi
         end if
 
         for each device in devices
+            if m.devices.DoesExist(device.id)
+                device.lastConnectEventType = m.devices[device.id].lastConnectEventType
+            end if
             m.devices[device.id] = device
         end for
     end function
@@ -359,6 +362,12 @@ class LoungeApi
 
         m.devices[id] = newDevice
 
+        if ValidString(newDevice.lastConnectEventType) = commandType
+            return
+        end if
+
+        newDevice.lastConnectEventType = commandType
+
         userName = newDevice.user
         deviceName = newDevice.name
         userAvatarUri = newDevice.userAvatarUri
@@ -368,6 +377,17 @@ class LoungeApi
 
     function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
         LogInfo(commandType, FormatJson(commandArgs))
+        newDevice = commandArgs
+        id = newDevice.id
+        if StringUtils.IsNullOrEmpty(id)
+            return
+        end if
+
+        if not m.devices.DoesExist(id)
+            return
+        end if
+
+        m.devices[id].lastConnectEventType = commandType
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
