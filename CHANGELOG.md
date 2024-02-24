@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- Small improvement in the context menu of the Playlist view
 
 ## [0.20.1] - 2024-02-23
 
