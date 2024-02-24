@@ -154,17 +154,22 @@ function GetContextMenuOptionsForItem(rowItem as object) as object
         options.push(ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayVideo", [rowItem]))
         options.push(ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueueVideo", [rowItem]))
 
-        item = ContextMenuUtils.CreateOption("Open channel", m.top, "OpenVideoChannel", [rowItem])
-        options.push(item)
+        authorId = rowItem.authorId
+        if not StringUtils.IsNullOrEmpty(authorId)
+            options.push(ContextMenuUtils.CreateOption("Open channel", m.top, "OpenVideoChannel", [rowItem]))
+        end if
     else if rowItem.type = "playlist"
         options.push(ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayPlaylist", [rowItem, 0]))
         options.push(ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueuePlaylist", [rowItem]))
 
-        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenPlaylist", [rowItem])
-        options.push(item)
+        options.push(ContextMenuUtils.CreateOption("Open playlist", m.top, "OpenPlaylist", [rowItem]))
+
+        authorId = rowItem.authorId
+        if not StringUtils.IsNullOrEmpty(authorId)
+            options.push(ContextMenuUtils.CreateOption("Open channel", m.top, "OpenPlaylistChannel", [rowItem]))
+        end if
     else if rowItem.type = "channel"
-        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenChannel", [rowItem])
-        options.push(item)
+        options.push(ContextMenuUtils.CreateOption("Open", m.top, "OpenChannel", [rowItem]))
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
         return []
@@ -183,6 +188,16 @@ end function
 
 function OpenVideoChannel(video as object) as void
     authorId = video.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    ChannelUtils.Open(channel)
+end function
+
+function OpenPlaylistChannel(playlist as object) as void
+    authorId = playlist.authorId
     if StringUtils.IsNullOrEmpty(authorId)
         LogWarn("Invalid authorId:", authorId)
         return
