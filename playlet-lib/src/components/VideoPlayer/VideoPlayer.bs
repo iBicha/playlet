@@ -31,6 +31,10 @@ function Init()
     ' Indicates that we're currently paused and seeking position
     m.isSeekingPosition = false
 
+    ' Checks if current RokuOS version has showUI field in Video node
+    m.showUIEnabled = m.top.hasField("showUI")
+    LogInfo(`Custom OK handler is ${m.showUIEnabled ? "enabled" : "disabled"}`)
+
     ' asyncStopSemantics available since Roku OS 12.5
     ' It is set to true because stopping synchronously causes timeout and crash
     ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
@@ -80,6 +84,9 @@ function PlayWithContent(contentNode as object)
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     if not StringUtils.IsNullOrEmpty(contentNode._author)
         videoContentNode.secondaryTitle = contentNode._author
+    end if
+    if IsBool(contentNode.liveNow)
+        videoContentNode.live = contentNode.liveNow
     end if
 
     StartVideoContentTask(videoContentNode)
@@ -255,29 +262,48 @@ function OnVideoFinished() as void
     end if
 end function
 
-function ShowUIAndStartTimer()
-    m.top.showUI = { "show": true, "trickPlaybar": true, "titleAndTime": true, "trickplayBackgroundOverlay": true, "focusTrickplayBar": false }
-    m.trickplayUITimer.control = "start"
+function IsLiveVideo() as boolean
+    if m.top.content <> invalid and ValidBool(m.top.content.live)
+        return m.top.content.live
+    end if
+    return false
 end function
 
-function HideUI()
-    m.top.showUI = { "show": false, "focusTrickplayBar": false }
+function ShowUIAndStartTimer()
+    if m.showUIEnabled
+        m.top.showUI = { "show": true, "trickPlaybar": true, "titleAndTime": true, "trickplayBackgroundOverlay": true, "focusTrickplayBar": false }
+        m.trickplayUITimer.control = "start"
+    end if
+end function
+
+function HideUIAndStopTimer()
+    if m.showUIEnabled
+        m.top.showUI = { "show": false, "focusTrickplayBar": false }
+        m.trickplayUITimer.control = "stop"
+    end if
 end function
 
 function HandleOKPress() as boolean
+    if not m.showUIEnabled
+        return false
+    end if
+
     handled = false
     state = m.top.state
     uiVisible = m.top.trickPlaybar.visible
-    LogInfo("OK", state, uiVisible, m.isSeekingPosition)
+    isLive = IsLiveVideo()
+    LogInfo(`Handling OK button: state = ${state}, uiVisible = ${uiVisible} isLive = ${isLive}`)
     if state = "playing"
         if not uiVisible
             ' Video is playing and UI is not visible, show it
             ShowUIAndStartTimer()
-        else
+        else if not isLive
             ' Trickplay bar is visible and video is currently played, pause it and retain the UI
             m.trickplayUITimer.control = "stop"
             m.top.control = "pause"
             ShowUIAndStartTimer()
+        else
+            HideUIAndStopTimer()
         end if
         handled = true
     else if state = "paused"
@@ -291,8 +317,7 @@ function HandleOKPress() as boolean
             ShowUIAndStartTimer()
         else
             ' Video is currently paused with visible UI, resume it and hide UI
-            m.trickplayUITimer.control = "stop"
-            HideUI()
+            HideUIAndStopTimer()
             m.top.control = "resume"
         end if
         handled = true
@@ -323,11 +348,9 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     end if
 
     if key = "left" or key = "right" or key = "rewind" or key = "fastforward"
-        if m.top.state = "paused"
-            ' We're paused and one of the buttons is pressed: left, right ff, rw.
-            ' That means we're seeking position. Check that in HandleOKPress and exit early
-            m.isSeekingPosition = true
-        end if
+        ' We're paused and one of the buttons is pressed: left, right ff, rw.
+        ' That means we're seeking position. Check that in HandleOKPress and exit early
+        m.isSeekingPosition = true
     end if
 
     ' Always stop UI timer when pressing any button to avoid UI being hidden twice
@@ -353,6 +376,8 @@ function SetupAnimation()
 end function
 
 function OnFullScreenChange()
+    HideUIAndStopTimer()
+
     m.widthInterpolator.reverse = m.container.fullscreen
     m.heightInterpolator.reverse = m.container.fullscreen
     m.translationInterpolator.reverse = m.container.fullscreen
@@ -385,7 +410,7 @@ function OnShowFullScreenHint() as void
 end function
 
 function OnTrickplayUITimer()
-    HideUI()
+    HideUIAndStopTimer()
 end function
 
 function OnFullScreenHintTimer()
