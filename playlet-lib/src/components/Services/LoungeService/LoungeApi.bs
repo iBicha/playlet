@@ -99,6 +99,7 @@ class LoungeApi
         end if
 
         request = HttpClient.Get("https://www.youtube.com/api/lounge/pairing/generate_screen_id")
+
         response = request.Await()
         if not response.IsSuccess()
             error = `Failed to get screen id. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
@@ -106,6 +107,7 @@ class LoungeApi
             DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
+
         id = response.Text()
         if not IsString(id)
             error = `Failed to get screen id. Please restart playlet to use the cast function.\nNot a valid screen id: ${id}`
@@ -113,6 +115,7 @@ class LoungeApi
             DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
+
         m.screenId = id
         return id
     end function
@@ -122,9 +125,11 @@ class LoungeApi
             return m.loungeToken
         end if
 
-        form = UrlUtils.GetUrlEncodedForm({ "screen_ids": m.screenId })
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", form)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", "")
+        request.UrlEncodedForm({
+            "screen_ids": m.screenId
+        })
+
         response = request.Await()
         if not response.IsSuccess()
             error = `Failed to get lounge token. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
@@ -148,7 +153,6 @@ class LoungeApi
     end function
 
     function GetSessionData() as boolean
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -166,10 +170,11 @@ class LoungeApi
         queryParams["loungeIdToken"] = m.loungeToken
         queryParams["zx"] = m.Zx()
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
-        request = HttpClient.Post(url, "count=0")
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm({
+            "count": 0
+        })
 
         response = request.Await()
         if not response.IsSuccess()
@@ -435,7 +440,6 @@ class LoungeApi
             return
         end if
 
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -462,8 +466,6 @@ class LoungeApi
             queryParams["AID"] = messages[0].commandId
         end if
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
         postData = [
             { key: "count", value: messages.Count() }
             { key: "ofs", value: loungeData.ofs }
@@ -487,9 +489,10 @@ class LoungeApi
 
         LogDebug("Sending messages:", postData)
 
-        body = UrlUtils.GetUrlEncodedForm(postData)
-        request = HttpClient.Post(url, body)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm(postData)
+
         request.Send()
 
         ' we do not need to wait for requests to finish, we check on them later
