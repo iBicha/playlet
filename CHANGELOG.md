@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Small improvement in the context menu of the Playlist view
+- Videos can be paused and resumed using the `Ok` remote button
 
 ## [0.20.1] - 2024-02-23
 
