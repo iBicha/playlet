@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `Device connected` notification only show once every 30 minutes per device to avoid spam
+- SponsorBlock category "highlight" was not visible in chapter label
 
 ## [0.20.1] - 2024-02-23
 
