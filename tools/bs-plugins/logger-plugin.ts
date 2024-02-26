@@ -84,7 +84,9 @@ export class LoggerPlugin implements CompilerPlugin {
             }
         }
 
-        this.generateLoggingFile(program, usedLogFunctions);
+        // @ts-ignore
+        const isDebug = !!program.options.debug;
+        this.generateLoggingFile(program, usedLogFunctions, isDebug);
     }
 
     beforeFileTranspile(event: BeforeFileTranspileEvent<BscFile>) {
@@ -133,20 +135,20 @@ export class LoggerPlugin implements CompilerPlugin {
         }
     }
 
-    generateLoggingFile(program: Program, usedLogFunctions: Map<string, LogFunction>) {
+    generateLoggingFile(program: Program, usedLogFunctions: Map<string, LogFunction>, isDebug: boolean) {
         const file = program.getFile(loggingFilePath);
         let content = file.fileContents;
 
         content += '\n\' Start of auto-generated functions\n'
         usedLogFunctions.forEach((logFunction, newFunctionName) => {
-            content += this.generateLoggingFunction(newFunctionName, logFunction.name, logFunction.argCount);
+            content += this.generateLoggingFunction(newFunctionName, logFunction.name, logFunction.argCount, isDebug);
         });
         content += '\n\' End of auto-generated functions\n'
 
         program.setFile(loggingFilePath, content)
     }
 
-    generateLoggingFunction(newFunctionName: string, level: string, argCount: number) {
+    generateLoggingFunction(newFunctionName: string, level: string, argCount: number, isDebug: boolean) {
         const args: string[] = [];
         const argsParams: string[] = [];
         for (let i = 0; i < argCount; i++) {
@@ -160,13 +162,49 @@ export class LoggerPlugin implements CompilerPlugin {
 
         const func = logFunctions[level as 'LogError' | 'LogWarn' | 'LogInfo' | 'LogDebug'];
 
+        // https://github.com/microsoft/vscode/issues/571
+        const USE_COLOR = false;
+
+        const RED = '[31m';
+        const YELLOW = '[33m';
+        const GREEN = '[32m';
+        const BOLD = '[1m';
+        const BOLD_RED = '[1;31m';
+        const BOLD_YELLOW = '[1;33m';
+        const BOLD_GREEN = '[1;32m';
+        const CLEAR = '[0m';
+
+        let logLine = '';
+
+        if (isDebug && USE_COLOR) {
+            switch (func.stringLevel) {
+                case 'ERROR':
+                    logLine = `Chr(27) + "${BOLD_RED}" + "[${func.stringLevel}]" + Chr(27) + "${RED}" + ${msg} + Chr(27) + "${CLEAR}"`;
+                    break;
+                case 'WARN':
+                    logLine = `Chr(27) + "${BOLD_YELLOW}" + "[${func.stringLevel}]" + Chr(27) + "${YELLOW}" + ${msg} + Chr(27) + "${CLEAR}"`;
+                    break;
+                case 'INFO':
+                    logLine = `Chr(27) + "${BOLD}" + "[${func.stringLevel}]" + Chr(27) + "${CLEAR}" + ${msg}`;
+                    break;
+                case 'DEBUG':
+                    logLine = `Chr(27) + "${BOLD_GREEN}" + "[${func.stringLevel}]" + Chr(27) + "${GREEN}" + ${msg} + Chr(27) + "${CLEAR}"`;
+                    break;
+                default:
+                    throw new Error(`Unknown log level: ${func.stringLevel}`);
+            }
+        }
+        else {
+            logLine = `"[${func.stringLevel}]" + ${msg}`
+        }
+
         return `
 function ${newFunctionName}(${args.join(', ')}) as void
     logger = m.global.logger
     if logger.logLevel < ${func.level}
         return
     end if
-    logger.logLine = "[${func.stringLevel}]" + ${msg}
+    logger.logLine = ${logLine}
 end function
 `;
     }
