@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Small improvement in the context menu of the Playlist view
 - Videos can be paused and resumed using the `Ok` remote button
 
+### Fixed
+
+- `Device connected` notification only show once every 30 minutes per device to avoid spam
+
 ## [0.20.1] - 2024-02-23
 
 ### Fixed

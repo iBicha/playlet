@@ -13,6 +13,11 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
 
+' Apparently devices can be connected and disconnected very frequently.
+' We don't want to spam the user with notifications, so we'll only show a notification
+' if the last notification was more than 30 minutes ago.
+const CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS = 1800
+
 class LoungeApi
 
     public loungeServiceNode
@@ -57,13 +62,13 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
-        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -340,7 +345,7 @@ class LoungeApi
 
         for each device in devices
             if m.devices.DoesExist(device.id)
-                device.lastConnectEventType = m.devices[device.id].lastConnectEventType
+                device.lastConnectNotificationTime = m.devices[device.id].lastConnectNotificationTime
             end if
             m.devices[device.id] = device
         end for
@@ -362,32 +367,20 @@ class LoungeApi
 
         m.devices[id] = newDevice
 
-        if ValidString(newDevice.lastConnectEventType) = commandType
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        lastConnectNotificationInterval = nowSeconds - ValidInt(newDevice.lastConnectNotificationTime)
+        if lastConnectNotificationInterval < CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS
+            LogInfo("Skipping connect notification. Last connect notification interval:", lastConnectNotificationInterval, "seconds")
             return
         end if
 
-        newDevice.lastConnectEventType = commandType
+        newDevice.lastConnectNotificationTime = nowSeconds
 
         userName = newDevice.user
         deviceName = newDevice.name
         userAvatarUri = newDevice.userAvatarUri
 
         LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
-    end function
-
-    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType, FormatJson(commandArgs))
-        newDevice = commandArgs
-        id = newDevice.id
-        if StringUtils.IsNullOrEmpty(id)
-            return
-        end if
-
-        if not m.devices.DoesExist(id)
-            return
-        end if
-
-        m.devices[id].lastConnectEventType = commandType
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
