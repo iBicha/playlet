@@ -22,4 +22,31 @@ namespace DialogUtils
         m.top.getScene().dialog = dialog
         return dialog
     end function
+
+    function ShowTimedDialogButtons(message as dynamic, title as string, buttons as object, defaultButton as integer, timeoutSeconds as integer, large = false as boolean) as object
+        dialog = CreateObject("roSGNode", "TimedDialog")
+        if GetInterface(message, "ifArray") = invalid
+            message = message.Tokenize(`\n`).ToArray()
+        end if
+        dialog.message = message
+        dialog.title = title
+        dialog.actualButtons = buttons
+
+        if large
+            if m._deviceDisplayWidth = invalid
+                deviceInfo = CreateObject("roDeviceInfo")
+                displaySize = deviceInfo.GetDisplaySize()
+                m._deviceDisplayWidth = displaySize.w
+            end if
+            dialog.width = m._deviceDisplayWidth - 100
+        end if
+
+        dialog.defaultButtonIndex = defaultButton
+        dialog.defaultActionTimeoutSeconds = timeoutSeconds
+        dialog.startCountdown = true
+
+        m.top.getScene().dialog = dialog
+
+        return dialog
+    end function
 end namespace

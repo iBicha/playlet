@@ -124,9 +124,10 @@ function OnVideoContentTaskResults(output as object) as void
         LogError(error)
         videoId = output.task.input.content.videoId
         message = `Failed to load video information for ${videoId}\n${error}`
-        DialogUtils.ShowDialog(message, "Video load fail", true)
-        ' TODO:P1 play next video in the queue after showing the error dialog
-        m.videoQueue.closePlayer = true
+
+        dialog = DialogUtils.ShowTimedDialogButtons(message, "Video load fail", ["Play next video", "Cancel"], 0, 10, true)
+        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+
         Lounge.SendOnStateChange()
         return
     end if
@@ -137,6 +138,18 @@ function OnVideoContentTaskResults(output as object) as void
     if ValidInt(m.top.content.timestamp) > 0
         m.top.seek = m.top.content.timestamp
     end if
+end function
+
+function OnVideoContentTaskErrorDialogResponse(event as object)
+    dialog = event.getRoSGNode()
+    dialog.unobserveFieldScoped("wasClosed")
+    shouldPlayNext = dialog.actualButtonSelected = 0
+
+    if not shouldPlayNext or not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
+        m.videoQueue.closePlayer = true
+    end if
+
+    Lounge.SendOnStateChange()
 end function
 
 function MarkVideoWatched(videoId as string)
@@ -247,9 +260,9 @@ function OnVideoPlayerStateChange() as void
 
         title = `Error playing video ${content.videoId}`
         LogError(title, messageLines)
-        DialogUtils.ShowDialog(messageLines, title, true)
-        ' TODO:P1 play next video in the queue after showing the error dialog
-        m.videoQueue.closePlayer = true
+
+        dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, ["Play next video", "Cancel"], 0, 10, true)
+        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
     end if
 end function
 
