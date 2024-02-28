@@ -1,3 +1,4 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
@@ -203,8 +204,6 @@ end function
 
 function Search(text as string)
     m.rowlist.UnobserveFieldScoped("someContentReady")
-    ' TODO:P1 someContentReady only fires if there are search results.
-    ' The case where search results are empty is not handled.
     m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
     ShowLoadingScreen()
 
@@ -238,10 +237,16 @@ function Search(text as string)
 end function
 
 function OnSearchContentReady() as void
+    m.rowlist.UnobserveFieldScoped("someContentReady")
+
     if not m.rowlist.someContentReady
+        DialogUtils.ShowDialog("We didn't find any results for your search. Please try again with a different query or different filters.", "No results found")
+        m.rowlist.feeds = invalid
+        m.rowlist.focusable = false
+        HideLoadingScreen()
         return
     end if
-    m.rowlist.UnobserveFieldScoped("someContentReady")
+
     m.rowlist.focusable = true
     m.currentNavigtionNode = m.rowList
     NodeSetFocus(m.rowlist, true)
@@ -253,6 +258,7 @@ function OnSearchContentReady() as void
 end function
 
 function OnSearchError()
+    ' Note: we don't display an error dialog, VideoRowListRowContentTask will do that.
     m.rowlist.feeds = invalid
     m.rowlist.focusable = false
     HideLoadingScreen()

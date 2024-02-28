@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- When a video error dialog shows, a timer with 10 seconds starts to play the next video
+
+### Fixed
+
+- A bug where the loading screen does not disappear if search results are empty.
+
+## [0.20.2] - 2024-02-26
+
+### Added
+
+- Small improvement in the context menu of the Playlist view
+- Videos can be paused and resumed using the `Ok` remote button
+
+### Fixed
+
+- `Device connected` notification only show once every 30 minutes per device to avoid spam
+- SponsorBlock category "highlight" was not visible in chapter label
+
+### Changed
+
+- UI focus images are now with rounded corners, and with a slight glow
+
+## [0.20.1] - 2024-02-23
+
+### Fixed
+
+- `Device connected` notification showing repeatedly
+
 ## [0.20.0] - 2024-02-21
 
 ### Added

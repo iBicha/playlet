@@ -1,0 +1,98 @@
+import "DialogPalette.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    SetPalette(m.top)
+    m.top.observeField("buttonSelected", FuncName(OnButtonSelected))
+    m.top.observeField("wasClosed", FuncName(OnDialogClosed))
+end function
+
+function OnStartCountdown()
+    actualButtons = m.top.actualButtons
+    defaultButtonIndex = m.top.defaultButtonIndex
+    defaultActionTimeoutSeconds = m.top.defaultActionTimeoutSeconds
+
+    buttons = []
+    for i = 0 to actualButtons.Count() - 1
+        if i = defaultButtonIndex
+            buttons.push(`${actualButtons[i]} (${defaultActionTimeoutSeconds})`)
+        else
+            buttons.push(actualButtons[i])
+        end if
+    end for
+    m.top.buttons = buttons
+
+    CancelTimer()
+    m.timer = CreateObject("roSGNode", "Timer")
+    m.timer.repeat = true
+    m.timer.observeFieldScoped("fire", FuncName(TimerUpdateButtons))
+    m.currentCountDown = defaultActionTimeoutSeconds
+    m.timer.control = "start"
+end function
+
+function TimerUpdateButtons() as void
+    m.currentCountDown -= 1
+    if m.currentCountDown <= 0
+        m.top.actualButtonSelected = m.top.defaultButtonIndex
+        m.top.close = true
+        return
+    end if
+
+    FindButtonComponents()
+    if m.buttonComponents = invalid
+        return
+    end if
+
+    defaultButtonIndex = m.top.defaultButtonIndex
+    m.buttonComponents[defaultButtonIndex].text = `${m.top.actualButtons[defaultButtonIndex]} (${m.currentCountDown})`
+end function
+
+function OnButtonSelected()
+    m.top.actualButtonSelected = m.top.buttonSelected
+    m.top.close = true
+end function
+
+function OnDialogClosed()
+    CancelTimer()
+end function
+
+function onKeyEvent(key as string, press as boolean) as boolean
+    if m.timer = invalid
+        return false
+    end if
+
+    CancelTimer()
+
+    FindButtonComponents()
+    if m.buttonComponents = invalid
+        return false
+    end if
+
+    defaultButtonIndex = m.top.defaultButtonIndex
+    m.buttonComponents[defaultButtonIndex].text = m.top.actualButtons[defaultButtonIndex]
+    return false
+end function
+
+function CancelTimer()
+    if m.timer <> invalid
+        m.timer.control = "stop"
+        m.timer.unobserveFieldScoped("fire")
+        m.timer = invalid
+    end if
+end function
+
+function FindButtonComponents() as void
+    if m.buttonComponents <> invalid
+        return
+    end if
+
+    areas = m.top.getChildren(-1, 0)
+    for each area in areas
+        if area.subtype() = "StdDlgButtonArea"
+            m.buttonComponents = area.getChildren(-1, 0)
+            return
+        end if
+    end for
+    LogWarn("No buttons found in dialog")
+end function

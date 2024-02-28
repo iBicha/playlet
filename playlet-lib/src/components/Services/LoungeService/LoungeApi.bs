@@ -13,6 +13,11 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
 
+' Apparently devices can be connected and disconnected very frequently.
+' We don't want to spam the user with notifications, so we'll only show a notification
+' if the last notification was more than 30 minutes ago.
+const CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS = 1800
+
 class LoungeApi
 
     public loungeServiceNode
@@ -27,6 +32,7 @@ class LoungeApi
     public loungeToken
     public sessionId
     public gSessionId
+    public devices
 
     private ofs
     private lastProcessedCommandIndex = -1
@@ -46,6 +52,7 @@ class LoungeApi
         m.ofs = 0
         m.poller = invalid
         m.outgoingMessagesRequests = {}
+        m.devices = {}
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
@@ -55,13 +62,13 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
-        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -92,6 +99,7 @@ class LoungeApi
         end if
 
         request = HttpClient.Get("https://www.youtube.com/api/lounge/pairing/generate_screen_id")
+
         response = request.Await()
         if not response.IsSuccess()
             error = `Failed to get screen id. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
@@ -99,6 +107,7 @@ class LoungeApi
             DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
+
         id = response.Text()
         if not IsString(id)
             error = `Failed to get screen id. Please restart playlet to use the cast function.\nNot a valid screen id: ${id}`
@@ -106,6 +115,7 @@ class LoungeApi
             DialogUtils.ShowDialog(error, "Lounge service setup error")
             return invalid
         end if
+
         m.screenId = id
         return id
     end function
@@ -115,9 +125,11 @@ class LoungeApi
             return m.loungeToken
         end if
 
-        form = UrlUtils.GetUrlEncodedForm({ "screen_ids": m.screenId })
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", form)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", "")
+        request.UrlEncodedForm({
+            "screen_ids": m.screenId
+        })
+
         response = request.Await()
         if not response.IsSuccess()
             error = `Failed to get lounge token. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
@@ -141,7 +153,6 @@ class LoungeApi
     end function
 
     function GetSessionData() as boolean
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -159,10 +170,11 @@ class LoungeApi
         queryParams["loungeIdToken"] = m.loungeToken
         queryParams["zx"] = m.Zx()
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
-        request = HttpClient.Post(url, "count=0")
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm({
+            "count": 0
+        })
 
         response = request.Await()
         if not response.IsSuccess()
@@ -336,59 +348,44 @@ class LoungeApi
             return
         end if
 
-        devicesDict = {}
         for each device in devices
-            devicesDict[device.id] = device
+            if m.devices.DoesExist(device.id)
+                device.lastConnectNotificationTime = m.devices[device.id].lastConnectNotificationTime
+            end if
+            m.devices[device.id] = device
         end for
-
-        m.loungeServiceNode.devices = devicesDict
     end function
 
     function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
+        LogInfo(commandType, FormatJson(commandArgs))
         newDevice = commandArgs
         id = newDevice.id
         if StringUtils.IsNullOrEmpty(id)
             return
         end if
 
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-
-        if devices.DoesExist(id)
-            device = devices[id]
+        if m.devices.DoesExist(id)
+            device = m.devices[id]
             device.Append(newDevice)
             newDevice = device
         end if
 
-        devices[id] = newDevice
-        m.loungeServiceNode.devices = devices
+        m.devices[id] = newDevice
+
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        lastConnectNotificationInterval = nowSeconds - ValidInt(newDevice.lastConnectNotificationTime)
+        if lastConnectNotificationInterval < CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS
+            LogInfo("Skipping connect notification. Last connect notification interval:", lastConnectNotificationInterval, "seconds")
+            return
+        end if
+
+        newDevice.lastConnectNotificationTime = nowSeconds
 
         userName = newDevice.user
         deviceName = newDevice.name
         userAvatarUri = newDevice.userAvatarUri
 
         LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
-    end function
-
-    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
-        device = commandArgs
-        id = device.id
-        if StringUtils.IsNullOrEmpty(id)
-            return
-        end if
-
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-        if devices.Delete(id)
-            m.loungeServiceNode.devices = devices
-        end if
-        ' TODO:P1 disconnect notification
     end function
 
     function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
@@ -443,7 +440,6 @@ class LoungeApi
             return
         end if
 
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -470,8 +466,6 @@ class LoungeApi
             queryParams["AID"] = messages[0].commandId
         end if
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
         postData = [
             { key: "count", value: messages.Count() }
             { key: "ofs", value: loungeData.ofs }
@@ -495,9 +489,10 @@ class LoungeApi
 
         LogDebug("Sending messages:", postData)
 
-        body = UrlUtils.GetUrlEncodedForm(postData)
-        request = HttpClient.Post(url, body)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm(postData)
+
         request.Send()
 
         ' we do not need to wait for requests to finish, we check on them later
