@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - When a video error dialog shows, a timer with 10 seconds starts to play the next video
 
+### Fixed
+
+- A bug where the loading screen does not disappear if search results are empty.
+
 ## [0.20.2] - 2024-02-26
 
 ### Added

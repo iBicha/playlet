@@ -14,6 +14,8 @@ function VideoRowListRowContentTask(input as object) as object
 
         totalfetchedItems = 0
 
+        someContentReadySet = false
+
         while true
             if m.top.cancel
                 feedContentNode.loadState = FeedLoadState.None
@@ -25,6 +27,10 @@ function VideoRowListRowContentTask(input as object) as object
 
             if feedSourcesIndex >= feedSources.Count()
                 feedContentNode.loadState = FeedLoadState.Loaded
+
+                if not someContentReadySet
+                    rowList.someContentReady = false
+                end if
                 return {
                     success: true
                 }
@@ -36,6 +42,9 @@ function VideoRowListRowContentTask(input as object) as object
                 feedSourcesIndex += 1
                 if feedSourcesIndex >= feedSources.Count()
                     feedContentNode.loadState = FeedLoadState.Loaded
+                    if not someContentReadySet
+                        rowList.someContentReady = false
+                    end if
                     return {
                         success: true
                     }
@@ -130,7 +139,8 @@ function VideoRowListRowContentTask(input as object) as object
                 feedContentNode.loadState = FeedLoadState.LoadedPage
             end if
 
-            if itemNodes.Count() > 0
+            if itemNodes.Count() > 0 and not someContentReadySet
+                someContentReadySet = true
                 rowList.someContentReady = true
             end if
 
