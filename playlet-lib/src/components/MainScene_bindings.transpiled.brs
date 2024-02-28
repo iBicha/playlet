@@ -24,6 +24,9 @@ function InitializeBindings()
             "SearchHistory": {
                 "preferences": "../Preferences"
             }, 
+            "Profiles": {
+                "invidious": "../Invidious"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
