@@ -36,6 +36,7 @@ function InitializeBindings()
                 "appController": "/AppController", 
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
+                "profiles": "../Profiles", 
                 "preferences": "../Preferences", 
                 "videoQueue": "../VideoQueue", 
                 "bookmarks": "../Bookmarks", 
