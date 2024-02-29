@@ -8,6 +8,7 @@ namespace Http
         function new(server as object)
             super()
 
+            m.profilesNode = server.task.profiles
             m.invidiousNode = server.task.invidious
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
         end function
@@ -42,7 +43,12 @@ namespace Http
                 username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
                 referer = request.query["ref"].DecodeUriComponent()
 
-                m.invidiousNode@.SetAuthToken(token, referer, username)
+                profile = CreateObject("roSGNode", "ProfileContentNode")
+                profile.username = username
+                profile.accessToken = token
+                profile.serverUrl = referer
+
+                m.profilesNode.loginWithProfile = profile
             end if
             response.Redirect("/")
             return true

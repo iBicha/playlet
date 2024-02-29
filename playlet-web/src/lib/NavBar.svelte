@@ -89,6 +89,14 @@
               <button on:click={logout}>Logout</button>
             </div>
           </li>
+          <li>
+            <div
+              class="tooltip tooltip-left"
+              data-tip={`Login using ${currentInstance}`}
+            >
+              <button on:click={login}>Switch profile</button>
+            </div>
+          </li>
         {:else}
           <li>
             <div

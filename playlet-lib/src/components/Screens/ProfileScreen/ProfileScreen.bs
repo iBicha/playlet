@@ -6,16 +6,15 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.top.focusable = true
     m.profileRowList = m.top.FindNode("ProfileRowList")
-
-    ' TODO:P0 remove test code
-    m.randomTestNames = ["John", "Oumaima", "Bob", "Alice", "Charlie", "David", "Eve", "Frank", "Grace", "Hank", "Ivy", "Jack", "Kathy", "Larry", "Molly", "Nancy", "Oscar", "Patty", "Quincy", "Randy", "Sally", "Tom", "Ursula", "Vince", "Wendy", "Xander", "Yvonne", "Zack"]
 end function
 
 function OnNodeReady()
     SetNavigation(invalid, "back", m.navBar)
     SetNavigation(invalid, "left", m.navBar)
 
+    m.profileRowList.content = m.profiles.content
     m.profileRowList.observeFieldScoped("rowItemSelected", FuncName(OnRowItemSelected))
+    m.profiles.observeFieldScoped("currentProfile", FuncName(OnCurrentProfileChanged))
 end function
 
 function OnFocusChange() as void
@@ -40,21 +39,24 @@ function OnRowItemSelected() as void
         dialog = CreateObject("roSGNode", "LoginDialog")
         dialog@.BindNode()
         m.top.getScene().dialog = dialog
-
-        ' TODO:P0 remove test code
-        newProfile = CreateObject("roSGNode", "ProfileContentNode")
-        newProfile.username = m.randomTestNames[row.getChildCount() mod m.randomTestNames.count()]
-        newProfile.serverUrl = "http://192.168.1.119:8095"
-        row.insertChild(newProfile, 0)
         return
     end if
 
-    DialogUtils.ShowDialog(`You selected ${selectedProfile.username}!`, "Profile Selected!")
+    m.profiles.currentProfile = selectedProfile
+end function
 
+function OnCurrentProfileChanged() as void
+    currentProfile = m.profiles.currentProfile
+    if currentProfile = invalid
+        return
+    end if
+
+    row = m.profileRowList.content.GetChild(0)
     allProfiles = row.getChildren(-1, 0)
-    for each profile in allProfiles
-        profile.isSelected = false
+    for i = 0 to allProfiles.Count() - 1
+        if currentProfile.isSameNode(allProfiles[i])
+            m.profileRowList.jumpToRowItem = [0, i]
+            return
+        end if
     end for
-
-    selectedProfile.isSelected = true
 end function

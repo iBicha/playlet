@@ -1,7 +1,24 @@
+' TODO:P0
+' - ProfileView on profile select:
+'   - Profile info
+'   - Logout / delete profile
+'   - Change color
+' - Web apis for profile /api/profiles
+' - Migrate existing profiles from old format
+' - Web app changes:
+'  - Profile selection (list/selected/logout)
+'  - Login with profile
 import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/Logging.bs"
 
 function Init()
+    content = m.top.findNode("ProfilesContent")
+    m.top.content = content
+    m.profilesContent = content.getChild(0)
+end function
+
+function OnNodeReady()
     LoadProfilesFromRegistry()
 end function
 
@@ -32,9 +49,9 @@ function LoadProfilesFromRegistry()
         profileNodes.Push(profileNode)
     end for
 
-    m.top.appendChildren(profileNodes)
+    m.profilesContent.insertChildren(profileNodes, 0)
 
-    if userProfiles.currentProfileIndex >= 0 and userProfiles.currentProfileIndex < profileNodes.Count()
+    if userProfiles.currentProfileIndex >= 0 and userProfiles.currentProfileIndex < profileNodes.Count() - 1
         m.top.currentProfile = profileNodes[userProfiles.currentProfileIndex]
     end if
 
@@ -59,16 +76,19 @@ function SaveUserProfilesToRegistry()
         currentProfileIndex: -1
     }
 
-    profileNodes = m.top.getChildren(-1, 0)
+    profileNodes = m.profilesContent.getChildren(-1, 0)
 
     for each profileNode in profileNodes
+        if profileNode.type = "login"
+            continue for
+        end if
+
         profile = {
             type: profileNode.type
             username: profileNode.username
             serverUrl: profileNode.serverUrl
             accessToken: profileNode.accessToken
         }
-
         userProfiles.profiles.Push(profile)
     end for
 
@@ -76,4 +96,55 @@ function SaveUserProfilesToRegistry()
 
     userProfiles.__version = m.top.__version
     RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
+end function
+
+function OnLoginWithProfile()
+    isNewProfile = true
+    newProfile = m.top.loginWithProfile
+    existingProfile = invalid
+    profiles = m.profilesContent.getChildren(-1, 0)
+    for each profile in profiles
+        if profile.username = newProfile.username and profile.serverUrl = newProfile.serverUrl
+            existingProfile = profile
+            isNewProfile = false
+            exit for
+        end if
+    end for
+
+    if not isNewProfile
+        existingProfile.accessToken = newProfile.accessToken
+        newProfile = existingProfile
+    end if
+
+    if isNewProfile
+        m.profilesContent.insertChild(newProfile, 0)
+    end if
+
+    m.top.currentProfile = newProfile
+end function
+
+function OnCurrentProfile() as void
+    currentProfile = m.top.currentProfile
+    allProfiles = m.profilesContent.getChildren(-1, 0)
+    if currentProfile = invalid
+        for each profile in allProfiles
+            profile.isSelected = false
+        end for
+        m.invidious.authToken = invalid
+        LogInfo("Current profile set to invalid.")
+        SaveUserProfilesToRegistry()
+        return
+    end if
+
+    for each profile in allProfiles
+        profile.isSelected = currentProfile.isSameNode(profile)
+    end for
+
+    m.invidious.authToken = {
+        token: currentProfile.accessToken
+        instance: currentProfile.serverUrl
+        username: currentProfile.username
+    }
+    LogInfo("Current profile set to", currentProfile.username, "@", currentProfile.serverUrl)
+    SaveUserProfilesToRegistry()
 end function

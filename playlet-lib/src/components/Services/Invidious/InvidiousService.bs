@@ -488,6 +488,8 @@ namespace Invidious
             end if
         end function
 
+        ' TODO:P0 remove this function, make token verification happen
+        ' as part of the profiles service
         function GetAuthToken() as object
             tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
             if tokenPayload = invalid
@@ -516,19 +518,6 @@ We apologize for the inconvenience.`
             return authToken
         end function
 
-        function SetAuthToken(token as string, instance as string, username as dynamic)
-            obj = {
-                token: token
-                instance: instance
-                username: username
-            }
-
-            json = FormatJson(obj)
-            RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
-
-            m.node.authToken = obj
-        end function
-
         function VerifyTokenScope(token as string) as boolean
             tokenObject = ParseJson(token)
             if tokenObject = invalid
@@ -555,6 +544,7 @@ We apologize for the inconvenience.`
             RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
         end function
 
+        ' TODO:P0 Move this to profiles service
         function Logout() as boolean
             authToken = m.node.authToken
             if authToken = invalid

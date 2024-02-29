@@ -1,4 +1,3 @@
-import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
@@ -25,35 +24,44 @@ function OnContentSet() as void
     m.top.circlePosterInnerUri = "pkg:/images/white-circle.png"
     m.top.circlePosterInnerBlendColor = "#9696C8FF"
     username = content.username
+    m.top.username = username
     if not StringUtils.IsNullOrEmpty(username)
         m.top.letter = UCase(username.Left(1))
-        m.top.username = username
+    else
+        m.top.letter = ""
     end if
     m.top.serverUrl = content.serverUrl
     m.top.crownVisible = content.isSelected
 end function
 
 function OnRowListHasFocus()
-    m.top.animate = m.top.rowListHasFocus and m.top.itemHasFocus
+    if not m.top.rowListHasFocus
+        m.top.animate = false
+    end if
 end function
 
 function OnItemHasFocus()
-    m.top.animate = m.top.rowListHasFocus and m.top.itemHasFocus
+    m.top.animate = (m.top.itemHasFocus or m.top.focusPercent > 0.5) and m.top.rowListHasFocus
+end function
+
+function OnFocusPercent()
+    if m.top.focusPercent > 0.5 and m.top.rowListHasFocus
+        m.top.animate = true
+    else
+        m.top.animate = false
+    end if
 end function
 
 function OnAnimate()
     animate = m.top.animate
-    if animate
-        m.top.animationControl = "start"
-    else
-        m.top.animationControl = "stop"
-    end if
     m.top.shadowVisible = animate
     m.top.serverLabelVisible = animate
     m.top.circlePosterTranslation = [20, 20]
     if animate
         m.top.UsernameLabelFont = m.boldFont
+        m.top.animationControl = "start"
     else
         m.top.UsernameLabelFont = m.normalFont
+        m.top.animationControl = "stop"
     end if
 end function
