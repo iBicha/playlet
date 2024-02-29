@@ -1,0 +1,59 @@
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+function Init()
+    m.normalFont = m.top.findNode("normalFont")
+    m.boldFont = m.top.findNode("boldFont")
+end function
+
+function OnContentSet() as void
+    content = m.top.itemContent
+    if content = invalid
+        return
+    end if
+
+    if content.type = "login"
+        m.top.circlePosterInnerUri = "pkg:/images/icons/user-200.png"
+        ' bs:disable-next-line LINT3023
+        m.top.circlePosterInnerBlendColor = "#FFFFFFFF"
+        m.top.letter = ""
+        m.top.username = "Login"
+        m.top.crownVisible = false
+        return
+    end if
+
+    m.top.circlePosterInnerUri = "pkg:/images/white-circle.png"
+    m.top.circlePosterInnerBlendColor = "#9696C8FF"
+    username = content.username
+    if not StringUtils.IsNullOrEmpty(username)
+        m.top.letter = UCase(username.Left(1))
+        m.top.username = username
+    end if
+    m.top.serverUrl = content.serverUrl
+    m.top.crownVisible = content.isSelected
+end function
+
+function OnRowListHasFocus()
+    m.top.animate = m.top.rowListHasFocus and m.top.itemHasFocus
+end function
+
+function OnItemHasFocus()
+    m.top.animate = m.top.rowListHasFocus and m.top.itemHasFocus
+end function
+
+function OnAnimate()
+    animate = m.top.animate
+    if animate
+        m.top.animationControl = "start"
+    else
+        m.top.animationControl = "stop"
+    end if
+    m.top.shadowVisible = animate
+    m.top.serverLabelVisible = animate
+    m.top.circlePosterTranslation = [20, 20]
+    if animate
+        m.top.UsernameLabelFont = m.boldFont
+    else
+        m.top.UsernameLabelFont = m.normalFont
+    end if
+end function
