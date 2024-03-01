@@ -11,8 +11,8 @@
   let loggedIn = false;
   let auth_url;
   let currentInstance;
-  let loggedInInstance;
-  let username;
+  let profiles = [];
+  let currentProfile;
   let appId = "693751";
 
   playletStateStore.subscribe((value) => {
@@ -33,8 +33,10 @@
     loggedIn = value?.invidious?.logged_in;
     auth_url = value?.invidious?.auth_url;
     currentInstance = value?.invidious?.current_instance;
-    loggedInInstance = value?.invidious?.logged_in_instance;
-    username = value?.invidious?.logged_in_username;
+    profiles = value?.profiles?.profiles ?? [];
+    currentProfile = profiles.find(
+      (p) => p.id === value?.profiles?.currentProfile
+    );
   });
 
   const login = () => {
@@ -65,9 +67,9 @@
   </div>
   <div class="flex-none">
     <ThemeSelect />
-    {#if loggedIn && username}
+    {#if currentProfile}
       <div class="badge badge-outline">
-        <span>{username}</span>
+        <span>{currentProfile.username}</span>
       </div>
     {/if}
     <div class="dropdown dropdown-end">
@@ -80,33 +82,28 @@
         tabindex="-1"
         class="menu menu-sm dropdown-content mt-3 p-2 shadow bg-base-100 rounded-box"
       >
-        {#if loggedIn}
+        {#each profiles as profile}
           <li>
             <div
               class="tooltip tooltip-left"
-              data-tip={`Logout from ${loggedInInstance}`}
+              data-tip={`Logout from ${profile.username}`}
             >
-              <button on:click={logout}>Logout</button>
+              <button>{profile.username}</button>
             </div>
           </li>
-          <li>
-            <div
-              class="tooltip tooltip-left"
-              data-tip={`Login using ${currentInstance}`}
-            >
+        {/each}
+        <li>
+          <div
+            class="tooltip tooltip-left"
+            data-tip={`Login using ${currentInstance}`}
+          >
+            {#if currentProfile}
               <button on:click={login}>Switch profile</button>
-            </div>
-          </li>
-        {:else}
-          <li>
-            <div
-              class="tooltip tooltip-left"
-              data-tip={`Login using ${currentInstance}`}
-            >
+            {:else}
               <button on:click={login}>Login to Invidious</button>
-            </div>
-          </li>
-        {/if}
+            {/if}
+          </div>
+        </li>
       </ul>
     </div>
   </div>

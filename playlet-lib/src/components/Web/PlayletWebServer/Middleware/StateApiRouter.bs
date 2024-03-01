@@ -11,6 +11,7 @@ namespace Http
             m.applicationInfoNode = task.applicationInfo
             m.invidiousNode = task.invidious
             m.preferencesNode = task.preferences
+            m.profilesNode = task.profiles
         end function
 
         @get("/api/state")
@@ -18,7 +19,7 @@ namespace Http
             request = context.request
             response = context.response
 
-            keys = ["app", "device", "invidious", "preferences"]
+            keys = ["app", "device", "invidious", "preferences", "profiles"]
 
             if request.query.DoesExist("key")
                 keys = request.query["key"]
@@ -27,9 +28,14 @@ namespace Http
                 end if
             end if
 
+            keysDict = {}
+            for each key in keys
+                keysDict[key] = true
+            end for
+
             state = {}
 
-            if ArrayUtils.IndexOfString(keys, "app") <> -1
+            if keysDict["app"] = true
                 appInfo = m.applicationInfoNode@.GetAppInfo()
 
                 if appInfo.lib_version_latest = "N/A"
@@ -46,23 +52,23 @@ namespace Http
                 state["app"] = appInfo
             end if
 
-            if ArrayUtils.IndexOfString(keys, "device") <> -1
+            if keysDict["device"] = true
                 state["device"] = m.applicationInfoNode@.GetDeviceInfo()
             end if
 
-            if ArrayUtils.IndexOfString(keys, "invidious") <> -1
-                authToken = m.invidiousNode.authToken
+            if keysDict["invidious"] = true
                 state["invidious"] = {
                     current_instance: m.invidiousNode@.GetCurrentInstance()
                     auth_url: m.invidiousNode@.GetAuthorizeTokenLink()
-                    logged_in: authToken <> invalid
-                    logged_in_instance: authToken <> invalid ? authToken.instance : invalid
-                    logged_in_username: authToken <> invalid ? authToken.username : invalid
                 }
             end if
 
-            if ArrayUtils.IndexOfString(keys, "preferences") <> -1
+            if keysDict["preferences"] = true
                 state["preferences"] = m.preferencesNode@.GetUserPreferences()
+            end if
+
+            if keysDict["profiles"] = true
+                state["profiles"] = m.profilesNode@.GetProfilesDTO(false)
             end if
 
             response.Json(state)

@@ -84,7 +84,7 @@
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
     invidiousApi.userCountryCode = value?.device?.user_country_code ?? "US";
-    invidiousApi.isLoggedIn = value.invidious?.logged_in ?? false;
+    invidiousApi.isLoggedIn = !!(value.profiles?.currentProfile ?? false);
     loadRow();
   });
 

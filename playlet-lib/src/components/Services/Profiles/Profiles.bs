@@ -4,15 +4,17 @@
 '   - Logout / delete profile
 '   - Change color
 ' - Web apis for profile /api/profiles
-' - Migrate existing profiles from old format
 ' - Web app changes:
 '  - Profile selection (list/selected/logout)
 '  - Login with profile
 import "pkg:/source/utils/ArrayUtils.bs"
+import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
+    m.disableSavingToRegistry = false
     content = m.top.findNode("ProfilesContent")
     m.top.content = content
     m.profilesContent = content.getChild(0)
@@ -29,7 +31,7 @@ function LoadProfilesFromRegistry()
     if userProfiles = invalid
         userProfiles = {
             profiles: []
-            currentProfileIndex: -1
+            currentProfile: invalid
         }
     else
         userProfiles = ParseJson(userProfiles)
@@ -38,9 +40,16 @@ function LoadProfilesFromRegistry()
     ' Step 2: Migrate existing profiles to new format (if needed)
     isDirty = MigrateExistingProfiles(userProfiles)
 
+    ' Step 3: Save user preferences (if needed)
+    if isDirty
+        SaveUserProfilesToRegistry()
+    end if
+
+    ' Step 4: Load user profiles into content nodes
     profileNodes = []
     for each profile in userProfiles.profiles
         profileNode = CreateObject("roSGNode", "ProfileContentNode")
+        profileNode.id = profile.id
         profileNode.type = profile.type
         profileNode.username = profile.username
         profileNode.serverUrl = profile.serverUrl
@@ -51,29 +60,71 @@ function LoadProfilesFromRegistry()
 
     m.profilesContent.insertChildren(profileNodes, 0)
 
-    if userProfiles.currentProfileIndex >= 0 and userProfiles.currentProfileIndex < profileNodes.Count() - 1
-        m.top.currentProfile = profileNodes[userProfiles.currentProfileIndex]
-    end if
-
-    ' Step 3: Save user preferences (if needed)
-    if isDirty
-        SaveUserProfilesToRegistry()
+    if not StringUtils.IsNullOrEmpty(userProfiles.currentProfile)
+        for each profileNode in profileNodes
+            if profileNode.id = userProfiles.currentProfile
+                ' Setting current profile will also save the profiles to registry
+                ' but we just saved the profiles
+                m.disableSavingToRegistry = true
+                m.top.currentProfile = profileNode
+                m.disableSavingToRegistry = false
+                exit for
+            end if
+        end for
     end if
 end function
 
 function MigrateExistingProfiles(userProfiles as object) as boolean
-    ' TODO:P0
-    ' read RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
-    ' copy the profile from there to the new format
-    ' delete the old registry key
-    ' if no current profile, set the first profile as current
-    return false
+    tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
+    if tokenPayload = invalid
+        return false
+    end if
+
+    authToken = ParseJson(tokenPayload)
+    RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+
+    if authToken = invalid or authToken.instance = invalid or authToken.token = invalid or authToken.username = invalid
+        return false
+    end if
+
+    id = CreateProfileId(authToken.username, authToken.instance)
+    for each profile in userProfiles.profiles
+        if profile.id = id
+            return false
+        end if
+    end for
+
+    profile = {
+        "id": CreateProfileId(authToken.username, authToken.instance)
+        "type": "invidious"
+        "username": authToken.username
+        "serverUrl": authToken.instance
+        "accessToken": authToken.token
+    }
+
+    userProfiles.profiles.Unshift(profile)
+    if StringUtils.IsNullOrEmpty(userProfiles["currentProfile"])
+        userProfiles["currentProfile"] = profile.id
+    end if
+
+    return true
 end function
 
-function SaveUserProfilesToRegistry()
+function SaveUserProfilesToRegistry() as void
+    if m.disableSavingToRegistry
+        return
+    end if
+
+    userProfiles = GetProfilesDTO(true)
+
+    userProfiles.__version = m.top.__version
+    RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
+end function
+
+function GetProfilesDTO(includeAccessToken as boolean) as object
     userProfiles = {
-        profiles: []
-        currentProfileIndex: -1
+        "profiles": []
+        "currentProfile": invalid
     }
 
     profileNodes = m.profilesContent.getChildren(-1, 0)
@@ -84,18 +135,25 @@ function SaveUserProfilesToRegistry()
         end if
 
         profile = {
-            type: profileNode.type
-            username: profileNode.username
-            serverUrl: profileNode.serverUrl
-            accessToken: profileNode.accessToken
+            "id": profileNode.id
+            "type": profileNode.type
+            "username": profileNode.username
+            "serverUrl": profileNode.serverUrl
         }
+
+        if includeAccessToken
+            profile["accessToken"] = profileNode.accessToken
+        end if
+
         userProfiles.profiles.Push(profile)
     end for
 
-    userProfiles.currentProfileIndex = ArrayUtils.IndexOfNode(profileNodes, m.top.currentProfile)
+    currentProfile = m.top.currentProfile
+    if currentProfile <> invalid
+        userProfiles["currentProfile"] = currentProfile.id
+    end if
 
-    userProfiles.__version = m.top.__version
-    RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
+    return userProfiles
 end function
 
 function OnLoginWithProfile()
@@ -117,6 +175,7 @@ function OnLoginWithProfile()
     end if
 
     if isNewProfile
+        newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
         m.profilesContent.insertChild(newProfile, 0)
     end if
 
@@ -147,4 +206,8 @@ function OnCurrentProfile() as void
     }
     LogInfo("Current profile set to", currentProfile.username, "@", currentProfile.serverUrl)
     SaveUserProfilesToRegistry()
+end function
+
+function CreateProfileId(username as string, serverUrl as string) as string
+    return "v1:" + CryptoUtils.GetMd5(username + serverUrl)
 end function

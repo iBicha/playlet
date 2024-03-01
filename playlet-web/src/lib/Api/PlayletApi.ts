@@ -46,7 +46,7 @@ export class PlayletApi {
     }
 
     static async logout() {
-        await fetch(`${PlayletApi.host()}/invidious/logout`);
+        throw new Error("Not implemented");
     }
 
     static async playVideo(args) {
