@@ -159,10 +159,14 @@ end function
 function OnLoginWithProfile()
     isNewProfile = true
     newProfile = m.top.loginWithProfile
+    if StringUtils.IsNullOrEmpty(newProfile.id)
+        newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
+    end if
+
     existingProfile = invalid
     profiles = m.profilesContent.getChildren(-1, 0)
     for each profile in profiles
-        if profile.username = newProfile.username and profile.serverUrl = newProfile.serverUrl
+        if profile.id = newProfile.id
             existingProfile = profile
             isNewProfile = false
             exit for
@@ -170,16 +174,35 @@ function OnLoginWithProfile()
     end for
 
     if not isNewProfile
+        ' Refresh token of existing profile
         existingProfile.accessToken = newProfile.accessToken
         newProfile = existingProfile
     end if
 
     if isNewProfile
-        newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
         m.profilesContent.insertChild(newProfile, 0)
     end if
 
     m.top.currentProfile = newProfile
+end function
+
+function OnLogoutWithProfile() as void
+    logoutWithProfile = m.top.logoutWithProfile
+    if logoutWithProfile = invalid
+        return
+    end if
+
+    profile = m.profilesContent.findNode(logoutWithProfile.id)
+    if profile = invalid
+        return
+    end if
+
+    m.profilesContent.removeChild(profile)
+    if m.top.currentProfile.id = profile.id
+        m.top.currentProfile = invalid
+    else
+        OnCurrentProfile()
+    end if
 end function
 
 function OnCurrentProfile() as void
@@ -190,13 +213,13 @@ function OnCurrentProfile() as void
             profile.isSelected = false
         end for
         m.invidious.authToken = invalid
-        LogInfo("Current profile set to invalid.")
+        LogInfo("Current profile set to <invalid>")
         SaveUserProfilesToRegistry()
         return
     end if
 
     for each profile in allProfiles
-        profile.isSelected = currentProfile.isSameNode(profile)
+        profile.isSelected = profile.id = currentProfile.id
     end for
 
     m.invidious.authToken = {

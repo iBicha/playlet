@@ -6,6 +6,7 @@ namespace Http
             super()
 
             m.profilesNode = server.task.profiles
+            m.profilesContent = m.profilesNode.content.getChild(0)
         end function
 
         @get("/api/profiles")
@@ -17,8 +18,36 @@ namespace Http
             return true
         end function
 
-        @post("/api/profiles/use")
-        function UpdatePreferences(context as object) as boolean
+        @post("/api/profiles/activate")
+        function ActivateProfile(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.Json()
+            if payload = invalid
+                response.Default(400, `Invalid JSON payload`)
+                return true
+            end if
+
+            id = payload.id
+            if StringUtils.IsNullOrEmpty(id)
+                response.Default(400, "Missing profile id")
+                return true
+            end if
+
+            profile = m.profilesContent.findNode(id)
+            if profile = invalid
+                response.Default(404, `Profile id "${id}" not found`)
+                return true
+            end if
+
+            m.profilesNode.currentProfile = profile
+            response.Default(200, "Profile updated")
+            return true
+        end function
+
+        @delete("/api/profiles")
+        function Logout(context as object) as boolean
             request = context.request
             response = context.response
 
@@ -28,14 +57,14 @@ namespace Http
                 return true
             end if
 
-            ' TODO:P0 switch to the profile
+            profile = m.profilesContent.findNode(id)
+            if profile = invalid
+                response.Default(404, `Profile id "${id}" not found`)
+                return true
+            end if
 
-            return true
-        end function
-
-        @delete("/api/profile")
-        function ResetPreferences(context as object) as boolean
-            ' TODO:P0 Logout
+            m.profilesNode.logoutWithProfile = profile
+            response.Default(200, "Profile logged out")
             return true
         end function
 
