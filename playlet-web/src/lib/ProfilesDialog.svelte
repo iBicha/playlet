@@ -18,13 +18,13 @@
   let profiles = [];
   let currentProfile;
 
-  let auth_url;
+  let authUrl;
   let currentInstance;
 
   let accordionState = null;
 
   playletStateStore.subscribe((value) => {
-    auth_url = value?.invidious?.auth_url;
+    authUrl = value?.invidious?.auth_url;
     currentInstance = value?.invidious?.current_instance;
     profiles = value?.profiles?.profiles ?? [];
     currentProfile = profiles.find(
@@ -47,7 +47,7 @@
 
   async function logout(profileId: string) {
     await PlayletApi.logout(profileId);
-    if (profileId === currentProfile.id) {
+    if (profileId === currentProfile?.id) {
       window.location.reload();
       return;
     }
@@ -55,11 +55,11 @@
   }
 
   function login() {
-    if (!auth_url) {
+    if (!authUrl) {
       alert("Error with login, please refresh the page.");
       return;
     }
-    window.location = auth_url;
+    window.location = authUrl;
   }
 </script>
 
@@ -69,7 +69,7 @@
       <div class="text-xl font-medium m-4">Profiles</div>
 
       {#each profiles as profile}
-        <div class="collapse collapse-arrow bg-base-200">
+        <div class="collapse collapse-arrow bg-base-300 m-1">
           <input
             type="radio"
             name="profiles-accordion"
@@ -80,9 +80,9 @@
             <div>
               <div class="avatar placeholder">
                 <div
-                  class="bg-neutral text-neutral-content rounded-full w-12 ring ring-offset-base-100 ring-offset-2 {profile.id ===
-                  currentProfile.id
-                    ? 'ring-primary'
+                  class="bg-neutral text-neutral-content rounded-full w-12 {profile.id ===
+                  currentProfile?.id
+                    ? 'ring ring-primary ring-offset-base-100 ring-offset-2'
                     : ''} "
                 >
                   <span class="text-xl font-medium"
@@ -101,7 +101,7 @@
             </div>
           </div>
           <div class="collapse-content">
-            {#if profile.id !== currentProfile.id}
+            {#if profile.id !== currentProfile?.id}
               <button
                 on:click={() => activate(profile.id)}
                 class="btn btn-primary m-1">Activate</button

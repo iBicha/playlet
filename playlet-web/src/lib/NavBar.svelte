@@ -1,11 +1,11 @@
 <script lang="ts">
   import PlayletLogoDark from "assets/logo-dark.svg.svelte";
   import PlayletLogoLight from "assets/logo-light.svg.svelte";
-  import UserIcon from "assets/user.svg.svelte";
   import { ExternalControlProtocol } from "lib/Api/ExternalControlProtocol";
   import { appThemeStore, playletStateStore } from "lib/Stores";
   import ThemeSelect from "lib/ThemeToggle.svelte";
   import ProfilesDialog from "./ProfilesDialog.svelte";
+  import ProfileAvatar from "./ProfileAvatar.svelte";
 
   let profilesDialog;
   let version;
@@ -67,10 +67,7 @@
       on:click={showProfilesDialog}
       class="btn btn-ghost btn-circle avatar"
     >
-      <div class="w-8 rounded-full">
-        <!-- TODO:P0 user icon should show the currently active profile -->
-        <UserIcon />
-      </div>
+      <ProfileAvatar />
     </button>
   </div>
 </div>
