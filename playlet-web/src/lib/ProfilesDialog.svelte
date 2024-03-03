@@ -96,7 +96,12 @@
                 {profile.username}
               </div>
               <div class="text-xs font-light">
-                {profile.serverUrl}
+                <a
+                  class="link"
+                  href={profile.serverUrl}
+                  target="_blank"
+                  rel="noopener noreferrer">{profile.serverUrl}</a
+                >
               </div>
             </div>
           </div>
