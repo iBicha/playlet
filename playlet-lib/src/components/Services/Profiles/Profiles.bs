@@ -5,6 +5,8 @@ import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
 
 function Init()
     m.disableSavingToRegistry = false
@@ -65,6 +67,14 @@ function LoadProfilesFromRegistry()
             end if
         end for
     end if
+
+    if profileNodes.Count() > 0
+        AsyncTask.Start(Tasks.ProfilesVerifyTokensTask, {
+            profiles: m.top
+            invidious: m.invidious
+            profileNodes: profileNodes
+        })
+    end if
 end function
 
 function MigrateExistingProfiles(userProfiles as object) as boolean
@@ -88,7 +98,7 @@ function MigrateExistingProfiles(userProfiles as object) as boolean
     end for
 
     profile = {
-        "id": CreateProfileId(authToken.username, authToken.instance)
+        "id": id
         "type": "invidious"
         "username": authToken.username
         "serverUrl": authToken.instance
@@ -149,9 +159,9 @@ function GetProfilesDTO(includeAccessToken as boolean) as object
     return userProfiles
 end function
 
-function OnLoginWithProfile()
+function OnLoginWithProfile(event as object)
+    newProfile = event.getData()
     isNewProfile = true
-    newProfile = m.top.loginWithProfile
     if StringUtils.IsNullOrEmpty(newProfile.id)
         newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
     end if
@@ -179,8 +189,8 @@ function OnLoginWithProfile()
     m.top.currentProfile = newProfile
 end function
 
-function OnLogoutWithProfile() as void
-    logoutWithProfile = m.top.logoutWithProfile
+function OnLogoutWithProfile(event as object) as void
+    logoutWithProfile = event.getData()
     if logoutWithProfile = invalid
         return
     end if
@@ -196,6 +206,68 @@ function OnLogoutWithProfile() as void
     else
         OnCurrentProfile()
     end if
+
+    AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
+        profiles: m.top
+        invidious: m.invidious
+        profileNodes: [profile]
+    })
+end function
+
+function OnLogoutWithProfiles(event as object) as void
+    logoutWithProfiles = event.getData()
+    if logoutWithProfiles = invalid or logoutWithProfiles.Count() = 0
+        return
+    end if
+
+    logoutFromCurrentProfile = false
+    for each profile in logoutWithProfiles
+        profileNode = m.profilesContent.findNode(profile.id)
+        if profileNode = invalid
+            continue for
+        end if
+
+        m.profilesContent.removeChild(profileNode)
+        if m.top.currentProfile.id = profileNode.id
+            logoutFromCurrentProfile = true
+        end if
+    end for
+
+    if logoutFromCurrentProfile
+        m.top.currentProfile = invalid
+    else
+        OnCurrentProfile()
+    end if
+
+    AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
+        profiles: m.top
+        invidious: m.invidious
+        profileNodes: logoutWithProfiles
+    })
+end function
+
+function OnLogoutWithAccessToken(event as object) as void
+    logoutWithAccessToken = event.getData()
+    if StringUtils.IsNullOrEmpty(logoutWithAccessToken)
+        return
+    end if
+
+    ' We are not going to invalidate the token on the server
+    ' because we are likely dealing with an invalid token
+    ' in the first place. All we need to do is remove the
+    ' profile from the list of profiles.
+
+    allProfiles = m.profilesContent.getChildren(-1, 0)
+    for each profile in allProfiles
+        if profile.accessToken = logoutWithAccessToken
+            m.profilesContent.removeChild(profile)
+            if m.top.currentProfile.id = profile.id
+                m.top.currentProfile = invalid
+            else
+                OnCurrentProfile()
+            end if
+        end if
+    end for
 end function
 
 function OnCurrentProfile() as void
