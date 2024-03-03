@@ -30,7 +30,8 @@ function InitializeBindings()
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "profiles": "../Profiles"
             }, 
             "WebServer": {
                 "appController": "/AppController", 
