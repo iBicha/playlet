@@ -80,12 +80,12 @@
             <div>
               <div class="avatar placeholder">
                 <div
-                  class="bg-neutral text-neutral-content rounded-full w-12 {profile.id ===
-                  currentProfile?.id
+                  class="rounded-full w-12 {profile.id === currentProfile?.id
                     ? 'ring ring-primary ring-offset-base-100 ring-offset-2'
                     : ''} "
+                  style="background-color: {profile.color}"
                 >
-                  <span class="text-xl font-medium"
+                  <span class="text-xl font-medium text-gray-200"
                     >{profile.username.substring(0, 1).toUpperCase()}</span
                   >
                 </div>

@@ -16,9 +16,10 @@
   {#if currentProfile && currentProfile.username}
     <div class="avatar placeholder m-1.5">
       <div
-        class="bg-neutral text-neutral-content rounded-full w-8 ring ring-offset-base-100 ring-offset-2"
+        class="rounded-full w-8 ring ring-offset-base-100 ring-offset-2"
+        style="background-color: {currentProfile.color}"
       >
-        <span class="text-xl font-medium"
+        <span class="text-xl font-medium text-gray-200"
           >{currentProfile.username.substring(0, 1).toUpperCase()}</span
         >
       </div>

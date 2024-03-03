@@ -1,7 +1,6 @@
 ' TODO:P0
-' - Change color of profile?
+' - The username first letter should have a color based on the profile color
 ' - Add a disabled button in the ProfileView when "In Use"
-' - Profile icon in the navbar should show current user's icon
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
@@ -9,7 +8,9 @@ import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/ColorUtils.bs"
 
+' TODO:P1 add the ability to change color of profiles
 function Init()
     m.disableSavingToRegistry = false
     content = m.top.findNode("ProfilesContent")
@@ -18,10 +19,13 @@ function Init()
 end function
 
 function OnNodeReady()
+    LogInfo("Profiles node is ready")
     LoadProfilesFromRegistry()
 end function
 
 function LoadProfilesFromRegistry()
+    LogInfo("LoadProfilesFromRegistry")
+
     ' Step 1: Load user profiles from registry
     userProfiles = RegistryUtils.Read(RegistryUtils.USER_PROFILES)
 
@@ -51,6 +55,7 @@ function LoadProfilesFromRegistry()
         profileNode.username = profile.username
         profileNode.serverUrl = profile.serverUrl
         profileNode.accessToken = profile.accessToken
+        profileNode.color = profile.color
 
         profileNodes.Push(profileNode)
     end for
@@ -105,6 +110,7 @@ function MigrateExistingProfiles(userProfiles as object) as boolean
         "username": authToken.username
         "serverUrl": authToken.instance
         "accessToken": authToken.token
+        "color": ColorUtils.RandomSoftColorHex()
     }
 
     userProfiles.profiles.Unshift(profile)
@@ -139,11 +145,17 @@ function GetProfilesDTO(includeAccessToken as boolean) as object
             continue for
         end if
 
+        color = profileNode.color
+        if IsInt(color)
+            color = ColorUtils.IntToHex(color)
+        end if
+
         profile = {
             "id": profileNode.id
             "type": profileNode.type
             "username": profileNode.username
             "serverUrl": profileNode.serverUrl
+            "color": color
         }
 
         if includeAccessToken
@@ -185,6 +197,7 @@ function OnLoginWithProfile(event as object)
     end if
 
     if isNewProfile
+        newProfile.color = ColorUtils.RandomSoftColorHex()
         m.profilesContent.insertChild(newProfile, 0)
     end if
 
@@ -203,7 +216,8 @@ function OnLogoutWithProfile(event as object) as void
     end if
 
     m.profilesContent.removeChild(profile)
-    if m.top.currentProfile.id = profile.id
+    currentProfile = m.top.currentProfile
+    if currentProfile <> invalid and currentProfile.id = profile.id
         m.top.currentProfile = invalid
     else
         OnCurrentProfile()
@@ -222,6 +236,7 @@ function OnLogoutWithProfiles(event as object) as void
         return
     end if
 
+    currentProfile = m.top.currentProfile
     logoutFromCurrentProfile = false
     for each profile in logoutWithProfiles
         profileNode = m.profilesContent.findNode(profile.id)
@@ -230,7 +245,7 @@ function OnLogoutWithProfiles(event as object) as void
         end if
 
         m.profilesContent.removeChild(profileNode)
-        if m.top.currentProfile.id = profileNode.id
+        if currentProfile <> invalid and currentProfile.id = profile.id
             logoutFromCurrentProfile = true
         end if
     end for
@@ -263,7 +278,8 @@ function OnLogoutWithAccessToken(event as object) as void
     for each profile in allProfiles
         if profile.accessToken = logoutWithAccessToken
             m.profilesContent.removeChild(profile)
-            if m.top.currentProfile.id = profile.id
+            currentProfile = m.top.currentProfile
+            if currentProfile <> invalid and currentProfile.id = profile.id
                 m.top.currentProfile = invalid
             else
                 OnCurrentProfile()
@@ -273,6 +289,8 @@ function OnLogoutWithAccessToken(event as object) as void
 end function
 
 function OnCurrentProfile() as void
+    LogInfo("OnCurrentProfile")
+
     currentProfile = m.top.currentProfile
     allProfiles = m.profilesContent.getChildren(-1, 0)
     if currentProfile = invalid
