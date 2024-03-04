@@ -9,4 +9,5 @@ export type PlayletState = {
     device?: any,
     invidious?: any,
     preferences?: any,
+    profiles?: any,
 }

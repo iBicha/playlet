@@ -1,11 +1,17 @@
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
-' Based on https://github.com/jellyfin/jellyfin-roku/blob/unstable/components/IconButton.brs
+' TODO:P1 this file is a copy paste of IconButton. It should be refactored.
 function Init()
     m.buttonBackground = m.top.findNode("buttonBackground")
     m.buttonIcon = m.top.findNode("buttonIcon")
     m.buttonText = m.top.findNode("buttonText")
+
+    m.circlePoster = m.top.findNode("circlePoster")
+    m.circlePosterInner = m.top.findNode("circlePosterInner")
+    m.letterLabel = m.top.findNode("LetterLabel")
 
     m.top.observeField("background", FuncName(onBackgroundChanged))
     m.top.observeField("icon", FuncName(onIconChanged))
@@ -13,6 +19,13 @@ function Init()
     m.top.observeField("height", FuncName(onHeightChanged))
     m.top.observeField("width", FuncName(onWidthChanged))
     m.top.observeField("padding", FuncName(onPaddingChanged))
+
+    profiles = m.top.getScene().findNode("Profiles")
+    if profiles <> invalid
+        m.profiles = profiles
+        profiles.observeField("currentProfile", FuncName(OnCurrentProfile))
+        OnCurrentProfile()
+    end if
 end function
 
 function OnFocusChange()
@@ -45,9 +58,20 @@ function setIconSize()
         m.buttonIcon.height = iconSize
         m.buttonIcon.width = iconSize
 
-        m.buttonIcon.translation = [((width - iconSize) / 2), ((height - iconSize) / 2)]
+        iconTranslation = [((width - iconSize) / 2), ((height - iconSize) / 2)]
+        m.buttonIcon.translation = iconTranslation
         m.buttonText.translation = [-5, height + 2]
         m.buttonText.width = width + 10
+
+        m.circlePoster.width = iconSize
+        m.circlePoster.height = iconSize
+        m.circlePoster.translation = iconTranslation
+
+        m.circlePosterInner.width = iconSize - 4
+        m.circlePosterInner.height = iconSize - 4
+
+        m.letterLabel.width = iconSize - 4
+        m.letterLabel.height = iconSize - 4
     end if
 end function
 
@@ -64,4 +88,24 @@ end function
 
 function onPaddingChanged()
     setIconSize()
+end function
+
+function OnCurrentProfile() as void
+    currentProfile = m.profiles.currentProfile
+    if currentProfile = invalid
+        m.circlePoster.visible = false
+        m.buttonIcon.visible = true
+        return
+    end if
+
+    username = currentProfile.username
+    if not StringUtils.IsNullOrEmpty(username)
+        m.LetterLabel.text = UCase(username.Left(1))
+    else
+        m.LetterLabel.text = ""
+    end if
+    m.circlePosterInner.blendColor = currentProfile.color
+
+    m.circlePoster.visible = true
+    m.buttonIcon.visible = false
 end function
