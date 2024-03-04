@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A bug where the loading screen does not disappear if search results are empty.
+- Empty invidious instance in preferences when default instance is being used
 
 ## [0.20.2] - 2024-02-26
 
