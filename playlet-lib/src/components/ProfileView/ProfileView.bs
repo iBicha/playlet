@@ -23,7 +23,7 @@ function OnNodeReady()
     SetNavigation(m.logoutButton, "up", m.activateButton)
 
     DisposableObserveFieldScoped(m.profiles, "currentProfile", FuncName(OnCunrrentProfileChanged))
-    DisposableObserveFieldScoped(m.profiles, "logoutWithProfile", FuncName(OnProfilesLogout))
+    DisposableObserveFieldScoped(m.profiles, "onProfileLogout", FuncName(OnProfileLogout))
 end function
 
 function OnContentSet() as void
@@ -88,7 +88,7 @@ function Activate() as void
     end if
 
     m.top.content = invalid
-    m.profiles.currentProfile = profile
+    m.profiles@.SetCurrentProfile(profile)
     Close()
 end function
 
@@ -99,7 +99,7 @@ function Logout() as void
     end if
 
     m.top.content = invalid
-    m.profiles.logoutWithProfile = content
+    m.profiles@.LogoutWithProfile(content)
     Close()
 end function
 
@@ -122,14 +122,14 @@ function OnCunrrentProfileChanged() as void
     UpdateActivateButton()
 end function
 
-function OnProfilesLogout() as void
+function OnProfileLogout() as void
     content = m.top.content
     if content = invalid
         return
     end if
 
-    logoutWithProfile = m.profiles.logoutWithProfile
-    if logoutWithProfile <> invalid and logoutWithProfile.id = content.id
+    profile = m.profiles.content.getChild(0).findNode(content.id)
+    if profile = invalid
         Close()
     end if
 end function

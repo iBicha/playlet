@@ -65,7 +65,7 @@ function LoadProfilesFromRegistry()
                 ' Setting current profile will also save the profiles to registry
                 ' but we just saved the profiles
                 m.disableSavingToRegistry = true
-                m.top.currentProfile = profileNode
+                SetCurrentProfile(profileNode)
                 m.disableSavingToRegistry = false
                 exit for
             end if
@@ -170,8 +170,7 @@ function GetProfilesDTO(includeAccessToken as boolean) as object
     return userProfiles
 end function
 
-function OnLoginWithProfile(event as object)
-    newProfile = event.getData()
+function LoginWithProfile(newProfile as object)
     isNewProfile = true
     if StringUtils.IsNullOrEmpty(newProfile.id)
         newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
@@ -197,17 +196,15 @@ function OnLoginWithProfile(event as object)
         newProfile.color = ColorUtils.RandomSoftColorHex()
         m.profilesContent.insertChild(newProfile, 0)
     end if
-
-    m.top.currentProfile = newProfile
+    SetCurrentProfile(newProfile)
 end function
 
-function OnLogoutWithProfile(event as object) as void
-    logoutWithProfile = event.getData()
-    if logoutWithProfile = invalid
+function LogoutWithProfile(profile as object) as void
+    if profile = invalid
         return
     end if
 
-    profile = m.profilesContent.findNode(logoutWithProfile.id)
+    profile = m.profilesContent.findNode(profile.id)
     if profile = invalid
         return
     end if
@@ -215,10 +212,12 @@ function OnLogoutWithProfile(event as object) as void
     m.profilesContent.removeChild(profile)
     currentProfile = m.top.currentProfile
     if currentProfile <> invalid and currentProfile.id = profile.id
-        m.top.currentProfile = invalid
+        SetCurrentProfile(invalid)
     else
-        OnCurrentProfile()
+        RefreshActiveProfileState(currentProfile)
     end if
+
+    m.top.onProfileLogout = true
 
     AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
         profiles: m.top
@@ -227,42 +226,46 @@ function OnLogoutWithProfile(event as object) as void
     })
 end function
 
-function OnLogoutWithProfiles(event as object) as void
-    logoutWithProfiles = event.getData()
-    if logoutWithProfiles = invalid or logoutWithProfiles.Count() = 0
+function LogoutWithProfiles(profiles as object) as void
+    if profiles = invalid or profiles.Count() = 0
         return
     end if
 
     currentProfile = m.top.currentProfile
     logoutFromCurrentProfile = false
-    for each profile in logoutWithProfiles
+    onProfileLogout = false
+    for each profile in profiles
         profileNode = m.profilesContent.findNode(profile.id)
         if profileNode = invalid
             continue for
         end if
 
         m.profilesContent.removeChild(profileNode)
+        onProfileLogout = true
         if currentProfile <> invalid and currentProfile.id = profile.id
             logoutFromCurrentProfile = true
         end if
     end for
 
     if logoutFromCurrentProfile
-        m.top.currentProfile = invalid
+        SetCurrentProfile(invalid)
     else
-        OnCurrentProfile()
+        RefreshActiveProfileState(currentProfile)
+    end if
+
+    if onProfileLogout
+        m.top.onProfileLogout = true
     end if
 
     AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
         profiles: m.top
         invidious: m.invidious
-        profileNodes: logoutWithProfiles
+        profileNodes: profiles
     })
 end function
 
-function OnLogoutWithAccessToken(event as object) as void
-    logoutWithAccessToken = event.getData()
-    if StringUtils.IsNullOrEmpty(logoutWithAccessToken)
+function LogoutWithAccessToken(accessToken as dynamic) as void
+    if StringUtils.IsNullOrEmpty(accessToken)
         return
     end if
 
@@ -273,44 +276,54 @@ function OnLogoutWithAccessToken(event as object) as void
 
     allProfiles = m.profilesContent.getChildren(-1, 0)
     for each profile in allProfiles
-        if profile.accessToken = logoutWithAccessToken
+        if profile.accessToken = accessToken
             m.profilesContent.removeChild(profile)
             currentProfile = m.top.currentProfile
             if currentProfile <> invalid and currentProfile.id = profile.id
-                m.top.currentProfile = invalid
+                SetCurrentProfile(invalid)
             else
-                OnCurrentProfile()
+                RefreshActiveProfileState(currentProfile)
             end if
+            m.top.onProfileLogout = true
+            exit for
         end if
     end for
 end function
 
-function OnCurrentProfile() as void
-    LogInfo("OnCurrentProfile")
-
-    currentProfile = m.top.currentProfile
-    allProfiles = m.profilesContent.getChildren(-1, 0)
-    if currentProfile = invalid
-        for each profile in allProfiles
-            profile.isSelected = false
-        end for
+function SetCurrentProfile(newActiveProfile as object) as void
+    if newActiveProfile = invalid
+        RefreshActiveProfileState(invalid)
+        m.top.currentProfile = invalid
         m.invidious.authToken = invalid
         LogInfo("Current profile set to <invalid>")
         SaveUserProfilesToRegistry()
         return
     end if
 
-    for each profile in allProfiles
-        profile.isSelected = profile.id = currentProfile.id
-    end for
+    RefreshActiveProfileState(newActiveProfile)
 
+    m.top.currentProfile = newActiveProfile
     m.invidious.authToken = {
-        token: currentProfile.accessToken
-        instance: currentProfile.serverUrl
-        username: currentProfile.username
+        token: newActiveProfile.accessToken
+        instance: newActiveProfile.serverUrl
+        username: newActiveProfile.username
     }
-    LogInfo("Current profile set to", currentProfile.username, "@", currentProfile.serverUrl)
+    LogInfo("Current profile set to", newActiveProfile.username, "@", newActiveProfile.serverUrl)
     SaveUserProfilesToRegistry()
+end function
+
+function RefreshActiveProfileState(activeProfile as object) as void
+    allProfiles = m.profilesContent.getChildren(-1, 0)
+    if activeProfile = invalid
+        for each profile in allProfiles
+            profile.isSelected = false
+        end for
+        return
+    end if
+
+    for each profile in allProfiles
+        profile.isSelected = profile.id = activeProfile.id
+    end for
 end function
 
 function CreateProfileId(username as string, serverUrl as string) as string
