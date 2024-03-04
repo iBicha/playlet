@@ -16,12 +16,11 @@ function Init()
 end function
 
 function OnNodeReady()
-    LogInfo("Profiles node is ready")
     LoadProfilesFromRegistry()
 end function
 
 function LoadProfilesFromRegistry()
-    LogInfo("LoadProfilesFromRegistry")
+    LogInfo("Loading profiles from registry...")
 
     ' Step 1: Load user profiles from registry
     userProfiles = RegistryUtils.Read(RegistryUtils.USER_PROFILES)
@@ -123,13 +122,13 @@ function SaveUserProfilesToRegistry() as void
         return
     end if
 
-    userProfiles = GetProfilesDTO(true)
+    userProfiles = GetProfilesDto(true)
 
     userProfiles.__version = m.top.__version
     RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
 end function
 
-function GetProfilesDTO(includeAccessToken as boolean) as object
+function GetProfilesDto(includeAccessToken as boolean) as object
     userProfiles = {
         "profiles": []
         "currentProfile": invalid
@@ -144,6 +143,7 @@ function GetProfilesDTO(includeAccessToken as boolean) as object
 
         color = profileNode.color
         if IsInt(color)
+            ' Use hex color for web app
             color = ColorUtils.IntToHex(color)
         end if
 
