@@ -83,6 +83,7 @@
   let deviceInfo = {};
   let invidiousInfo = {};
   let preferencesInfo = {};
+  let profilesInfo = {};
   const feedbackTitle = encodeURIComponent("[Feedback] Playlet");
   let githubUrlIssue = "https://github.com/iBicha/playlet/issues/new";
   let mailToUrl = "mailto:brahim.hadriche@gmail.com";
@@ -92,6 +93,7 @@
     deviceInfo = value.device || {};
     invidiousInfo = value.invidious || {};
     preferencesInfo = value.preferences || {};
+    profilesInfo = value.profiles || {};
     githubUrlIssue = createGithubIssueUrl();
     mailToUrl = createMailToUrl();
   });
@@ -118,6 +120,11 @@ ${JSON.stringify(invidiousInfo, null, 2)}
 #### User preferences
 \`\`\`
 ${JSON.stringify(preferencesInfo, null, 2)}
+\`\`\`
+
+#### Profiles
+\`\`\`
+${JSON.stringify(profilesInfo, null, 2)}
 \`\`\``;
   }
 

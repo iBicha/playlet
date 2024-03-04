@@ -2,6 +2,7 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
+' TODO:P1 handle case where all feedSources are empty
 @asynctask
 function VideoRowListRowContentTask(input as object) as object
     try
@@ -59,17 +60,13 @@ function VideoRowListRowContentTask(input as object) as object
 
             if not response.success
                 if response.error = Invidious.ERROR_NOT_AUTHENTICATED
-                    RemovePlaceHolderItems(feedContentNode)
-                    actionNode = CreateObject("roSGNode", "ActionContentNode")
-                    actionNode.title = `Login to view ${feedSource.title}`
-                    actionNode.action = "LoginDialog"
-
-                    feedSource.state.loadState = FeedLoadState.Loaded
-                    feedSources[feedSourcesIndex] = feedSource
-                    feedContentNode.feedSources = feedSources
-
-                    feedContentNode.appendChild(actionNode)
-                    feedContentNode.loadState = FeedLoadState.Loaded
+                    if feedSources.Count() = 1
+                        parent = feedContentNode.getParent()
+                        parent.removeChild(feedContentNode)
+                        return {
+                            success: true
+                        }
+                    end if
 
                     continue while
                 end if

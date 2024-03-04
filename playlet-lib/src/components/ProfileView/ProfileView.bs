@@ -1,0 +1,160 @@
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.activateButton = m.top.findNode("activateButton")
+    m.logoutButton = m.top.findNode("logoutButton")
+    m.closeButton = m.top.findNode("closeButton")
+    m.buttonGroup = m.top.findNode("buttonGroup")
+
+    DisposableObserveField(m.activateButton, "buttonSelected", FuncName(Activate))
+    DisposableObserveField(m.logoutButton, "buttonSelected", FuncName(Logout))
+    DisposableObserveField(m.closeButton, "buttonSelected", FuncName(Close))
+end function
+
+function OnNodeReady()
+    SetNavigation(m.activateButton, "down", m.logoutButton)
+    SetNavigation(m.logoutButton, "down", m.closeButton)
+    SetNavigation(m.closeButton, "up", m.logoutButton)
+    SetNavigation(m.logoutButton, "up", m.activateButton)
+
+    DisposableObserveFieldScoped(m.profiles, "currentProfile", FuncName(OnCunrrentProfileChanged))
+    DisposableObserveFieldScoped(m.profiles, "onProfileLogout", FuncName(OnProfileLogout))
+end function
+
+function OnContentSet() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    m.top.circlePosterInnerUri = "pkg:/images/white-circle.png"
+    m.top.circlePosterInnerBlendColor = content.color
+    username = content.username
+    m.top.username = username
+    if not StringUtils.IsNullOrEmpty(username)
+        m.top.letter = UCase(username.Left(1))
+    else
+        m.top.letter = ""
+    end if
+    m.top.serverUrl = content.serverUrl
+    m.top.crownVisible = content.isSelected
+    UpdateActivateButton()
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    if m.activateButton.focusable
+        NodeSetFocus(m.activateButton, true)
+    else
+        NodeSetFocus(m.logoutButton, true)
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
+    if key = "options"
+        ' A pass-through to the app controller, so it can toggle picture-in-picture
+        return false
+    end if
+
+    if key = "back" and press
+        Close()
+        return true
+    end if
+
+    return true
+end function
+
+function Activate() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    profile = m.profiles.content.getChild(0).findNode(content.id)
+    if profile = invalid
+        return
+    end if
+
+    m.top.content = invalid
+    m.profiles@.SetCurrentProfile(profile)
+    Close()
+end function
+
+function Logout() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    m.top.content = invalid
+    m.profiles@.LogoutWithProfile(content)
+    Close()
+end function
+
+function Close()
+    m.top.appController@.PopScreen()
+    m.top.dispose = true
+end function
+
+function OnDispose()
+    DisposeObservers()
+    m.top.content = invalid
+end function
+
+function OnCunrrentProfileChanged() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+    m.top.crownVisible = content.isSelected
+    UpdateActivateButton()
+end function
+
+function OnProfileLogout() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    profile = m.profiles.content.getChild(0).findNode(content.id)
+    if profile = invalid
+        Close()
+    end if
+end function
+
+function UpdateActivateButton() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    isSelected = content.isSelected
+    if isSelected
+        if m.activateButton.hasFocus()
+            NodeSetFocus(m.logoutButton, true)
+        end if
+
+        parent = m.activateButton.getParent()
+        if parent <> invalid
+            m.buttonGroup.removeChild(m.activateButton)
+        end if
+        m.activateButton.focusable = false
+    else
+        parent = m.activateButton.getParent()
+        if parent = invalid
+            m.buttonGroup.insertChild(m.activateButton, 0)
+        end if
+        m.activateButton.focusable = true
+    end if
+end function

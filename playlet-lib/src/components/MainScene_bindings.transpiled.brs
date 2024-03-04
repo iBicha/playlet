@@ -24,15 +24,20 @@ function InitializeBindings()
             "SearchHistory": {
                 "preferences": "../Preferences"
             }, 
+            "Profiles": {
+                "invidious": "../Invidious"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 
-                "preferences": "../Preferences"
+                "preferences": "../Preferences", 
+                "profiles": "../Profiles"
             }, 
             "WebServer": {
                 "appController": "/AppController", 
                 "applicationInfo": "../ApplicationInfo", 
                 "invidious": "../Invidious", 
+                "profiles": "../Profiles", 
                 "preferences": "../Preferences", 
                 "videoQueue": "../VideoQueue", 
                 "bookmarks": "../Bookmarks", 

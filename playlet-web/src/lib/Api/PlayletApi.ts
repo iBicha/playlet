@@ -45,8 +45,17 @@ export class PlayletApi {
         return await response;
     }
 
-    static async logout() {
-        await fetch(`${PlayletApi.host()}/invidious/logout`);
+    static async getProfiles() {
+        const response = await fetch(`${PlayletApi.host()}/api/profiles`);
+        return await response.json();
+    }
+
+    static async activateProfile(profileId) {
+        await this.postJson(`${PlayletApi.host()}/api/profiles/activate`, { id: profileId });
+    }
+
+    static async logout(profileId) {
+        return await fetch(`${PlayletApi.host()}/api/profiles?id=${profileId}`, { method: "DELETE" });
     }
 
     static async playVideo(args) {
