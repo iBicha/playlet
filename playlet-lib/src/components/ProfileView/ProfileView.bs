@@ -8,6 +8,7 @@ function Init()
     m.activateButton = m.top.findNode("activateButton")
     m.logoutButton = m.top.findNode("logoutButton")
     m.closeButton = m.top.findNode("closeButton")
+    m.buttonGroup = m.top.findNode("buttonGroup")
 
     DisposableObserveField(m.activateButton, "buttonSelected", FuncName(Activate))
     DisposableObserveField(m.logoutButton, "buttonSelected", FuncName(Logout))
@@ -141,14 +142,20 @@ function UpdateActivateButton() as void
 
     isSelected = content.isSelected
     if isSelected
-        m.activateButton.text = "In Use"
-        m.activateButton.focusable = false
-
         if m.activateButton.hasFocus()
             NodeSetFocus(m.logoutButton, true)
         end if
+
+        parent = m.activateButton.getParent()
+        if parent <> invalid
+            m.buttonGroup.removeChild(m.activateButton)
+        end if
+        m.activateButton.focusable = false
     else
-        m.activateButton.text = "Activate"
+        parent = m.activateButton.getParent()
+        if parent = invalid
+            m.buttonGroup.insertChild(m.activateButton, 0)
+        end if
         m.activateButton.focusable = true
     end if
 end function
