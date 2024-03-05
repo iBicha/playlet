@@ -257,9 +257,9 @@
   }
 </script>
 
-<!-- Hide rows that are loaded but have no videos. Typically a 
-     disabled feed (like popular) or unauthenticated. 
-     TODO:P1 show action nodes (action to login)
+<!-- 
+  Hide rows that are loaded but have no videos. Typically a 
+  disabled feed (like popular) or unauthenticated. 
 -->
 {#if feedLoadState !== FeedLoadState.Loaded || videos.length !== 0}
   <div class="text-lg font-semibold ml-4">
