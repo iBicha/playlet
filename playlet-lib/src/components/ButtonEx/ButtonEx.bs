@@ -1,0 +1,147 @@
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/MathUtils.bs"
+
+function Init()
+    m.backgroundNode = m.top.findNode("background")
+    m.labelNode = m.top.findNode("label")
+    m.iconNode = m.top.findNode("icon")
+    m.anchorNode = m.top.findNode("anchor")
+    m.focusAnimation = m.top.findNode("focusAnimation")
+    m.normalFont = m.top.findNode("normalFont")
+    m.boldFont = m.top.findNode("boldFont")
+
+    DoLayout()
+    OnDisabledChange()
+    m.top.observeField("focusedChild", FuncName(OnFocusedChild))
+end function
+
+function DoLayout() as void
+    minWidth = m.top.minWidth
+    height = m.top.height
+    padding = m.top.padding
+    textVisible = m.top.textVisible
+    iconVisible = m.top.iconVisible
+
+    if not textVisible and not iconVisible
+        m.top.width = minWidth
+        return
+    end if
+
+    contentWidth = 0
+    iconWidth = 0
+    iconHeight = 0
+    textWidth = 0
+    textHeight = 0
+    iconTextSpacing = 0
+
+    if iconVisible
+        iconWidth = m.top.iconWidth
+        iconHeight = m.top.iconHeight
+        contentWidth += iconWidth
+    end if
+
+    if textVisible
+        labelRect = m.labelNode.boundingRect()
+        textWidth = labelRect.width
+        textHeight = labelRect.height
+        contentWidth += textWidth
+    end if
+
+    if iconVisible and textVisible
+        iconTextSpacing = m.top.iconTextSpacing
+        contentWidth += iconTextSpacing
+    end if
+
+    contentWidth += padding[0] + padding[1]
+
+    width = MathUtils.Max(contentWidth, minWidth)
+    m.top.width = width
+
+    if iconVisible
+        x = (width - contentWidth) / 2 + padding[0]
+        y = (height - iconHeight) / 2
+        m.iconNode.translation = [x, y]
+    end if
+
+    if textVisible
+        x = (width - contentWidth) / 2 + padding[0] + iconWidth + iconTextSpacing
+        y = (height - textHeight) / 2
+        m.labelNode.translation = [x, y]
+    end if
+
+    OnAnchorChange()
+end function
+
+function OnAnchorChange()
+    width = m.top.width
+    height = m.top.height
+    anchor = m.top.anchor
+
+    m.anchorNode.translation = [-width * anchor[0], -height * anchor[1]]
+end function
+
+function OnDisabledChange()
+    disabled = m.top.disabled
+
+    if disabled
+        if m.top.textVisible
+            m.labelNode.color = m.top.disabledTextColor
+            m.labelNode.font = m.normalFont
+        end if
+        if m.top.iconVisible
+            m.iconNode.blendColor = m.top.disabledIconColor
+        end if
+        m.backgroundNode.blendColor = m.top.disabledBackgroundColor
+    else
+        OnButtonFocused()
+    end if
+    m.top.focusable = not disabled
+end function
+
+function OnFocusedChild()
+    m.top.buttonFocused = m.top.hasFocus()
+end function
+
+function OnButtonFocused()
+    buttonFocused = m.top.buttonFocused
+    textVisible = m.top.textVisible
+    iconVisible = m.top.iconVisible
+
+    if buttonFocused
+        if textVisible
+            m.labelNode.color = m.top.focusedTextColor
+            m.labelNode.font = m.boldFont
+        end if
+        if iconVisible
+            m.iconNode.blendColor = m.top.focusedIconColor
+        end if
+        m.backgroundNode.blendColor = m.top.focusedBackgroundColor
+
+        m.focusAnimation.control = "start"
+    else
+        if textVisible
+            m.labelNode.color = m.top.textColor
+            m.labelNode.font = m.normalFont
+        end if
+        if iconVisible
+            m.iconNode.blendColor = m.top.iconColor
+        end if
+        m.backgroundNode.blendColor = m.top.backgroundColor
+    end if
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+
+    if key = "OK"
+        disabled = m.top.disabled
+        if not disabled
+            m.top.buttonSelected = true
+        end if
+        return true
+    end if
+
+    return false
+end function
