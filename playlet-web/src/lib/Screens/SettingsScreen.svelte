@@ -1,5 +1,4 @@
 <script lang="ts">
-  import DevSettings from "lib/Screens/Settings/DevSettings.svelte";
   import SettingsNode from "lib/Screens/Settings/SettingsNode.svelte";
   import { preferencesModelStore } from "lib/Stores";
 
@@ -15,6 +14,4 @@
       {/if}
     {/if}
   {/each}
-  <div class="divider" />
-  <DevSettings />
 </div>

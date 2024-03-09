@@ -1,0 +1,46 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function VideoContentTaskDev(input as object) as object
+    contentNode = input.content
+    invidiousNode = input.invidious
+
+    if StringUtils.IsNullOrEmpty(contentNode.videoId)
+        throw "Can't load video information: videoId is missing"
+    end if
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    response = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    metadata = response.Json()
+
+    if not response.IsSuccess() or metadata = invalid
+        return {
+            success: false
+            error: response.ErrorMessage()
+        }
+    end if
+
+    contentNode.title = metadata.title
+    contentNode.secondaryTitle = metadata.author
+    contentNode.live = metadata.liveNow
+
+    streamUrls = [`http://127.0.0.1:8888/api/dash?v=${metadata.videoId}`]
+    contentNode.url = streamUrls[0]
+
+    contentNode.addFields({
+        metadata: metadata
+        ' StreamUrls is taken
+        playletStreamUrls: streamUrls
+        playletStreamUrlIndex: 0
+    })
+
+    return {
+        success: true
+    }
+end function
