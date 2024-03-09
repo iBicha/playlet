@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import { onMount } from "svelte";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore } from "lib/Stores";
@@ -76,14 +76,6 @@
     }
   }
 </script>
-
-<div class="m-5">
-  <div class="text-2xl">Developer settings</div>
-  <div class="text-xs text-gray-500">
-    Options for Playlet developers. Do not change unless you "know what you're
-    doing"™
-  </div>
-</div>
 
 <div class="m-5">
   <div class="text-lg">Playlet Library version</div>
