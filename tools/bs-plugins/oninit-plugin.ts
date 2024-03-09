@@ -207,7 +207,7 @@ export class OnInitPlugin implements CompilerPlugin {
             return 0;
         }
 
-        return args[0].valueOf() as number;
+        return args[0]!.valueOf() as number;
     }
 }
 
