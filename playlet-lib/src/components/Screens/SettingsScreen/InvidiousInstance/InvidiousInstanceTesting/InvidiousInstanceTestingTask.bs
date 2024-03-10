@@ -16,7 +16,7 @@ function InvidiousInstanceTestingTask(input as object) as object
     content = PrepareTests()
     listNode.content = content
 
-    RunTests(instance, content)
+    RunTests(instance, content, m.top.cancellation)
 
     return invalid
 end function
@@ -47,14 +47,14 @@ function CreateTestNode(title as string, func as function) as object
     return testNode
 end function
 
-function RunTests(instance as string, content as object) as void
+function RunTests(instance as string, content as object, cancellation as object) as void
     testNodes = content.getChildren(-1, 0)
 
     timer = CreateObject("roTimespan")
 
     for each testNode in testNodes
         timer.Mark()
-        m[testNode.func](instance, testNode)
+        m[testNode.func](instance, testNode, cancellation)
 
         testNode.duration = timer.TotalMilliseconds()
         testNode.title = `${testNode.title} (${testNode.duration}ms)`
@@ -69,7 +69,7 @@ function RunTests(instance as string, content as object) as void
     end for
 end function
 
-function IsValidUrl(instance as string, testNode as object) as void
+function IsValidUrl(instance as string, testNode as object, cancellation as object) as void
     try
         if not instance.StartsWith("http://") and not instance.StartsWith("https://")
             testNode.state = "failed"
@@ -90,10 +90,10 @@ function IsValidUrl(instance as string, testNode as object) as void
     end try
 end function
 
-function IsReachable(instance as string, testNode as object) as void
+function IsReachable(instance as string, testNode as object, cancellation as object) as void
     try
         url = `${instance}${Invidious.STATS_ENDPOINT}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
         if not response.IsSuccess()
             testNode.state = "failed"
             testNode.details = response.ErrorMessage()
@@ -137,11 +137,11 @@ function IsReachable(instance as string, testNode as object) as void
 
 end function
 
-function CanFetchVideoDetails(instance as string, testNode as object) as void
+function CanFetchVideoDetails(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -171,11 +171,11 @@ function CanFetchVideoDetails(instance as string, testNode as object) as void
     end try
 end function
 
-function CanFetchVideoComments(instance as string, testNode as object) as void
+function CanFetchVideoComments(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}/api/v1/comments/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -212,12 +212,12 @@ function CanFetchVideoComments(instance as string, testNode as object) as void
     end try
 end function
 
-function CanFetchVideoCaptions(instance as string, testNode as object) as void
+function CanFetchVideoCaptions(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         label = "English"
         url = `${instance}/api/v1/captions/${videoId}?label=${label}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -254,11 +254,11 @@ function CanFetchVideoCaptions(instance as string, testNode as object) as void
     end try
 end function
 
-function CanFetchVideoThumbails(instance as string, testNode as object) as void
+function CanFetchVideoThumbails(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -290,7 +290,7 @@ function CanFetchVideoThumbails(instance as string, testNode as object) as void
 
         ' Note: we could do a HEAD request, but Invidious returns 200 even for invalid thumbnails
         ' To make sure we don't get a 200 for an invalid thumbnail, we do a GET request instead
-        response = HttpClient.Get(thumbnail).NoCache().Await()
+        response = HttpClient.Get(thumbnail).NoCache().Cancellation(cancellation).Await()
         if not response.IsSuccess()
             testNode.state = "failed"
             testNode.details = `${thumbnail} is not reachable\n${response.ErrorMessage(false)}`
