@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Subscriber count in the channel page
 
+### Fixed
+
+- A bug where videos that did not premiere yet would error with a playback error
+- A bug where a playback error dialog is dismissed too fast before playing the next video
+
 ## [0.21.0] - 2024-03-07
 
 ### Added
