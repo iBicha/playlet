@@ -99,6 +99,69 @@ namespace Http
             return true
         end function
 
+        ' A shortcut to play a video using a /watch endpoint
+        @get("/watch")
+        function PlayWatch(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            videoId = request.query.v
+            playlistId = request.query.list
+            playlistIndex = request.query.index
+
+            hasValidVideo = not StringUtils.IsNullOrEmpty(videoId)
+            hasValidPlaylist = not StringUtils.IsNullOrEmpty(playlistId) and not StringUtils.IsNullOrEmpty(playlistIndex)
+            if not hasValidVideo and not hasValidPlaylist
+                response.Default(400, `Missing video id ("v") or playlist id and index ("list" and "index") in query`)
+                return true
+            end if
+
+            instance = m.invidiousService.GetInstance()
+
+            if hasValidPlaylist
+                payload = {
+                    "type": "playlist"
+                    "playlistId": playlistId
+                }
+
+                contentNode = InvidiousContent.ToRowCellContentNode(payload, instance)
+                playlistIndex = MathUtils.Max(0, ValidInt(playlistIndex.toInt()) - 1)
+
+                ' TODO:P1 handle playlist with timestamp
+                ' TODO:P1 videoId should take precedence over index
+                m.videoQueueNode.playPlaylist = {
+                    playlistNode: contentNode
+                    playlistIndex: playlistIndex
+                }
+
+                response.Default(200, "Now playing playlist - " + playlistId)
+                return true
+            else if hasValidVideo
+                timestamp = request.query.t
+                if IsString(timestamp)
+                    if timestamp.endsWith("s")
+                        timestamp = timestamp.left(timestamp.Len() - 1)
+                    end if
+                    timestamp = timestamp.toInt()
+                end if
+                timestamp = ValidInt(timestamp)
+
+                payload = {
+                    "type": "video"
+                    "videoId": videoId
+                    "timestamp": timestamp
+                }
+
+                contentNode = InvidiousContent.ToRowCellContentNode(payload, instance)
+                m.videoQueueNode.playVideo = contentNode
+
+                response.Default(200, "Now playing video - " + videoId)
+                return true
+            end if
+
+            return false
+        end function
+
         @delete("/api/queue")
         function ClearQueue(context as object) as boolean
             response = context.response

@@ -114,7 +114,7 @@ export class LoggerPlugin implements CompilerPlugin {
                         event.editor.addToArray(args, 0, sourceExpression);
                     } else {
                         const fileName = path.basename(event.file.pkgPath);
-                        const line = statement.range.start.line;
+                        const line = statement.range!.start.line;
                         const t = createToken(TokenKind.StringLiteral, `\"[${fileName}:${line}]\"`, statement.expression.range);
                         let sourceExpression = new SourceLiteralExpression(t);
                         event.editor.addToArray(args, 0, sourceExpression);

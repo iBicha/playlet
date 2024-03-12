@@ -2,10 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- Context menu sort options for channel videos and playlists
+
+### Fixed
+
+- A bug where instance testing is not immediately cancelled when the testing page is closed
+
+## [0.21.2] - 2024-03-10
+
+### Fixed
+
+- Deeplinking required for certification
+
+## [0.21.1] - 2024-03-09
+
+### Added
+
+- Subscriber count in the channel page
+
+### Fixed
+
+- A bug where videos that did not premiere yet would error with a playback error
+- A bug where a playback error dialog is dismissed too fast before playing the next video
+
+## [0.21.0] - 2024-03-07
 
 ### Added
 

@@ -1,0 +1,65 @@
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busySpinnerPoster = m.busySpinner.poster
+
+    m.busySpinnerPoster.uri = "pkg:/images/spinner.png"
+
+    m.top.observeField("width", FuncName(OnSizeChange))
+    m.top.observeField("height", FuncName(OnSizeChange))
+    OnSizeChange()
+end function
+
+function OnSizeChange()
+    width = m.top.width
+    height = m.top.height
+
+    m.busySpinnerPoster.width = width / 2
+    m.busySpinnerPoster.height = height / 2
+    m.busySpinner.translation = [width / 4, height / 4]
+end function
+
+function OnTextChange() as void
+    if m.qrCodeGenTask <> invalid
+        m.qrCodeGenTask.cancel = true
+    end if
+
+    text = m.top.text
+
+    width = m.top.loadWidth
+    if width = 0
+        width = m.top.width
+    end if
+
+    m.top.uri = ""
+
+    if StringUtils.IsNullOrEmpty(text)
+        m.busySpinner.control = "stop"
+        m.busySpinner.visible = false
+        return
+    end if
+
+    m.busySpinnerPoster.rotation = 0
+    m.busySpinner.visible = true
+    m.busySpinner.control = "start"
+
+    m.qrCodeGenTask = AsyncTask.Start(Tasks.GenerateQrCodeTask, {
+        poster: m.top
+        text: text
+        size: width
+        padding: m.top.padding
+    }, OnGenerateQrCodeTaskResult)
+end function
+
+function OnGenerateQrCodeTaskResult(output as object) as void
+    if output.cancelled
+        return
+    end if
+
+    m.busySpinner.control = "stop"
+    m.busySpinner.visible = false
+end function
