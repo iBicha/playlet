@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Context menu sort options for channel videos and playlists
+
 ### Fixed
 
 - A bug where instance testing is not immediately cancelled when the testing page is closed
