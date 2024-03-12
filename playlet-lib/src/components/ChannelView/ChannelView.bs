@@ -1,3 +1,5 @@
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
@@ -27,6 +29,7 @@ function Init()
     m.authorId = ""
 
     InitializeTabs()
+    InitializeSortOptions()
 end function
 
 function OnNodeready()
@@ -173,7 +176,7 @@ end function
 function InitializeTabs()
     m.tabs = {
         videos: function(authorId as string, author as string) as object
-            return CreateChannelFeed("Latest videos", "channel_videos", authorId, author)
+            return CreateChannelFeed("Videos", "channel_videos", authorId, author)
         end function
         shorts: function(authorId as string, author as string) as object
             return CreateChannelFeed("Shorts", "channel_shorts", authorId, author)
@@ -187,6 +190,28 @@ function InitializeTabs()
         playlists: function(authorId as string, author as string) as object
             return CreateChannelFeed("Playlists", "channel_playlists", authorId, author)
         end function
+    }
+end function
+
+function InitializeSortOptions()
+    m.sortOptions = {
+        "channel_videos": [{
+            "id": "newest"
+            "title": "Latest"
+        }, {
+            "id": "popular"
+            "title": "Popular"
+        }, {
+            "id": "oldest"
+            "title": "Oldest"
+        }]
+        "channel_playlists": [{
+            "id": "newest"
+            "title": "Date added (newest)"
+        }, {
+            "id": "last"
+            "title": "Last video added"
+        }]
     }
 end function
 
@@ -209,7 +234,32 @@ function GetContextMenuOptionsForItem(video as object) as object
     if StringUtils.IsNullOrEmpty(m.top.authorId)
         return []
     end if
-    return m.bookmarks@.GetMenuForChannel(m.top.content)
+    options = m.bookmarks@.GetMenuForChannel(m.top.content)
+    options.Append(GetSortingContextMenuOptionsForItem(video))
+    return options
+end function
+
+function GetSortingContextMenuOptionsForItem(video as object) as object
+    feedContentNode = video.getParent()
+    if feedContentNode = invalid or not feedContentNode.hasField("feedSources")
+        return []
+    end if
+
+    feedSources = feedContentNode.feedSources
+    if feedSources = invalid or feedSources.Count() = 0
+        return []
+    end if
+
+    feedSource = feedSources[0]
+    endpoint = feedSource.endpoint
+    if not m.sortOptions.DoesExist(endpoint)
+        return []
+    end if
+
+    title = `Sort ${feedContentNode.title} by`
+    sortOptions = m.sortOptions[endpoint]
+
+    return [ContextMenuUtils.CreateOption(title + "...", m.top, "ShowSortDialog", [title, sortOptions, feedContentNode])]
 end function
 
 function IsLoggedIn() as boolean
@@ -253,4 +303,52 @@ function OnSubscriptionChanged()
     else
         m.subscribeButton.text = "Subscribe"
     end if
+end function
+
+function ShowSortDialog(title as string, sortOptions as object, feedContentNode as object)
+    buttons = []
+    for i = 0 to sortOptions.Count() - 1
+        buttons.Push(sortOptions[i].title)
+    end for
+
+    dialog = DialogUtils.ShowDialogButtons("", title, buttons)
+    dialog.addFields({
+        "feedContentNode": feedContentNode
+        "sortOptions": sortOptions
+    })
+    dialog.observeField("buttonSelected", FuncName(OnSortDialogResult), ["buttonSelected"])
+end function
+
+function OnSortDialogResult(event as object) as void
+    dialog = event.getRoSGNode()
+    sortOptions = dialog.sortOptions
+    buttonIndex = event.GetData()
+
+    if not IsInt(buttonIndex) or buttonIndex < 0 or buttonIndex >= sortOptions.Count()
+        return
+    end if
+
+    selected = sortOptions[buttonIndex]
+
+    feedContentNode = dialog.feedContentNode
+    feedSources = feedContentNode.feedSources
+    if feedSources = invalid or feedSources.Count() = 0
+        return
+    end if
+    selectedFeedSource = feedSources[0]
+
+    currentFeeds = m.rowList.feeds
+    for i = 0 to currentFeeds.Count() - 1
+        feed = currentFeeds[i]
+        feedSource = feed.feedSources[0]
+        if feedSource.id = selectedFeedSource.id
+            if feedSource.queryParams = invalid
+                feedSource.queryParams = {}
+            end if
+
+            feedSource.queryParams["sort_by"] = selected.id
+            m.rowList.feeds = currentFeeds
+            return
+        end if
+    end for
 end function
