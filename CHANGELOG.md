@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Context menu sort options for channel videos and playlists
 
+### Changed
+
+- Colors to be more broadcast safe
+
 ### Fixed
 
 - A bug where instance testing is not immediately cancelled when the testing page is closed
