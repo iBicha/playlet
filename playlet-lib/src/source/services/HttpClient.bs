@@ -1,4 +1,9 @@
+' DISABLE_CACHE will disable all caching for all requests.
+' Only use this for debugging purposes.
 #const DISABLE_CACHE = false
+' NETWORK_THROTTLE will add a random delay to all requests to simulate network latency.
+' Only use this for debugging purposes.
+#const NETWORK_THROTTLE = false
 
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
@@ -297,7 +302,9 @@ namespace HttpClient
             end if
 
             #if DISABLE_CACHE
-                m._noCache = true
+                #if DEBUG
+                    m._noCache = true
+                #end if
             #end if
 
             if m._noCache <> true
@@ -431,6 +438,12 @@ namespace HttpClient
             end if
 
             if m._sent <> true or m._cache <> invalid
+                #if NETWORK_THROTTLE
+                    #if DEBUG
+                        sleep(1000 + Rnd(2000))
+                    #end if
+                #end if
+
                 return new HttpResponse(m, invalid)
             end if
 
@@ -450,6 +463,12 @@ namespace HttpClient
             end if
 
             msg = wait(m._timeoutSeconds * 1000, messagePort)
+
+            #if NETWORK_THROTTLE
+                #if DEBUG
+                    sleep(1000 + Rnd(2000))
+                #end if
+            #end if
 
             if m._cancellation <> invalid
                 if m._cancellation.node <> invalid and m._cancellation.field <> invalid

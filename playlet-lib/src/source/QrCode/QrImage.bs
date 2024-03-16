@@ -1,3 +1,5 @@
+' DISABLE_CACHE will force the generation of the QRCode every time.
+' Only use this for debugging purposes.
 #const DISABLE_CACHE = false
 
 import "pkg:/source/utils/CryptoUtils.bs"
@@ -9,12 +11,15 @@ namespace QrCode
         function Generate(text as string, size as integer, padding as integer, mode = QrCode.QrMode.Byte as QrCode.QrMode) as string
             fileName = m.GetFileName(text, mode, size, padding)
 
-            #if DISABLE_CACHE
+            #if DEBUG
             #else
-                fs = CreateObject("roFileSystem")
-                if fs.exists(fileName)
-                    return fileName
-                end if
+                #if DISABLE_CACHE
+                #else
+                    fs = CreateObject("roFileSystem")
+                    if fs.exists(fileName)
+                        return fileName
+                    end if
+                #end if
             #end if
 
             qr = new QrCode.QRCode()
