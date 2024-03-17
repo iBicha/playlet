@@ -91,6 +91,22 @@
             <translation>Populaire</translation>
         </message>
         <message>
+            <source>Videos</source>
+            <translation>Vidéos</translation>
+        </message>
+        <message>
+            <source>Shorts</source>
+            <translation>Shorts</translation>
+        </message>
+        <message>
+            <source>Live</source>
+            <translation>En direct</translation>
+        </message>
+        <message>
+            <source>Podcasts</source>
+            <translation>Podcasts</translation>
+        </message>
+        <message>
             <source>Edit</source>
             <translation>Modifier</translation>
         </message>
@@ -101,6 +117,14 @@
         <message>
             <source>Test instance</source>
             <translation>Tester l'instance</translation>
+        </message>
+        <message>
+            <source>Subscribe</source>
+            <translation>S'abonner</translation>
+        </message>
+        <message>
+            <source>Unsubscribe</source>
+            <translation>Se désabonner</translation>
         </message>
     </context>
 </TS>

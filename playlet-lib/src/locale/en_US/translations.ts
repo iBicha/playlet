@@ -90,6 +90,22 @@
             <translation>Popular</translation>
         </message>
         <message>
+            <source>Videos</source>
+            <translation>Videos</translation>
+        </message>
+        <message>
+            <source>Shorts</source>
+            <translation>Shorts</translation>
+        </message>
+        <message>
+            <source>Live</source>
+            <translation>Live</translation>
+        </message>
+        <message>
+            <source>Podcasts</source>
+            <translation>Podcasts</translation>
+        </message>
+        <message>
             <source>Edit</source>
             <translation>Edit</translation>
         </message>
@@ -100,6 +116,14 @@
         <message>
             <source>Test instance</source>
             <translation>Test instance</translation>
+        </message>
+        <message>
+            <source>Subscribe</source>
+            <translation>Subscribe</translation>
+        </message>
+        <message>
+            <source>Unsubscribe</source>
+            <translation>Unsubscribe</translation>
         </message>
     </context>
 </TS>
