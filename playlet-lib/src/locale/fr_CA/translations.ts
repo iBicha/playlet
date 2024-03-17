@@ -34,5 +34,73 @@
             <source>Info</source>
             <translation>Info</translation>
         </message>
+        <message>
+            <source>Activate</source>
+            <translation>Activer</translation>
+        </message>
+        <message>
+            <source>In Use</source>
+            <translation>Actif</translation>
+        </message>
+        <message>
+            <source>Login</source>
+            <translation>Se connecter</translation>
+        </message>
+        <message>
+            <source>Logout</source>
+            <translation>Se déconnecter</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>Fermer</translation>
+        </message>
+        <message>
+            <source>Filters</source>
+            <translation>Filtres</translation>
+        </message>
+        <message>
+            <source>Subscriptions</source>
+            <translation>Abonnements</translation>
+        </message>
+        <message>
+            <source>Playlists</source>
+            <translation>Playlists</translation>
+        </message>
+        <message>
+            <source>Watch history</source>
+            <translation>Historique</translation>
+        </message>
+        <message>
+            <source>Trending</source>
+            <translation>Tendances</translation>
+        </message>
+        <message>
+            <source>Trending - Movies</source>
+            <translation>Tendances - Films</translation>
+        </message>
+        <message>
+            <source>Trending - Music</source>
+            <translation>Tendances - Musique</translation>
+        </message>
+        <message>
+            <source>Trending - Gaming</source>
+            <translation>Tendances - Jeux vidéo</translation>
+        </message>
+        <message>
+            <source>Popular</source>
+            <translation>Populaire</translation>
+        </message>
+        <message>
+            <source>Edit</source>
+            <translation>Modifier</translation>
+        </message>
+        <message>
+            <source>Save</source>
+            <translation>Enregistrer</translation>
+        </message>
+        <message>
+            <source>Test instance</source>
+            <translation>Tester l'instance</translation>
+        </message>
     </context>
 </TS>
