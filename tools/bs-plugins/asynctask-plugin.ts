@@ -8,6 +8,7 @@ import {
     createVisitor,
     Program,
     FunctionStatement,
+    DiagnosticSeverity,
 } from 'brighterscript';
 
 export class AsyncTaskPlugin implements CompilerPlugin {
@@ -43,7 +44,7 @@ export class AsyncTaskPlugin implements CompilerPlugin {
                             file: file,
                             range: func.range,
                             message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
-                            severity: 1,
+                            severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
                         }]);
                     }
@@ -57,7 +58,7 @@ export class AsyncTaskPlugin implements CompilerPlugin {
                             file: file,
                             range: func.range,
                             message: `AsyncTaskPlugin: file ${bsFile} already exists`,
-                            severity: 1,
+                            severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
                         }]);
                     }

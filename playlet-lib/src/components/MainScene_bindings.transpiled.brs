@@ -40,7 +40,7 @@ function InitializeBindings()
                 "profiles": "../Profiles", 
                 "preferences": "../Preferences", 
                 "videoQueue": "../VideoQueue", 
-                "bookmarks": "../Bookmarks", 
+                "bookmarksService": "../BookmarksService", 
                 "loungeService": "../LoungeService"
             }, 
             "DialServer": {

@@ -16,11 +16,10 @@
             <source>Home</source>
             <translation>Home</translation>
         </message>
-        <!-- Bookmarks crashes the app -->
-        <!-- <message>
+        <message>
             <source>Bookmarks</source>
             <translation>Bookmarks</translation>
-        </message> -->
+        </message>
         <message>
             <source>Settings</source>
             <translation>Settings</translation>
@@ -67,7 +66,7 @@
         </message>
         <message>
             <source>Watch history</source>
-            <translation>Watch History</translation>
+            <translation>Watch history</translation>
         </message>
         <message>
             <source>Trending</source>

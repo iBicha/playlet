@@ -16,11 +16,10 @@
             <source>Home</source>
             <translation>Accueil</translation>
         </message>
-        <!-- Bookmarks crashes the app -->
-        <!-- <message>
+        <message>
             <source>Bookmarks</source>
             <translation>Favoris</translation>
-        </message> -->
+        </message>
         <message>
             <source>Settings</source>
             <translation>Paramètres</translation>
