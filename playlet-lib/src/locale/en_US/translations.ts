@@ -124,5 +124,46 @@
             <source>Unsubscribe</source>
             <translation>Unsubscribe</translation>
         </message>
+        <message>
+            <source>Login to Invidious</source>
+            <translation>Login to Invidious</translation>
+        </message>
+        <message>
+            <source>IP address not available</source>
+            <translation>IP address not available</translation>
+        </message>
+        <message>
+            <source>Scan the QR code</source>
+            <translation>Scan the QR code</translation>
+        </message>
+        <message>
+            <source>Login to Invidious in order to view Subscriptions, Playlists, and use the Watch history.</source>
+            <translation>Login to Invidious in order to view Subscriptions, Playlists, and use the Watch history.</translation>
+        </message>
+        <message>
+            <source>Please note that an Invidious account is different from a YouTube account.</source>
+            <translation>Please note that an Invidious account is different from a YouTube account.</translation>
+        </message>
+        <message>
+            <source>Invidious custom instance</source>
+            <translation>Invidious custom instance</translation>
+        </message>
+        <message>
+            <source>Or</source>
+            <translation>Or</translation>
+        </message>
+        <message>
+            <source>Invidious public instances</source>
+            <translation>Invidious public instances</translation>
+        </message>
+        <message>
+            <source>Move up</source>
+            <translation>Move up</translation>
+        </message>
+        <message>
+            <source>Move down</source>
+            <translation>Move down</translation>
+        </message>
+
     </context>
 </TS>

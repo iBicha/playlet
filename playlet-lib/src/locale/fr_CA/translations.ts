@@ -27,7 +27,7 @@
         <message>
             <source>Remote</source>
             <comment>Télécommande is too long for the UI</comment>
-            <translation>Remote</translation>
+            <translation>Commande</translation>
         </message>
         <message>
             <source>Info</source>
@@ -124,6 +124,46 @@
         <message>
             <source>Unsubscribe</source>
             <translation>Se désabonner</translation>
+        </message>
+        <message>
+            <source>Login to Invidious</source>
+            <translation>Se connecter à Invidious</translation>
+        </message>
+        <message>
+            <source>IP address not available</source>
+            <translation>Adresse IP non disponible</translation>
+        </message>
+        <message>
+            <source>Scan the QR code</source>
+            <translation>Scannez le code QR</translation>
+        </message>
+        <message>
+            <source>Login to Invidious in order to view Subscriptions, Playlists, and use the Watch history.</source>
+            <translation>Connectez-vous à Invidious pour consulter les abonnements, les playlists et utiliser l'historique de visionnage.</translation>
+        </message>
+        <message>
+            <source>Please note that an Invidious account is different from a YouTube account.</source>
+            <translation>Veuillez noter qu'un compte Invidious est différent d'un compte YouTube.</translation>
+        </message>
+        <message>
+            <source>Invidious custom instance</source>
+            <translation>Instance personnalisée d'Invidious</translation>
+        </message>
+        <message>
+            <source>Or</source>
+            <translation>Ou</translation>
+        </message>
+        <message>
+            <source>Invidious public instances</source>
+            <translation>Instances publiques d'Invidious</translation>
+        </message>
+        <message>
+            <source>Move up</source>
+            <translation>Monter</translation>
+        </message>
+        <message>
+            <source>Move down</source>
+            <translation>Descendre</translation>
         </message>
     </context>
 </TS>

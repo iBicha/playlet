@@ -5,7 +5,7 @@
 // 3. All translations from different languages have a corresponding key in the locale enum
 // 4. Xml components do not have values that can be translated by accident
 //   - an accidental translation can be a translated node id that's not supposed to be translated
-//   - For that reason, only the "text" and "title" attributes are allowed to have localized values
+//   - For that reason, only certain attributes (like "text" and "title") are allowed to have localized values
 
 import {
     BrsFile,
@@ -25,6 +25,8 @@ import { join as pathJoin } from "path";
 import * as xml2js from 'xml2js';
 import { globSync } from 'glob';
 import { SGNode } from "brighterscript/dist/parser/SGTypes";
+
+const allowedXmlAttributes = ["text", "title", "primaryTitle"];
 
 export class LocaleValidationPlugin implements CompilerPlugin {
     public name = 'LocaleValidationPlugin';
@@ -63,7 +65,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                 const value = field.value;
                 if (value && localeValues.includes(value)) {
                     const id = field.id;
-                    if (id !== "text" && id !== "title") {
+                    if (!allowedXmlAttributes.includes(id)) {
                         file.addDiagnostics([{
                             file: file,
                             range: field.range!,
@@ -88,7 +90,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             const value = attribute.value.text;
             if (value && localeValues.includes(value)) {
                 const key = attribute.key.text;
-                if (key !== "text" && key !== "title") {
+                if (!allowedXmlAttributes.includes(key)) {
                     file.addDiagnostics([{
                         file: file,
                         range: attribute.value.range!,
