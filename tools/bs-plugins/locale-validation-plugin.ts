@@ -1,4 +1,3 @@
-// TODO:P0 document the plugin in plugins.md
 // This plugin validates locale files. It ensures that:
 // 1. The English translations match the keys (key = value)
 // 2. All keys in the locale enum have a translation
