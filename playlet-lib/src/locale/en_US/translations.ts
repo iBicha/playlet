@@ -33,6 +33,10 @@
             <translation>Info</translation>
         </message>
         <message>
+            <source>OK</source>
+            <translation>OK</translation>
+        </message>
+        <message>
             <source>Activate</source>
             <translation>Activate</translation>
         </message>
@@ -51,6 +55,14 @@
         <message>
             <source>Close</source>
             <translation>Close</translation>
+        </message>
+        <message>
+            <source>Exit</source>
+            <translation>Exit</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Cancel</translation>
         </message>
         <message>
             <source>Filters</source>
@@ -164,6 +176,41 @@
             <source>Move down</source>
             <translation>Move down</translation>
         </message>
-
+        <message>
+            <source>name</source>
+            <translation>name</translation>
+        </message>
+        <message>
+            <source>version</source>
+            <translation>version</translation>
+        </message>
+        <message>
+            <source>users</source>
+            <translation>users</translation>
+        </message>
+        <message>
+            <source>signup</source>
+            <translation>signup</translation>
+        </message>
+        <message>
+            <source>location</source>
+            <translation>location</translation>
+        </message>
+        <message>
+            <source>health</source>
+            <translation>health</translation>
+        </message>
+        <message>
+            <source>Yes</source>
+            <translation>Yes</translation>
+        </message>
+        <message>
+            <source>No</source>
+            <translation>No</translation>
+        </message>
+        <message>
+            <source>Refresh</source>
+            <translation>Refresh</translation>
+        </message>
     </context>
 </TS>

@@ -54,6 +54,14 @@
             <translation>Fermer</translation>
         </message>
         <message>
+            <source>Exit</source>
+            <translation>Quitter</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Annuler</translation>
+        </message>
+        <message>
             <source>Filters</source>
             <translation>Filtres</translation>
         </message>
@@ -164,6 +172,42 @@
         <message>
             <source>Move down</source>
             <translation>Descendre</translation>
+        </message>
+        <message>
+            <source>name</source>
+            <translation>nom</translation>
+        </message>
+        <message>
+            <source>version</source>
+            <translation>version</translation>
+        </message>
+        <message>
+            <source>users</source>
+            <translation>utilisateurs</translation>
+        </message>
+        <message>
+            <source>signup</source>
+            <translation>inscription</translation>
+        </message>
+        <message>
+            <source>location</source>
+            <translation>lieu</translation>
+        </message>
+        <message>
+            <source>health</source>
+            <translation>santé</translation>
+        </message>
+        <message>
+            <source>Yes</source>
+            <translation>Oui</translation>
+        </message>
+        <message>
+            <source>No</source>
+            <translation>Non</translation>
+        </message>
+        <message>
+            <source>Refresh</source>
+            <translation>Rafraîchir</translation>
         </message>
     </context>
 </TS>

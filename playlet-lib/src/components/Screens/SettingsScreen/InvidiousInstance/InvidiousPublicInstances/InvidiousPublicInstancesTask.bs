@@ -5,6 +5,7 @@ import "pkg:/source/utils/Logging.bs"
 @asynctask
 function InvidiousPublicInstancesTask(input as object) as object
     listNode = input.listNode
+    fieldWidths = input.fieldWidths
 
     if m.top.cancel
         return invalid
@@ -29,7 +30,7 @@ function InvidiousPublicInstancesTask(input as object) as object
     content = CreateObject("roSGNode", "ContentNode")
 
     for each instance in instances
-        item = CreateListItemContent(instance)
+        item = CreateListItemContent(instance, fieldWidths)
         if item = invalid
             continue for
         end if
@@ -61,7 +62,7 @@ function FilterInstances(instances as object) as object
     return filtered
 end function
 
-function CreateListItemContent(instance as object) as object
+function CreateListItemContent(instance as object, fieldWidths as object) as object
     if not IsArray(instance) or instance.Count() < 2
         LogWarn("Invalid instance:", instance)
         return invalid
@@ -72,12 +73,13 @@ function CreateListItemContent(instance as object) as object
         name: instance[0]
         version: DrillIntoObject(instance[1], ["stats", "software", "version"], "N/A")
         users: DrillIntoObject(instance[1], ["stats", "usage", "users", "total"], "N/A")
-        signup: DrillIntoObject(instance[1], ["stats", "openRegistrations"], false) ? "Yes" : "No"
+        signup: Tr(DrillIntoObject(instance[1], ["stats", "openRegistrations"], false) ? "Yes" : "No")
         ' Leave 5 spaces for the flag, just to simplify the layout
         location: `     ${DrillIntoObject(instance[1], ["region"], "N/A")}`
         flag: GetFlagUrl(DrillIntoObject(instance[1], ["flag"], ""))
         health: DrillIntoObject(instance[1], ["monitor", "30dRatio", "ratio"], "N/A")
         uri: instance[1].uri
+        fieldWidths: fieldWidths
     })
 
     return item
