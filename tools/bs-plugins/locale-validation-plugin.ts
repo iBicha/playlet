@@ -114,6 +114,21 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             return;
         }
 
+        const uniqueLocaleValues = Array.from(new Set(this.localeValues));
+        if (uniqueLocaleValues.length !== this.localeValues.length) {
+            const duplicates = this.localeValues.filter((value, index) => this.localeValues.indexOf(value) !== index);
+            program.addDiagnostics([{
+                file: this.enums[0].file,
+                range: {
+                    start: { line: 0, character: 0 },
+                    end: { line: 0, character: 0 }
+                },
+                message: `Duplicate values in locale enums: ${duplicates.join(', ')}`,
+                severity: DiagnosticSeverity.Error,
+                code: 'LOCALE_DUPLICATE_VALUES',
+            }]);
+        }
+
         this.validateEnglishTranslations(program, this.localeValues, this.enums[0].file);
 
         const rootDir = program.options.rootDir!;
