@@ -332,5 +332,189 @@
             <source>Failed</source>
             <translation>Failed</translation>
         </message>
+        <message>
+            <source>0 subscribers</source>
+            <translation>0 subscribers</translation>
+        </message>
+        <message>
+            <source>1 subscriber</source>
+            <translation>1 subscriber</translation>
+        </message>
+        <message>
+            <source>^n subscribers</source>
+            <translation>^n subscribers</translation>
+        </message>
+        <message>
+            <source>0 videos</source>
+            <translation>0 videos</translation>
+        </message>
+        <message>
+            <source>1 video</source>
+            <translation>1 video</translation>
+        </message>
+        <message>
+            <source>^n videos</source>
+            <translation>^n videos</translation>
+        </message>
+        <message>
+            <source>0 views</source>
+            <translation>0 views</translation>
+        </message>
+        <message>
+            <source>1 view</source>
+            <translation>1 view</translation>
+        </message>
+        <message>
+            <source>^n views</source>
+            <translation>^n views</translation>
+        </message>
+        <message>
+            <source>Updated 0 seconds ago</source>
+            <translation>Updated 0 seconds ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 second ago</source>
+            <translation>Updated 1 second ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n seconds ago</source>
+            <translation>Updated ^n seconds ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 minute ago</source>
+            <translation>Updated 1 minute ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n minutes ago</source>
+            <translation>Updated ^n minutes ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 hour ago</source>
+            <translation>Updated 1 hour ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n hours ago</source>
+            <translation>Updated ^n hours ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 day ago</source>
+            <translation>Updated 1 day ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n days ago</source>
+            <translation>Updated ^n days ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 week ago</source>
+            <translation>Updated 1 week ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n weeks ago</source>
+            <translation>Updated ^n weeks ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 month ago</source>
+            <translation>Updated 1 month ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n months ago</source>
+            <translation>Updated ^n months ago</translation>
+        </message>
+        <message>
+            <source>Updated 1 year ago</source>
+            <translation>Updated 1 year ago</translation>
+        </message>
+        <message>
+            <source>Updated ^n years ago</source>
+            <translation>Updated ^n years ago</translation>
+        </message>
+        <message>
+            <source>1 year ago</source>
+            <translation>1 year ago</translation>
+        </message>
+        <message>
+            <source>^n years ago</source>
+            <translation>^n years ago</translation>
+        </message>
+        <message>
+            <source>1 month ago</source>
+            <translation>1 month ago</translation>
+        </message>
+        <message>
+            <source>^n months ago</source>
+            <translation>^n months ago</translation>
+        </message>
+        <message>
+            <source>1 week ago</source>
+            <translation>1 week ago</translation>
+        </message>
+        <message>
+            <source>^n weeks ago</source>
+            <translation>^n weeks ago</translation>
+        </message>
+        <message>
+            <source>^n days ago</source>
+            <translation>^n days ago</translation>
+        </message>
+        <message>
+            <source>1 hour ago</source>
+            <translation>1 hour ago</translation>
+        </message>
+        <message>
+            <source>^n hours ago</source>
+            <translation>^n hours ago</translation>
+        </message>
+        <message>
+            <source>1 minute ago</source>
+            <translation>1 minute ago</translation>
+        </message>
+        <message>
+            <source>^n minutes ago</source>
+            <translation>^n minutes ago</translation>
+        </message>
+        <message>
+            <source>Premiering now</source>
+            <translation>Premiering now</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 second</source>
+            <translation>Premieres in 1 second</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n seconds</source>
+            <translation>Premieres in ^n seconds</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 minute</source>
+            <translation>Premieres in 1 minute</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n minutes</source>
+            <translation>Premieres in ^n minutes</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 hour</source>
+            <translation>Premieres in 1 hour</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n hours</source>
+            <translation>Premieres in ^n hours</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 day</source>
+            <translation>Premieres in 1 day</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n days</source>
+            <translation>Premieres in ^n days</translation>
+        </message>
+        <message>
+            <source>LIVE</source>
+            <translation>LIVE</translation>
+        </message>
+        <message>
+            <source>UPCOMING</source>
+            <translation>UPCOMING</translation>
+        </message>
     </context>
 </TS>

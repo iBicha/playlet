@@ -1,3 +1,4 @@
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -5,6 +6,8 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
+    m.smallestSystemFont = m.top.FindNode("smallestSystemFont")
+    m.smallestBoldSystemFont = m.top.FindNode("smallestBoldSystemFont")
 end function
 
 function OnContentSet() as void
@@ -32,23 +35,25 @@ function OnContentSet() as void
 
     m.top.thumbnailUri = content.thumbnail
 
-    m.top.durationRectVisible = false
-    m.top.upcomingRectVisible = false
-    m.top.liveRectVisible = false
-
     if ValidInt(content.lengthSeconds) <> 0
-        SetDurationText(content.lengthText)
+        ' bs:disable-next-line LINT3023
+        SetDurationLabel(content.lengthText, "#000000FF", 0.8, m.smallestSystemFont)
         m.top.durationRectVisible = true
     else
         if content.isUpcoming = true
-            m.top.upcomingRectVisible = true
+            ' bs:disable-next-line LINT3023
+            SetDurationLabel(Tr(Locale.RowCell.Upcoming), "#000000FF", 0.8, m.smallestBoldSystemFont)
+            m.top.durationRectVisible = true
         else if content.liveNow
-            m.top.liveRectVisible = true
+            SetDurationLabel(Tr(Locale.RowCell.Live), "#CC0000FF", 0.9, m.smallestBoldSystemFont)
+            m.top.durationRectVisible = true
+        else
+            m.top.durationRectVisible = false
         end if
     end if
 end function
 
-function SetDurationText(text as string) as void
+function SetDurationLabel(text as string, bgColor as string, bgOpacity as float, font as object) as void
     m.top.duration = text
 
     label = m.durationLabel
@@ -59,10 +64,13 @@ function SetDurationText(text as string) as void
     end if
 
     rectParent = rect.getParent()
+    label.font = font
 
     size = label.localBoundingRect()
 
     rect.width = size.width + 16
     rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+    rect.color = bgColor
+    rect.opacity = bgOpacity
 end function
 

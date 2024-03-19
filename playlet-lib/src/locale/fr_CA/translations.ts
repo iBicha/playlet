@@ -329,5 +329,189 @@
             <source>Failed</source>
             <translation>Échoué</translation>
         </message>
+        <message>
+            <source>0 subscribers</source>
+            <translation>0 abonné</translation>
+        </message>
+        <message>
+            <source>1 subscriber</source>
+            <translation>1 abonné</translation>
+        </message>
+        <message>
+            <source>^n subscribers</source>
+            <translation>^n abonnés</translation>
+        </message>
+        <message>
+            <source>0 videos</source>
+            <translation>0 vidéo</translation>
+        </message>
+        <message>
+            <source>1 video</source>
+            <translation>1 vidéo</translation>
+        </message>
+        <message>
+            <source>^n videos</source>
+            <translation>^n vidéos</translation>
+        </message>
+        <message>
+            <source>0 views</source>
+            <translation>0 vue</translation>
+        </message>
+        <message>
+            <source>1 view</source>
+            <translation>1 vue</translation>
+        </message>
+        <message>
+            <source>^n views</source>
+            <translation>^n vues</translation>
+        </message>
+        <message>
+            <source>Updated 0 seconds ago</source>
+            <translation>Mis à jour il y a 0 seconde</translation>
+        </message>
+        <message>
+            <source>Updated 1 second ago</source>
+            <translation>Mis à jour il y a 1 seconde</translation>
+        </message>
+        <message>
+            <source>Updated ^n seconds ago</source>
+            <translation>Mis à jour il y a ^n secondes</translation>
+        </message>
+        <message>
+            <source>Updated 1 minute ago</source>
+            <translation>Mis à jour il y a 1 minute</translation>
+        </message>
+        <message>
+            <source>Updated ^n minutes ago</source>
+            <translation>Mis à jour il y a ^n minutes</translation>
+        </message>
+        <message>
+            <source>Updated 1 hour ago</source>
+            <translation>Mis à jour il y a 1 heure</translation>
+        </message>
+        <message>
+            <source>Updated ^n hours ago</source>
+            <translation>Mis à jour il y a ^n heures</translation>
+        </message>
+        <message>
+            <source>Updated 1 day ago</source>
+            <translation>Mis à jour il y a 1 jour</translation>
+        </message>
+        <message>
+            <source>Updated ^n days ago</source>
+            <translation>Mis à jour il y a ^n jours</translation>
+        </message>
+        <message>
+            <source>Updated 1 week ago</source>
+            <translation>Mis à jour il y a 1 semaine</translation>
+        </message>
+        <message>
+            <source>Updated ^n weeks ago</source>
+            <translation>Mis à jour il y a ^n semaines</translation>
+        </message>
+        <message>
+            <source>Updated 1 month ago</source>
+            <translation>Mis à jour il y a 1 mois</translation>
+        </message>
+        <message>
+            <source>Updated ^n months ago</source>
+            <translation>Mis à jour il y a ^n mois</translation>
+        </message>
+        <message>
+            <source>Updated 1 year ago</source>
+            <translation>Mis à jour il y a 1 an</translation>
+        </message>
+        <message>
+            <source>Updated ^n years ago</source>
+            <translation>Mis à jour il y a ^n ans</translation>
+        </message>
+        <message>
+            <source>1 year ago</source>
+            <translation>il y a 1 an</translation>
+        </message>
+        <message>
+            <source>^n years ago</source>
+            <translation>il y a ^n ans</translation>
+        </message>
+        <message>
+            <source>1 month ago</source>
+            <translation>il y a 1 mois</translation>
+        </message>
+        <message>
+            <source>^n months ago</source>
+            <translation>il y a ^n mois</translation>
+        </message>
+        <message>
+            <source>1 week ago</source>
+            <translation>il y a 1 semaine</translation>
+        </message>
+        <message>
+            <source>^n weeks ago</source>
+            <translation>il y a ^n semaines</translation>
+        </message>
+        <message>
+            <source>^n days ago</source>
+            <translation>il y a ^n jours</translation>
+        </message>
+        <message>
+            <source>1 hour ago</source>
+            <translation>il y a 1 heure</translation>
+        </message>
+        <message>
+            <source>^n hours ago</source>
+            <translation>il y a ^n heures</translation>
+        </message>
+        <message>
+            <source>1 minute ago</source>
+            <translation>il y a 1 minute</translation>
+        </message>
+        <message>
+            <source>^n minutes ago</source>
+            <translation>il y a ^n minutes</translation>
+        </message>
+        <message>
+            <source>Premiering now</source>
+            <translation>En première maintenant</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 second</source>
+            <translation>En première dans 1 seconde</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n seconds</source>
+            <translation>En première dans ^n secondes</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 minute</source>
+            <translation>En première dans 1 minute</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n minutes</source>
+            <translation>En première dans ^n minutes</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 hour</source>
+            <translation>En première dans 1 heure</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n hours</source>
+            <translation>En première dans ^n heures</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 day</source>
+            <translation>En première dans 1 jour</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n days</source>
+            <translation>En première dans ^n jours</translation>
+        </message>
+        <message>
+            <source>LIVE</source>
+            <translation>EN DIRECT</translation>
+        </message>
+        <message>
+            <source>UPCOMING</source>
+            <translation>À VENIR</translation>
+        </message>
     </context>
 </TS>
