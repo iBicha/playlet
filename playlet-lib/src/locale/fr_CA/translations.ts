@@ -54,6 +54,14 @@
             <translation>Fermer</translation>
         </message>
         <message>
+            <source>Exit</source>
+            <translation>Quitter</translation>
+        </message>
+        <message>
+            <source>Cancel</source>
+            <translation>Annuler</translation>
+        </message>
+        <message>
             <source>Filters</source>
             <translation>Filtres</translation>
         </message>
@@ -164,6 +172,346 @@
         <message>
             <source>Move down</source>
             <translation>Descendre</translation>
+        </message>
+        <message>
+            <source>name</source>
+            <translation>nom</translation>
+        </message>
+        <message>
+            <source>version</source>
+            <translation>version</translation>
+        </message>
+        <message>
+            <source>users</source>
+            <translation>utilisateurs</translation>
+        </message>
+        <message>
+            <source>signup</source>
+            <translation>inscription</translation>
+        </message>
+        <message>
+            <source>location</source>
+            <translation>lieu</translation>
+        </message>
+        <message>
+            <source>health</source>
+            <translation>santé</translation>
+        </message>
+        <message>
+            <source>Yes</source>
+            <translation>Oui</translation>
+        </message>
+        <message>
+            <source>No</source>
+            <translation>Non</translation>
+        </message>
+        <message>
+            <source>Refresh</source>
+            <translation>Rafraîchir</translation>
+        </message>
+        <message>
+            <source>Test</source>
+            <translation>Test</translation>
+        </message>
+        <message>
+            <source>Testing %1</source>
+            <translation>Test de %1</translation>
+        </message>
+        <message>
+            <source>Status</source>
+            <translation>Statut</translation>
+        </message>
+        <message>
+            <source>Test duration</source>
+            <translation>Durée du test</translation>
+        </message>
+        <message>
+            <source>Details</source>
+            <translation>Détails</translation>
+        </message>
+        <message>
+            <source>Valid URL</source>
+            <translation>URL valide</translation>
+        </message>
+        <message>
+            <source>Instance reachable</source>
+            <translation>Instance accessible</translation>
+        </message>
+        <message>
+            <source>Fetch video details</source>
+            <translation>Récupérer les détails de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video comments</source>
+            <translation>Récupérer les commentaires de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video captions</source>
+            <translation>Récupérer les sous-titres de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video thumbnails</source>
+            <translation>Récupérer les vignettes de la vidéo</translation>
+        </message>
+        <message>
+            <source>Press 'OK' for details</source>
+            <translation>Appuyez sur 'OK' pour les détails</translation>
+        </message>
+        <message>
+            <source>Url must start with http:// or https://</source>
+            <translation>L'URL doit commencer par http:// ou https://</translation>
+        </message>
+        <message>
+            <source>Url must not end with /</source>
+            <translation>L'URL ne doit pas se terminer par /</translation>
+        </message>
+        <message>
+            <source>The url seems to be of a valid format</source>
+            <translation>L'URL semble être d'un format valide</translation>
+        </message>
+        <message>
+            <source>Invalid JSON from %1</source>
+            <translation>JSON invalide de %1</translation>
+        </message>
+        <message>
+            <source>Invalid json from %1 (couldn't read %2)</source>
+            <translation>JSON invalide de %1 (impossible de lire %2)</translation>
+        </message>
+        <message>
+            <source>The instance is reachable and running %1 version %2</source>
+            <translation>L'instance est accessible et fonctionne en version %1 %2</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video details for ID %1 (%2)</source>
+            <translation>L'instance peut récupérer les détails de la vidéo pour l'ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video comments for ID %1 (%2 comments)</source>
+            <translation>L'instance peut récupérer les commentaires de la vidéo pour l'ID %1 (%2 commentaires)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (Content-Type is not text/vtt)</source>
+            <translation>Données de sous-titres non valides de %1 (Content-Type n'est pas text/vtt)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
+            <translation>Données de sous-titres non valides de %1 (la réponse n'est pas un fichier vtt valide)</translation>
+        </message>
+        <message>
+            <source>Did not find expected text in caption data from %1</source>
+            <translation>N'a pas trouvé le texte attendu dans les données de sous-titres de %1</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video %1 captions for ID %2</source>
+            <translation>L'instance peut récupérer les sous-titres %1 de la vidéo pour l'ID %2</translation>
+        </message>
+        <message>
+            <source>No thumbnails found in json from %1</source>
+            <translation>Aucune vignette trouvée dans JSON de %1</translation>
+        </message>
+        <message>
+            <source>%1 is not reachable</source>
+            <translation>%1 n'est pas accessible</translation>
+        </message>
+        <message>
+            <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
+            <translation>Données de vignette non valides %1 (Content-Type n'est pas image/*)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+            <translation>L'instance peut récupérer la vignette de la vidéo pour l'ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>Passed</source>
+            <translation>Réussi</translation>
+        </message>
+        <message>
+            <source>Failed</source>
+            <translation>Échoué</translation>
+        </message>
+        <message>
+            <source>0 subscribers</source>
+            <translation>0 abonné</translation>
+        </message>
+        <message>
+            <source>1 subscriber</source>
+            <translation>1 abonné</translation>
+        </message>
+        <message>
+            <source>^n subscribers</source>
+            <translation>^n abonnés</translation>
+        </message>
+        <message>
+            <source>0 videos</source>
+            <translation>0 vidéo</translation>
+        </message>
+        <message>
+            <source>1 video</source>
+            <translation>1 vidéo</translation>
+        </message>
+        <message>
+            <source>^n videos</source>
+            <translation>^n vidéos</translation>
+        </message>
+        <message>
+            <source>0 views</source>
+            <translation>0 vue</translation>
+        </message>
+        <message>
+            <source>1 view</source>
+            <translation>1 vue</translation>
+        </message>
+        <message>
+            <source>^n views</source>
+            <translation>^n vues</translation>
+        </message>
+        <message>
+            <source>Updated 0 seconds ago</source>
+            <translation>Mis à jour il y a 0 seconde</translation>
+        </message>
+        <message>
+            <source>Updated 1 second ago</source>
+            <translation>Mis à jour il y a 1 seconde</translation>
+        </message>
+        <message>
+            <source>Updated ^n seconds ago</source>
+            <translation>Mis à jour il y a ^n secondes</translation>
+        </message>
+        <message>
+            <source>Updated 1 minute ago</source>
+            <translation>Mis à jour il y a 1 minute</translation>
+        </message>
+        <message>
+            <source>Updated ^n minutes ago</source>
+            <translation>Mis à jour il y a ^n minutes</translation>
+        </message>
+        <message>
+            <source>Updated 1 hour ago</source>
+            <translation>Mis à jour il y a 1 heure</translation>
+        </message>
+        <message>
+            <source>Updated ^n hours ago</source>
+            <translation>Mis à jour il y a ^n heures</translation>
+        </message>
+        <message>
+            <source>Updated 1 day ago</source>
+            <translation>Mis à jour il y a 1 jour</translation>
+        </message>
+        <message>
+            <source>Updated ^n days ago</source>
+            <translation>Mis à jour il y a ^n jours</translation>
+        </message>
+        <message>
+            <source>Updated 1 week ago</source>
+            <translation>Mis à jour il y a 1 semaine</translation>
+        </message>
+        <message>
+            <source>Updated ^n weeks ago</source>
+            <translation>Mis à jour il y a ^n semaines</translation>
+        </message>
+        <message>
+            <source>Updated 1 month ago</source>
+            <translation>Mis à jour il y a 1 mois</translation>
+        </message>
+        <message>
+            <source>Updated ^n months ago</source>
+            <translation>Mis à jour il y a ^n mois</translation>
+        </message>
+        <message>
+            <source>Updated 1 year ago</source>
+            <translation>Mis à jour il y a 1 an</translation>
+        </message>
+        <message>
+            <source>Updated ^n years ago</source>
+            <translation>Mis à jour il y a ^n ans</translation>
+        </message>
+        <message>
+            <source>1 year ago</source>
+            <translation>il y a 1 an</translation>
+        </message>
+        <message>
+            <source>^n years ago</source>
+            <translation>il y a ^n ans</translation>
+        </message>
+        <message>
+            <source>1 month ago</source>
+            <translation>il y a 1 mois</translation>
+        </message>
+        <message>
+            <source>^n months ago</source>
+            <translation>il y a ^n mois</translation>
+        </message>
+        <message>
+            <source>1 week ago</source>
+            <translation>il y a 1 semaine</translation>
+        </message>
+        <message>
+            <source>^n weeks ago</source>
+            <translation>il y a ^n semaines</translation>
+        </message>
+        <message>
+            <source>^n days ago</source>
+            <translation>il y a ^n jours</translation>
+        </message>
+        <message>
+            <source>1 hour ago</source>
+            <translation>il y a 1 heure</translation>
+        </message>
+        <message>
+            <source>^n hours ago</source>
+            <translation>il y a ^n heures</translation>
+        </message>
+        <message>
+            <source>1 minute ago</source>
+            <translation>il y a 1 minute</translation>
+        </message>
+        <message>
+            <source>^n minutes ago</source>
+            <translation>il y a ^n minutes</translation>
+        </message>
+        <message>
+            <source>Premiering now</source>
+            <translation>En première maintenant</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 second</source>
+            <translation>En première dans 1 seconde</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n seconds</source>
+            <translation>En première dans ^n secondes</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 minute</source>
+            <translation>En première dans 1 minute</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n minutes</source>
+            <translation>En première dans ^n minutes</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 hour</source>
+            <translation>En première dans 1 heure</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n hours</source>
+            <translation>En première dans ^n heures</translation>
+        </message>
+        <message>
+            <source>Premieres in 1 day</source>
+            <translation>En première dans 1 jour</translation>
+        </message>
+        <message>
+            <source>Premieres in ^n days</source>
+            <translation>En première dans ^n jours</translation>
+        </message>
+        <message>
+            <source>LIVE</source>
+            <translation>EN DIRECT</translation>
+        </message>
+        <message>
+            <source>UPCOMING</source>
+            <translation>À VENIR</translation>
         </message>
     </context>
 </TS>

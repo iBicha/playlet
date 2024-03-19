@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Small improvement in the context menu of the Playlist view
-- Videos can be paused and resumed using the `Ok` remote button
+- Videos can be paused and resumed using the `OK` remote button
 
 ### Fixed
 
@@ -156,7 +156,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - If you like to add these two feeds to your bookmarks:
     - Search for `Funny` (or `News`)
     - Set the `Sort by` filter to `Upload date`
-    - Press and hold the `Ok` button while a video from the search result is selected
+    - Press and hold the `OK` button while a video from the search result is selected
     - Choose the `Add to "Search - Funny"` option
 
 ## [0.18.0] - 2023-12-28

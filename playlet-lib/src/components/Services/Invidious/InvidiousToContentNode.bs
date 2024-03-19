@@ -1,4 +1,6 @@
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/LocaleUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
@@ -41,7 +43,7 @@ namespace InvidiousContent
         node.lengthText = TimeUtils.GetFormattedTime(item.lengthSeconds)
         node.liveNow = VideoIsLive(item)
         VideoSetPremiereTimestampText(node, item)
-        SetIfExists(node, "publishedText", item, "publishedText")
+        node.publishedText = VideoGetPublishedText(item)
         VideoSetThumbnail(node, item, instance)
         SetIfExists(node, "title", item, "title")
         SetIfExists(node, "timestamp", item, "timestamp")
@@ -172,10 +174,58 @@ namespace InvidiousContent
         return videoItem.isUpcoming = true and ValidInt(videoItem.premiereTimestamp) <> 0
     end function
 
-    function VideoSetPremiereTimestampText(node as object, videoItem as object)
+    function VideoSetPremiereTimestampText(node as object, videoItem as object) as void
         if VideoIsUpcoming(videoItem)
             node.isUpcoming = true
-            node.premiereTimestampText = `Premeres in ${TimeUtils.GetFormattedTimeLeft(videoItem.premiereTimestamp)}`
+
+            timestamp = videoItem.premiereTimestamp
+            if timestamp = invalid
+                node.premiereTimestampText = "N/A"
+                return
+            end if
+
+            currentTime = TimeUtils.Now().AsSeconds()
+            timeLeft = timestamp - currentTime
+            if timeLeft <= 0
+                node.premiereTimestampText = Tr(Locale.RowCell.PremieringNow)
+                return
+            end if
+
+            if timeLeft < 60
+                if timeLeft = 1
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInOneSecond)
+                else
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInNSeconds).Replace("^n", timeLeft.toStr())
+                end if
+                return
+            end if
+
+            if timeLeft < 3600
+                minutes = timeLeft \ 60
+                if minutes = 1
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInOneMinute)
+                else
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInNMinutes).Replace("^n", minutes.toStr())
+                end if
+                return
+            end if
+
+            if timeLeft < 86400
+                hours = timeLeft \ 3600
+                if hours = 1
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInOneHour)
+                else
+                    node.premiereTimestampText = Tr(Locale.RowCell.PremieresInNHours).Replace("^n", hours.toStr())
+                end if
+                return
+            end if
+
+            days = timeLeft \ 86400
+            if days = 1
+                node.premiereTimestampText = Tr(Locale.RowCell.PremieresInOneDay)
+            else
+                node.premiereTimestampText = Tr(Locale.RowCell.PremieresInNDays).Replace("^n", days.toStr())
+            end if
         end if
     end function
 
@@ -184,30 +234,8 @@ namespace InvidiousContent
         if viewCount = invalid
             return ""
         end if
-        if viewCount < 1000
-            return `${FormatFloat(viewCount)} views`
-        end if
 
-        viewCount = viewCount / 1000
-        if viewCount < 1000
-            return `${FormatFloat(viewCount)}K views`
-        end if
-
-        viewCount = viewCount / 1000
-        if viewCount < 1000
-            return `${FormatFloat(viewCount)}M views`
-        end if
-
-        viewCount = viewCount / 1000
-        return `${FormatFloat(viewCount)}B views`
-    end function
-
-    function FormatFloat(X as float) as float
-        X = X * 10
-        X = X + 0.5
-        X = Fix(X)
-        X = X / 10
-        return X
+        return LocaleUtils.GetFormattedPluralString(viewCount, Locale.RowCell.ZeroViews, Locale.RowCell.OneView, Locale.RowCell.NViews)
     end function
 
     function PlaylistSetThumbnail(node as object, nodeField as string, playlistItem as object, instance as dynamic, quality = "medium" as string) as void
@@ -251,38 +279,70 @@ namespace InvidiousContent
 
     function GetVideoCountText(item as object) as string
         videoCount = ValidInt(item.videoCount)
-        if videoCount = 1
-            return "1 video"
-        end if
-        return `${videoCount} videos`
+        return LocaleUtils.GetPluralString(videoCount, Locale.RowCell.ZeroVideos, Locale.RowCell.OneVideo, Locale.RowCell.NVideos)
     end function
 
     function GetChannelSubCountText(channel as object) as string
         subCount = ValidInt(channel.subCount)
-        if subCount = 1
-            return "1 subscriber"
-        end if
-
-        if subCount < 1000
-            return `${subCount} subscribers`
-        end if
-
-        subCount = subCount / 1000
-        if subCount < 1000
-            return `${FormatFloat(subCount)}K subscribers`
-        end if
-
-        subCount = subCount / 1000
-        if subCount < 1000
-            return `${FormatFloat(subCount)}M subscribers`
-        end if
-
-        subCount = subCount / 1000
-        return `${FormatFloat(subCount)}B subscribers`
+        return LocaleUtils.GetFormattedPluralString(subCount, Locale.RowCell.ZeroSubscribers, Locale.RowCell.OneSubscriber, Locale.RowCell.NSubscribers)
     end function
 
     function PlaylistGetViewCountText(playlistItem as object) as string
         return VideoGetViewCountText(playlistItem)
+    end function
+
+    function VideoGetPublishedText(videoItem as object) as string
+        published = ValidInt(videoItem.published)
+        if published = 0
+            return ValidString(videoItem.publishedText)
+        end if
+
+        span = TimeUtils.Now().AsSeconds() - published
+        if span < 1
+            return ValidString(videoItem.publishedText)
+        end if
+
+        total_days = span \ 86400
+        if total_days > 365
+            years = total_days \ 365
+            if years = 1
+                return Tr(Locale.RowCell.OneYearAgo)
+            else
+                return Tr(Locale.RowCell.NYearsAgo).Replace("^n", years.toStr())
+            end if
+        else if total_days > 30
+            months = total_days \ 30
+            if months = 1
+                return Tr(Locale.RowCell.OneMonthAgo)
+            else
+                return Tr(Locale.RowCell.NMonthsAgo).Replace("^n", months.toStr())
+            end if
+        else if total_days > 7
+            weeks = total_days \ 7
+            if weeks = 1
+                return Tr(Locale.RowCell.OneWeekAgo)
+            else
+                return Tr(Locale.RowCell.NWeeksAgo).Replace("^n", weeks.toStr())
+            end if
+        else if total_days > 1
+            return Tr(Locale.RowCell.NDaysAgo).Replace("^n", total_days.toStr())
+        else if span > 3600
+            hours = span \ 3600
+            if hours = 1
+                return Tr(Locale.RowCell.OneHourAgo)
+            else
+                return Tr(Locale.RowCell.NHoursAgo).Replace("^n", hours.toStr())
+            end if
+        else if span > 60
+            minutes = span \ 60
+            if minutes = 1
+                return Tr(Locale.RowCell.OneMinuteAgo)
+            else
+                return Tr(Locale.RowCell.NMinutesAgo).Replace("^n", minutes.toStr())
+            end if
+        else
+            return Tr(Locale.RowCell.OneMinuteAgo)
+        end if
     end function
 
     function PlaylistGetUpdatedText(playlistItem as object) as string
@@ -295,32 +355,46 @@ namespace InvidiousContent
             return ""
         end if
 
-        count = ""
         total_days = span \ 86400
         if total_days > 365
             years = total_days \ 365
-            count = years > 1 ? `${years} years` : "1 year"
+            if years = 1
+                return Tr(Locale.RowCell.UpdatedOneYearAgo)
+            else
+                return Tr(Locale.RowCell.UpdatedNYearsAgo).Replace("^n", years.toStr())
+            end if
         else if total_days > 30
             months = total_days \ 30
-            count = months > 1 ? `${months} months` : "1 month"
+            if months = 1
+                return Tr(Locale.RowCell.UpdatedOneMonthAgo)
+            else
+                return Tr(Locale.RowCell.UpdatedNMonthsAgo).Replace("^n", months.toStr())
+            end if
         else if total_days > 7
             weeks = total_days \ 7
-            count = weeks > 1 ? `${weeks} weeks` : "1 week"
+            if weeks = 1
+                return Tr(Locale.RowCell.UpdatedOneWeekAgo)
+            else
+                return Tr(Locale.RowCell.UpdatedNWeeksAgo).Replace("^n", weeks.toStr())
+            end if
         else if total_days > 1
-            count = `${total_days} days`
+            return Tr(Locale.RowCell.UpdatedNDaysAgo).Replace("^n", total_days.toStr())
         else if span > 3600
             hours = span \ 3600
-            count = hours > 1 ? `${hours} hours` : "1 hour"
+            if hours = 1
+                return Tr(Locale.RowCell.UpdatedOneHourAgo)
+            else
+                return Tr(Locale.RowCell.UpdatedNHoursAgo).Replace("^n", hours.toStr())
+            end if
         else if span > 60
             minutes = span \ 60
-            count = minutes > 1 ? `${minutes} minutes` : "1 minute"
+            if minutes = 1
+                return Tr(Locale.RowCell.UpdatedOneMinuteAgo)
+            else
+                return Tr(Locale.RowCell.UpdatedNMinutesAgo).Replace("^n", minutes.toStr())
+            end if
         else
-            count = span > 1 ? `${span} seconds` : "1 second"
+            return Tr(Locale.RowCell.UpdatedOneMinuteAgo)
         end if
-
-        if StringUtils.IsNullOrEmpty(count)
-            return ""
-        end if
-        return `Updated ${count} ago`
     end function
 end namespace
