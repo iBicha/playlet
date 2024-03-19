@@ -212,5 +212,125 @@
             <source>Refresh</source>
             <translation>Refresh</translation>
         </message>
+        <message>
+            <source>Test</source>
+            <translation>Test</translation>
+        </message>
+        <message>
+            <source>Testing %1</source>
+            <translation>Testing %1</translation>
+        </message>
+        <message>
+            <source>Status</source>
+            <translation>Status</translation>
+        </message>
+        <message>
+            <source>Test duration</source>
+            <translation>Test duration</translation>
+        </message>
+        <message>
+            <source>Details</source>
+            <translation>Details</translation>
+        </message>
+        <message>
+            <source>Valid URL</source>
+            <translation>Valid URL</translation>
+        </message>
+        <message>
+            <source>Instance reachable</source>
+            <translation>Instance reachable</translation>
+        </message>
+        <message>
+            <source>Fetch video details</source>
+            <translation>Fetch video details</translation>
+        </message>
+        <message>
+            <source>Fetch video comments</source>
+            <translation>Fetch video comments</translation>
+        </message>
+        <message>
+            <source>Fetch video captions</source>
+            <translation>Fetch video captions</translation>
+        </message>
+        <message>
+            <source>Fetch video thumbnails</source>
+            <translation>Fetch video thumbnails</translation>
+        </message>
+        <message>
+            <source>Press 'OK' for details</source>
+            <translation>Press 'OK' for details</translation>
+        </message>
+        <message>
+            <source>Url must start with http:// or https://</source>
+            <translation>Url must start with http:// or https://</translation>
+        </message>
+        <message>
+            <source>Url must not end with /</source>
+            <translation>Url must not end with /</translation>
+        </message>
+        <message>
+            <source>The url seems to be of a valid format</source>
+            <translation>The url seems to be of a valid format</translation>
+        </message>
+        <message>
+            <source>Invalid JSON from %1</source>
+            <translation>Invalid JSON from %1</translation>
+        </message>
+        <message>
+            <source>Invalid json from %1 (couldn't read %2)</source>
+            <translation>Invalid json from %1 (couldn't read %2)</translation>
+        </message>
+        <message>
+            <source>The instance is reachable and running %1 version %2</source>
+            <translation>The instance is reachable and running %1 version %2</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video details for ID %1 (%2)</source>
+            <translation>The instance can fetch video details for ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video comments for ID %1 (%2 comments)</source>
+            <translation>The instance can fetch video comments for ID %1 (%2 comments)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (Content-Type is not text/vtt)</source>
+            <translation>Invalid caption data from %1 (Content-Type is not text/vtt)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
+            <translation>Invalid caption data from %1 (response is not a valid vtt file)</translation>
+        </message>
+        <message>
+            <source>Did not find expected text in caption data from %1</source>
+            <translation>Did not find expected text in caption data from %1</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video %1 captions for ID %2</source>
+            <translation>The instance can fetch video %1 captions for ID %2</translation>
+        </message>
+        <message>
+            <source>No thumbnails found in json from %1</source>
+            <translation>No thumbnails found in json from %1</translation>
+        </message>
+        <message>
+            <source>%1 is not reachable</source>
+            <translation>%1 is not reachable</translation>
+        </message>
+        <message>
+            <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
+            <translation>Invalid thumbnail data %1 (Content-Type is not image/*)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+            <translation>The instance can fetch video thumbnail for ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>Passed</source>
+            <translation>Passed</translation>
+        </message>
+        <message>
+            <source>Failed</source>
+            <translation>Failed</translation>
+        </message>
     </context>
 </TS>

@@ -209,5 +209,125 @@
             <source>Refresh</source>
             <translation>Rafraîchir</translation>
         </message>
+        <message>
+            <source>Test</source>
+            <translation>Test</translation>
+        </message>
+        <message>
+            <source>Testing %1</source>
+            <translation>Test de %1</translation>
+        </message>
+        <message>
+            <source>Status</source>
+            <translation>Statut</translation>
+        </message>
+        <message>
+            <source>Test duration</source>
+            <translation>Durée du test</translation>
+        </message>
+        <message>
+            <source>Details</source>
+            <translation>Détails</translation>
+        </message>
+        <message>
+            <source>Valid URL</source>
+            <translation>URL valide</translation>
+        </message>
+        <message>
+            <source>Instance reachable</source>
+            <translation>Instance accessible</translation>
+        </message>
+        <message>
+            <source>Fetch video details</source>
+            <translation>Récupérer les détails de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video comments</source>
+            <translation>Récupérer les commentaires de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video captions</source>
+            <translation>Récupérer les sous-titres de la vidéo</translation>
+        </message>
+        <message>
+            <source>Fetch video thumbnails</source>
+            <translation>Récupérer les vignettes de la vidéo</translation>
+        </message>
+        <message>
+            <source>Press 'OK' for details</source>
+            <translation>Appuyez sur 'OK' pour les détails</translation>
+        </message>
+        <message>
+            <source>Url must start with http:// or https://</source>
+            <translation>L'URL doit commencer par http:// ou https://</translation>
+        </message>
+        <message>
+            <source>Url must not end with /</source>
+            <translation>L'URL ne doit pas se terminer par /</translation>
+        </message>
+        <message>
+            <source>The url seems to be of a valid format</source>
+            <translation>L'URL semble être d'un format valide</translation>
+        </message>
+        <message>
+            <source>Invalid JSON from %1</source>
+            <translation>JSON invalide de %1</translation>
+        </message>
+        <message>
+            <source>Invalid json from %1 (couldn't read %2)</source>
+            <translation>JSON invalide de %1 (impossible de lire %2)</translation>
+        </message>
+        <message>
+            <source>The instance is reachable and running %1 version %2</source>
+            <translation>L'instance est accessible et fonctionne en version %1 %2</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video details for ID %1 (%2)</source>
+            <translation>L'instance peut récupérer les détails de la vidéo pour l'ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video comments for ID %1 (%2 comments)</source>
+            <translation>L'instance peut récupérer les commentaires de la vidéo pour l'ID %1 (%2 commentaires)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (Content-Type is not text/vtt)</source>
+            <translation>Données de sous-titres non valides de %1 (Content-Type n'est pas text/vtt)</translation>
+        </message>
+        <message>
+            <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
+            <translation>Données de sous-titres non valides de %1 (la réponse n'est pas un fichier vtt valide)</translation>
+        </message>
+        <message>
+            <source>Did not find expected text in caption data from %1</source>
+            <translation>N'a pas trouvé le texte attendu dans les données de sous-titres de %1</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video %1 captions for ID %2</source>
+            <translation>L'instance peut récupérer les sous-titres %1 de la vidéo pour l'ID %2</translation>
+        </message>
+        <message>
+            <source>No thumbnails found in json from %1</source>
+            <translation>Aucune vignette trouvée dans JSON de %1</translation>
+        </message>
+        <message>
+            <source>%1 is not reachable</source>
+            <translation>%1 n'est pas accessible</translation>
+        </message>
+        <message>
+            <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
+            <translation>Données de vignette non valides %1 (Content-Type n'est pas image/*)</translation>
+        </message>
+        <message>
+            <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+            <translation>L'instance peut récupérer la vignette de la vidéo pour l'ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>Passed</source>
+            <translation>Réussi</translation>
+        </message>
+        <message>
+            <source>Failed</source>
+            <translation>Échoué</translation>
+        </message>
     </context>
 </TS>
