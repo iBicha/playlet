@@ -157,6 +157,10 @@
             <translation>Please note that an Invidious account is different from a YouTube account.</translation>
         </message>
         <message>
+            <source>Do you want to exit Playlet?</source>
+            <translation>Do you want to exit Playlet?</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Invidious custom instance</translation>
         </message>
@@ -515,6 +519,66 @@
         <message>
             <source>UPCOMING</source>
             <translation>UPCOMING</translation>
+        </message>
+        <message>
+            <source>You currently have no bookmarks.</source>
+            <translation>You currently have no bookmarks.</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, long-press 'OK' on a video, playlist or channel.</source>
+            <translation>To add bookmarks, long-press 'OK' on a video, playlist or channel.</translation>
+        </message>
+        <message>
+            <source>Please note that Bookmarks is an experimental feature.</source>
+            <translation>Please note that Bookmarks is an experimental feature.</translation>
+        </message>
+        <message>
+            <source>Could not get IP address: are we connected to the internet?</source>
+            <translation>Could not get IP address: are we connected to the internet?</translation>
+        </message>
+        <message>
+            <source>On your phone, connect to the same Wi-Fi network as this device.</source>
+            <translation>On your phone, connect to the same Wi-Fi network as this device.</translation>
+        </message>
+        <message>
+            <source>Open the YouTube app on your phone.</source>
+            <translation>Open the YouTube app on your phone.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon and select %1</source>
+            <translation>Tap the cast icon and select %1</translation>
+        </message>
+        <message>
+            <source>Roku connected to:</source>
+            <translation>Roku connected to:</translation>
+        </message>
+        <message>
+            <source>Wired connection</source>
+            <translation>Wired connection</translation>
+        </message>
+        <message>
+            <source>On your phone, open the YouTube app.</source>
+            <translation>On your phone, open the YouTube app.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon.</source>
+            <translation>Tap the cast icon.</translation>
+        </message>
+        <message>
+            <source>Tap 'Link with TV code' and enter the code below.</source>
+            <translation>Tap 'Link with TV code' and enter the code below.</translation>
+        </message>
+        <message>
+            <source>Loading...</source>
+            <translation>Loading...</translation>
+        </message>
+        <message>
+            <source>TV code error</source>
+            <translation>TV code error</translation>
+        </message>
+        <message>
+            <source>Failed to generate manual pairing code</source>
+            <translation>Failed to generate manual pairing code</translation>
         </message>
     </context>
 </TS>

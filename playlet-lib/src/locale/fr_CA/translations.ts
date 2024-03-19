@@ -154,6 +154,10 @@
             <translation>Veuillez noter qu'un compte Invidious est différent d'un compte YouTube.</translation>
         </message>
         <message>
+            <source>Do you want to exit Playlet?</source>
+            <translation>Voulez-vous quitter Playlet?</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Instance personnalisée d'Invidious</translation>
         </message>
@@ -512,6 +516,66 @@
         <message>
             <source>UPCOMING</source>
             <translation>À VENIR</translation>
+        </message>
+        <message>
+            <source>You currently have no bookmarks.</source>
+            <translation>Actuellement, vous n'avez aucun favori.</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, long-press 'OK' on a video, playlist or channel.</source>
+            <translation>Pour ajouter des favoris, maintenez enfoncé le bouton 'OK' sur une vidéo, une playlist ou une chaîne.</translation>
+        </message>
+        <message>
+            <source>Please note that Bookmarks is an experimental feature.</source>
+            <translation>Veuillez noter que les favoris sont une fonctionnalité expérimentale.</translation>
+        </message>
+        <message>
+            <source>Could not get IP address: are we connected to the internet?</source>
+            <translation>Impossible d'obtenir l'adresse IP: est-on connecté à Internet?</translation>
+        </message>
+        <message>
+            <source>On your phone, connect to the same Wi-Fi network as this device.</source>
+            <translation>Sur votre téléphone, connectez-vous au même réseau Wi-Fi que cet appareil.</translation>
+        </message>
+        <message>
+            <source>Open the YouTube app on your phone.</source>
+            <translation>Ouvrez l'application YouTube sur votre téléphone.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon and select %1</source>
+            <translation>Appuyez sur l'icône de diffusion et sélectionnez %1</translation>
+        </message>
+        <message>
+            <source>Roku connected to:</source>
+            <translation>Roku connecté à :</translation>
+        </message>
+        <message>
+            <source>Wired connection</source>
+            <translation>Connexion filaire</translation>
+        </message>
+        <message>
+            <source>On your phone, open the YouTube app.</source>
+            <translation>Sur votre téléphone, ouvrez l'application YouTube.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon.</source>
+            <translation>Appuyez sur l'icône de diffusion.</translation>
+        </message>
+        <message>
+            <source>Tap 'Link with TV code' and enter the code below.</source>
+            <translation>Appuyez sur "Associer avec un code TV" et entrez le code ci-dessous.</translation>
+        </message>
+        <message>
+            <source>Loading...</source>
+            <translation>Chargement...</translation>
+        </message>
+        <message>
+            <source>TV code error</source>
+            <translation>Erreur de code TV</translation>
+        </message>
+        <message>
+            <source>Failed to generate manual pairing code</source>
+            <translation>Échec de la génération du code d'appariement manuel</translation>
         </message>
     </context>
 </TS>
