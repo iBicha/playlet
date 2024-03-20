@@ -157,6 +157,10 @@
             <translation>Please note that an Invidious account is different from a YouTube account.</translation>
         </message>
         <message>
+            <source>Do you want to exit Playlet?</source>
+            <translation>Do you want to exit Playlet?</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Invidious custom instance</translation>
         </message>
@@ -209,8 +213,16 @@
             <translation>No</translation>
         </message>
         <message>
+            <source>Success</source>
+            <translation>Success</translation>
+        </message>
+        <message>
             <source>Refresh</source>
             <translation>Refresh</translation>
+        </message>
+        <message>
+            <source>Play next video</source>
+            <translation>Play next video</translation>
         </message>
         <message>
             <source>Test</source>
@@ -515,6 +527,286 @@
         <message>
             <source>UPCOMING</source>
             <translation>UPCOMING</translation>
+        </message>
+        <message>
+            <source>You currently have no bookmarks.</source>
+            <translation>You currently have no bookmarks.</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, long-press 'OK' on a video, playlist or channel.</source>
+            <translation>To add bookmarks, long-press 'OK' on a video, playlist or channel.</translation>
+        </message>
+        <message>
+            <source>Please note that Bookmarks is an experimental feature.</source>
+            <translation>Please note that Bookmarks is an experimental feature.</translation>
+        </message>
+        <message>
+            <source>Could not get IP address: are we connected to the internet?</source>
+            <translation>Could not get IP address: are we connected to the internet?</translation>
+        </message>
+        <message>
+            <source>Playlet Web App</source>
+            <translation>Playlet Web App</translation>
+        </message>
+        <message>
+            <source>Use Playlet Remote in the browser</source>
+            <translation>Use Playlet Remote in the browser</translation>
+        </message>
+        <message>
+            <source>Link with Wi-Fi</source>
+            <translation>Link with Wi-Fi</translation>
+        </message>
+        <message>
+            <source>Link with TV code</source>
+            <translation>Link with TV code</translation>
+        </message>
+        <message>
+            <source>Cast from the YouTube app to Playlet</source>
+            <translation>Cast from the YouTube app to Playlet</translation>
+        </message>
+        <message>
+            <source>On your phone, connect to the same Wi-Fi network as this device.</source>
+            <translation>On your phone, connect to the same Wi-Fi network as this device.</translation>
+        </message>
+        <message>
+            <source>Open the YouTube app on your phone.</source>
+            <translation>Open the YouTube app on your phone.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon and select %1</source>
+            <translation>Tap the cast icon and select %1</translation>
+        </message>
+        <message>
+            <source>Roku connected to:</source>
+            <translation>Roku connected to:</translation>
+        </message>
+        <message>
+            <source>Wired connection</source>
+            <translation>Wired connection</translation>
+        </message>
+        <message>
+            <source>On your phone, open the YouTube app.</source>
+            <translation>On your phone, open the YouTube app.</translation>
+        </message>
+        <message>
+            <source>Tap the cast icon.</source>
+            <translation>Tap the cast icon.</translation>
+        </message>
+        <message>
+            <source>Tap 'Link with TV code' and enter the code below.</source>
+            <translation>Tap 'Link with TV code' and enter the code below.</translation>
+        </message>
+        <message>
+            <source>Loading...</source>
+            <translation>Loading...</translation>
+        </message>
+        <message>
+            <source>TV code error</source>
+            <translation>TV code error</translation>
+        </message>
+        <message>
+            <source>Failed to generate manual pairing code</source>
+            <translation>Failed to generate manual pairing code</translation>
+        </message>
+        <message>
+            <source>Playback</source>
+            <translation>Playback</translation>
+        </message>
+        <message>
+            <source>Playback preferences</source>
+            <translation>Playback preferences</translation>
+        </message>
+        <message>
+            <source>Autoplay</source>
+            <translation>Autoplay</translation>
+        </message>
+        <message>
+            <source>When you finish a video, another plays automatically</source>
+            <translation>When you finish a video, another plays automatically</translation>
+        </message>
+        <message>
+            <source>Preferred quality</source>
+            <translation>Preferred quality</translation>
+        </message>
+        <message>
+            <source>Preferred video quality</source>
+            <translation>Preferred video quality</translation>
+        </message>
+        <message>
+            <source>Auto (DASH)</source>
+            <translation>Auto (DASH)</translation>
+        </message>
+        <message>
+            <source>720p</source>
+            <translation>720p</translation>
+        </message>
+        <message>
+            <source>Medium</source>
+            <translation>Medium</translation>
+        </message>
+        <message>
+            <source>Invidious preferences</source>
+            <translation>Invidious preferences</translation>
+        </message>
+        <message>
+            <source>Instance</source>
+            <translation>Instance</translation>
+        </message>
+        <message>
+            <source>Invidious instance to use. Example: https://example.com</source>
+            <translation>Invidious instance to use. Example: https://example.com</translation>
+        </message>
+        <message>
+            <source>Proxy videos</source>
+            <translation>Proxy videos</translation>
+        </message>
+        <message>
+            <source>Proxy videos through the Invidious server. This is useful if videos are geoblocked.</source>
+            <translation>Proxy videos through the Invidious server. This is useful if videos are geoblocked.</translation>
+        </message>
+        <message>
+            <source>Always</source>
+            <translation>Always</translation>
+        </message>
+        <message>
+            <source>Only if needed</source>
+            <translation>Only if needed</translation>
+        </message>
+        <message>
+            <source>Never</source>
+            <translation>Never</translation>
+        </message>
+        <message>
+            <source>SponsorBlock</source>
+            <translation>SponsorBlock</translation>
+        </message>
+        <message>
+            <source>SponsorBlock preferences</source>
+            <translation>SponsorBlock preferences</translation>
+        </message>
+        <message>
+            <source>Enabled</source>
+            <translation>Enabled</translation>
+        </message>
+        <message>
+            <source>Enable SponsorBlock</source>
+            <translation>Enable SponsorBlock</translation>
+        </message>
+        <message>
+            <source>Show notifications</source>
+            <translation>Show notifications</translation>
+        </message>
+        <message>
+            <source>Show notifications when a segment is skipped</source>
+            <translation>Show notifications when a segment is skipped</translation>
+        </message>
+        <message>
+            <source>Search History</source>
+            <translation>Search History</translation>
+        </message>
+        <message>
+            <source>Search history preferences</source>
+            <translation>Search history preferences</translation>
+        </message>
+        <message>
+            <source>Enable search history</source>
+            <translation>Enable search history</translation>
+        </message>
+        <message>
+            <source>Clear Search History</source>
+            <translation>Clear Search History</translation>
+        </message>
+        <message>
+            <source>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</source>
+            <translation>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</translation>
+        </message>
+        <message>
+            <source>Search history cleared.</source>
+            <translation>Search history cleared.</translation>
+        </message>
+        <message>
+            <source>Miscellaneous</source>
+            <translation>Miscellaneous</translation>
+        </message>
+        <message>
+            <source>Misc. preferences</source>
+            <translation>Misc. preferences</translation>
+        </message>
+        <message>
+            <source>Edit home screen</source>
+            <translation>Edit home screen</translation>
+        </message>
+        <message>
+            <source>Enable/disable and reorder sections on the home screen</source>
+            <translation>Enable/disable and reorder sections on the home screen</translation>
+        </message>
+        <message>
+            <source>Queue notifications</source>
+            <translation>Queue notifications</translation>
+        </message>
+        <message>
+            <source>Show a notification when a video is added to the queue</source>
+            <translation>Show a notification when a video is added to the queue</translation>
+        </message>
+        <message>
+            <source>Developer</source>
+            <translation>Developer</translation>
+        </message>
+        <message>
+            <source>Developer preferences</source>
+            <translation>Developer preferences</translation>
+        </message>
+        <message>
+            <source>Use dev video player</source>
+            <translation>Use dev video player</translation>
+        </message>
+        <message>
+            <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
+            <translation>Enable the dev video player. This is an unfinished video player for testing purposes.</translation>
+        </message>
+        <message>
+            <source>Playlet Library version</source>
+            <translation>Playlet Library version</translation>
+        </message>
+        <message>
+            <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
+            <translation>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</translation>
+        </message>
+        <message>
+            <source>Press Options (*) for full screen</source>
+            <translation>Press Options (*) for full screen</translation>
+        </message>
+        <message>
+            <source>Video load error</source>
+            <translation>Video load error</translation>
+        </message>
+        <message>
+            <source>Failed to load video information for %1</source>
+            <translation>Failed to load video information for %1</translation>
+        </message>
+        <message>
+            <source>Error playing video %1</source>
+            <translation>Error playing video %1</translation>
+        </message>
+        <message>
+            <source>Error closing video</source>
+            <translation>Error closing video</translation>
+        </message>
+        <message>
+            <source>Request not sent.</source>
+            <translation>Request not sent.</translation>
+        </message>
+        <message>
+            <source>Request timed out.</source>
+            <translation>Request timed out.</translation>
+        </message>
+        <message>
+            <source>Request cancelled.</source>
+            <translation>Request cancelled.</translation>
+        </message>
+        <message>
+            <source>Reason</source>
+            <translation>Reason</translation>
         </message>
     </context>
 </TS>

@@ -25,7 +25,7 @@ import * as xml2js from 'xml2js';
 import { globSync } from 'glob';
 import { SGNode } from "brighterscript/dist/parser/SGTypes";
 
-const allowedXmlAttributes = ["text", "title", "primaryTitle"];
+const allowedXmlAttributes = ["text", "title", "primaryTitle", "displayText", "description"];
 
 export class LocaleValidationPlugin implements CompilerPlugin {
     public name = 'LocaleValidationPlugin';
@@ -68,7 +68,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                         file.addDiagnostics([{
                             file: file,
                             range: field.range!,
-                            message: `Locale value found in xml component: ${value}.`,
+                            message: `Locale value found in xml component "${value}" but the attribute "${id}" is not allowed to be localized.`,
                             severity: DiagnosticSeverity.Error,
                             code: 'LOCALE_VALUE_IN_XML',
                         }]);
@@ -93,7 +93,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                     file.addDiagnostics([{
                         file: file,
                         range: attribute.value.range!,
-                        message: `Locale value found in xml component: ${value}.`,
+                        message: `Locale value found in xml component: "${value}" but the attribute "${key}" is not allowed to be localized.`,
                         severity: DiagnosticSeverity.Error,
                         code: 'LOCALE_VALUE_IN_XML',
                     }]);

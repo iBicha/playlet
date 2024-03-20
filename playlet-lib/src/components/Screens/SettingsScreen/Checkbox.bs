@@ -1,7 +1,9 @@
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
     m.top.observeField("checkedState", FuncName(OnCheckedStateChange))
+    m.minItemWidth = m.top.itemSize[0]
 end function
 
 function OnValueChange()
@@ -14,4 +16,20 @@ function OnCheckedStateChange() as void
         return
     end if
     m.top.value = checkedState[0]
+end function
+
+function OnTitleChange()
+    title = m.top.title
+    ' TODO:P2 FIX THIS
+    ' This is a gross estimate of the width of the text, because there isn't
+    ' a simple way to measure using the font, and accurately estimate the width
+    ' of the checkbox. I hate it, but I currently don't have the patience to
+    ' do something else.
+    ' The risks are, if the checkbox is too big, it will look ugly, and if it's
+    ' too small, the text will be scrolling. Either way, it will be usable.
+    ' A better way is to create a Checkbox from scratch, instead of using the CheckList
+    size = title.len() * 14 - 30
+
+    size = MathUtils.Max(size, m.minItemWidth)
+    m.top.itemSize = [size, m.top.itemSize[1]]
 end function

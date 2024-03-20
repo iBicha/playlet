@@ -128,9 +128,12 @@ function OnVideoContentTaskResults(output as object) as void
         error = ErrorUtils.Format(error)
         LogError(error)
         videoId = output.task.input.content.videoId
-        message = `Failed to load video information for ${videoId}\n${error}`
 
-        dialog = DialogUtils.ShowTimedDialogButtons(message, "Video load fail", ["Play next video", "Cancel"], 0, 10, true)
+        title = Tr(Locale.VideoPlayer.VideoLoadError)
+        message = Tr(Locale.VideoPlayer.VideoLoadErrorMessage).Replace("%1", videoId) + `\n${error}`
+        buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
+
+        dialog = DialogUtils.ShowTimedDialogButtons(message, title, buttons, 0, 10, true)
         dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
 
         Lounge.SendOnStateChange()
@@ -186,7 +189,7 @@ function Close(_unused as dynamic)
     try
         m.top.control = "stop"
     catch error
-        DialogUtils.ShowDialog(ErrorUtils.Format(error), "Error closing video", true)
+        DialogUtils.ShowDialog(ErrorUtils.Format(error), Tr(Locale.VideoPlayer.ErrorClosingVideo), true)
     end try
 
     m.top.content = invalid
@@ -263,10 +266,12 @@ function OnVideoPlayerStateChange() as void
             end for
         end if
 
-        title = `Error playing video ${content.videoId}`
+        title = Tr(Locale.VideoPlayer.ErrorPlayingVideo).Replace("%1", content.videoId)
         LogError(title, messageLines)
 
-        dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, ["Play next video", "Cancel"], 0, 10, true)
+        buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
+
+        dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, buttons, 0, 10, true)
         dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
         m.ignoreNextFinishedState = true
     end if
