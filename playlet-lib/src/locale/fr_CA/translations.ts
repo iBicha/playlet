@@ -805,5 +805,90 @@
             <source>Reason</source>
             <translation>Raison</translation>
         </message>
+        <message>
+            <source>Skipped</source>
+            <translation>Ignoré</translation>
+        </message>
+        <message>
+            <source>Sponsor</source>
+            <translation>Message sponsorisé</translation>
+        </message>
+        <message>
+            <source>Unpaid/Self Promotion</source>
+            <translation>Non rémunéré/autopromotion</translation>
+        </message>
+        <message>
+            <source>Exclusive Access</source>
+            <translation>Accès exclusif</translation>
+        </message>
+        <message>
+            <source>Interaction Reminder (Subscribe)</source>
+            <translation>Rappel d'interaction (abonnement)</translation>
+        </message>
+        <message>
+            <source>Interaction Reminder</source>
+            <translation>Rappel d'interaction</translation>
+        </message>
+        <message>
+            <source>Highlight</source>
+            <translation>Point essentiel</translation>
+        </message>
+        <message>
+            <source>Intermission/Intro Animation</source>
+            <translation>Entracte/Animation d'introduction</translation>
+        </message>
+        <message>
+            <source>Intermission</source>
+            <translation>Entracte</translation>
+        </message>
+        <message>
+            <source>Endcards/Credits</source>
+            <translation>Écrans de fin/Crédits</translation>
+        </message>
+        <message>
+            <source>Preview/Recap/Hook</source>
+            <translation>Aperçu/Récapitulatif/Accroche</translation>
+        </message>
+        <message>
+            <source>Preview/Recap</source>
+            <translation>Aperçu/Récapitulatif</translation>
+        </message>
+        <message>
+            <source>Filler Tangent/Jokes</source>
+            <translation>Digressions/Blagues</translation>
+        </message>
+        <message>
+            <source>Filler</source>
+            <translation>Remplissage</translation>
+        </message>
+        <message>
+            <source>Chapter</source>
+            <translation>Chapitre</translation>
+        </message>
+        <message>
+            <source>Music: Non-Music Section</source>
+            <translation>Musique: Segment non musical</translation>
+        </message>
+        <message>
+            <source>Non-Music</source>
+            <translation>Section non musicale</translation>
+        </message>
+        <message>
+            <source>Added to queue</source>
+            <translation>Ajouté à la file d'attente</translation>
+        </message>
+        <message>
+            <source>Press and hold Options (*) to open the queue</source>
+            <translation>Appuyez et maintenez Options (*) pour la file d'attente</translation>
+            <comment>Should be "pour ouvrir la file d'attente" but to keep it short for the UI</comment>
+        </message>
+        <message>
+            <source>Device</source>
+            <translation>Appareil</translation>
+        </message>
+        <message>
+            <source>Device connected</source>
+            <translation>Appareil connecté</translation>
+        </message>
     </context>
 </TS>

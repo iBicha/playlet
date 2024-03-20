@@ -808,5 +808,89 @@
             <source>Reason</source>
             <translation>Reason</translation>
         </message>
+        <message>
+            <source>Skipped</source>
+            <translation>Skipped</translation>
+        </message>
+        <message>
+            <source>Sponsor</source>
+            <translation>Sponsor</translation>
+        </message>
+        <message>
+            <source>Unpaid/Self Promotion</source>
+            <translation>Unpaid/Self Promotion</translation>
+        </message>
+        <message>
+            <source>Exclusive Access</source>
+            <translation>Exclusive Access</translation>
+        </message>
+        <message>
+            <source>Interaction Reminder (Subscribe)</source>
+            <translation>Interaction Reminder (Subscribe)</translation>
+        </message>
+        <message>
+            <source>Interaction Reminder</source>
+            <translation>Interaction Reminder</translation>
+        </message>
+        <message>
+            <source>Highlight</source>
+            <translation>Highlight</translation>
+        </message>
+        <message>
+            <source>Intermission/Intro Animation</source>
+            <translation>Intermission/Intro Animation</translation>
+        </message>
+        <message>
+            <source>Intermission</source>
+            <translation>Intermission</translation>
+        </message>
+        <message>
+            <source>Endcards/Credits</source>
+            <translation>Endcards/Credits</translation>
+        </message>
+        <message>
+            <source>Preview/Recap/Hook</source>
+            <translation>Preview/Recap/Hook</translation>
+        </message>
+        <message>
+            <source>Preview/Recap</source>
+            <translation>Preview/Recap</translation>
+        </message>
+        <message>
+            <source>Filler Tangent/Jokes</source>
+            <translation>Filler Tangent/Jokes</translation>
+        </message>
+        <message>
+            <source>Filler</source>
+            <translation>Filler</translation>
+        </message>
+        <message>
+            <source>Chapter</source>
+            <translation>Chapter</translation>
+        </message>
+        <message>
+            <source>Music: Non-Music Section</source>
+            <translation>Music: Non-Music Section</translation>
+        </message>
+        <message>
+            <source>Non-Music</source>
+            <translation>Non-Music</translation>
+        </message>
+        <message>
+            <source>Added to queue</source>
+            <translation>Added to queue</translation>
+        </message>
+        <message>
+            <source>Press and hold Options (*) to open the queue</source>
+            <translation>Press and hold Options (*) to open the queue</translation>
+        </message>
+        <message>
+            <source>Device</source>
+            <translation>Device</translation>
+        </message>
+        <message>
+            <source>Device connected</source>
+            <translation>Device connected</translation>
+        </message>
     </context>
 </TS>
