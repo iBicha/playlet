@@ -225,6 +225,10 @@
             <translation>Play next video</translation>
         </message>
         <message>
+            <source>Clear</source>
+            <translation>Clear</translation>
+        </message>
+        <message>
             <source>Test</source>
             <translation>Test</translation>
         </message>
@@ -895,6 +899,10 @@
         <message>
             <source>Device connected</source>
             <translation>Device connected</translation>
+        </message>
+        <message>
+            <source>Queue</source>
+            <translation>Queue</translation>
         </message>
     </context>
 </TS>

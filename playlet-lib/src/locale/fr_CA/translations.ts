@@ -222,6 +222,10 @@
             <translation>Lire la vidéo suivante</translation>
         </message>
         <message>
+            <source>Clear</source>
+            <translation>Effacer</translation>
+        </message>
+        <message>
             <source>Test</source>
             <translation>Test</translation>
         </message>
@@ -893,6 +897,10 @@
         <message>
             <source>Device connected</source>
             <translation>Appareil connecté</translation>
+        </message>
+        <message>
+            <source>Queue</source>
+            <translation>File d'attente</translation>
         </message>
     </context>
 </TS>
