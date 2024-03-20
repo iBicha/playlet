@@ -6,6 +6,7 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
@@ -65,6 +66,11 @@ function OnNodeReady()
     m.linkWithWifiPanel.visible = false
     m.linkWithTvPanel.observeField("visible", FuncName(OnLinkWithTvPanelVisibleChanged))
     m.linkWithTvPanel.visible = false
+
+    m.webAppButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    m.linkWithWifiButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    m.linkWithTvButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    OnButtonSizeChange()
 end function
 
 function OnFocusChange() as void
@@ -85,6 +91,18 @@ function OnUrlSet()
 
     m.webAppUrlLabel.text = url
     m.webAppQrCodePoster.text = url
+end function
+
+function OnButtonSizeChange()
+    width1 = m.webAppButton.contentWidth
+    width2 = m.linkWithWifiButton.contentWidth
+    width3 = m.linkWithTvButton.contentWidth
+
+    width = MathUtils.Max(width1, MathUtils.Max(width2, width3))
+
+    m.webAppButton.minimumWidth = width
+    m.linkWithWifiButton.minimumWidth = width
+    m.linkWithTvButton.minimumWidth = width
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean

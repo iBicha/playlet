@@ -210,6 +210,10 @@
             <translation>Non</translation>
         </message>
         <message>
+            <source>Success</source>
+            <translation>Succès</translation>
+        </message>
+        <message>
             <source>Refresh</source>
             <translation>Rafraîchir</translation>
         </message>
@@ -534,6 +538,26 @@
             <translation>Impossible d'obtenir l'adresse IP: est-on connecté à Internet?</translation>
         </message>
         <message>
+            <source>Playlet Web App</source>
+            <translation>Application Web Playlet</translation>
+        </message>
+        <message>
+            <source>Use Playlet Remote in the browser</source>
+            <translation>Controller Playlet depuis le navigateur</translation>
+        </message>
+        <message>
+            <source>Link with Wi-Fi</source>
+            <translation>Connecter avec Wi-Fi</translation>
+        </message>
+        <message>
+            <source>Link with TV code</source>
+            <translation>Connecter avec code TV</translation>
+        </message>
+        <message>
+            <source>Cast from the YouTube app to Playlet</source>
+            <translation>Diffusion depuis YouTube vers Playlet</translation>
+        </message>
+        <message>
             <source>On your phone, connect to the same Wi-Fi network as this device.</source>
             <translation>Sur votre téléphone, connectez-vous au même réseau Wi-Fi que cet appareil.</translation>
         </message>
@@ -576,6 +600,170 @@
         <message>
             <source>Failed to generate manual pairing code</source>
             <translation>Échec de la génération du code d'appariement manuel</translation>
+        </message>
+        <message>
+            <source>Playback</source>
+            <translation>Lecture</translation>
+        </message>
+        <message>
+            <source>Playback preferences</source>
+            <translation>Préférences de lecture</translation>
+        </message>
+        <message>
+            <source>Autoplay</source>
+            <translation>Lecture automatique</translation>
+        </message>
+        <message>
+            <source>When you finish a video, another plays automatically</source>
+            <translation>Lorsque vous avez terminé une vidéo, une autre se lance automatiquement</translation>
+        </message>
+        <message>
+            <source>Preferred quality</source>
+            <translation>Qualité préférée</translation>
+        </message>
+        <message>
+            <source>Preferred video quality</source>
+            <translation>Qualité vidéo préférée</translation>
+        </message>
+        <message>
+            <source>Auto (DASH)</source>
+            <translation>Auto (DASH)</translation>
+        </message>
+        <message>
+            <source>720p</source>
+            <translation>720p</translation>
+        </message>
+        <message>
+            <source>Medium</source>
+            <translation>Moyenne</translation>
+        </message>
+        <message>
+            <source>Invidious preferences</source>
+            <translation>Préférences Invidious</translation>
+        </message>
+        <message>
+            <source>Instance</source>
+            <translation>Instance</translation>
+        </message>
+        <message>
+            <source>Invidious instance to use. Example: https://example.com</source>
+            <translation>Instance Invidious à utiliser. Exemple: https://exemple.com</translation>
+        </message>
+        <message>
+            <source>Proxy videos</source>
+            <translation>Proxy vidéos</translation>
+        </message>
+        <message>
+            <source>Proxy videos through the Invidious server. This is useful if videos are geoblocked.</source>
+            <translation>Proxy vidéos à travers le serveur Invidious. Ceci est utile si les vidéos sont géobloquées.</translation>
+        </message>
+        <message>
+            <source>Always</source>
+            <translation>Toujours</translation>
+        </message>
+        <message>
+            <source>Only if needed</source>
+            <translation>Uniquement si nécessaire</translation>
+        </message>
+        <message>
+            <source>Never</source>
+            <translation>Jamais</translation>
+        </message>
+        <message>
+            <source>SponsorBlock</source>
+            <translation>SponsorBlock</translation>
+        </message>
+        <message>
+            <source>SponsorBlock preferences</source>
+            <translation>Préférences SponsorBlock</translation>
+        </message>
+        <message>
+            <source>Enabled</source>
+            <translation>Activé</translation>
+        </message>
+        <message>
+            <source>Enable SponsorBlock</source>
+            <translation>Activer SponsorBlock</translation>
+        </message>
+        <message>
+            <source>Show notifications</source>
+            <translation>Afficher les notifications</translation>
+        </message>
+        <message>
+            <source>Show notifications when a segment is skipped</source>
+            <translation>Afficher les notifications lorsqu'un segment est sauté</translation>
+        </message>
+        <message>
+            <source>Search History</source>
+            <translation>Historique de recherche</translation>
+        </message>
+        <message>
+            <source>Search history preferences</source>
+            <translation>Préférences de l'historique de recherche</translation>
+        </message>
+        <message>
+            <source>Enable search history</source>
+            <translation>Activer l'historique de recherche</translation>
+        </message>
+        <message>
+            <source>Clear Search History</source>
+            <translation>Effacer l'historique de recherche</translation>
+        </message>
+        <message>
+            <source>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</source>
+            <translation>Effacer l'historique de recherche de Playlet. Cela affecte les suggestions de recherche. Cela n'affecte pas l'historique de visionnage sur Invidious.</translation>
+        </message>
+        <message>
+            <source>Search history cleared.</source>
+            <translation>Search history cleared.</translation>
+        </message>
+        <message>
+            <source>Miscellaneous</source>
+            <translation>Divers</translation>
+        </message>
+        <message>
+            <source>Misc. preferences</source>
+            <translation>Préférences diverses</translation>
+        </message>
+        <message>
+            <source>Edit home screen</source>
+            <translation>Modifier l'écran d'accueil</translation>
+        </message>
+        <message>
+            <source>Enable/disable and reorder sections on the home screen</source>
+            <translation>Activer/désactiver et réorganiser les sections sur l'écran d'accueil</translation>
+        </message>
+        <message>
+            <source>Queue notifications</source>
+            <translation>Notifications de file d'attente</translation>
+        </message>
+        <message>
+            <source>Show a notification when a video is added to the queue</source>
+            <translation>Afficher une notification lorsqu'une vidéo est ajoutée à la file d'attente</translation>
+        </message>
+        <message>
+            <source>Developer</source>
+            <translation>Développeur</translation>
+        </message>
+        <message>
+            <source>Developer preferences</source>
+            <translation>Préférences du développeur</translation>
+        </message>
+        <message>
+            <source>Use dev video player</source>
+            <translation>Utiliser le lecteur vidéo dev</translation>
+        </message>
+        <message>
+            <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
+            <translation>Activer le lecteur vidéo de dev. Il s'agit d'un lecteur vidéo inachevé à des fins de test.</translation>
+        </message>
+        <message>
+            <source>Playlet Library version</source>
+            <translation>Version de Playlet Library</translation>
+        </message>
+        <message>
+            <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
+            <translation>La version de Playlet Lib à utiliser. Celles-ci correspondent aux versions taguées sur Github. Les versions qui n'ont pas de fichier playlet-lib.zip sont désactivées.</translation>
         </message>
     </context>
 </TS>
