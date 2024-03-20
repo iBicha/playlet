@@ -719,7 +719,7 @@
         </message>
         <message>
             <source>Search history cleared.</source>
-            <translation>Search history cleared.</translation>
+            <translation>Historique de recherche effacé.</translation>
         </message>
         <message>
             <source>Miscellaneous</source>
