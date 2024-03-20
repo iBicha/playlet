@@ -465,6 +465,10 @@
             <translation>^n weeks ago</translation>
         </message>
         <message>
+            <source>1 day ago</source>
+            <translation>1 day ago</translation>
+        </message>
+        <message>
             <source>^n days ago</source>
             <translation>^n days ago</translation>
         </message>

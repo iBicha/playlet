@@ -462,6 +462,10 @@
             <translation>il y a ^n semaines</translation>
         </message>
         <message>
+            <source>1 day ago</source>
+            <translation>il y a 1 jour</translation>
+        </message>
+        <message>
             <source>^n days ago</source>
             <translation>il y a ^n jours</translation>
         </message>
