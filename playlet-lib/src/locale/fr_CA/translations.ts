@@ -218,6 +218,10 @@
             <translation>Rafraîchir</translation>
         </message>
         <message>
+            <source>Play next video</source>
+            <translation>Lire la vidéo suivante</translation>
+        </message>
+        <message>
             <source>Test</source>
             <translation>Test</translation>
         </message>
@@ -764,6 +768,42 @@
         <message>
             <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
             <translation>La version de Playlet Lib à utiliser. Celles-ci correspondent aux versions taguées sur Github. Les versions qui n'ont pas de fichier playlet-lib.zip sont désactivées.</translation>
+        </message>
+        <message>
+            <source>Press Options (*) for full screen</source>
+            <translation>Appuyez sur Options (*) pour plein écran</translation>
+        </message>
+        <message>
+            <source>Video load error</source>
+            <translation>Erreur de chargement de la vidéo</translation>
+        </message>
+        <message>
+            <source>Failed to load video information for %1</source>
+            <translation>Échec du chargement des informations de la vidéo pour %1</translation>
+        </message>
+        <message>
+            <source>Error playing video %1</source>
+            <translation>Erreur de lecture de la vidéo %1</translation>
+        </message>
+        <message>
+            <source>Error closing video</source>
+            <translation>Erreur lors de la fermeture de la vidéo</translation>
+        </message>
+        <message>
+            <source>Request not sent.</source>
+            <translation>Requête non envoyée.</translation>
+        </message>
+        <message>
+            <source>Request timed out.</source>
+            <translation>Requête expirée.</translation>
+        </message>
+        <message>
+            <source>Request cancelled.</source>
+            <translation>Requête annulée.</translation>
+        </message>
+        <message>
+            <source>Reason</source>
+            <translation>Raison</translation>
         </message>
     </context>
 </TS>

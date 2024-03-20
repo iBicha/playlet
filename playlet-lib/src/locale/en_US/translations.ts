@@ -221,6 +221,10 @@
             <translation>Refresh</translation>
         </message>
         <message>
+            <source>Play next video</source>
+            <translation>Play next video</translation>
+        </message>
+        <message>
             <source>Test</source>
             <translation>Test</translation>
         </message>
@@ -767,6 +771,42 @@
         <message>
             <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
             <translation>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</translation>
+        </message>
+        <message>
+            <source>Press Options (*) for full screen</source>
+            <translation>Press Options (*) for full screen</translation>
+        </message>
+        <message>
+            <source>Video load error</source>
+            <translation>Video load error</translation>
+        </message>
+        <message>
+            <source>Failed to load video information for %1</source>
+            <translation>Failed to load video information for %1</translation>
+        </message>
+        <message>
+            <source>Error playing video %1</source>
+            <translation>Error playing video %1</translation>
+        </message>
+        <message>
+            <source>Error closing video</source>
+            <translation>Error closing video</translation>
+        </message>
+        <message>
+            <source>Request not sent.</source>
+            <translation>Request not sent.</translation>
+        </message>
+        <message>
+            <source>Request timed out.</source>
+            <translation>Request timed out.</translation>
+        </message>
+        <message>
+            <source>Request cancelled.</source>
+            <translation>Request cancelled.</translation>
+        </message>
+        <message>
+            <source>Reason</source>
+            <translation>Reason</translation>
         </message>
     </context>
 </TS>
