@@ -922,5 +922,57 @@
             <source>Queue</source>
             <translation>File d'attente</translation>
         </message>
+        <message>
+            <source>Load more</source>
+            <translation>Charger plus</translation>
+        </message>
+        <message>
+            <source>No Bookmarks</source>
+            <translation>Aucun favori</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, select a video, playlist or channel, and add a bookmark.</source>
+            <translation>Pour ajouter des favoris, sélectionnez une vidéo, une playlist ou une chaîne, et ajoutez un favori.</translation>
+        </message>
+        <message>
+            <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
+            <translation>Instance Invidious à utiliser. Exemple : https://example.com. Trouvez plus d'instances sur $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        </message>
+        <message>
+            <source>Thank you for using Playlet.</source>
+            <translation>Merci d'utiliser Playlet.</translation>
+        </message>
+        <message>
+            <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
+            <translation>Vous avez des commentaires ? Faites-nous savoir en %IssueStart%créant un "Issue" sur Github%IssueEnd% ou en %EmailStart%envoyant un email%EmailEnd%.</translation>
+        </message>
+        <message>
+            <source>Latest (default)</source>
+            <translation>La plus récente (par défaut)</translation>
+        </message>
+        <message>
+            <source>Apply</source>
+            <translation>Appliquer</translation>
+        </message>
+        <message>
+            <source>Are you sure you want to change the Playlet Library version to %1?</source>
+            <translation>Êtes-vous sûr de vouloir changer la version de Playlet Lib en %1 ?</translation>
+        </message>
+        <message>
+            <source>This will restart Playlet.</source>
+            <translation>Cela redémarrera Playlet.</translation>
+        </message>
+        <message>
+            <source>Playlet Library version changed. Playlet will now restart.</source>
+            <translation>La version de Playlet Lib a été modifiée. Playlet va maintenant redémarrer.</translation>
+        </message>
+        <message>
+            <source>Error with login, please refresh the page.</source>
+            <translation>Erreur de connexion, veuillez rafraîchir la page.</translation>
+        </message>
+        <message>
+            <source>Profiles</source>
+            <translation>Profils</translation>
+        </message>
     </context>
 </TS>

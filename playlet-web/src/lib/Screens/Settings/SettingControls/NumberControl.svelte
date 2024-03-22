@@ -52,5 +52,5 @@
       </button>
     </div>
   </label>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
 </div>

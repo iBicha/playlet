@@ -3,6 +3,7 @@
   import { tr, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
+  const invidiousPublicInstancesLink = `<a class="link" href="https://api.invidious.io" target="_blank" rel="noopener noreferrer">https://api.invidious.io</a>`;
 
   export let displayText: string = "";
   export let key: string = "";
@@ -27,7 +28,13 @@
 
 <div class="m-5">
   <div class={textSizes[level]}>{$tr(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class="text-xs text-gray-500">
+    <!-- TODO:P2 this should not be hardcoded here -->
+    {@html $tr(description).replace(
+      "$INVIDIOUS_PUBLIC_INSTANCES",
+      invidiousPublicInstancesLink
+    )}
+  </div>
 
   <div class="join w-full m-1">
     <input

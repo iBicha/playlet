@@ -25,7 +25,7 @@
 
 <div class="m-5">
   <div class={textSizes[level]}>{$tr(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
 
   {#each options as option}
     <div class="form-control">

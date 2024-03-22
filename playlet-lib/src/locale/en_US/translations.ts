@@ -924,5 +924,57 @@
             <source>Queue</source>
             <translation>Queue</translation>
         </message>
+        <message>
+            <source>Load more</source>
+            <translation>Load more</translation>
+        </message>
+        <message>
+            <source>No Bookmarks</source>
+            <translation>No Bookmarks</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, select a video, playlist or channel, and add a bookmark.</source>
+            <translation>To add bookmarks, select a video, playlist or channel, and add a bookmark.</translation>
+        </message>
+        <message>
+            <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
+            <translation>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        </message>
+        <message>
+            <source>Thank you for using Playlet.</source>
+            <translation>Thank you for using Playlet.</translation>
+        </message>
+        <message>
+            <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
+            <translation>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</translation>
+        </message>
+        <message>
+            <source>Latest (default)</source>
+            <translation>Latest (default)</translation>
+        </message>
+        <message>
+            <source>Apply</source>
+            <translation>Apply</translation>
+        </message>
+        <message>
+            <source>Are you sure you want to change the Playlet Library version to %1?</source>
+            <translation>Are you sure you want to change the Playlet Library version to %1?</translation>
+        </message>
+        <message>
+            <source>This will restart Playlet.</source>
+            <translation>This will restart Playlet.</translation>
+        </message>
+        <message>
+            <source>Playlet Library version changed. Playlet will now restart.</source>
+            <translation>Playlet Library version changed. Playlet will now restart.</translation>
+        </message>
+        <message>
+            <source>Error with login, please refresh the page.</source>
+            <translation>Error with login, please refresh the page.</translation>
+        </message>
+        <message>
+            <source>Profiles</source>
+            <translation>Profiles</translation>
+        </message>
     </context>
 </TS>

@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { tr } from "lib/Stores";
+
   let modal;
 
-  export let label = "Filters";
+  export let label = $tr("Filters");
 
   export const filters = {
     date: "",
@@ -28,7 +30,7 @@
     count += filters.features.length;
     count += filters.sort_by ? 1 : 0;
 
-    label = `Filters` + `${count > 0 ? ` (${count})` : ""}`;
+    label = $tr("Filters") + `${count > 0 ? ` (${count})` : ""}`;
   }
 
   const options = {
@@ -239,12 +241,12 @@
         <button
           class="btn btn-outline"
           type="button"
-          on:click={() => modal.close()}>Close</button
+          on:click={() => modal.close()}>{$tr("Close")}</button
         >
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>Close</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>

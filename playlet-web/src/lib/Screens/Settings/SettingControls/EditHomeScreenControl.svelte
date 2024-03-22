@@ -86,7 +86,7 @@
 
 <div class="m-5">
   <div class={textSizes[level]}>{$tr(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
   <button class="btn m-1" on:click={openHomeScreenEditor}
     >{$tr("Edit home screen")}</button
   >
