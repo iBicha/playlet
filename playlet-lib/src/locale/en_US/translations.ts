@@ -161,6 +161,26 @@
             <translation>Do you want to exit Playlet?</translation>
         </message>
         <message>
+            <source>Sort %1 by</source>
+            <translation>Sort %1 by</translation>
+        </message>
+        <message>
+            <source>Latest</source>
+            <translation>Latest</translation>
+        </message>
+        <message>
+            <source>Oldest</source>
+            <translation>Oldest</translation>
+        </message>
+        <message>
+            <source>Date added (newest)</source>
+            <translation>Date added (newest)</translation>
+        </message>
+        <message>
+            <source>Last video added</source>
+            <translation>Last video added</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Invidious custom instance</translation>
         </message>

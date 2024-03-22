@@ -158,6 +158,26 @@
             <translation>Voulez-vous quitter Playlet?</translation>
         </message>
         <message>
+            <source>Sort %1 by</source>
+            <translation>Trier %1 par</translation>
+        </message>
+        <message>
+            <source>Latest</source>
+            <translation>Les plus récentes</translation>
+        </message>
+        <message>
+            <source>Oldest</source>
+            <translation>Les plus anciennes</translation>
+        </message>
+        <message>
+            <source>Date added (newest)</source>
+            <translation>Date d'ajout (la plus récente)</translation>
+        </message>
+        <message>
+            <source>Last video added</source>
+            <translation>Dernière vidéo ajoutée</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Instance personnalisée d'Invidious</translation>
         </message>
