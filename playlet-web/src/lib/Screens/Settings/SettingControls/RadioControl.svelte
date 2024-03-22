@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { userPreferencesStore } from "lib/Stores";
+  import { tr, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -24,13 +24,13 @@
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{displayText}</div>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class={textSizes[level]}>{$tr(displayText)}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
 
   {#each options as option}
     <div class="form-control">
       <label class="label cursor-pointer">
-        <span class="label-text">{option.displayText}</span>
+        <span class="label-text">{$tr(option.displayText)}</span>
         <input
           type="radio"
           name={key}

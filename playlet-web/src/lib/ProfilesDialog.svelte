@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import { PlayletApi } from "./Api/PlayletApi";
   import { get } from "svelte/store";
 
@@ -66,7 +66,7 @@
 <dialog bind:this={modal} class="modal">
   <form method="dialog" class="modal-box bg-base-100">
     <div class="flex flex-col items-center">
-      <div class="text-xl font-medium m-4">Profiles</div>
+      <div class="text-xl font-medium m-4">{$tr("Profiles")}</div>
 
       {#each profiles as profile}
         <div class="collapse collapse-arrow bg-base-300 m-1">
@@ -109,12 +109,12 @@
             {#if profile.id !== currentProfile?.id}
               <button
                 on:click={() => activate(profile.id)}
-                class="btn btn-primary m-1">Activate</button
+                class="btn btn-primary m-1">{$tr("Activate")}</button
               >
             {/if}
             <button
               on:click={() => logout(profile.id)}
-              class="btn btn-primary m-1">Logout</button
+              class="btn btn-primary m-1">{$tr("Logout")}</button
             >
           </div>
         </div>
@@ -122,15 +122,15 @@
       <div class="flex items-center">
         <button class="btn btn-primary" on:click={login}>
           <div class="">
-            <div class="text-m">Login to Invidious</div>
+            <div class="text-m">{$tr("Login to Invidious")}</div>
             <div class="text-xs font-light">{currentInstance}</div>
           </div>
         </button>
-        <button class="btn m-6" on:click={close}>Close</button>
+        <button class="btn m-6" on:click={close}>{$tr("Close")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button on:click={close}>Close</button>
+    <button on:click={close}>{$tr("Close")}</button>
   </form>
 </dialog>

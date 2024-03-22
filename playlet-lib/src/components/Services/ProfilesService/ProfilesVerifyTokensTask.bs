@@ -2,7 +2,7 @@ import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 @asynctask
 function ProfilesVerifyTokensTask(input as object) as object
-    profilesNode = input.profiles
+    profilesNode = input.profilesService
     invidiousNode = input.invidious
     profileContentNodes = input.profileNodes
 
@@ -27,12 +27,8 @@ function ProfilesVerifyTokensTask(input as object) as object
     end for
     profileNames = profileNames.join(", ")
 
-    message = `It looks like you are logged in to Invidious, but do not have the required permissions.
-For that reason, we have logged you out from the following profiles: ${profileNames}
-Please log in again.
-This can happen when Playlet is updated with new features.
-We apologize for the inconvenience.`
-    DialogUtils.ShowDialog(message, "User logged out")
+    message = Tr(Locale.Dialogs.UserLoggedOutMessage).Replace("\n", `\n`).Replace("%1", profileNames)
+    DialogUtils.ShowDialog(message, Tr(Locale.Dialogs.UserLoggedOut))
 
     return invalid
 end function

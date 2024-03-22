@@ -196,6 +196,16 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_MISSING_TRANSLATIONS',
             }]);
+
+            const xml = missingLocaleValues.reduce((acc, value) => {
+                acc += `<message>
+    <source>${value}</source>
+    <translation>${value}</translation>
+</message>\n`;
+                return acc;
+            }, '');
+
+            program.logger.error(`Add the following to en_US/translations.ts:\n${xml}`);
         }
     }
 

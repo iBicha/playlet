@@ -6,6 +6,7 @@
   import RadioControl from "lib/Screens/Settings/SettingControls/RadioControl.svelte";
   import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
   import NumberControl from "./SettingControls/NumberControl.svelte";
+  import { tr } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -53,8 +54,8 @@
     />
   {:else}
     <div class="m-5">
-      <div class={textSizes[level]}>{displayText}</div>
-      <div class="text-xs text-gray-500">{description}</div>
+      <div class={textSizes[level]}>{$tr(displayText)}</div>
+      <div class="text-xs text-gray-500">{$tr(description)}</div>
     </div>
   {/if}
 

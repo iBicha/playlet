@@ -181,6 +181,74 @@
             <translation>Last video added</translation>
         </message>
         <message>
+            <source>Channel load error</source>
+            <translation>Channel load error</translation>
+        </message>
+        <message>
+            <source>Failed to load channel %1</source>
+            <translation>Failed to load channel %1</translation>
+        </message>
+        <message>
+            <source>Playlist load error</source>
+            <translation>Playlist load error</translation>
+        </message>
+        <message>
+            <source>Failed to load playlist %1</source>
+            <translation>Failed to load playlist %1</translation>
+        </message>
+        <message>
+            <source>No results found</source>
+            <translation>No results found</translation>
+        </message>
+        <message>
+            <source>We didn't find any results for your search. Please try again with a different query or different filters.</source>
+            <translation>We didn't find any results for your search. Please try again with a different query or different filters.</translation>
+        </message>
+        <message>
+            <source>Invidious public instances load error</source>
+            <translation>Invidious public instances load error</translation>
+        </message>
+        <message>
+            <source>Failed to load Invidious public instances</source>
+            <translation>Failed to load Invidious public instances</translation>
+        </message>
+        <message>
+            <source>Failed to load feed</source>
+            <translation>Failed to load feed</translation>
+        </message>
+        <message>
+            <source>User logged out</source>
+            <translation>User logged out</translation>
+        </message>
+        <message>
+            <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
+            <translation>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</translation>
+        </message>
+        <message>
+            <source>Lounge service setup error</source>
+            <translation>Lounge service setup error</translation>
+        </message>
+        <message>
+            <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get screen ID. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
+            <source>Not a valid screen id: %1</source>
+            <translation>Not a valid screen id: %1</translation>
+        </message>
+        <message>
+            <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get lounge token. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
+            <source>Invalid response: %1</source>
+            <translation>Invalid response: %1</translation>
+        </message>
+        <message>
+            <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get session data. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Invidious custom instance</translation>
         </message>
@@ -741,8 +809,8 @@
             <translation>Enable search history</translation>
         </message>
         <message>
-            <source>Clear Search History</source>
-            <translation>Clear Search History</translation>
+            <source>Clear search history</source>
+            <translation>Clear search history</translation>
         </message>
         <message>
             <source>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</source>
@@ -923,6 +991,62 @@
         <message>
             <source>Queue</source>
             <translation>Queue</translation>
+        </message>
+        <message>
+            <source>Load more</source>
+            <translation>Load more</translation>
+        </message>
+        <message>
+            <source>No Bookmarks</source>
+            <translation>No Bookmarks</translation>
+        </message>
+        <message>
+            <source>To add bookmarks, select a video, playlist or channel, and add a bookmark.</source>
+            <translation>To add bookmarks, select a video, playlist or channel, and add a bookmark.</translation>
+        </message>
+        <message>
+            <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
+            <translation>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        </message>
+        <message>
+            <source>Thank you for using Playlet.</source>
+            <translation>Thank you for using Playlet.</translation>
+        </message>
+        <message>
+            <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
+            <translation>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</translation>
+        </message>
+        <message>
+            <source>Latest (default)</source>
+            <translation>Latest (default)</translation>
+        </message>
+        <message>
+            <source>Apply</source>
+            <translation>Apply</translation>
+        </message>
+        <message>
+            <source>Are you sure you want to change the Playlet Library version to %1?</source>
+            <translation>Are you sure you want to change the Playlet Library version to %1?</translation>
+        </message>
+        <message>
+            <source>This will restart Playlet.</source>
+            <translation>This will restart Playlet.</translation>
+        </message>
+        <message>
+            <source>Playlet Library version changed. Playlet will now restart.</source>
+            <translation>Playlet Library version changed. Playlet will now restart.</translation>
+        </message>
+        <message>
+            <source>Error with login, please refresh the page.</source>
+            <translation>Error with login, please refresh the page.</translation>
+        </message>
+        <message>
+            <source>Profiles</source>
+            <translation>Profiles</translation>
+        </message>
+        <message>
+            <source>Drop a YouTube link here</source>
+            <translation>Drop a YouTube link here</translation>
         </message>
     </context>
 </TS>
