@@ -8,6 +8,11 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getLocale(locale: string) {
+        const response = await fetch(`${PlayletApi.host()}/locale/${locale}/translations.ts`);
+        return await response.text();
+    }
+
     static async getPreferencesFile() {
         const response = await fetch(`${PlayletApi.host()}/config/preferences.json5`);
         return await response.json();

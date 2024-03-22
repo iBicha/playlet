@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { userPreferencesStore } from "lib/Stores";
+  import { tr, userPreferencesStore } from "lib/Stores";
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
   export let displayText: string = "";
   export let key: string = "";
@@ -21,7 +21,7 @@
 
 <div class="form-control m-5">
   <label class="label p-0 cursor-pointer">
-    <div class="label-text {textSizes[level]}">{displayText}</div>
+    <div class="label-text {textSizes[level]}">{$tr(displayText)}</div>
     <div class="join mt-2 mb-2">
       <button
         class="join-item btn btn-sm btn-primary"

@@ -741,8 +741,8 @@
             <translation>Enable search history</translation>
         </message>
         <message>
-            <source>Clear Search History</source>
-            <translation>Clear Search History</translation>
+            <source>Clear search history</source>
+            <translation>Clear search history</translation>
         </message>
         <message>
             <source>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</source>

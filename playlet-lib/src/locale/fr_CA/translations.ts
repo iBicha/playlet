@@ -738,7 +738,7 @@
             <translation>Activer l'historique de recherche</translation>
         </message>
         <message>
-            <source>Clear Search History</source>
+            <source>Clear search history</source>
             <translation>Effacer l'historique de recherche</translation>
         </message>
         <message>
