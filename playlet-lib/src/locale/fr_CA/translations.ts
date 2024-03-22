@@ -178,6 +178,74 @@
             <translation>Dernière vidéo ajoutée</translation>
         </message>
         <message>
+            <source>Channel load error</source>
+            <translation>Erreur de chargement de la chaîne</translation>
+        </message>
+        <message>
+            <source>Failed to load channel %1</source>
+            <translation>Échec du chargement de la chaîne %1</translation>
+        </message>
+        <message>
+            <source>Playlist load error</source>
+            <translation>Erreur de chargement de la playlist</translation>
+        </message>
+        <message>
+            <source>Failed to load playlist %1</source>
+            <translation>Échec du chargement de la playlist %1</translation>
+        </message>
+        <message>
+            <source>No results found</source>
+            <translation>Aucun résultat trouvé</translation>
+        </message>
+        <message>
+            <source>We didn't find any results for your search. Please try again with a different query or different filters.</source>
+            <translation>Nous n'avons trouvé aucun résultat pour votre recherche. Veuillez réessayer avec une requête différente ou des filtres différents.</translation>
+        </message>
+        <message>
+            <source>Invidious public instances load error</source>
+            <translation>Erreur de chargement des instances publiques Invidious</translation>
+        </message>
+        <message>
+            <source>Failed to load Invidious public instances</source>
+            <translation>Échec du chargement des instances publiques Invidious</translation>
+        </message>
+        <message>
+            <source>Failed to load feed</source>
+            <translation>Échec du chargement du flux</translation>
+        </message>
+        <message>
+            <source>User logged out</source>
+            <translation>Utilisateur déconnecté</translation>
+        </message>
+        <message>
+            <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
+            <translation>Il semble que vous soyez connecté à Invidious, mais n'avez pas les permissions requises.\nPour cette raison, nous vous avons déconnecté des profils suivants : %1\nVeuillez vous reconnecter.\nCela peut se produire lorsque Playlet est mis à jour avec de nouvelles fonctionnalités.\nNous nous excusons pour la gêne occasionnée.</translation>
+        </message>
+        <message>
+            <source>Lounge service setup error</source>
+            <translation>Erreur de configuration du service Lounge</translation>
+        </message>
+        <message>
+            <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
+            <translation>Impossible d'obtenir l'identifiant de l'écran. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
+        </message>
+        <message>
+            <source>Not a valid screen id: %1</source>
+            <translation>Identifiant d'écran non valide : %1</translation>
+        </message>
+        <message>
+            <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
+            <translation>Échec de l'obtention du jeton Lounge. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
+        </message>
+        <message>
+            <source>Invalid response: %1</source>
+            <translation>Réponse non valide : %1</translation>
+        </message>
+        <message>
+            <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
+            <translation>Échec de l'obtention des données de session. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Instance personnalisée d'Invidious</translation>
         </message>
@@ -944,7 +1012,7 @@
         </message>
         <message>
             <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
-            <translation>Vous avez des commentaires ? Faites-nous savoir en %IssueStart%créant un "Issue" sur Github%IssueEnd% ou en %EmailStart%envoyant un email%EmailEnd%.</translation>
+            <translation>Vous avez des commentaires? Faites-nous savoir en %IssueStart%créant un "Issue" sur Github%IssueEnd% ou en %EmailStart%envoyant un email%EmailEnd%.</translation>
         </message>
         <message>
             <source>Latest (default)</source>
@@ -973,6 +1041,10 @@
         <message>
             <source>Profiles</source>
             <translation>Profils</translation>
+        </message>
+        <message>
+            <source>Drop a YouTube link here</source>
+            <translation>Déposez un lien YouTube ici</translation>
         </message>
     </context>
 </TS>

@@ -181,6 +181,74 @@
             <translation>Last video added</translation>
         </message>
         <message>
+            <source>Channel load error</source>
+            <translation>Channel load error</translation>
+        </message>
+        <message>
+            <source>Failed to load channel %1</source>
+            <translation>Failed to load channel %1</translation>
+        </message>
+        <message>
+            <source>Playlist load error</source>
+            <translation>Playlist load error</translation>
+        </message>
+        <message>
+            <source>Failed to load playlist %1</source>
+            <translation>Failed to load playlist %1</translation>
+        </message>
+        <message>
+            <source>No results found</source>
+            <translation>No results found</translation>
+        </message>
+        <message>
+            <source>We didn't find any results for your search. Please try again with a different query or different filters.</source>
+            <translation>We didn't find any results for your search. Please try again with a different query or different filters.</translation>
+        </message>
+        <message>
+            <source>Invidious public instances load error</source>
+            <translation>Invidious public instances load error</translation>
+        </message>
+        <message>
+            <source>Failed to load Invidious public instances</source>
+            <translation>Failed to load Invidious public instances</translation>
+        </message>
+        <message>
+            <source>Failed to load feed</source>
+            <translation>Failed to load feed</translation>
+        </message>
+        <message>
+            <source>User logged out</source>
+            <translation>User logged out</translation>
+        </message>
+        <message>
+            <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
+            <translation>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</translation>
+        </message>
+        <message>
+            <source>Lounge service setup error</source>
+            <translation>Lounge service setup error</translation>
+        </message>
+        <message>
+            <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get screen ID. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
+            <source>Not a valid screen id: %1</source>
+            <translation>Not a valid screen id: %1</translation>
+        </message>
+        <message>
+            <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get lounge token. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
+            <source>Invalid response: %1</source>
+            <translation>Invalid response: %1</translation>
+        </message>
+        <message>
+            <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
+            <translation>Failed to get session data. Please restart Playlet to use the cast function.</translation>
+        </message>
+        <message>
             <source>Invidious custom instance</source>
             <translation>Invidious custom instance</translation>
         </message>
@@ -975,6 +1043,10 @@
         <message>
             <source>Profiles</source>
             <translation>Profiles</translation>
+        </message>
+        <message>
+            <source>Drop a YouTube link here</source>
+            <translation>Drop a YouTube link here</translation>
         </message>
     </context>
 </TS>
