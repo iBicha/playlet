@@ -625,6 +625,10 @@
             <translation>Please note that Bookmarks is an experimental feature.</translation>
         </message>
         <message>
+            <source>Channels</source>
+            <translation>Channels</translation>
+        </message>
+        <message>
             <source>Could not get IP address: are we connected to the internet?</source>
             <translation>Could not get IP address: are we connected to the internet?</translation>
         </message>
@@ -1055,6 +1059,54 @@
         <message>
             <source>Start at</source>
             <translation>Start at</translation>
+        </message>
+        <message>
+            <source>Play Video</source>
+            <translation>Play Video</translation>
+        </message>
+        <message>
+            <source>Queue Video</source>
+            <translation>Queue Video</translation>
+        </message>
+        <message>
+            <source>Play Playlist</source>
+            <translation>Play Playlist</translation>
+        </message>
+        <message>
+            <source>Queue Playlist</source>
+            <translation>Queue Playlist</translation>
+        </message>
+        <message>
+            <source>Open Channel</source>
+            <translation>Open Channel</translation>
+        </message>
+        <message>
+            <source>Open Playlist</source>
+            <translation>Open Playlist</translation>
+        </message>
+        <message>
+            <source>Open Playlist Channel</source>
+            <translation>Open Playlist Channel</translation>
+        </message>
+        <message>
+            <source>Open Video Channel</source>
+            <translation>Open Video Channel</translation>
+        </message>
+        <message>
+            <source>Refresh Home</source>
+            <translation>Refresh Home</translation>
+        </message>
+        <message>
+            <source>Refresh Bookmarks</source>
+            <translation>Refresh Bookmarks</translation>
+        </message>
+        <message>
+            <source>Remove from %1 bookmarks</source>
+            <translation>Remove from %1 bookmarks</translation>
+        </message>
+        <message>
+            <source>Add to %1 bookmark</source>
+            <translation>Add to %1 bookmark</translation>
         </message>
     </context>
 </TS>

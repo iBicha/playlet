@@ -1,13 +1,10 @@
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
-
-const VIDEOS_GROUP = "Videos"
-const CHANNELS_GROUP = "Channels"
-const PLAYLISTS_GROUP = "Playlists"
 
 function Init()
     m.top.content = m.top.findNode("content")
@@ -140,7 +137,7 @@ function AddPlaylistBookmarkWithSpread(id as string, groupName as string)
 
     feedSource = {
         "id": `inv_playlist_${id}`
-        "title": `${groupName} videos`
+        "title": `${groupName} ${Tr(Locale.Feed.Videos)}`
         "apiType": "Invidious"
         "endpoint": "playlist"
         "pathParams": {
@@ -177,7 +174,7 @@ function AddChannelBookmarkWithSpread(id as string, groupName as string)
 
     feedSource = {
         "id": `inv_channel_videos_${id}`
-        "title": `${groupName} videos`
+        "title": `${groupName} ${Tr(Locale.Feed.Videos)}`
         "apiType": "Invidious"
         "endpoint": "channel_videos"
         "pathParams": {
@@ -241,10 +238,14 @@ function GetMenuForVideo(videoNode as object) as object
     isInBookmarks = bookmark <> invalid
     if isInBookmarks
         bookmarkGroup = bookmark.getParent()
-        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [videoId])
+        title = Tr(Locale.ContextMenu.RemoveFromBookmarks).Replace("%1", `"${bookmarkGroup.title}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "RemoveBookmark", [videoId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${VIDEOS_GROUP}" bookmark`, m.top, "AddVideoBookmark", [videoId, VIDEOS_GROUP])
+        ' "Videos" exists in feed
+        group = Tr(Locale.Feed.Videos)
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${group}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddVideoBookmark", [videoId, group])
         menu.push(item)
     end if
     return menu
@@ -261,13 +262,18 @@ function GetMenuForPlaylist(playlistNode as object) as object
     isInBookmarks = bookmark <> invalid
     if isInBookmarks
         bookmarkGroup = bookmark.getParent()
-        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [playlistId])
+        title = Tr(Locale.ContextMenu.RemoveFromBookmarks).Replace("%1", `"${bookmarkGroup.title}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "RemoveBookmark", [playlistId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${PLAYLISTS_GROUP}" bookmark`, m.top, "AddPlaylistBookmark", [playlistId, PLAYLISTS_GROUP])
+        ' "Playlists" exists in feed
+        group = Tr(Locale.Feed.Playlists)
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${group}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddPlaylistBookmark", [playlistId, group])
         menu.push(item)
 
-        item = ContextMenuUtils.CreateOption(`Add to "${playlistNode.title}" bookmark`, m.top, "AddPlaylistBookmarkWithSpread", [playlistId, playlistNode.title])
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${playlistNode.title}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddPlaylistBookmarkWithSpread", [playlistId, playlistNode.title])
         menu.push(item)
     end if
     return menu
@@ -284,13 +290,17 @@ function GetMenuForChannel(channelNode as object) as object
     isInBookmarks = bookmark <> invalid
     if isInBookmarks
         bookmarkGroup = bookmark.getParent()
-        item = ContextMenuUtils.CreateOption(`Remove from "${bookmarkGroup.title}" bookmarks`, m.top, "RemoveBookmark", [authorId])
+        title = Tr(Locale.ContextMenu.RemoveFromBookmarks).Replace("%1", `"${bookmarkGroup.title}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "RemoveBookmark", [authorId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${CHANNELS_GROUP}" bookmark`, m.top, "AddChannelBookmark", [authorId, CHANNELS_GROUP])
+        group = Tr(Locale.Bookmarks.Channels)
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${group}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddChannelBookmark", [authorId, group])
         menu.push(item)
 
-        item = ContextMenuUtils.CreateOption(`Add to "${channelNode._author}" bookmark`, m.top, "AddChannelBookmarkWithSpread", [authorId, channelNode._author])
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${channelNode._author}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddChannelBookmarkWithSpread", [authorId, channelNode._author])
         menu.push(item)
     end if
     return menu
@@ -316,17 +326,19 @@ function GetMenuForParentFeedSource(itemNode as object) as object
         return []
     end if
 
-    title = feedSource.title
+    feedSourceTitle = feedSource.title
     feedSourceId = feedSource.id
 
     menu = []
     isInBookmarks = m.top.content.findNode(feedSourceId) <> invalid
 
     if isInBookmarks
-        item = ContextMenuUtils.CreateOption(`Remove "${feedSource.title}" from bookmarks`, m.top, "RemoveBookmark", [feedSourceId])
+        title = Tr(Locale.ContextMenu.RemoveFromBookmarks).Replace("%1", `"${feedSourceTitle}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "RemoveBookmark", [feedSourceId])
         menu.push(item)
     else
-        item = ContextMenuUtils.CreateOption(`Add to "${title}" bookmark`, m.top, "AddFeedSourceBookmark", [feedSource, feedSourceId, title])
+        title = Tr(Locale.ContextMenu.AddToBookmark).Replace("%1", `"${feedSourceTitle}"`)
+        item = ContextMenuUtils.CreateOption(title, m.top, "AddFeedSourceBookmark", [feedSource, feedSourceId, feedSourceTitle])
         menu.push(item)
     end if
     return menu
