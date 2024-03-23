@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import VideoStartAt from "./VideoStartAt.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
 
@@ -109,19 +109,19 @@
       />
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>
-          Play on {tvName}
+          {$tr("Play on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={queueOnTv}>
-          Queue on {tvName}
+          {$tr("Queue on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
-          Open in Invidious
+          {$tr("Open in Invidious")}
         </button>
-        <button class="btn join-item hover:btn-accent">Cancel</button>
+        <button class="btn join-item hover:btn-accent">{$tr("Cancel")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>Close</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>

@@ -1,14 +1,17 @@
 <script lang="ts">
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import VideoCastDialog from "./VideoCastDialog.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
   import ChannelCastDialog from "./ChannelCastDialog.svelte";
+  import { get } from "svelte/store";
+  import { getFormattedPluralString } from "lib/Api/Locale";
 
   export let title: string | undefined = undefined;
   export let videoId: string | undefined = undefined;
   export let author: string | undefined = undefined;
   export let videoThumbnails: any[] | undefined = undefined;
   export let viewCount: number | undefined = undefined;
+  export let published: number = undefined;
   export let publishedText: string | undefined = undefined;
   export let isUpcoming: boolean = undefined;
   export let premiereTimestamp: number | undefined = undefined;
@@ -30,8 +33,6 @@
   // svelte-ignore unused-export-let
   export let viewCountText: string = undefined;
   // svelte-ignore unused-export-let
-  export let published: number = undefined;
-  // svelte-ignore unused-export-let
   export let premium: boolean = undefined;
   // svelte-ignore unused-export-let
   export let index: number = undefined;
@@ -47,10 +48,10 @@
   });
 
   function getViewCountDateText() {
-    if (isUpcoming) {
-      return `Premeres in ${getFormattedTimeLeft(premiereTimestamp)}`;
+    if (isUpcoming && premiereTimestamp) {
+      return getPremieresInText();
     }
-    const pubText = publishedText || "";
+    const pubText = getPublishedText();
     const viewCountText = formatViewCount(viewCount);
 
     if (pubText === "" && viewCountText === "") {
@@ -60,82 +61,122 @@
     return `${pubText} • ${viewCountText}`;
   }
 
-  function getFormattedTimeLeft(unixTimestamp) {
-    if (unixTimestamp === "invalid") {
-      return "N/A";
-    }
-
-    const currentTime = Math.floor(Date.now() / 1000);
-    let timeLeft = unixTimestamp - currentTime;
-    if (timeLeft <= 0) {
-      return "now";
-    }
-
-    if (timeLeft < 60) {
-      let result = `${timeLeft} second`;
-      if (timeLeft > 1) {
-        result += "s";
-      }
-      return result;
-    }
-
-    timeLeft = timeLeft / 60.0;
-    if (timeLeft < 60) {
-      timeLeft = Math.floor(timeLeft);
-      let result = `${timeLeft} minute`;
-      if (timeLeft > 1) {
-        result += "s";
-      }
-      return result;
-    }
-
-    timeLeft = timeLeft / 60.0;
-    if (timeLeft < 24) {
-      timeLeft = Math.floor(timeLeft);
-      let result = `${timeLeft} hour`;
-      if (timeLeft > 1) {
-        result += "s";
-      }
-      return result;
-    } else {
-      timeLeft = timeLeft / 24.0;
-      timeLeft = Math.floor(timeLeft);
-      let result = `${timeLeft} day`;
-      if (timeLeft > 1) {
-        result += "s";
-      }
-      return result;
-    }
-  }
-
   function formatViewCount(viewCount) {
     if (isNaN(viewCount)) {
       return "";
     }
-    if (viewCount < 1000) {
-      return `${formatFloat(viewCount)} views`;
-    }
-
-    viewCount = viewCount / 1000;
-    if (viewCount < 1000) {
-      return `${formatFloat(viewCount)}K views`;
-    }
-
-    viewCount = viewCount / 1000;
-    if (viewCount < 1000) {
-      return `${formatFloat(viewCount)}M views`;
-    }
-
-    viewCount = viewCount / 1000;
-    return `${formatFloat(viewCount)}B views`;
+    return getFormattedPluralString(viewCount, "0 views", "1 view", "^n views");
   }
 
-  function formatFloat(X) {
-    X = X * 10;
-    X = X + 0.5;
-    X = Math.floor(X);
-    X = X / 10;
-    return X;
+  function getPremieresInText() {
+    if (!isUpcoming || isNaN(premiereTimestamp)) {
+      return "";
+    }
+
+    const trFn = get(tr);
+
+    const currentTime = Math.floor(Date.now() / 1000);
+    let timeLeft = premiereTimestamp - currentTime;
+    if (timeLeft <= 0) {
+      return trFn("Premiering now");
+    }
+
+    if (timeLeft < 60) {
+      if (timeLeft === 1) {
+        return trFn("Premieres in 1 second");
+      } else {
+        return trFn("Premieres in ^n seconds").replace(
+          "^n",
+          timeLeft.toString()
+        );
+      }
+    }
+
+    if (timeLeft < 3600) {
+      const minutes = Math.floor(timeLeft / 60);
+      if (minutes === 1) {
+        return trFn("Premieres in 1 minute");
+      } else {
+        return trFn("Premieres in ^n minutes").replace(
+          "^n",
+          minutes.toString()
+        );
+      }
+    }
+
+    if (timeLeft < 86400) {
+      const hours = Math.floor(timeLeft / 3600);
+      if (hours === 1) {
+        return trFn("Premieres in 1 hour");
+      } else {
+        return trFn("Premieres in ^n hours").replace("^n", hours.toString());
+      }
+    }
+
+    const days = Math.floor(timeLeft / 86400);
+    if (days === 1) {
+      return trFn("Premieres in 1 day");
+    } else {
+      return trFn("Premieres in ^n days").replace("^n", days.toString());
+    }
+  }
+
+  function getPublishedText() {
+    if (isNaN(published)) {
+      return "";
+    }
+    const trFn = get(tr);
+    const currentTime = Math.floor(Date.now() / 1000);
+    const span = currentTime - published;
+    if (span < 1) {
+      return publishedText || "";
+    }
+
+    const totalDays = Math.floor(span / 86400);
+    if (totalDays > 365) {
+      const years = Math.floor(totalDays / 365);
+      if (years === 1) {
+        return trFn("1 year ago");
+      } else {
+        return trFn("^n years ago").replace("^n", years.toString());
+      }
+    } else if (totalDays > 30) {
+      const months = Math.floor(totalDays / 30);
+      if (months === 1) {
+        return trFn("1 month ago");
+      } else {
+        return trFn("^n months ago").replace("^n", months.toString());
+      }
+    } else if (totalDays > 7) {
+      const weeks = Math.floor(totalDays / 7);
+      if (weeks === 1) {
+        return trFn("1 week ago");
+      } else {
+        return trFn("^n weeks ago").replace("^n", weeks.toString());
+      }
+    } else if (totalDays > 0) {
+      if (totalDays === 1) {
+        return trFn("1 day ago");
+      } else {
+        return trFn("^n days ago").replace("^n", totalDays.toString());
+      }
+    } else if (span > 3600) {
+      const hours = Math.floor(span / 3600);
+      if (hours === 1) {
+        return trFn("1 hour ago");
+      } else {
+        return trFn("^n hours ago").replace("^n", hours.toString());
+      }
+    } else if (span > 60) {
+      const minutes = Math.floor(span / 60);
+      if (minutes === 1) {
+        return trFn("1 minute ago");
+      } else {
+        return trFn("^n minutes ago").replace("^n", minutes.toString());
+      }
+    } else {
+      return trFn("1 minute ago");
+    }
   }
 </script>
 

@@ -470,18 +470,6 @@
             <translation>^n vues</translation>
         </message>
         <message>
-            <source>Updated 0 seconds ago</source>
-            <translation>Mis à jour il y a 0 seconde</translation>
-        </message>
-        <message>
-            <source>Updated 1 second ago</source>
-            <translation>Mis à jour il y a 1 seconde</translation>
-        </message>
-        <message>
-            <source>Updated ^n seconds ago</source>
-            <translation>Mis à jour il y a ^n secondes</translation>
-        </message>
-        <message>
             <source>Updated 1 minute ago</source>
             <translation>Mis à jour il y a 1 minute</translation>
         </message>
@@ -1045,6 +1033,26 @@
         <message>
             <source>Drop a YouTube link here</source>
             <translation>Déposez un lien YouTube ici</translation>
+        </message>
+        <message>
+            <source>Play on %1</source>
+            <translation>Lire sur %1</translation>
+        </message>
+        <message>
+            <source>Queue on %1</source>
+            <translation>Mettre en file d'attente sur %1</translation>
+        </message>
+        <message>
+            <source>Open on %1</source>
+            <translation>Ouvrir sur %1</translation>
+        </message>
+        <message>
+            <source>Open in Invidious</source>
+            <translation>Ouvrir dans Invidious</translation>
+        </message>
+        <message>
+            <source>Start at</source>
+            <translation>Démarrer à</translation>
         </message>
     </context>
 </TS>
