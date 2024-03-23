@@ -1108,5 +1108,137 @@
             <source>Add to %1 bookmark</source>
             <translation>Add to %1 bookmark</translation>
         </message>
+        <message>
+            <source>Upload date</source>
+            <translation>Upload date</translation>
+        </message>
+        <message>
+            <source>Type</source>
+            <translation>Type</translation>
+        </message>
+        <message>
+            <source>Duration</source>
+            <translation>Duration</translation>
+        </message>
+        <message>
+            <source>Features</source>
+            <translation>Features</translation>
+        </message>
+        <message>
+            <source>Sort by</source>
+            <translation>Sort by</translation>
+        </message>
+        <message>
+            <source>Any date</source>
+            <translation>Any date</translation>
+        </message>
+        <message>
+            <source>Last hour</source>
+            <translation>Last hour</translation>
+        </message>
+        <message>
+            <source>Today</source>
+            <translation>Today</translation>
+        </message>
+        <message>
+            <source>This week</source>
+            <translation>This week</translation>
+        </message>
+        <message>
+            <source>This month</source>
+            <translation>This month</translation>
+        </message>
+        <message>
+            <source>This year</source>
+            <translation>This year</translation>
+        </message>
+        <message>
+            <source>Any type</source>
+            <translation>Any type</translation>
+        </message>
+        <message>
+            <source>Video</source>
+            <translation>Video</translation>
+        </message>
+        <message>
+            <source>Playlist</source>
+            <translation>Playlist</translation>
+        </message>
+        <message>
+            <source>Channel</source>
+            <translation>Channel</translation>
+        </message>
+        <message>
+            <source>Movie</source>
+            <translation>Movie</translation>
+        </message>
+        <message>
+            <source>Any duration</source>
+            <translation>Any duration</translation>
+        </message>
+        <message>
+            <source>Under 4 minutes</source>
+            <translation>Under 4 minutes</translation>
+        </message>
+        <message>
+            <source>4 - 20 minutes</source>
+            <translation>4 - 20 minutes</translation>
+        </message>
+        <message>
+            <source>Over 20 minutes</source>
+            <translation>Over 20 minutes</translation>
+        </message>
+        <message>
+            <source>4K</source>
+            <translation>4K</translation>
+        </message>
+        <message>
+            <source>HD</source>
+            <translation>HD</translation>
+        </message>
+        <message>
+            <source>Subtitles/CC</source>
+            <translation>Subtitles/CC</translation>
+        </message>
+        <message>
+            <source>Creative Commons</source>
+            <translation>Creative Commons</translation>
+        </message>
+        <message>
+            <source>360°</source>
+            <translation>360°</translation>
+        </message>
+        <message>
+            <source>VR180</source>
+            <translation>VR180</translation>
+        </message>
+        <message>
+            <source>3D</source>
+            <translation>3D</translation>
+        </message>
+        <message>
+            <source>HDR</source>
+            <translation>HDR</translation>
+        </message>
+        <message>
+            <source>Purchased</source>
+            <translation>Purchased</translation>
+        </message>
+        <message>
+            <source>Location</source>
+            <translation>Location</translation>
+        </message>
+        <message>
+            <source>Relevance</source>
+            <translation>Relevance</translation>
+        </message>
+        <message>
+            <source>View count</source>
+            <translation>View count</translation>
+        </message>
+        <message>
+            <source>Rating</source>
+            <translation>Rating</translation>
+        </message>
     </context>
 </TS>

@@ -81,10 +81,6 @@
         title: "Movie",
         value: "movie",
       },
-      {
-        title: "Show",
-        value: "show",
-      },
     ],
     duration: [
       {
@@ -181,37 +177,37 @@
       <h2 class="text-xl font-bold mb-4">{label}</h2>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Date</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Upload date")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.date}>
           {#each options.date as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Type</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Type")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.type}>
           {#each options.type as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Duration</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Duration")}</h3>
         <select
           class="input input-bordered w-full"
           bind:value={filters.duration}
         >
           {#each options.duration as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Features</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Features")}</h3>
         {#each options.features as { title, value }}
           <label class="flex items-center">
             <input
@@ -220,19 +216,19 @@
               class="form-checkbox"
               bind:checked={features_kv[value]}
             />
-            <span class="ml-2">{title}</span>
+            <span class="ml-2">{$tr(title)}</span>
           </label>
         {/each}
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Sort By</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Sort by")}</h3>
         <select
           class="input input-bordered w-full"
           bind:value={filters.sort_by}
         >
           {#each options.sort_by as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
