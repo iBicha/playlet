@@ -622,6 +622,10 @@
             <translation>Veuillez noter que les favoris sont une fonctionnalité expérimentale.</translation>
         </message>
         <message>
+            <source>Channels</source>
+            <translation>Chaînes</translation>
+        </message>
+        <message>
             <source>Could not get IP address: are we connected to the internet?</source>
             <translation>Impossible d'obtenir l'adresse IP: est-on connecté à Internet?</translation>
         </message>
@@ -1053,6 +1057,54 @@
         <message>
             <source>Start at</source>
             <translation>Démarrer à</translation>
+        </message>
+        <message>
+            <source>Play Video</source>
+            <translation>Lire la vidéo</translation>
+        </message>
+        <message>
+            <source>Queue Video</source>
+            <translation>Mettre en file d'attente la vidéo</translation>
+        </message>
+        <message>
+            <source>Play Playlist</source>
+            <translation>Lire la playlist</translation>
+        </message>
+        <message>
+            <source>Queue Playlist</source>
+            <translation>Mettre en file d'attente la playlist</translation>
+        </message>
+        <message>
+            <source>Open Channel</source>
+            <translation>Ouvrir la chaîne</translation>
+        </message>
+        <message>
+            <source>Open Playlist</source>
+            <translation>Ouvrir la playlist</translation>
+        </message>
+        <message>
+            <source>Open Playlist Channel</source>
+            <translation>Ouvrir la chaîne de la playlist</translation>
+        </message>
+        <message>
+            <source>Open Video Channel</source>
+            <translation>Ouvrir la chaîne de la vidéo</translation>
+        </message>
+        <message>
+            <source>Refresh Home</source>
+            <translation>Actualiser la page d'accueil</translation>
+        </message>
+        <message>
+            <source>Refresh Bookmarks</source>
+            <translation>Actualiser les favoris</translation>
+        </message>
+        <message>
+            <source>Remove from %1 bookmarks</source>
+            <translation>Retirer des favoris %1</translation>
+        </message>
+        <message>
+            <source>Add to %1 bookmark</source>
+            <translation>Ajouter au favori %1</translation>
         </message>
     </context>
 </TS>

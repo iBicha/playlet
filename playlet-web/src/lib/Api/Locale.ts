@@ -60,7 +60,7 @@ export function getFormattedPluralString(c: number, zeroString: string, oneStrin
         return trFn(oneString);
     } else {
         if (c < 1000) {
-            return trFn(pluralString).replace("^n", parseFloat(c.toFixed(1)).toString());
+            return trFn(pluralString).replace("^n", c.toString());
         }
         c = c / 1000;
         if (c < 1000) {
