@@ -1,10 +1,14 @@
 <script lang="ts">
+  import { tr } from "lib/Stores";
+
   export let videoId: string | undefined = undefined;
   export let title: string | undefined = undefined;
   export let videoThumbnails: any[] | undefined = undefined;
   export let liveNow: boolean = undefined;
   export let lengthSeconds: number = undefined;
   export let viewCount: number | undefined = undefined;
+  export let isUpcoming: boolean | undefined = undefined;
+  export let premiereTimestamp: number | undefined = undefined;
 
   export let invidiousInstance;
 
@@ -49,6 +53,10 @@
     }
     return lengthSeconds === 0 && viewCount === 0;
   }
+
+  function isVideoUpcoming() {
+    return isUpcoming && !!premiereTimestamp;
+  }
 </script>
 
 <figure class="relative">
@@ -60,11 +68,17 @@
     src={thumbnailUrl}
     alt={title}
   />
-  {#if isVideoLive()}
+  {#if isVideoUpcoming()}
+    <div
+      class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
+    >
+      {$tr("UPCOMING")}
+    </div>
+  {:else if isVideoLive()}
     <div
       class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
     >
-      LIVE
+      {$tr("LIVE")}
     </div>
   {:else if lengthSeconds}
     <div

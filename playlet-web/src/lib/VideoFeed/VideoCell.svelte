@@ -146,6 +146,8 @@
       bind:title
       bind:videoThumbnails
       bind:liveNow
+      bind:isUpcoming
+      bind:premiereTimestamp
       bind:lengthSeconds
       bind:viewCount
       bind:invidiousInstance
@@ -173,6 +175,8 @@
   bind:lengthSeconds
   bind:videoThumbnails
   bind:liveNow
+  bind:isUpcoming
+  bind:premiereTimestamp
   bind:viewCount
   videoStartAtChecked={false}
   videoStartAtTimestamp={0}

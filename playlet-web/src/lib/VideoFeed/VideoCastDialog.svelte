@@ -11,6 +11,8 @@
   export let lengthSeconds: number = undefined;
   export let liveNow: boolean = undefined;
   export let viewCount: number | undefined = undefined;
+  export let isUpcoming: boolean = undefined;
+  export let premiereTimestamp: number | undefined = undefined;
 
   export let videoStartAtChecked;
   export let videoStartAtTimestamp;
@@ -92,6 +94,8 @@
           bind:liveNow
           bind:lengthSeconds
           bind:viewCount
+          bind:isUpcoming
+          bind:premiereTimestamp
           bind:invidiousInstance
         />
       </div>

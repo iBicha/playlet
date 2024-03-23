@@ -208,6 +208,8 @@
   author={videoMetadata?.author}
   lengthSeconds={videoMetadata?.lengthSeconds}
   liveNow={videoMetadata?.liveNow}
+  isUpcoming={videoMetadata?.isUpcoming}
+  premiereTimestamp={videoMetadata?.premiereTimestamp}
   viewCount={videoMetadata?.viewCount}
   bind:videoStartAtChecked
   bind:videoStartAtTimestamp
