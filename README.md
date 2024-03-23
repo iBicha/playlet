@@ -9,6 +9,9 @@
     <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
     <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
   </a>
+  <a href="https://hosted.weblate.org/engage/playlet/">
+    <img src="https://hosted.weblate.org/widget/playlet/svg-badge.svg" alt="Translation status" />
+  </a>
   <a href="/LICENSE">
     <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
   </a>
