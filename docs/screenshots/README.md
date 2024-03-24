@@ -14,13 +14,17 @@
 | ------------------------- | --------------------------- |
 | ![Channel](./channel.jpg) | ![Playlist](./playlist.jpg) |
 
-| Settings                    | Invidious instances                              | Invidious testing                             |
-| --------------------------- | ------------------------------------------------ | --------------------------------------------- |
-| ![Settings](./settings.jpg) | ![Invidious instances](./invidious-settings.jpg) | ![Invidious testing](./invidious-testing.jpg) |
+| Profiles                    | Settings                    |
+| --------------------------- | --------------------------- |
+| ![Profiles](./profiles.jpg) | ![Settings](./settings.jpg) |
 
-| Remote                  | App info                    |
-| ----------------------- | --------------------------- |
-| ![Remote](./remote.jpg) | ![App info](./app-info.jpg) |
+| Invidious instances                              | Invidious testing                             |
+| ------------------------------------------------ | --------------------------------------------- |
+| ![Invidious instances](./invidious-settings.jpg) | ![Invidious testing](./invidious-testing.jpg) |
+
+| Remote                  | Info                |
+| ----------------------- | ------------------- |
+| ![Remote](./remote.jpg) | ![Info](./info.jpg) |
 
 ## Playlet web app
 
