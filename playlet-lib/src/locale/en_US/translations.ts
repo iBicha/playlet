@@ -113,6 +113,10 @@
             <translation>Live</translation>
         </message>
         <message>
+            <source>Releases</source>
+            <translation>Releases</translation>
+        </message>
+        <message>
             <source>Podcasts</source>
             <translation>Podcasts</translation>
         </message>

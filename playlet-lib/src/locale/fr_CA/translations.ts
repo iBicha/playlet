@@ -110,6 +110,10 @@
             <translation>En direct</translation>
         </message>
         <message>
+            <source>Releases</source>
+            <translation>Sorties</translation>
+        </message>
+        <message>
             <source>Podcasts</source>
             <translation>Podcasts</translation>
         </message>
