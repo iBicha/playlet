@@ -10,7 +10,7 @@
     type: "",
     duration: "",
     features: [],
-    sort_by: "",
+    sort: "",
   };
 
   let features_kv: any = {};
@@ -28,7 +28,7 @@
     count += filters.type ? 1 : 0;
     count += filters.duration ? 1 : 0;
     count += filters.features.length;
-    count += filters.sort_by ? 1 : 0;
+    count += filters.sort ? 1 : 0;
 
     label = $tr("Filters") + `${count > 0 ? ` (${count})` : ""}`;
   }
@@ -146,18 +146,18 @@
         value: "location",
       },
     ],
-    sort_by: [
+    sort: [
       {
         title: "Relevance",
         value: "",
       },
       {
         title: "Upload date",
-        value: "upload_date",
+        value: "date",
       },
       {
         title: "View count",
-        value: "view_count",
+        value: "views",
       },
       {
         title: "Rating",
@@ -223,11 +223,8 @@
 
       <div class="mb-4">
         <h3 class="text-lg font-bold mb-2">{$tr("Sort by")}</h3>
-        <select
-          class="input input-bordered w-full"
-          bind:value={filters.sort_by}
-        >
-          {#each options.sort_by as { title, value }}
+        <select class="input input-bordered w-full" bind:value={filters.sort}>
+          {#each options.sort as { title, value }}
             <option {value}>{$tr(title)}</option>
           {/each}
         </select>

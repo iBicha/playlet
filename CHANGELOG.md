@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A bug where instance testing is not immediately cancelled when the testing page is closed
 - A bug in the web app where "upcoming" videos show up as "live"
+- Search sort filters
 
 ## [0.21.2] - 2024-03-10
 
