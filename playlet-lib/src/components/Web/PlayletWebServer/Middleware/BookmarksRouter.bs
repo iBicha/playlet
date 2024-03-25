@@ -1,3 +1,4 @@
+import "pkg:/components/Services/BookmarksService/BookmarksServiceUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 
 namespace Http
@@ -33,33 +34,10 @@ namespace Http
         function GetBookmarksFeeds(context as object) as boolean
             response = context.response
 
-            feeds = m.BookmarksContentToFeeds(m.bookmarksService.content)
-
+            feeds = BookmarksServiceUtils.BookmarksContentToFeed(m.bookmarksService.content)
             response.Json(feeds)
 
             return true
-        end function
-
-        ' TODO:P1 refactor to share code with Bookmarks screen
-        function BookmarksContentToFeeds(bookmarksContent as object) as object
-            bookmarkGroupNodes = bookmarksContent.getChildren(-1, 0)
-
-            feeds = []
-            for each bookmarkGroupNode in bookmarkGroupNodes
-                bookmarkNodes = bookmarkGroupNode.getChildren(-1, 0)
-
-                feedSources = []
-                for each bookmarkNode in bookmarkNodes
-                    feedSources.push(bookmarkNode.feedSource)
-                end for
-
-                feeds.push({
-                    "title": bookmarkGroupNode.title
-                    "feedSources": feedSources
-                })
-            end for
-
-            return feeds
         end function
 
     end class
