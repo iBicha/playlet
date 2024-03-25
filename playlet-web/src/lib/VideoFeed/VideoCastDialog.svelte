@@ -23,6 +23,9 @@
 
   export function close() {
     modal.close();
+  }
+
+  export function onClose() {
     videoStartAtChecked = false;
     videoStartAtTimestamp = 0;
   }
@@ -83,7 +86,7 @@
   }
 </script>
 
-<dialog bind:this={modal} class="modal">
+<dialog bind:this={modal} class="modal" on:close={onClose}>
   <form method="dialog" class="modal-box bg-base-100">
     <div class="flex flex-col items-center">
       <div class="w-64">

@@ -3,6 +3,14 @@
 
   let modal;
 
+  export function show() {
+    modal.showModal();
+  }
+
+  export function close() {
+    modal.close();
+  }
+
   export let label = $tr("Filters");
 
   export const filters = {
@@ -165,10 +173,6 @@
       },
     ],
   };
-
-  export function open() {
-    modal.showModal();
-  }
 </script>
 
 <dialog bind:this={modal} id="modal_search_filters" class="modal">
@@ -231,11 +235,7 @@
       </div>
 
       <div class="flex justify-end">
-        <button
-          class="btn btn-outline"
-          type="button"
-          on:click={() => modal.close()}>{$tr("Close")}</button
-        >
+        <button class="btn btn-outline">{$tr("Close")}</button>
       </div>
     </div>
   </form>

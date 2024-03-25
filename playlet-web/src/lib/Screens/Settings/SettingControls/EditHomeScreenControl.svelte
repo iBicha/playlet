@@ -56,6 +56,10 @@
     }
   }
 
+  export function close() {
+    modal.close();
+  }
+
   function onClose() {
     // Reset value to original value to avoid weird animation on show
     value = JSON.parse(JSON.stringify(originalValue));
@@ -92,7 +96,7 @@
   >
 </div>
 
-<dialog bind:this={modal} on:close={onClose} class="modal">
+<dialog bind:this={modal} class="modal" on:close={onClose}>
   <div class="modal-box bg-base-100">
     {#if value && homeLayout}
       <table class="w-full">

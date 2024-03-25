@@ -154,7 +154,7 @@
       </div>
       <button
         class="btn border border-neutral rounded-full mt-1"
-        on:click={searchFiltersComponent.open()}
+        on:click={searchFiltersComponent.show()}
       >
         <div class="h-6 w-8">
           <FiltersIcon />

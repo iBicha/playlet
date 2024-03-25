@@ -10,6 +10,9 @@
 
   export function close() {
     modal.close();
+  }
+
+  function onClose() {
     accordionState = null;
   }
 
@@ -63,7 +66,7 @@
   }
 </script>
 
-<dialog bind:this={modal} class="modal">
+<dialog bind:this={modal} class="modal" on:close={onClose}>
   <form method="dialog" class="modal-box bg-base-100">
     <div class="flex flex-col items-center">
       <div class="text-xl font-medium m-4">{$tr("Profiles")}</div>
@@ -126,11 +129,11 @@
             <div class="text-xs font-light">{currentInstance}</div>
           </div>
         </button>
-        <button class="btn m-6" on:click={close}>{$tr("Close")}</button>
+        <button class="btn m-6">{$tr("Close")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button on:click={close}>{$tr("Close")}</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>
