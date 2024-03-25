@@ -64,9 +64,11 @@ const getEnvVars = require('./get-env-vars');
 
         for (const section in registry) {
             for (const key in registry[section]) {
-                // We expect all values to be JSON strings.
-                // If this changes, we let JSON.parse throw an error.
-                registry[section][key] = JSON.parse(registry[section][key]);
+                try {
+                    registry[section][key] = JSON.parse(registry[section][key]);
+                } catch (error) {
+                    console.error(`Failed to parse value for key "${key}" in section "${section}"`);
+                }
             }
         }
 
