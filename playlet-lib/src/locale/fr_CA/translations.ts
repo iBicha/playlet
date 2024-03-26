@@ -972,7 +972,6 @@
     <message>
         <source>Press and hold Options (*) to open the queue</source>
         <translation>Appuyez et maintenez Options (*) pour la file d&apos;attente</translation>
-        <comment>Should be &quot;pour ouvrir la file d&apos;attente&quot; but to keep it short for the UI</comment>
     </message>
     <message>
         <source>Device</source>
@@ -1249,10 +1248,6 @@
     <message>
         <source>Remote</source>
         <translation>Commande</translation>
-    </message>
-    <message>
-        <source>Press and hold Options (*) to open the queue</source>
-        <translation>Appuyez et maintenez Options (*) pour la file d&apos;attente</translation>
     </message>
 </context>
 </TS>
