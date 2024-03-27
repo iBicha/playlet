@@ -470,6 +470,37 @@ namespace Invidious
             }
         end function
 
+        function AuthChannelsHandler(context as object) as object
+            response = context.response
+            authToken = context.authToken
+
+            m.DeleteExpiredToken(response, authToken)
+
+            if response.StatusCode() <> 200
+                return invalid
+            end if
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            channels = []
+            for each item in json
+                channels.push({
+                    "type": "channel"
+                    "author": item.author
+                    "authorId": item.authorId
+                })
+            end for
+
+            channels.SortBy("author")
+
+            return {
+                items: channels
+            }
+        end function
+
         function WatchHistoryHandler(context as object) as object
             response = context.response
             authToken = context.authToken
