@@ -29,6 +29,9 @@ function OnStartCountdown()
     m.timer.observeFieldScoped("fire", FuncName(TimerUpdateButtons))
     m.currentCountDown = defaultActionTimeoutSeconds
     m.timer.control = "start"
+
+    FindContentComponent()
+    WatchContentTranslation()
 end function
 
 function TimerUpdateButtons() as void
@@ -39,13 +42,8 @@ function TimerUpdateButtons() as void
         return
     end if
 
-    FindButtonComponents()
-    if m.buttonComponents = invalid
-        return
-    end if
-
-    defaultButtonIndex = m.top.defaultButtonIndex
-    m.buttonComponents[defaultButtonIndex].text = `${m.top.actualButtons[defaultButtonIndex]} (${m.currentCountDown})`
+    FindButtonComponent()
+    SetDefaultButtonText(m.currentCountDown)
 end function
 
 function OnButtonSelected()
@@ -55,6 +53,7 @@ end function
 
 function OnDialogClosed()
     CancelTimer()
+    UnwatchContentTranslation()
 end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -63,14 +62,10 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     CancelTimer()
+    UnwatchContentTranslation()
 
-    FindButtonComponents()
-    if m.buttonComponents = invalid
-        return false
-    end if
-
-    defaultButtonIndex = m.top.defaultButtonIndex
-    m.buttonComponents[defaultButtonIndex].text = m.top.actualButtons[defaultButtonIndex]
+    FindButtonComponent()
+    SetDefaultButtonText(0)
     return false
 end function
 
@@ -82,7 +77,21 @@ function CancelTimer()
     end if
 end function
 
-function FindButtonComponents() as void
+function SetDefaultButtonText(timeLeft as integer) as void
+    if m.buttonComponents = invalid
+        return
+    end if
+
+    defaultButtonIndex = m.top.defaultButtonIndex
+
+    if timeLeft > 0
+        m.buttonComponents[defaultButtonIndex].text = `${m.top.actualButtons[defaultButtonIndex]} (${timeLeft})`
+    else
+        m.buttonComponents[defaultButtonIndex].text = m.top.actualButtons[defaultButtonIndex]
+    end if
+end function
+
+function FindButtonComponent() as void
     if m.buttonComponents <> invalid
         return
     end if
@@ -95,4 +104,45 @@ function FindButtonComponents() as void
         end if
     end for
     LogWarn("No buttons found in dialog")
+end function
+
+function FindContentComponent() as void
+    if m.contentComponent <> invalid
+        return
+    end if
+
+    areas = m.top.getChildren(-1, 0)
+    for each area in areas
+        if area.subtype() = "StdDlgContentArea"
+            if area.getChildCount() > 0
+                m.contentComponent = area.getChild(0)
+            end if
+            return
+        end if
+    end for
+    LogWarn("No content component found in dialog")
+end function
+
+function WatchContentTranslation() as void
+    if m.contentComponent = invalid
+        return
+    end if
+
+    m.contentComponent.observeFieldScoped("translation", FuncName(OnContentMoved))
+end function
+
+function UnwatchContentTranslation() as void
+    if m.contentComponent = invalid
+        return
+    end if
+
+    m.contentComponent.unobserveFieldScoped("translation")
+    m.contentComponent = invalid
+end function
+
+function OnContentMoved()
+    CancelTimer()
+    UnwatchContentTranslation()
+    FindButtonComponent()
+    SetDefaultButtonText(0)
 end function
