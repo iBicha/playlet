@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- [Attempt] A bug where the lounge would randomly lose the session id, making it unable to cast, and spam the same error over and over
 - Dialog with timer now stops as expected if any button is pressed
 
 ## [0.22.0] - 2024-03-24

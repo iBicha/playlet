@@ -283,15 +283,15 @@ class LoungeApi
             end if
 
             commandIndex = command[0]
-            if commandIndex <= m.lastProcessedCommandIndex
+            commandData = command[1]
+            commandType = commandData[0]
+
+            if commandIndex <= m.lastProcessedCommandIndex and commandType <> COMMAND_TYPE_G_SESSION_ID and commandType <> COMMAND_TYPE_SESSION_ID
                 LogDebug("Skipping command already processed:", command)
                 continue for
             end if
             m.lastProcessedCommandIndex = commandIndex
 
-            commandId = command[0]
-            commandData = command[1]
-            commandType = commandData[0]
             commandArgs = invalid
             if commandData.Count() > 1
                 commandArgs = commandData[1]
@@ -300,7 +300,7 @@ class LoungeApi
             handler = COMMAND_HANDLER_PREFIX + commandType
             if m.DoesExist(handler)
                 LogInfo(commandType)
-                m[handler](commandId, commandType, commandArgs, messagesToSend)
+                m[handler](commandIndex, commandType, commandArgs, messagesToSend)
             else
                 LogWarn("Unknown command type:", commandType, "command:", command)
             end if
@@ -502,11 +502,20 @@ class LoungeApi
         m.outgoingMessagesRequests[requestId] = request
     end function
 
-    function ProcessPendingOutgoingMessages()
+    function ProcessPendingOutgoingMessages() as object
+        results = []
         for each key in m.outgoingMessagesRequests
             request = m.outgoingMessagesRequests[key]
             if request.IsCompleted()
                 response = request.Await()
+                status = response.StatusCode()
+                error = response.ErrorMessage()
+
+                results.Push({
+                    "status": status
+                    "error": error
+                })
+
                 if not response.IsSuccess()
                     LogError(response.ErrorMessage())
                 end if
@@ -514,6 +523,8 @@ class LoungeApi
                 m.outgoingMessagesRequests.Delete(key)
             end if
         end for
+
+        return results
     end function
 
     function SaveCurrentLoungeData() as void
