@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Dialog with timer now stops as expected if any button is pressed
 
 ## [0.22.0] - 2024-03-24
 
