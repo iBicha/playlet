@@ -1,4 +1,5 @@
 import "DialogPalette.bs"
+import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -30,8 +31,20 @@ function OnStartCountdown()
     m.currentCountDown = defaultActionTimeoutSeconds
     m.timer.control = "start"
 
-    FindContentComponent()
-    WatchContentTranslation()
+    FindButtonComponent()
+end function
+
+function OnFocusDefaultButton() as void
+    FindButtonComponent()
+    if m.buttonComponents = invalid
+        return
+    end if
+    defaultButtonIndex = m.top.defaultButtonIndex
+    if m.buttonComponents.Count() <= defaultButtonIndex
+        return
+    end if
+    button = m.buttonComponents[defaultButtonIndex]
+    NodeSetFocus(button, true)
 end function
 
 function TimerUpdateButtons() as void
@@ -42,7 +55,6 @@ function TimerUpdateButtons() as void
         return
     end if
 
-    FindButtonComponent()
     SetDefaultButtonText(m.currentCountDown)
 end function
 
@@ -53,7 +65,6 @@ end function
 
 function OnDialogClosed()
     CancelTimer()
-    UnwatchContentTranslation()
 end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
@@ -62,7 +73,6 @@ function onKeyEvent(key as string, press as boolean) as boolean
     end if
 
     CancelTimer()
-    UnwatchContentTranslation()
 
     FindButtonComponent()
     SetDefaultButtonText(0)
@@ -104,45 +114,4 @@ function FindButtonComponent() as void
         end if
     end for
     LogWarn("No buttons found in dialog")
-end function
-
-function FindContentComponent() as void
-    if m.contentComponent <> invalid
-        return
-    end if
-
-    areas = m.top.getChildren(-1, 0)
-    for each area in areas
-        if area.subtype() = "StdDlgContentArea"
-            if area.getChildCount() > 0
-                m.contentComponent = area.getChild(0)
-            end if
-            return
-        end if
-    end for
-    LogWarn("No content component found in dialog")
-end function
-
-function WatchContentTranslation() as void
-    if m.contentComponent = invalid
-        return
-    end if
-
-    m.contentComponent.observeFieldScoped("translation", FuncName(OnContentMoved))
-end function
-
-function UnwatchContentTranslation() as void
-    if m.contentComponent = invalid
-        return
-    end if
-
-    m.contentComponent.unobserveFieldScoped("translation")
-    m.contentComponent = invalid
-end function
-
-function OnContentMoved()
-    CancelTimer()
-    UnwatchContentTranslation()
-    FindButtonComponent()
-    SetDefaultButtonText(0)
 end function
