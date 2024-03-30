@@ -1,3 +1,4 @@
+'import "Dialog/DialogUtils.bs"
 'import "pkg:/components/EcpArgs.bs"
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
@@ -19,6 +20,7 @@ function MainSceneContainerChanged()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
     CopyLoadingMessagesToCache()
+    ShowAnnouncement()
 end function
 
 function StartWebServer()
@@ -28,5 +30,9 @@ function StartWebServer()
     m.webServer.callfunc("StartServer", invalid)
     m.dialServer = m.top.findNode("DialServer")
     m.dialServer.callfunc("StartServer", invalid)
+end function
+
+function ShowAnnouncement()
+    DialogUtils_ShowDialog("Invidious is currently experiencing a major outage affecting all public and private instances." + chr(10) + "Playing videos might not work." + chr(10) + "Please be patient while the issue is being resolved." + chr(10) + "We apologize for the inconvenience." + chr(10) + "Issue url: https://github.com/iv-org/invidious/issues/4498", "Announcement", true)
 end function
 '//# sourceMappingURL=./MainScene.brs.map
