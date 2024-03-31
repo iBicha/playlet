@@ -1,8 +1,8 @@
-'import "Dialog/DialogUtils.bs"
 'import "pkg:/components/EcpArgs.bs"
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
+'import "pkg:/source/utils/Locale.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
@@ -33,6 +33,32 @@ function StartWebServer()
 end function
 
 function ShowAnnouncement()
-    DialogUtils_ShowDialog("Invidious is currently experiencing a major outage affecting all public and private instances." + chr(10) + "Playing videos might not work." + chr(10) + "Please be patient while the issue is being resolved." + chr(10) + "We apologize for the inconvenience." + chr(10) + "Issue url: https://github.com/iv-org/invidious/issues/4498", "Announcement", true)
+    title = "Announcement"
+    message = [
+        "Invidious was experiencing an outage, and a fix has been deployed."
+        "If you are experiencing issues playing videos:"
+    ]
+    bulletText = [
+        "For custom instances, please update to the latest version."
+        "For public instances, go to Settings -> Invidious -> Instance, and select an instance with a version 2024.03.31 or newer."
+    ]
+    bottomMessage = [
+        "If you don't know what instance you're using, follow the instructions from step 2."
+        "We apologize for the inconvenience."
+    ]
+    buttons = [
+        Tr("OK")
+    ]
+    dialog = CreateObject("roSGNode", "SimpleDialog")
+    dialog.title = title
+    dialog.message = message
+    dialog.bulletText = bulletText
+    dialog.bulletType = "numbered"
+    dialog.bottomMessage = bottomMessage
+    dialog.buttons = buttons
+    deviceInfo = CreateObject("roDeviceInfo")
+    displaySize = deviceInfo.GetDisplaySize()
+    dialog.width = displaySize.w - 180
+    m.top.getScene().dialog = dialog
 end function
 '//# sourceMappingURL=./MainScene.brs.map
