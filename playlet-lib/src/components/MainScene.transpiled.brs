@@ -39,8 +39,8 @@ function ShowAnnouncement()
         "If you are experiencing issues playing videos:"
     ]
     bulletText = [
-        "For custom instances, please update to the latest version."
-        "For public instances, go to Settings -> Invidious -> Instance, and select an instance with a version 2024.03.31 or newer."
+        "For custom Invidious instances, please update to the latest version."
+        "For public Invidious instances, go to Settings -> Invidious -> Instance, and select an instance with a version 2024.03.31 or newer."
     ]
     bottomMessage = [
         "If you don't know what instance you're using, follow the instructions from step 2."
