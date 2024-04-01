@@ -209,7 +209,7 @@
           videos = [...(videos || []), ...newVideos];
 
           totalFetchedItems += result.items.length;
-          if (totalFetchedItems >= 3) {
+          if (totalFetchedItems >= 6) {
             break;
           }
         }
