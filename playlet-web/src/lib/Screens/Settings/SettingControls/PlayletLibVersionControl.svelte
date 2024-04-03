@@ -38,7 +38,9 @@
       const release = releases[i].name;
       if (
         libUrl ===
-        `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.zip`
+          `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.zip` ||
+        libUrl ===
+          `https://github.com/iBicha/playlet/releases/download/${release}/playlet-lib.squashfs.pkg`
       ) {
         selectedRelease = release;
         break;
@@ -55,8 +57,11 @@
       return {
         name: release.tag_name,
         enabled:
-          release.assets.filter((asset) => asset.name === "playlet-lib.zip")
-            .length > 0,
+          release.assets.filter(
+            (asset) =>
+              asset.name === "playlet-lib.zip" ||
+              asset.name === "playlet-lib.squashfs.pkg"
+          ).length > 0,
       };
     });
   }

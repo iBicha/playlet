@@ -142,6 +142,9 @@ export class PlayletApi {
     static async setPlayletLibVersion(tag) {
         if (tag !== "") {
             const urls = [{
+                link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.squashfs.pkg`,
+                type: 'custom'
+            }, {
                 link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
                 type: 'custom'
             }]
@@ -149,6 +152,9 @@ export class PlayletApi {
             // To avoid the "not found" error, we fallback to the default "latest" release.
             if (tag === "canary") {
                 urls.push({
+                    link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.squashfs.pkg`,
+                    type: 'custom'
+                }, {
                     link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip`,
                     type: 'custom'
                 })
