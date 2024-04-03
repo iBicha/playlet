@@ -1,4 +1,15 @@
+const shell = require('shelljs');
 const { ArgumentParser } = require('argparse')
+
+if (!shell.which('unzip')) {
+    shell.echo('Sorry, this script requires unzip');
+    shell.exit(1);
+}
+
+if (!shell.which('mksquashfs')) {
+    shell.echo('Sorry, this script requires mksquashfs');
+    shell.exit(1);
+}
 
 const parser = new ArgumentParser({
     description: 'Convert a zip file to a squashfs file'
