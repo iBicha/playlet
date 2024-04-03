@@ -40,11 +40,4 @@ These are mostly the steps when releasing a new version:
 
 ## Playlet
 
-For releasing to the store (when needed), this is done following a Playlet lib release:
-
-- Switch to main branch and pull changes, **including tags** - **match commit corresponding to the release.**
-- `npm run build:release:ci`
-  - This makes sure to have a valid app in the staging folder
-- `npm run sign-released-package`
-  - This should create the signed package under `release/playlet.pkg`
-- Upload to dashboard, and schedule a release (takes a couple of days)
+For releasing to the store (when needed), signed packages are attached to Github releases, ready to publish

@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- Squashfs signed build artifacts to releases
 
 ## [0.22.3] - 2024-03-31
 
