@@ -23,6 +23,9 @@ jobs:
           node-version: 20.x
           cache: "npm"
 
+      - name: Install squashfs-tools
+        run: sudo apt-get install -y squashfs-tools
+
       - name: Install dependencies
         run: npm ci
 
@@ -30,7 +33,7 @@ jobs:
         run: npm run test:build
 
       - name: Build Playlet
-        run: npm run build:release:ci
+        run: npm run build:release
 
       - name: Use Java 21
         uses: actions/setup-java@v4
@@ -56,7 +59,8 @@ jobs:
       - name: Delete Canary release
         uses: dev-drprasad/delete-tag-and-release@v1.0
         with:
-          tag_name: canary
+          # TODO: revert this after testing
+          tag_name: testing
           github_token: ${{ secrets.GH_TOKEN }}
 
       - name: Extract changelog
@@ -69,7 +73,9 @@ jobs:
       - name: Wait 10 seconds
         run: sleep 10
 
-      - name: Create Canary release
-        run: gh release create canary ./release/playlet.zip ./release/playlet-lib.zip --notes-file docs/canary-changelog.md --prerelease --title Canary
+      - name:
+          Create Canary release
+          # TODO: revert this after testing
+        run: gh release create testing ./release/playlet.zip ./release/playlet.pkg ./release/playlet-lib.zip ./release/playlet-lib.pkg --notes-file docs/canary-changelog.md --prerelease --title Testing --target feature/squashfs
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
