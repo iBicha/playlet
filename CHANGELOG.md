@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Loading Playlet lib as squashfs, with fallback to the zip file. This significantly increases load times.
+- Loading Playlet lib as squashfs, with fallback to the zip file. This significantly decreases load times.
 
 ## [0.22.3] - 2024-03-31
 
