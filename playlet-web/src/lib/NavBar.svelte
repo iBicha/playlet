@@ -36,8 +36,10 @@
 
     if (
       playletState?.app?.lib_url_type === "custom" &&
-      playletState?.app?.lib_url ===
-        "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.zip"
+      (playletState?.app?.lib_url ===
+        "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.zip" ||
+        playletState?.app?.lib_url ===
+          "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.squashfs.pkg")
     ) {
       version += "-canary";
     }
