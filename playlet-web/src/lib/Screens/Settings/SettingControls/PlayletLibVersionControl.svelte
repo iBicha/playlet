@@ -103,7 +103,7 @@
       bind:value={selectedRelease}
       class="select select-bordered join-item w-full mr-1"
     >
-      <option selected value=""></option>
+      <option selected value="">{$tr("Latest (default)")}</option>
       {#each releases as release}
         <option disabled={!release.enabled} value={release.name}
           >{release.name}</option
