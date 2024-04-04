@@ -5,11 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Nothing worth mentioning yet.
+
 ## [0.23.0] - 2024-04-04
 
 ### Added
 
 - Loading Playlet lib as squashfs, with fallback to the zip file. This significantly decreases load times.
+
+### Changed
+
+- Bumped minimum OS version to 11, this is required for squashfs-zstd
 
 ## [0.22.3] - 2024-03-31
 
