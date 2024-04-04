@@ -441,7 +441,7 @@ This version went through a major refactor, which resulted in a different arcite
   - It reads the response data, headers, error codes and etc even if they are not needed
   - Excessive logging without a way to toggle it, or redirect it to a file
 - Some unused parts of the code (Like basic auth in the server, WebSockets, RegistryRouter, Kanji QR Code)
-  - These were unsued and/or feature flagged features. Things can be restored as needed.
+  - These were unused and/or feature flagged features. Things can be restored as needed.
 - The video player loading spinner when the video is minimized: this added too much hacky code with minimum value.
 
 ### Fixed
