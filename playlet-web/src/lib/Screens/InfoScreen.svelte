@@ -67,7 +67,9 @@
         return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
       case "lib_url":
         const filename =
-          value && value.includes("/") && value.endsWith(".zip")
+          value &&
+          value.includes("/") &&
+          (value.endsWith(".zip") || value.endsWith(".pkg"))
             ? value.substring(value.lastIndexOf("/") + 1)
             : value;
         return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${filename}</a>`;
