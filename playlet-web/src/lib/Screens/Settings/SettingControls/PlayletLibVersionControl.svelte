@@ -77,7 +77,7 @@
     if (
       confirm(
         trFn(
-          "Are you sure you want to change the Playlet Library version to %1"
+          "Are you sure you want to change the Playlet Library version to %1?"
         ).replace("%1", version)
       ) +
       `\n` +
