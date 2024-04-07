@@ -41,9 +41,6 @@ export class OnInitPlugin implements CompilerPlugin {
         const initFunction = this.getInitCallableInScope(scope);
         if (!initFunction) {
             onInitCallables.forEach((onInitCallable) => {
-                // TODO:P2 we currently add diagnostics to the xml file, but we should add them to the brs file
-                // The reasons is, when we add to a generated file (like Component_bindings.brs), the errors
-                // Are stuck, and won't be fixed until the file is changed, which we can't do since it's not a real file.
                 scope.xmlFile.addDiagnostics([{
                     file: scope.xmlFile,
                     range: onInitCallable.annotation!.range,
