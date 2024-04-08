@@ -7,7 +7,7 @@
   </a>
   <a href="https://github.com/iBicha/playlet/releases">
     <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
-    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
+    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.squashfs.pkg.svg"/>
   </a>
   <a href="https://hosted.weblate.org/engage/playlet/">
     <img src="https://hosted.weblate.org/widget/playlet/svg-badge.svg" alt="Translation status" />
