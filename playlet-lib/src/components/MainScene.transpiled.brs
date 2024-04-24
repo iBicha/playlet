@@ -2,6 +2,7 @@
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
+'import "pkg:/source/utils/Locale.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
@@ -19,6 +20,7 @@ function MainSceneContainerChanged()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
     CopyLoadingMessagesToCache()
+    ShowAnnouncement()
 end function
 
 function StartWebServer()
@@ -28,5 +30,26 @@ function StartWebServer()
     m.webServer.callfunc("StartServer", invalid)
     m.dialServer = m.top.findNode("DialServer")
     m.dialServer.callfunc("StartServer", invalid)
+end function
+
+function ShowAnnouncement()
+    title = "Announcement"
+    message = [
+        "YouTube has made changes that broke 3rd party apps, which is affecting Playlet and Invidious."
+        "Some videos might not play, and you might see error messages often."
+        "We're aware of the issue, and working on a fix."
+        "We apologize for the inconvenience."
+    ]
+    buttons = [
+        Tr("OK")
+    ]
+    dialog = CreateObject("roSGNode", "SimpleDialog")
+    dialog.title = title
+    dialog.message = message
+    dialog.buttons = buttons
+    deviceInfo = CreateObject("roDeviceInfo")
+    displaySize = deviceInfo.GetDisplaySize()
+    dialog.width = displaySize.w - 180
+    m.top.getScene().dialog = dialog
 end function
 '//# sourceMappingURL=./MainScene.brs.map
