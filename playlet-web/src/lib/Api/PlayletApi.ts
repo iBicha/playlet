@@ -94,16 +94,14 @@ export class PlayletApi {
                 args.timestamp = parseInt(args.timestamp);
             }
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
-        return await response.json();
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 
     static async queuePlaylist(args) {
         if (!args.playlistId) {
             return;
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
-        return await response.json();
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 
     static async openPlaylist(playlistId) {
