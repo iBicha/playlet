@@ -4,8 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version"
+        description: "Release version (X.Y.Z)"
         required: true
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
   release-pr:
@@ -32,6 +36,7 @@ jobs:
         run: |
           sed -i "s/## \[Unreleased\]/## \[${{ github.event.inputs.version }}\] - $(date +%Y-%m-%d)/" CHANGELOG.md
 
+      # Building for release should sync the version in multiple files, and then fail if there are any changes.
       - name: Build for release
         run: npm run build:release || exit 0
 
