@@ -32,6 +32,7 @@ function PrepareTests() as object
     content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoComments), CanFetchVideoComments))
     content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoCaptions), CanFetchVideoCaptions))
     content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoThumbnails), CanFetchVideoThumbails))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchWithCors), CanFetchWithCors))
     return content
 end function
 
@@ -307,6 +308,40 @@ function CanFetchVideoThumbails(instance as string, testNode as object, cancella
 
         testNode.state = "passed"
         testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchVideoThumbnails).Replace("%1", videoId).Replace("%2", thumbnail)
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function CanFetchWithCors(instance as string, testNode as object, cancellation as object) as void
+    try
+        url = `${instance}/api/v1/trending`
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
+            return
+        end if
+
+        headers = response.Headers()
+        corsHeader = headers["Access-Control-Allow-Origin"]
+        if not IsString(corsHeader) or corsHeader <> "*"
+            testNode.state = "failed"
+            testNode.details = Tr(Locale.InvidiousTesting.CorsHeaderNotSetCorrectly).Replace("%1", url)
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchWithCors).Replace("%1", url)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)

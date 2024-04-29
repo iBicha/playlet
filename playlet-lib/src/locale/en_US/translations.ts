@@ -365,6 +365,10 @@
             <translation>Fetch video thumbnails</translation>
         </message>
         <message>
+            <source>Fetch with CORS</source>
+            <translation>Fetch with CORS</translation>
+        </message>
+        <message>
             <source>Press 'OK' for details</source>
             <translation>Press 'OK' for details</translation>
         </message>
@@ -431,6 +435,14 @@
         <message>
             <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
             <translation>The instance can fetch video thumbnail for ID %1 (%2)</translation>
+        </message>
+        <message>
+            <source>CORS header not set correctly from %1</source>
+            <translation>CORS header not set correctly from %1</translation>
+        </message>
+        <message>
+            <source>The instance can fetch with CORS from %1</source>
+            <translation>The instance can fetch with CORS from %1</translation>
         </message>
         <message>
             <source>Passed</source>

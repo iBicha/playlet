@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- An invidious instance "fetch with CORS" test
+
 ### Fixed
 
 - a bug where public Invidious instances all showed `N/A` in the health column
