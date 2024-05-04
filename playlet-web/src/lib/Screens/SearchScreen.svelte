@@ -31,7 +31,11 @@
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
-    invidiousApi.userCountryCode = value?.device?.user_country_code ?? "US";
+    let userCountryCode = value?.device?.user_country_code;
+    if (!userCountryCode || userCountryCode === "OT") {
+      userCountryCode = "US";
+    }
+    invidiousApi.userCountryCode = userCountryCode;
   });
 
   searchHistoryStore.subscribe((value) => {
