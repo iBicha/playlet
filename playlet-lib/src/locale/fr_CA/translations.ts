@@ -1249,5 +1249,17 @@
         <source>Remote</source>
         <translation>Commande</translation>
     </message>
+    <message>
+        <source>Fetch with CORS</source>
+        <translation>Récupérer avec CORS</translation>
+    </message>
+    <message>
+        <source>CORS header not set correctly from %1</source>
+        <translation>En-tête CORS non défini correctement depuis %1</translation>
+    </message>
+    <message>
+        <source>The instance can fetch with CORS from %1</source>
+        <translation>L&apos;instance peut récupérer avec CORS depuis %1</translation>
+    </message>
 </context>
 </TS>
