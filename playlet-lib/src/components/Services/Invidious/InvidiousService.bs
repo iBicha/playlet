@@ -43,11 +43,17 @@ namespace Invidious
             m.invidiousNode = invidiousNode
         end function
 
-        function GetUserRegion() as string
-            if m._userRegion = invalid
-                m._userRegion = m.invidiousNode.applicationInfo@.GetUserCountryCode()
+        function GetUserCountryCode() as string
+            if m._userCountryCode = invalid
+                m._userCountryCode = m.invidiousNode.applicationInfo@.GetUserCountryCode()
+
+                ' GetUserCountryCode() can return OT, which is not a valid country code.
+                ' https://github.com/iBicha/playlet/issues/372
+                if ValidString(m._userCountryCode) = "OT"
+                    m._userCountryCode = "US"
+                end if
             end if
-            return m._userRegion
+            return m._userCountryCode
         end function
 
         function GetAuthenticationHeaders(token as string) as object
@@ -89,7 +95,7 @@ namespace Invidious
             url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
             request = HttpClient.Get(url)
-            request.QueryParam("region", m.GetUserRegion())
+            request.QueryParam("region", m.GetUserCountryCode())
             request.QueryParam("q", q)
             request.CacheSeconds(60 * 60 * 24)
 
@@ -266,7 +272,7 @@ namespace Invidious
                     if queryParam.default <> invalid
                         if IsString(queryParam.type) and queryParam.type = "#ISO3166"
                             if queryParam.default = "GetUserCountryCode"
-                                request.QueryParam(queryParamKey, m.GetUserRegion())
+                                request.QueryParam(queryParamKey, m.GetUserCountryCode())
                             else
                                 request.QueryParam(queryParamKey, queryParam.default)
                             end if
