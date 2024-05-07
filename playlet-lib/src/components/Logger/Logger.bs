@@ -131,25 +131,16 @@ end function
 
 function GetLastExitInfo() as dynamic
     ' roAppManager.GetLastExitInfo() is only available on Roku OS 13 and above
-    if not IsOs13OrHigher()
+    appManager = CreateObject("roAppManager")
+    hasMethod = FindMemberFunction(appManager, "GetLastExitInfo") <> invalid
+    if not hasMethod
         return invalid
     end if
 
-    appManager = CreateObject("roAppManager")
     lastExitInfo = appManager.GetLastExitInfo()
     if lastExitInfo = invalid
         return invalid
     end if
 
     return ToString(lastExitInfo)
-end function
-
-function IsOs13OrHigher() as boolean
-    deviceInfo = CreateObject("roDeviceInfo")
-    osVersion = deviceInfo.GetOSVersion()
-    if osVersion = invalid or StringUtils.IsNullOrEmpty(osVersion.major)
-        return false
-    end if
-
-    return ValidInt(osVersion.major.ToInt()) >= 13
 end function
