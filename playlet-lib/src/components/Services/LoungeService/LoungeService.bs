@@ -49,14 +49,14 @@ function LoungeServiceLoop() as void
 
     screenId = api.GetScreenId()
     if StringUtils.IsNullOrEmpty(screenId)
-        m.top.isRunning = false
+        Shutdown("No screen ID found")
         return
     end if
     m.top.screenId = screenId
 
     loungeToken = api.GetToken()
     if StringUtils.IsNullOrEmpty(loungeToken)
-        m.top.isRunning = false
+        Shutdown("No lounge token found")
         return
     end if
     m.top.loungeToken = loungeToken
@@ -64,8 +64,7 @@ function LoungeServiceLoop() as void
     m.top.observeField("outgoingMessages", messagePort)
 
     if not api.GetSessionData()
-        m.top.unobserveField("outgoingMessages", messagePort)
-        m.top.isRunning = false
+        Shutdown("Failed to get session data")
         return
     end if
 
@@ -142,8 +141,7 @@ function LoungeServiceLoop() as void
                 ' We lost the session for some reason, so we need to rejoin the lounge
                 LogWarn("Lost session, rejoining")
                 if not api.GetSessionData()
-                    m.top.unobserveField("outgoingMessages", messagePort)
-                    m.top.isRunning = false
+                    Shutdown("Failed to rejoin session data")
                     return
                 end if
 
@@ -154,6 +152,11 @@ function LoungeServiceLoop() as void
         end if
     end while
 
-    m.top.unobserveField("outgoingMessages", messagePort)
+    Shutdown("Service stopped")
+end function
+
+function Shutdown(reason as string)
+    LogInfo("Shutting down:", reason)
+    m.top.unobserveField("outgoingMessages")
     m.top.isRunning = false
 end function

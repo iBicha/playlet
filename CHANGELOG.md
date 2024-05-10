@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - a bug where trending and search wouldn't work in certain countries (web app)
+- A crash when lounge session is lost and fails to recover
 
 ## [0.23.4] - 2024-05-04
 
