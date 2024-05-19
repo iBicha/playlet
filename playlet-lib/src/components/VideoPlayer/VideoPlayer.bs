@@ -80,7 +80,7 @@ function PlayWithContent(contentNode as object)
     if not StringUtils.IsNullOrEmpty(contentNode.videoId)
         videoContentNode.AddFields({ videoId: contentNode.videoId })
     end if
-    if IsInt(contentNode.timestamp)
+    if ValidInt(contentNode.timestamp) <> -1
         videoContentNode.AddFields({ timestamp: contentNode.timestamp })
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.title)
@@ -143,7 +143,10 @@ function OnVideoContentTaskResults(output as object) as void
     content = m.top.content
     SponsorBlock.FetchSponsorBlock(content.metadata)
 
-    if content.Live = true
+    timestamp = content.timestamp
+    hasTimestamp = IsInt(timestamp)
+
+    if content.Live = true and not hasTimestamp
         duration = m.top.duration
         if duration > 0
             SeekToEndOfStream()
@@ -153,8 +156,9 @@ function OnVideoContentTaskResults(output as object) as void
     end if
 
     m.top.control = "play"
-    if ValidInt(m.top.content.timestamp) > 0
-        m.top.seek = m.top.content.timestamp
+
+    if hasTimestamp and timestamp > 0
+        m.top.seek = content.timestamp
     end if
 end function
 
@@ -244,7 +248,11 @@ function OnVideoPlayerStateChange() as void
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
-                    if ValidInt(content.timestamp) > 0
+                    ' TODO:P2 handle SeekToEndOfStream for live videos on error
+                    timestamp = content.timestamp
+                    hasTimestamp = IsInt(timestamp)
+
+                    if hasTimestamp and timestamp > 0
                         m.top.seek = content.timestamp
                     end if
                     return
