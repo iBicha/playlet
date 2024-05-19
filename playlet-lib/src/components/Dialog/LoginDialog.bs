@@ -1,6 +1,5 @@
 import "DialogPalette.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -11,6 +10,9 @@ function Init()
 
     m.top.width = "920"
     m.top.observeFieldScoped("buttonSelected", FuncName(Close))
+
+    scanLabel = m.top.findNode("scanLabel")
+    scanLabel.text = Tr(Locale.Dialogs.ScanTheQrCode)
 end function
 
 function OnNodeReady()
@@ -19,7 +21,7 @@ function OnNodeReady()
     if isValidAddress
         m.top.url = `${address}/invidious/login`
     else
-        m.urlLabel.text = "No IP address found"
+        m.urlLabel.text = Tr(Locale.Dialogs.IpAddressNotAvailable)
     end if
 
     m.invidious.observeFieldScoped("authToken", FuncName(OnAuthTokenChange))
@@ -33,14 +35,10 @@ function OnUrlSet()
     url = m.top.url
 
     m.urlLabel.text = url
-    AsyncTask.Start(Tasks.GenerateQrCodeTask, {
-        poster: m.qrCode
-        text: url
-        size: m.qrCode.loadWidth
-        padding: 10
-    })
+    m.qrCode.text = url
 end function
 
 function OnAuthTokenChange()
+    m.invidious.unobserveFieldScoped("authToken")
     Close()
 end function

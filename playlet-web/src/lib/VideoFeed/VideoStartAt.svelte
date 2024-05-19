@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { tr } from "lib/Stores";
+
   export let checked = false;
   export let lengthSeconds = undefined;
   export let timestamp = 0;
@@ -58,7 +60,7 @@
   <div class="flex flex-row items-center">
     <label class="label justify-start cursor-pointer">
       <input type="checkbox" bind:checked class="checkbox" />
-      <span class="label-text m-2">Start at</span>
+      <span class="label-text m-2">{$tr("Start at")}</span>
     </label>
     <input
       bind:this={textInputElemet}

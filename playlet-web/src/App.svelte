@@ -22,10 +22,12 @@
   import LinkDragDrop from "lib/LinkDragDrop.svelte";
   import BookmarksScreen from "lib/Screens/BookmarksScreen.svelte";
   import RemoteControlScreen from "lib/Screens/RemoteControlScreen.svelte";
+  import { fetchLocale } from "lib/Api/Locale";
 
   onMount(async () => {
     PlayletApi.getState().then((value) => {
       playletStateStore.set(value);
+      fetchLocale(value.device?.current_locale);
     });
 
     PlayletApi.getHomeLayout().then((value) => {

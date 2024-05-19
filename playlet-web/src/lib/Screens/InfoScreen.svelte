@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getHost } from "lib/Api/Host";
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
 
   export let visibility: boolean;
 
@@ -66,7 +66,13 @@
       case "lib_version_latest":
         return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
       case "lib_url":
-        return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
+        const filename =
+          value &&
+          value.includes("/") &&
+          (value.endsWith(".zip") || value.endsWith(".pkg"))
+            ? value.substring(value.lastIndexOf("/") + 1)
+            : value;
+        return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${filename}</a>`;
       case "app_git_commit_hash":
       case "lib_git_commit_hash":
         if (value === "unknown") {
@@ -83,15 +89,19 @@
   let deviceInfo = {};
   let invidiousInfo = {};
   let preferencesInfo = {};
+  let profilesInfo = {};
   const feedbackTitle = encodeURIComponent("[Feedback] Playlet");
   let githubUrlIssue = "https://github.com/iBicha/playlet/issues/new";
   let mailToUrl = "mailto:brahim.hadriche@gmail.com";
+  const feedbackMessageRaw =
+    "You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.";
 
   playletStateStore.subscribe((value) => {
     appInfo = value.app || {};
     deviceInfo = value.device || {};
     invidiousInfo = value.invidious || {};
     preferencesInfo = value.preferences || {};
+    profilesInfo = value.profiles || {};
     githubUrlIssue = createGithubIssueUrl();
     mailToUrl = createMailToUrl();
   });
@@ -118,6 +128,11 @@ ${JSON.stringify(invidiousInfo, null, 2)}
 #### User preferences
 \`\`\`
 ${JSON.stringify(preferencesInfo, null, 2)}
+\`\`\`
+
+#### Profiles
+\`\`\`
+${JSON.stringify(profilesInfo, null, 2)}
 \`\`\``;
   }
 
@@ -134,17 +149,17 @@ ${JSON.stringify(preferencesInfo, null, 2)}
 
 <div class={visibility ? "" : "hidden"}>
   <div class="text-base text-center m-8">
-    Thank you for using Playlet.<br /> You have feedback? Let us know by
-    <a
-      class="link"
-      href={githubUrlIssue}
-      target="_blank"
-      rel="noopener noreferrer">creating an issue on Github</a
-    >
-    or by
-    <a class="link" href={mailToUrl} target="_blank" rel="noopener noreferrer"
-      >sending an email</a
-    >.
+    {@html $tr(feedbackMessageRaw)
+      .replace(
+        "%IssueStart%",
+        `<a class="link" href="${githubUrlIssue}" target="_blank" rel="noopener noreferrer">`
+      )
+      .replace("%IssueEnd%", "</a>")
+      .replace(
+        "%EmailStart%",
+        `<a class="link" href="${mailToUrl}" target="_blank" rel="noopener noreferrer">`
+      )
+      .replace("%EmailEnd%", "</a>")}
   </div>
   <div class="overflow-x-auto">
     <table class="table">

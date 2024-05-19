@@ -1,12 +1,12 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
@@ -18,8 +18,24 @@ function Init()
     m.linkWithWifiPanel = m.top.findNode("LinkWithWiFiPanel")
     m.linkWithTvPanel = m.top.findNode("LinkWithTvPanel")
 
+    m.webAppUrlLabel = m.top.findNode("WebAppUrlLabel")
+    m.webAppQrCodePoster = m.top.findNode("WebAppQrCodePoster")
     m.wifiNameLabel = m.top.findNode("WifiNameLabel")
+    m.wifiInstructionWithDeviceNameLabel = m.top.findNode("WifiInstructionWithDeviceNameLabel")
     m.linkCodeLabel = m.top.findNode("LinkCodeLabel")
+
+    m.wifiInstructionWithDeviceNameLabel.drawingStyles = {
+        "Bold": {
+            "fontSize": 22
+            "fontUri": "font:SmallBoldSystemFont"
+            "color": "#DDDDDDFF"
+        }
+        "default": {
+            "fontSize": 22
+            "fontUri": "font:SmallSystemFont"
+            "color": "#DDDDDDFF"
+        }
+    }
 end function
 
 function OnNodeReady()
@@ -46,6 +62,11 @@ function OnNodeReady()
     m.linkWithWifiPanel.visible = false
     m.linkWithTvPanel.observeField("visible", FuncName(OnLinkWithTvPanelVisibleChanged))
     m.linkWithTvPanel.visible = false
+
+    m.webAppButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    m.linkWithWifiButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    m.linkWithTvButton.observeField("contentWidth", FuncName(OnButtonSizeChange))
+    OnButtonSizeChange()
 end function
 
 function OnFocusChange() as void
@@ -64,16 +85,20 @@ end function
 function OnUrlSet()
     url = m.top.url
 
-    urlLabel = m.top.findNode("urlLabel")
-    urlLabel.text = url
+    m.webAppUrlLabel.text = url
+    m.webAppQrCodePoster.text = url
+end function
 
-    qrCodePoster = m.top.findNode("QrCodePoster")
-    AsyncTask.Start(Tasks.GenerateQrCodeTask, {
-        poster: qrCodePoster
-        text: url
-        size: qrCodePoster.loadWidth
-        padding: 20
-    })
+function OnButtonSizeChange()
+    width1 = m.webAppButton.contentWidth
+    width2 = m.linkWithWifiButton.contentWidth
+    width3 = m.linkWithTvButton.contentWidth
+
+    width = MathUtils.Max(width1, MathUtils.Max(width2, width3))
+
+    m.webAppButton.minimumWidth = width
+    m.linkWithWifiButton.minimumWidth = width
+    m.linkWithTvButton.minimumWidth = width
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -124,10 +149,13 @@ function OnLinkWithWifiPanelVisibleChanged() as void
     if connectionInfo.type = "WiFiConnection"
         m.wifiNameLabel.text = connectionInfo.ssid
     else if connectionInfo.type = "WiredConnection"
-        m.wifiNameLabel.text = "Wired connection"
+        m.wifiNameLabel.text = Tr(Locale.RemoteScreen.WiredConnection)
     else
         m.wifiNameLabel.text = "N/A"
     end if
+
+    deviceName = `<Bold>"${m.loungeService.deviceName}"</Bold>`
+    m.wifiInstructionWithDeviceNameLabel.text = Tr(Locale.RemoteScreen.WifiInstruction3).Replace("%1", deviceName)
 end function
 
 function OnLinkWithTvPanelVisibleChanged()
@@ -147,6 +175,7 @@ function GeneratePairingCode()
         m.linkCodeTask.cancel = true
     end if
 
+    m.linkCodeLabel.text = Tr(Locale.RemoteScreen.Loading)
     m.linkCodeTask = AsyncTask.Start(Tasks.LoungeGenerateManualPairingCodeTask, {
         loungeService: m.loungeService
         loungeToken: m.loungeService.loungeToken
@@ -174,8 +203,8 @@ function OnLoungeGenerateManualPairingCodeTaskResult(output as object) as void
         error = ErrorUtils.Format(error)
         LogError(error)
 
-        message = `Failed to generate manual pairing code\n${error}`
-        DialogUtils.ShowDialog(message, "Get TV code fail", true)
+        message = Tr(Locale.RemoteScreen.FailedToGeneratePairingCode) + `\n${error}`
+        DialogUtils.ShowDialog(message, Tr(Locale.RemoteScreen.TvCodeError), true)
         return
     end if
 

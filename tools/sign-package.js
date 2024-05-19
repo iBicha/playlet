@@ -3,16 +3,32 @@
 
 const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
+const { ArgumentParser } = require('argparse');
 
 const config = getEnvVars(['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD', 'ROKU_SIGN_PASSWORD']);
 
+const parser = new ArgumentParser({
+    description: 'Sign package'
+});
+
+parser.add_argument('--out-file', { help: 'A zip file to sign' });
+parser.add_argument('--out-dir', { help: 'Folder of the zip file' });
+parser.add_argument('--staging-dir', { help: 'Path to the staging directory' });
+
+const args = parser.parse_args();
+
+const outFile = args.out_file;
+const outDir = args.out_dir;
+const stagingDir = args.staging_dir;
+
 const options = {
     host: config.ROKU_DEV_TARGET,
+    packagePort: config.ROKU_DEV_TARGET_PORT || 80,
     password: config.ROKU_DEVPASSWORD,
-    outDir: 'release',
-    outFile: 'playlet.zip',
+    outDir: outDir,
+    outFile: outFile,
     failOnCompileError: true,
-    stagingDir: 'build/playlet-app',
+    stagingDir: stagingDir,
     retainStagingDir: true,
     signingPassword: config.ROKU_SIGN_PASSWORD,
 };

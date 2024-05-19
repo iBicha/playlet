@@ -5,7 +5,7 @@
 
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore, searchHistoryStore } from "lib/Stores";
+  import { playletStateStore, searchHistoryStore, tr } from "lib/Stores";
   import VideoCell from "lib/VideoFeed/VideoCell.svelte";
   import PlaylistCell from "lib/VideoFeed/PlaylistCell.svelte";
   import ChannelCell from "lib/VideoFeed/ChannelCell.svelte";
@@ -31,7 +31,11 @@
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
-    invidiousApi.userCountryCode = value?.device?.user_country_code ?? "US";
+    let userCountryCode = value?.device?.user_country_code;
+    if (!userCountryCode || userCountryCode === "OT") {
+      userCountryCode = "US";
+    }
+    invidiousApi.userCountryCode = userCountryCode;
   });
 
   searchHistoryStore.subscribe((value) => {
@@ -125,7 +129,7 @@
         <input
           type="search"
           dir="auto"
-          placeholder="Search..."
+          placeholder="{$tr('Search')}..."
           class="join-item input w-full border border-neutral rounded-full"
           bind:this={searchBox}
           bind:value={searchBoxText}
@@ -154,7 +158,7 @@
       </div>
       <button
         class="btn border border-neutral rounded-full mt-1"
-        on:click={searchFiltersComponent.open()}
+        on:click={searchFiltersComponent.show()}
       >
         <div class="h-6 w-8">
           <FiltersIcon />
@@ -205,7 +209,7 @@
             await searchVideos();
           }}
         >
-          Load more
+          {$tr("Load more")}
         </button>
       </div>
     {/if}

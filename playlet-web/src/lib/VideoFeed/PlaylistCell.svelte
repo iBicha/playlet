@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import PlaylistCastDialog from "./PlaylistCastDialog.svelte";
   import PlaylistThumbnail from "./PlaylistThumbnail.svelte";
+  import { get } from "svelte/store";
 
   export let title: string | undefined = undefined;
   export let author: string | undefined = undefined;
@@ -21,7 +22,7 @@
     invidiousInstance = value?.invidious?.current_instance;
   });
 
-  function GetUpdatedText(updated) {
+  function getUpdatedText() {
     if (typeof updated !== "number") {
       return "";
     }
@@ -31,34 +32,49 @@
       return "";
     }
 
-    let count = "";
+    const trFn = get(tr);
+
     const totalDays = Math.floor(span / 86400);
     if (totalDays > 365) {
       const years = Math.floor(totalDays / 365);
-      count = years > 1 ? `${years} years` : "1 year";
+      if (years === 1) {
+        return trFn("Updated 1 year ago");
+      } else {
+        return trFn("Updated ^n years ago").replace("^n", years.toString());
+      }
     } else if (totalDays > 30) {
       const months = Math.floor(totalDays / 30);
-      count = months > 1 ? `${months} months` : "1 month";
+      if (months === 1) {
+        return trFn("Updated 1 month ago");
+      } else {
+        return trFn("Updated ^n months ago").replace("^n", months.toString());
+      }
     } else if (totalDays > 7) {
       const weeks = Math.floor(totalDays / 7);
-      count = weeks > 1 ? `${weeks} weeks` : "1 week";
+      if (weeks === 1) {
+        return trFn("Updated 1 week ago");
+      } else {
+        return trFn("Updated ^n weeks ago").replace("^n", weeks.toString());
+      }
     } else if (totalDays > 1) {
-      count = `${totalDays} days`;
+      return trFn("Updated ^n days ago").replace("^n", totalDays.toString());
     } else if (span > 3600) {
       const hours = Math.floor(span / 3600);
-      count = hours > 1 ? `${hours} hours` : "1 hour";
+      if (hours === 1) {
+        return trFn("Updated 1 hour ago");
+      } else {
+        return trFn("Updated ^n hours ago").replace("^n", hours.toString());
+      }
     } else if (span > 60) {
       const minutes = Math.floor(span / 60);
-      count = minutes > 1 ? `${minutes} minutes` : "1 minute";
+      if (minutes === 1) {
+        return trFn("Updated 1 minute ago");
+      } else {
+        return trFn("Updated ^n minutes ago").replace("^n", minutes.toString());
+      }
     } else {
-      count = span > 1 ? `${span} seconds` : "1 second";
+      return trFn("Updated 1 minute ago");
     }
-
-    if (count === "") {
-      return "";
-    }
-
-    return `Updated ${count} ago`;
   }
 </script>
 
@@ -74,7 +90,7 @@
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
       <div class="font-semibold">{author}</div>
-      <div>{GetUpdatedText(updated)}</div>
+      <div>{getUpdatedText()}</div>
     </div>
   </div>
 </button>

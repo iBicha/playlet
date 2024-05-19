@@ -14,6 +14,15 @@ namespace Registry
         sec.Flush()
     end function
 
+    function DeleteAll()
+        reg = CreateObject("roRegistry")
+        sectionNames = reg.GetSectionList()
+        for each sectionName in sectionNames
+            reg.Delete(sectionName)
+        end for
+        reg.Flush()
+    end function
+
     function GetPlayletLibUrlsFromRegistry() as object
         urlsJson = ReadKey("playlet_lib_urls", "Playlet")
         if urlsJson = invalid
@@ -29,6 +38,14 @@ namespace Registry
         end if
         DeleteKey("playlet_lib_urls", "Playlet")
         Logger.Log("Cleared key playlet_lib_urls from registry")
+    end function
+
+    function ClearRegistryIfNeeded(launchArgs as object) as void
+        if launchArgs = invalid or launchArgs.clearRegistry = invalid
+            return
+        end if
+        DeleteAll()
+        Logger.Log("Cleared all data from registry")
     end function
 
 end namespace

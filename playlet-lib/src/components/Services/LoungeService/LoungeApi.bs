@@ -13,6 +13,11 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
 
+' Apparently devices can be connected and disconnected very frequently.
+' We don't want to spam the user with notifications, so we'll only show a notification
+' if the last notification was more than 30 minutes ago.
+const CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS = 1800
+
 class LoungeApi
 
     public loungeServiceNode
@@ -27,6 +32,7 @@ class LoungeApi
     public loungeToken
     public sessionId
     public gSessionId
+    public devices
 
     private ofs
     private lastProcessedCommandIndex = -1
@@ -46,6 +52,7 @@ class LoungeApi
         m.ofs = 0
         m.poller = invalid
         m.outgoingMessagesRequests = {}
+        m.devices = {}
 
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
@@ -55,13 +62,13 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
-        commandHandlers[COMMAND_TYPE_REMOTE_DISCONNECTED] = m.HandleRemoteDisconnected
         commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
@@ -92,20 +99,23 @@ class LoungeApi
         end if
 
         request = HttpClient.Get("https://www.youtube.com/api/lounge/pairing/generate_screen_id")
+
         response = request.Await()
         if not response.IsSuccess()
-            error = `Failed to get screen id. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            error = Tr(Locale.Dialogs.LoungeFailedToGetScreenId) + `\n${response.ErrorMessage()}`
             LogError(error)
-            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.LoungeServiceSetupError))
             return invalid
         end if
+
         id = response.Text()
         if not IsString(id)
-            error = `Failed to get screen id. Please restart playlet to use the cast function.\nNot a valid screen id: ${id}`
+            error = Tr(Locale.Dialogs.LoungeFailedToGetScreenId) + `\n` = Tr(Locale.Dialogs.LoungeNotAValidScreenId).Replace("%1", `${id}`)
             LogError(error)
-            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.LoungeServiceSetupError))
             return invalid
         end if
+
         m.screenId = id
         return id
     end function
@@ -115,23 +125,25 @@ class LoungeApi
             return m.loungeToken
         end if
 
-        form = UrlUtils.GetUrlEncodedForm({ "screen_ids": m.screenId })
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", form)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", "")
+        request.UrlEncodedForm({
+            "screen_ids": m.screenId
+        })
+
         response = request.Await()
         if not response.IsSuccess()
-            error = `Failed to get lounge token. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            error = Tr(Locale.Dialogs.LoungeFailedToGetLoungeToken) + `\n${response.ErrorMessage()}`
             LogError(error)
-            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.LoungeServiceSetupError))
             return invalid
         end if
 
         json = response.Json()
         screens = json.screens
         if not IsArray(screens) or screens.Count() <> 1
-            error = `Failed to get lounge token. Please restart playlet to use the cast function.\nInvalid response: ${json}`
+            error = Tr(Locale.Dialogs.LoungeFailedToGetLoungeToken) + `\n` + Tr(Locale.Dialogs.LoungeInvalidResponse).Replace("%1", `${json}`)
             LogError(error)
-            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.LoungeServiceSetupError))
             return invalid
         end if
 
@@ -141,7 +153,6 @@ class LoungeApi
     end function
 
     function GetSessionData() as boolean
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -159,16 +170,17 @@ class LoungeApi
         queryParams["loungeIdToken"] = m.loungeToken
         queryParams["zx"] = m.Zx()
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
-        request = HttpClient.Post(url, "count=0")
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm({
+            "count": 0
+        })
 
         response = request.Await()
         if not response.IsSuccess()
-            error = `Failed to get session data. Please restart playlet to use the cast function.\n${response.ErrorMessage()}`
+            error = Tr(Locale.Dialogs.LoungeFailedToGetSessionData) + `\n${response.ErrorMessage()}`
             LogError(error)
-            DialogUtils.ShowDialog(error, "Lounge service setup error")
+            DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.LoungeServiceSetupError))
             return false
         end if
 
@@ -271,15 +283,15 @@ class LoungeApi
             end if
 
             commandIndex = command[0]
-            if commandIndex <= m.lastProcessedCommandIndex
+            commandData = command[1]
+            commandType = commandData[0]
+
+            if commandIndex <= m.lastProcessedCommandIndex and commandType <> COMMAND_TYPE_G_SESSION_ID and commandType <> COMMAND_TYPE_SESSION_ID
                 LogDebug("Skipping command already processed:", command)
                 continue for
             end if
             m.lastProcessedCommandIndex = commandIndex
 
-            commandId = command[0]
-            commandData = command[1]
-            commandType = commandData[0]
             commandArgs = invalid
             if commandData.Count() > 1
                 commandArgs = commandData[1]
@@ -287,29 +299,29 @@ class LoungeApi
 
             handler = COMMAND_HANDLER_PREFIX + commandType
             if m.DoesExist(handler)
-                LogInfo(commandType)
-                m[handler](commandId, commandType, commandArgs, messagesToSend)
+                LogInfo(commandIndex, commandType)
+                m[handler](commandIndex, commandType, commandArgs, messagesToSend)
             else
                 LogWarn("Unknown command type:", commandType, "command:", command)
             end if
         end for
     end function
 
-    function HandleIgnoreCommand(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleIgnoreCommand(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object)
         LogDebug("Ignoring command:", commandType, "args:", commandArgs)
     end function
 
-    function HandleSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleSessionId(_commandId as integer, _commandType as string, commandArgs as object, _messagesToSend as object)
         m.sessionId = commandArgs
         LogInfo("sessionId:", m.sessionId)
     end function
 
-    function HandleGSessionId(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleGSessionId(_commandId as integer, _commandType as string, commandArgs as object, _messagesToSend as object)
         m.gSessionId = commandArgs
         LogInfo("gSessionId:", m.gSessionId)
     end function
 
-    function HandleGetPlayingNow(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+    function HandleGetPlayingNow(commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
         player = m.videoQueueNode.player
 
         message = LoungeMessages.OnHasPreviousNextChanged(m.videoQueueNode.hasPrevious, m.videoQueueNode.hasNext)
@@ -325,7 +337,7 @@ class LoungeApi
         messagesToSend.Push(message)
     end function
 
-    function HandleLoungeStatus(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+    function HandleLoungeStatus(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object) as void
         LogInfo(commandType, FormatJson(commandArgs))
         devices = commandArgs["devices"]
         if not IsString(devices)
@@ -336,64 +348,47 @@ class LoungeApi
             return
         end if
 
-        devicesDict = {}
         for each device in devices
-            devicesDict[device.id] = device
+            if m.devices.DoesExist(device.id)
+                device.lastConnectNotificationTime = m.devices[device.id].lastConnectNotificationTime
+            end if
+            m.devices[device.id] = device
         end for
-
-        m.loungeServiceNode.devices = devicesDict
     end function
 
-    function HandleRemoteConnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
+    function HandleRemoteConnected(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object) as void
+        LogInfo(commandType, FormatJson(commandArgs))
         newDevice = commandArgs
         id = newDevice.id
         if StringUtils.IsNullOrEmpty(id)
             return
         end if
 
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-
-        if devices.DoesExist(id)
-            device = devices[id]
+        if m.devices.DoesExist(id)
+            device = m.devices[id]
             device.Append(newDevice)
             newDevice = device
         end if
 
-        devices[id] = newDevice
-        m.loungeServiceNode.devices = devices
+        m.devices[id] = newDevice
 
-        userName = newDevice.user
-        if StringUtils.IsNullOrEmpty(userName)
-            userName = newDevice.name
-        end if
-        userAvatarUri = newDevice.userAvatarUri
-
-        LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, userName, userAvatarUri)
-    end function
-
-    function HandleRemoteDisconnected(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
-        LogInfo(commandType)
-        device = commandArgs
-        id = device.id
-        if StringUtils.IsNullOrEmpty(id)
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        lastConnectNotificationInterval = nowSeconds - ValidInt(newDevice.lastConnectNotificationTime)
+        if lastConnectNotificationInterval < CONNECT_NOTIFICATION_MIN_INTERVAL_SECONDS
+            LogInfo("Skipping connect notification. Last connect notification interval:", lastConnectNotificationInterval, "seconds")
             return
         end if
 
-        devices = m.loungeServiceNode.devices
-        if devices = invalid
-            devices = {}
-        end if
-        if devices.Delete(id)
-            m.loungeServiceNode.devices = devices
-        end if
-        ' TODO:P1 disconnect notification
+        newDevice.lastConnectNotificationTime = nowSeconds
+
+        userName = newDevice.user
+        deviceName = newDevice.name
+        userAvatarUri = newDevice.userAvatarUri
+
+        LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
     end function
 
-    function HandleSetVolume(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+    function HandleSetVolume(_commandId as integer, _commandType as string, commandArgs as object, _messagesToSend as object) as void
         player = m.videoQueueNode.player
         if player = invalid
             return
@@ -407,29 +402,29 @@ class LoungeApi
         player.mute = isMute
     end function
 
-    function HandleSetPlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleSetPlaylist(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object)
         LogDebug(commandType, commandArgs)
         LoungeVideoQueue.SetPlaylist(m.videoQueueNode, m.invService, commandArgs)
     end function
 
-    function HandleUpdatePlaylist(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleUpdatePlaylist(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object)
         LogDebug(commandType, commandArgs)
         LoungeVideoQueue.UpdatePlaylist(m.videoQueueNode, m.invService, commandArgs)
     end function
 
-    function HandlePause(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandlePause(_commandId as integer, _commandType as string, _commandArgs as object, _messagesToSend as object)
         m.videoQueueNode.pause = true
     end function
 
-    function HandlePlay(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandlePlay(_commandId as integer, _commandType as string, _commandArgs as object, _messagesToSend as object)
         m.videoQueueNode.play = true
     end function
 
-    function HandleStopVideo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object)
+    function HandleStopVideo(_commandId as integer, _commandType as string, _commandArgs as object, _messagesToSend as object)
         m.videoQueueNode.closePlayer = true
     end function
 
-    function HandleSeekTo(commandId as integer, commandType as string, commandArgs as object, messagesToSend as object) as void
+    function HandleSeekTo(_commandId as integer, _commandType as string, commandArgs as object, _messagesToSend as object) as void
         player = m.videoQueueNode.player
         if player = invalid
             return
@@ -445,7 +440,6 @@ class LoungeApi
             return
         end if
 
-        baseUrl = "https://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -472,8 +466,6 @@ class LoungeApi
             queryParams["AID"] = messages[0].commandId
         end if
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
         postData = [
             { key: "count", value: messages.Count() }
             { key: "ofs", value: loungeData.ofs }
@@ -497,9 +489,10 @@ class LoungeApi
 
         LogDebug("Sending messages:", postData)
 
-        body = UrlUtils.GetUrlEncodedForm(postData)
-        request = HttpClient.Post(url, body)
-        request.Header("Content-Type", "application/x-www-form-urlencoded")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request.QueryParams(queryParams)
+        request.UrlEncodedForm(postData)
+
         request.Send()
 
         ' we do not need to wait for requests to finish, we check on them later
@@ -509,11 +502,20 @@ class LoungeApi
         m.outgoingMessagesRequests[requestId] = request
     end function
 
-    function ProcessPendingOutgoingMessages()
+    function ProcessPendingOutgoingMessages() as object
+        results = []
         for each key in m.outgoingMessagesRequests
             request = m.outgoingMessagesRequests[key]
             if request.IsCompleted()
                 response = request.Await()
+                status = response.StatusCode()
+                error = response.ErrorMessage()
+
+                results.Push({
+                    "status": status
+                    "error": error
+                })
+
                 if not response.IsSuccess()
                     LogError(response.ErrorMessage())
                 end if
@@ -521,6 +523,8 @@ class LoungeApi
                 m.outgoingMessagesRequests.Delete(key)
             end if
         end for
+
+        return results
     end function
 
     function SaveCurrentLoungeData() as void

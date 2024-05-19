@@ -38,35 +38,50 @@ const getEnvVars = require('./get-env-vars');
             }
         }
 
-        await fetch(playletServer, {
+        const response = await fetch(playletServer, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(registry),
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to write registry: ${response.status} ${response.statusText}`);
+        }
     }
     else if (output) {
         if (fs.existsSync(output)) {
             throw new Error(`File "${output}" already exists`);
         }
         const response = await fetch(playletServer);
+
+        if (!response.ok) {
+            throw new Error(`Failed to read registry: ${response.status} ${response.statusText}`);
+        }
+
         const registry = await response.json();
 
         for (const section in registry) {
             for (const key in registry[section]) {
-                // We expect all values to be JSON strings.
-                // If this changes, we let JSON.parse throw an error.
-                registry[section][key] = JSON.parse(registry[section][key]);
+                try {
+                    registry[section][key] = JSON.parse(registry[section][key]);
+                } catch (error) {
+                    console.error(`Failed to parse value for key "${key}" in section "${section}"`);
+                }
             }
         }
 
         fs.writeFileSync(output, JSON.stringify(registry, null, 4));
     }
     else if (clear) {
-        await fetch(playletServer, {
+        const response = await fetch(playletServer, {
             method: 'DELETE',
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to clear registry: ${response.status} ${response.statusText}`);
+        }
     }
     else {
         console.error('No action specified');

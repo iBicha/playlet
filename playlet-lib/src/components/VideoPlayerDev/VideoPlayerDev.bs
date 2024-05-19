@@ -1,0 +1,95 @@
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.enableUI = false
+    m.top.enableTrickPlay = false
+
+    httpAgent = m.top.getHttpAgent()
+    httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0")
+end function
+
+function PlayWithContent(contentNode as object)
+    videoContentNode = CreateObject("roSGNode", "ContentNode")
+
+    if not StringUtils.IsNullOrEmpty(contentNode.videoId)
+        videoContentNode.AddFields({ videoId: contentNode.videoId })
+    end if
+    if not StringUtils.IsNullOrEmpty(contentNode.title)
+        videoContentNode.title = contentNode.title
+    end if
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    if not StringUtils.IsNullOrEmpty(contentNode._author)
+        videoContentNode.secondaryTitle = contentNode._author
+    end if
+
+    StartVideoContentTask(videoContentNode)
+end function
+
+function StartVideoContentTask(videoContentNode as object)
+    if m.videoContentTask <> invalid
+        m.videoContentTask.cancel = true
+    end if
+
+    m.top.content = videoContentNode
+
+    m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTaskDev, {
+        content: videoContentNode
+        invidious: m.top.invidious
+    }, OnVideoContentTaskResults)
+end function
+
+function OnVideoContentTaskResults(output as object) as void
+    m.videoContentTask = invalid
+    if output.cancelled
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        LogError(error)
+        Close(invalid)
+        return
+    end if
+
+    m.top.control = "play"
+end function
+
+function Close(_unused as dynamic)
+    if m.videoContentTask <> invalid
+        m.videoContentTask.cancel = true
+        m.videoContentTask = invalid
+    end if
+
+    parent = m.top.getParent()
+    if parent <> invalid
+        parent.RemoveChild(m.top)
+    end if
+
+    m.top.control = "stop"
+    m.top.content = invalid
+end function
+
+function OnkeyEvent(key as string, press as boolean) as boolean
+    if press = false
+        return false
+    end if
+
+    if key = "back"
+        m.videoQueue.closePlayer = true
+        return true
+    end if
+
+    return false
+end function

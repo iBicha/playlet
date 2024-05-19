@@ -1,0 +1,40 @@
+import "pkg:/source/utils/MathUtils.bs"
+
+namespace LocaleUtils
+
+    function GetPluralString(c as integer, zeroString as string, oneString as string, pluralString as string) as string
+        if c = 0
+            return Tr(zeroString)
+        else if c = 1
+            return Tr(oneString)
+        else
+            return Tr(pluralString).Replace("^n", c.toStr())
+        end if
+    end function
+
+    function GetFormattedPluralString(c as integer, zeroString as string, oneString as string, pluralString as string) as string
+        if c = 0
+            return Tr(zeroString)
+        else if c = 1
+            return Tr(oneString)
+        else
+            c! = c
+            if c! < 1000
+                return Tr(pluralString).Replace("^n", c!.toStr())
+            end if
+            c! = c! / 1000
+            if c! < 1000
+                return Tr(pluralString).Replace("^n", MathUtils.FormatFloat(c!).toStr() + " K")
+            end if
+
+            c! = c! / 1000
+            if c! < 1000
+                return Tr(pluralString).Replace("^n", MathUtils.FormatFloat(c!).toStr() + " M")
+            end if
+
+            c! = c! / 1000
+            return Tr(pluralString).Replace("^n", MathUtils.FormatFloat(c!).toStr() + " B")
+        end if
+    end function
+
+end namespace

@@ -12,9 +12,7 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
-' E.g. NBC News does not return any related chnanels
-' The "Continue Watching" feed source might return nothing. In this case,
-' it should be removed.
+' E.g. Subscriptions, Watch History and Playlists can be empty
 function Init()
     m.pendingLoadTasks = {}
 end function
@@ -108,12 +106,8 @@ function OnRowItemSelected(index as object) as void
         authorId = rowItem.authorId
         LogInfo("Open channel: " + authorId)
         OpenChannel(rowItem)
-    else if rowItem.type = "action"
-        if rowItem.action = "LoginDialog"
-            dialog = CreateObject("roSGNode", "LoginDialog")
-            dialog@.BindNode()
-            m.top.getScene().dialog = dialog
-        end if
+    else
+        LogWarn("Unknown row item type:", rowItem.type)
     end if
 end function
 
@@ -143,7 +137,7 @@ function OnRowItemLongPressed(index as object) as void
     end if
     rowItem = row.GetChild(rowItemIndex)
 
-    contextMenuProviders = [m.top, m.bookmarks, m.top.screen]
+    contextMenuProviders = [m.top, m.bookmarksService, m.top.screen]
     ContextMenuUtils.Open(contextMenuProviders, m.appController, rowItem)
 end function
 
@@ -151,20 +145,25 @@ function GetContextMenuOptionsForItem(rowItem as object) as object
     options = []
 
     if rowItem.type = "video"
-        options.push(ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayVideo", [rowItem]))
-        options.push(ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueueVideo", [rowItem]))
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.PlayVideo), m.videoQueue, "FuncPlayVideo", [rowItem]))
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.QueueVideo), m.videoQueue, "FuncAddToQueueVideo", [rowItem]))
 
-        item = ContextMenuUtils.CreateOption("Open channel", m.top, "OpenVideoChannel", [rowItem])
-        options.push(item)
+        authorId = rowItem.authorId
+        if not StringUtils.IsNullOrEmpty(authorId)
+            options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenChannel), m.top, "OpenVideoChannel", [rowItem]))
+        end if
     else if rowItem.type = "playlist"
-        options.push(ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayPlaylist", [rowItem, 0]))
-        options.push(ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueuePlaylist", [rowItem]))
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.PlayPlaylist), m.videoQueue, "FuncPlayPlaylist", [rowItem, 0]))
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.QueuePlaylist), m.videoQueue, "FuncAddToQueuePlaylist", [rowItem]))
 
-        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenPlaylist", [rowItem])
-        options.push(item)
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenPlaylist), m.top, "OpenPlaylist", [rowItem]))
+
+        authorId = rowItem.authorId
+        if not StringUtils.IsNullOrEmpty(authorId)
+            options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenChannel), m.top, "OpenPlaylistChannel", [rowItem]))
+        end if
     else if rowItem.type = "channel"
-        item = ContextMenuUtils.CreateOption("Open", m.top, "OpenChannel", [rowItem])
-        options.push(item)
+        options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenChannel), m.top, "OpenChannel", [rowItem]))
     else
         LogWarn("Unknown long pressed item type:", rowItem.type)
         return []
@@ -187,11 +186,21 @@ function OpenVideoChannel(video as object) as void
         LogWarn("Invalid authorId:", authorId)
         return
     end if
-    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId })
     ChannelUtils.Open(channel)
 end function
 
-function Refresh(unsued as dynamic)
+function OpenPlaylistChannel(playlist as object) as void
+    authorId = playlist.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId })
+    ChannelUtils.Open(channel)
+end function
+
+function Refresh(_unused as dynamic)
     InitContent()
 end function
 
@@ -203,7 +212,6 @@ end function
 
 function InitContent() as void
     CancelCurrentTasks()
-    m.top.someContentReady = false
 
     if m.top.feeds = invalid
         m.top.content = invalid

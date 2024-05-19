@@ -2,9 +2,11 @@
   import BooleanControl from "lib/Screens/Settings/SettingControls/BooleanControl.svelte";
   import ClearSearchHistoryControl from "lib/Screens/Settings/SettingControls/ClearSearchHistoryControl.svelte";
   import EditHomeScreenControl from "lib/Screens/Settings/SettingControls/EditHomeScreenControl.svelte";
+  import PlayletLibVersionControl from "lib/Screens/Settings/SettingControls/PlayletLibVersionControl.svelte";
   import RadioControl from "lib/Screens/Settings/SettingControls/RadioControl.svelte";
   import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
   import NumberControl from "./SettingControls/NumberControl.svelte";
+  import { tr } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -29,6 +31,7 @@
   const customComponents = {
     ClearSearchHistoryControl,
     EditHomeScreenControl,
+    PlayletLibVersionControl,
   };
 </script>
 
@@ -51,8 +54,8 @@
     />
   {:else}
     <div class="m-5">
-      <div class={textSizes[level]}>{displayText}</div>
-      <div class="text-xs text-gray-500">{description}</div>
+      <div class={textSizes[level]}>{$tr(displayText)}</div>
+      <div class="text-xs text-gray-500">{$tr(description)}</div>
     </div>
   {/if}
 

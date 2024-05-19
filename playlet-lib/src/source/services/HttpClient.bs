@@ -1,7 +1,13 @@
+' DISABLE_CACHE will disable all caching for all requests.
+' Only use this for debugging purposes.
 #const DISABLE_CACHE = false
+' NETWORK_THROTTLE will add a random delay to all requests to simulate network latency.
+' Only use this for debugging purposes.
+#const NETWORK_THROTTLE = false
 
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -211,6 +217,12 @@ namespace HttpClient
             return m
         end function
 
+        function UrlEncodedForm(form as object) as HttpRequest
+            m.Body(UrlUtils.GetUrlEncodedForm(form))
+            m.Header("Content-Type", "application/x-www-form-urlencoded")
+            return m
+        end function
+
         function TimeoutSeconds(timeoutSeconds as integer) as HttpRequest
             m._timeoutSeconds = timeoutSeconds
             return m
@@ -291,7 +303,9 @@ namespace HttpClient
             end if
 
             #if DISABLE_CACHE
-                m._noCache = true
+                #if DEBUG
+                    m._noCache = true
+                #end if
             #end if
 
             if m._noCache <> true
@@ -425,6 +439,12 @@ namespace HttpClient
             end if
 
             if m._sent <> true or m._cache <> invalid
+                #if NETWORK_THROTTLE
+                    #if DEBUG
+                        sleep(1000 + Rnd(2000))
+                    #end if
+                #end if
+
                 return new HttpResponse(m, invalid)
             end if
 
@@ -445,6 +465,12 @@ namespace HttpClient
 
             msg = wait(m._timeoutSeconds * 1000, messagePort)
 
+            #if NETWORK_THROTTLE
+                #if DEBUG
+                    sleep(1000 + Rnd(2000))
+                #end if
+            #end if
+
             if m._cancellation <> invalid
                 if m._cancellation.node <> invalid and m._cancellation.field <> invalid
                     ' TODO:P2 use a separate node as a cancellation token
@@ -460,7 +486,7 @@ namespace HttpClient
             else
                 eventType = type(msg)
                 if eventType = "roUrlEvent"
-                    LogInfo("Finished", "ID:", m.urlTransfer.GetIdentity())
+                    LogInfo("Finished ID:", m.urlTransfer.GetIdentity(), "after", m._timer.TotalMilliseconds(), "ms")
                 else if eventType = "roSGNodeEvent"
                     node = msg.getRoSGNode()
                     field = msg.getField()
@@ -568,6 +594,10 @@ namespace HttpClient
             return m._statusCode
         end function
 
+        function OverrideStatusCode(statusCode as integer)
+            m._statusCode = statusCode
+        end function
+
         function IsSuccess() as boolean
             statusCode = m.StatusCode()
             return statusCode >= 200 and statusCode < 400
@@ -642,13 +672,13 @@ namespace HttpClient
                 m._errorMessage = ""
             else
                 if m.request._sent <> true
-                    m._errorMessage = "Request not sent."
+                    m._errorMessage = Tr(Locale.HttpClient.RequestNotSent)
                 else if m.IsTimedOut()
-                    m._errorMessage = "Request timed out."
+                    m._errorMessage = Tr(Locale.HttpClient.RequestTimedOut)
                 else if m.IsCancelled()
-                    m._errorMessage = "Request cancelled."
+                    m._errorMessage = Tr(Locale.HttpClient.RequestCancelled)
                 else if type(m.event) = "roUrlEvent"
-                    m._errorMessage = `Reason :${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}`
+                    m._errorMessage = `${Tr(Locale.HttpClient.Reason)}:${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}`
                     if includeBody
                         m._errorMessage += `\nBody: ${m.event.GetString()}`
                     end if

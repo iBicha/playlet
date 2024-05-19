@@ -1,3 +1,4 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
@@ -6,6 +7,7 @@ import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
@@ -32,7 +34,7 @@ function Init()
         type: ""
         duration: ""
         features: []
-        sort_by: ""
+        sort: ""
     }
 
     m.top.ObserveField("filters", FuncName(OnFiltersChange))
@@ -195,22 +197,20 @@ function OnFiltersChange()
         end if
     end for
     if filterCount > 0
-        m.filtersButton.text = `Filters (${filterCount})`
+        m.filtersButton.text = `${Tr(Locale.Buttons.Filters)} (${filterCount})`
     else
-        m.filtersButton.text = "Filters"
+        m.filtersButton.text = Tr(Locale.Buttons.Filters)
     end if
 end function
 
 function Search(text as string)
     m.rowlist.UnobserveFieldScoped("someContentReady")
-    ' TODO:P1 someContentReady only fires if there are search results.
-    ' The case where search results are empty is not handled.
     m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
     ShowLoadingScreen()
 
     feedSource = {
         "id": `inv_search_${CryptoUtils.GetMd5(text)}`
-        "title": `Search - ${text}`
+        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
         "apiType": "Invidious"
         "endpoint": "search"
         "queryParams": {
@@ -232,16 +232,22 @@ function Search(text as string)
     end for
 
     m.rowList.feeds = [{
-        "title": `Search - ${text}`
+        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
         "feedSources": [feedSource]
     }]
 end function
 
 function OnSearchContentReady() as void
+    m.rowlist.UnobserveFieldScoped("someContentReady")
+
     if not m.rowlist.someContentReady
+        DialogUtils.ShowDialog(Tr(Locale.Dialogs.NoResultsFoundMessage), Tr(Locale.Dialogs.NoResultsFound))
+        m.rowlist.feeds = invalid
+        m.rowlist.focusable = false
+        HideLoadingScreen()
         return
     end if
-    m.rowlist.UnobserveFieldScoped("someContentReady")
+
     m.rowlist.focusable = true
     m.currentNavigtionNode = m.rowList
     NodeSetFocus(m.rowlist, true)
@@ -253,6 +259,7 @@ function OnSearchContentReady() as void
 end function
 
 function OnSearchError()
+    ' Note: we don't display an error dialog, VideoRowListRowContentTask will do that.
     m.rowlist.feeds = invalid
     m.rowlist.focusable = false
     HideLoadingScreen()

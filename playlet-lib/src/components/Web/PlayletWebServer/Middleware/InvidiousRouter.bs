@@ -8,7 +8,9 @@ namespace Http
         function new(server as object)
             super()
 
-            m.invidiousNode = server.task.invidious
+            task = server.task
+            m.profilesNode = task.profilesService
+            m.invidiousNode = task.invidious
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
         end function
 
@@ -18,16 +20,6 @@ namespace Http
 
             authLink = m.invidiousNode@.GetAuthorizeTokenLink()
             response.Redirect(authLink)
-            return true
-        end function
-
-        @get("/invidious/logout")
-        function Logout(context as object) as boolean
-            response = context.response
-
-            m.invidiousService.Logout()
-
-            response.Default(204, "OK")
             return true
         end function
 
@@ -42,7 +34,12 @@ namespace Http
                 username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
                 referer = request.query["ref"].DecodeUriComponent()
 
-                m.invidiousNode@.SetAuthToken(token, referer, username)
+                profile = CreateObject("roSGNode", "ProfileContentNode")
+                profile.username = username
+                profile.accessToken = token
+                profile.serverUrl = referer
+
+                m.profilesNode@.LoginWithProfile(profile)
             end if
             response.Redirect("/")
             return true

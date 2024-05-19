@@ -53,25 +53,37 @@ function Close()
 end function
 
 function RunTestsTask()
-    m.titleLabel.text = `Testing ${m.top.instance}`
+    instance = m.top.instance
+    m.titleLabel.text = Tr(Locale.InvidiousTesting.TestingInstance).Replace("%1", instance)
 
     if m.testingTask <> invalid
         m.testingTask.cancel = true
     end if
 
     m.testingTask = AsyncTask.Start(Tasks.InvidiousInstanceTestingTask, {
-        instance: m.top.instance
+        instance: instance
         listNode: m.testList
     })
 end function
 
-function ShowTestDetails(event as object) as void
+function ShowTestDetails() as void
     selected = m.testList.itemSelected
     itemContent = m.testList.content.GetChild(selected)
-    if StringUtils.IsNullOrEmpty(itemContent.details)
+    details = itemContent.details
+    if StringUtils.IsNullOrEmpty(details)
         return
     end if
 
-    message = `Status: ${itemContent.state}\nTest duration: ${itemContent.duration}ms\nDetails: ${itemContent.details}`
-    DialogUtils.ShowDialog(message, `Test: ${itemContent.title}`)
+    state = itemContent.state
+    displayStates = {
+        "passed": Locale.InvidiousTesting.Passed
+        "failed": Locale.InvidiousTesting.Failed
+    }
+
+    message = Tr(Locale.InvidiousTesting.Status) + ": " + Tr(ValidString(displayStates[state])) + `\n`
+    message += Tr(Locale.InvidiousTesting.TestDuration) + ": " + `${itemContent.duration}ms\n`
+    message += Tr(Locale.InvidiousTesting.Details) + ": " + details
+
+    title = Tr(Locale.InvidiousTesting.Test) + ": " + itemContent.title
+    DialogUtils.ShowDialog(message, title)
 end function

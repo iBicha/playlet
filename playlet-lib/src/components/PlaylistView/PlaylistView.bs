@@ -1,6 +1,5 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
-import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
@@ -143,9 +142,6 @@ function OnItemLongPressed(index as integer) as void
 
     LogInfo("Long press: playlist:", playlistId, "video:", videoId)
 
-    ' TODO:P1 handle case of opening the channel
-    ' - Owner of a video
-    ' - Owner of a playlist
     contextMenuProviders = [m.top]
     ContextMenuUtils.Open(contextMenuProviders, m.appController, video)
 end function
@@ -167,18 +163,30 @@ function GetContextMenuOptionsForItem(video as object) as object
     end if
 
     options = [
-        ContextMenuUtils.CreateOption("Play", m.videoQueue, "FuncPlayPlaylist", [playlist, index]),
-        ContextMenuUtils.CreateOption("Queue", m.videoQueue, "FuncAddToQueuePlaylist", [playlist])
-        ContextMenuUtils.CreateOption("Play video", m.videoQueue, "FuncPlayVideo", [video]),
-        ContextMenuUtils.CreateOption("Queue video", m.videoQueue, "FuncAddToQueueVideo", [video]),
+        ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.PlayPlaylist), m.videoQueue, "FuncPlayPlaylist", [playlist, index]),
+        ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.QueuePlaylist), m.videoQueue, "FuncAddToQueuePlaylist", [playlist])
+        ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.PlayVideo), m.videoQueue, "FuncPlayVideo", [video]),
+        ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.QueueVideo), m.videoQueue, "FuncAddToQueueVideo", [video]),
     ]
 
-    if not StringUtils.IsNullOrEmpty(playlist.authorId)
-        options.push(ContextMenuUtils.CreateOption("Open channel", m.top, "OpenPlaylistChannel", [playlist]))
+    playlistAuthorId = playlist.authorId
+    videoAuthorId = video.authorId
+
+    if not StringUtils.IsNullOrEmpty(playlistAuthorId) or not StringUtils.IsNullOrEmpty(videoAuthorId)
+        if playlistAuthorId = videoAuthorId
+            options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenChannel), m.top, "OpenPlaylistChannel", [playlist]))
+        else
+            if not StringUtils.IsNullOrEmpty(playlistAuthorId)
+                options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenPlaylistChannel), m.top, "OpenPlaylistChannel", [playlist]))
+            end if
+            if not StringUtils.IsNullOrEmpty(videoAuthorId)
+                options.push(ContextMenuUtils.CreateOption(Tr(Locale.ContextMenu.OpenVideoChannel), m.top, "OpenVideoChannel", [video]))
+            end if
+        end if
     end if
 
-    options.append(m.bookmarks@.GetMenuForPlaylist(playlist))
-    options.append(m.bookmarks@.GetMenuForVideo(video))
+    options.append(m.bookmarksService@.GetMenuForPlaylist(playlist))
+    options.append(m.bookmarksService@.GetMenuForVideo(video))
 
     return options
 end function
@@ -189,7 +197,17 @@ function OpenPlaylistChannel(playlist as object) as void
         LogWarn("Invalid authorId:", authorId)
         return
     end if
-    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId }, invalid)
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId })
+    ChannelUtils.Open(channel)
+end function
+
+function OpenVideoChannel(video as object) as void
+    authorId = video.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        LogWarn("Invalid authorId:", authorId)
+        return
+    end if
+    channel = InvidiousContent.ToChannelContentNode(invalid, { authorId: authorId })
     ChannelUtils.Open(channel)
 end function
 

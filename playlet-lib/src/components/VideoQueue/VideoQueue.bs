@@ -190,6 +190,17 @@ function OnPlaylistLoadStateChange() as void
     end for
 
     if playlistOp = "play"
+        playlistIndex = MathUtils.Clamp(playlistIndex, 0, videoNodes.Count() - 1)
+
+        ' If the playlist is already in the queue as is, play it from there.
+        existingIndex = FindPlaylistVideosInQueue(videoNodes)
+        if existingIndex >= 0
+            m.top.index = existingIndex + playlistIndex
+            m.top.closePlayer = true
+            m.top.play = true
+            return
+        end if
+
         queueCount = m.content.getChildCount()
         index = m.top.index
         index += 1
@@ -199,9 +210,7 @@ function OnPlaylistLoadStateChange() as void
             m.content.insertChildren(videoNodes, index)
         end if
 
-        playlistIndex = MathUtils.Clamp(playlistIndex, 0, videoNodes.Count() - 1)
-        index = index + playlistIndex
-        m.top.index = index
+        m.top.index = index + playlistIndex
 
         m.top.closePlayer = true
         m.top.play = true
@@ -215,6 +224,32 @@ function OnPlaylistLoadStateChange() as void
             VideoQueue.ShowNotifcation(m.top.notifications, playlistNode, hintVisible)
         end if
     end if
+end function
+
+function FindPlaylistVideosInQueue(videoNodes as object) as integer
+    queueCount = m.content.getChildCount()
+    playlistCount = videoNodes.Count()
+    if queueCount < playlistCount
+        return -1
+    end if
+
+    queueVideos = m.content.getChildren(-1, 0)
+
+    ' array in array search based on node.videoId, starting from the end
+    for i = queueCount - playlistCount to 0 step -1
+        found = true
+        for j = 0 to playlistCount - 1
+            if queueVideos[i + j].videoId <> videoNodes[j].videoId
+                found = false
+                exit for
+            end if
+        end for
+        if found
+            return i
+        end if
+    end for
+
+    return -1
 end function
 
 function OnClearQueue()
@@ -320,8 +355,15 @@ function OnHasNext()
 end function
 
 function CreateVideoPlayer() as object
+    useDevPlayer = m.top.preferences["dev.dev_video_player"]
+    if useDevPlayer
+        playerComponent = "VideoPlayerDev"
+    else
+        playerComponent = "VideoPlayer"
+    end if
+
     container = m.top.videoContainer
-    videoPlayer = container.createChild("VideoPlayer")
+    videoPlayer = container.createChild(playerComponent)
     videoPlayer.id = "VideoPlayer"
     videoPlayer@.BindNode()
 

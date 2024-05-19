@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
   import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
@@ -17,15 +17,10 @@
   let videoMetadata;
   let channelMetadata;
 
-  let tvName = "Roku TV";
-  let invidiousInstance;
-
   let invidiousApi = new InvidiousApi();
 
   playletStateStore.subscribe((value) => {
-    tvName = value?.device?.friendly_name ?? "Roku TV";
-    invidiousApi.instance = invidiousInstance =
-      value?.invidious?.current_instance;
+    invidiousApi.instance = value?.invidious?.current_instance;
   });
 
   onMount(async () => {
@@ -199,7 +194,7 @@
     : 'hidden'} fixed w-full h-full bg-base-100/80 z-50 flex justify-center items-center"
 >
   {#if isDragging}
-    <div class="text-2xl font-bold">Drop a YouTube link here</div>
+    <div class="text-2xl font-bold">{$tr("Drop a YouTube link here")}</div>
   {:else if isLoading}
     <span class="loading loading-spinner loading-md" />
   {/if}
@@ -213,6 +208,8 @@
   author={videoMetadata?.author}
   lengthSeconds={videoMetadata?.lengthSeconds}
   liveNow={videoMetadata?.liveNow}
+  isUpcoming={videoMetadata?.isUpcoming}
+  premiereTimestamp={videoMetadata?.premiereTimestamp}
   viewCount={videoMetadata?.viewCount}
   bind:videoStartAtChecked
   bind:videoStartAtTimestamp

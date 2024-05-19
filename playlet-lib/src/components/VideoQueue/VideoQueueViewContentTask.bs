@@ -14,15 +14,14 @@ function VideoQueueViewContentTask(input as object) as object
     index = MathUtils.Clamp(input.index - 2, 0, videoNodes.Count() - 1)
 
     requestOptions = {
-        ' Not providing a region should lead to a better DB hit rate
-        ' When the region is provided, the video will be fetched fresh every time
-        ' and will not be saved to the database.
-        region: false
         cacheSeconds: 8640000 ' 100 days
         cancellation: cancellation
         tryCount: 1
     }
 
+    ' TODO:P1: It turns out this might be too much. With a large number of videos
+    ' YouTube starts to rate limit us.
+    ' Need to change it to load on demand using render tracking
     for i = index to videoNodes.Count() - 1
         videoNode = videoNodes[i]
         if not LoadVideoDetail(videoNode, service, instance, requestOptions)

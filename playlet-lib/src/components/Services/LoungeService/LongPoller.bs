@@ -21,6 +21,7 @@ class LongPoller
     private socket_timer
 
     private status_code = 0
+    private status_text
     private headers
 
     function new()
@@ -182,16 +183,24 @@ class LongPoller
         newLineIndex = m.socket_buffer.InStr(`\r\n`)
         if newLineIndex > 0
             operationLine = m.socket_buffer.Left(newLineIndex)
-            parts = operationLine.Split(" ")
-            if parts.Count() <> 3 or parts[0] <> "HTTP/1.1"
+            if not operationLine.StartsWith("HTTP/1.1 ")
                 LogError("Invalid operation line:", operationLine)
                 m.CloseSocket()
                 return false
             end if
 
-            m.status_code = Val(parts[1])
-            if not m.status_code = 200
-                LogError("Http status code:", m.status_code)
+            status = operationLine.Mid(9)
+            spaceIndex = status.InStr(" ")
+            if spaceIndex = -1
+                LogError("Invalid operation line:", operationLine)
+                m.CloseSocket()
+                return false
+            end if
+            statusCode = status.Left(spaceIndex)
+            m.status_code = Val(statusCode)
+            m.status_text = status.Mid(spaceIndex + 1)
+            if m.status_code <> 200
+                LogError("Invalid status code:", m.status_code, m.status_text)
                 LogError("Response data:", m.socket_buffer)
                 m.CloseSocket()
                 return false

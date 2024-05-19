@@ -2,7 +2,7 @@ openapi: 3.0.0
 
 info:
   title: Playlet Web API
-  version: 0.19.2
+  version: 0.23.4
   description:
     Playlet Web API is a RESTful API for controlling the Playlet app on
     Roku devices. The API is intended to be used by the Playlet web app, but can
@@ -322,14 +322,63 @@ paths:
               schema:
                 type: string
                 format: uri
-  /invidious/logout:
+  /api/profiles:
     get:
-      summary: Logout from Invidious
-      description: Logout from Invidious, and invalidate the token if any.
-      operationId: invidiousLogout
+      summary: Get profiles
+      description: Get the logged profiles, and the currently active profile.
+      operationId: getProfiles
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currentProfile:
+                    type: string
+                  profiles:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProfileObject"
+    delete:
+      summary: Logout from a profile
+      description: Logout from a profile. This will remove the profile from the list of logged profiles.
+      operationId: logoutProfile
+      parameters:
+        - name: id
+          in: query
+          description: The ID of the profile to logout
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+  /api/profiles/activate:
+    post:
+      summary: Activate a profile
+      description: Activate a profile. This will set the profile as the active profile.
+      operationId: activateProfile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
 
   # Roku External Control Protocol (ECP)
   /input/{appId}:
@@ -523,6 +572,8 @@ components:
               type: string
             friendly_name:
               type: string
+            current_locale:
+              type: string
         invidious:
           type: object
           properties:
@@ -530,14 +581,17 @@ components:
               type: string
             auth_url:
               type: string
-            logged_in:
-              type: boolean
-            logged_in_instance:
-              type: string
-            logged_in_username:
-              type: string
         preferences:
           $ref: "#/components/schemas/PreferencesObject"
+        profiles:
+          type: object
+          properties:
+            currentProfile:
+              type: string
+            profiles:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProfileObject"
     PreferencesObject:
       type: object
       properties:
@@ -560,6 +614,17 @@ components:
           type: boolean
         sponsorblock.show_notifications:
           type: boolean
+    ProfileObject:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        username:
+          type: string
+        serverUrl:
+          type: string
     # TODO:P1 add the rest of properties
     VideoQueueObject:
       type: object

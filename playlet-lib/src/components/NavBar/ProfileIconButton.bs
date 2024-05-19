@@ -1,0 +1,111 @@
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' TODO:P1 this file is a copy paste of IconButton. It should be refactored.
+function Init()
+    m.buttonBackground = m.top.findNode("buttonBackground")
+    m.buttonIcon = m.top.findNode("buttonIcon")
+    m.buttonText = m.top.findNode("buttonText")
+
+    m.circlePoster = m.top.findNode("circlePoster")
+    m.circlePosterInner = m.top.findNode("circlePosterInner")
+    m.letterLabel = m.top.findNode("LetterLabel")
+
+    m.top.observeField("background", FuncName(onBackgroundChanged))
+    m.top.observeField("icon", FuncName(onIconChanged))
+    m.top.observeField("text", FuncName(onTextChanged))
+    m.top.observeField("height", FuncName(onHeightChanged))
+    m.top.observeField("width", FuncName(onWidthChanged))
+    m.top.observeField("padding", FuncName(onPaddingChanged))
+
+    profilesService = m.top.getScene().findNode("ProfilesService")
+    if profilesService <> invalid
+        m.profilesService = profilesService
+        profilesService.observeField("currentProfile", FuncName(OnCurrentProfile))
+        OnCurrentProfile()
+    end if
+end function
+
+function OnFocusChange()
+    if m.top.focus
+        m.buttonBackground.blendColor = m.top.focusBackground
+    else
+        m.buttonBackground.blendColor = m.top.background
+    end if
+    m.buttonBackground.visible = m.top.focus
+    m.buttonText.visible = m.top.focus
+end function
+
+function onBackgroundChanged()
+    m.buttonBackground.blendColor = m.top.background
+end function
+
+function onIconChanged()
+    m.buttonIcon.uri = m.top.icon
+end function
+
+function onTextChanged()
+    m.buttonText.text = m.top.text
+end function
+
+function setIconSize()
+    height = m.top.height
+    width = m.top.width
+    if height > 0 and width > 0
+        iconSize = MathUtils.Min(height, width) - m.top.padding
+        m.buttonIcon.height = iconSize
+        m.buttonIcon.width = iconSize
+
+        iconTranslation = [((width - iconSize) / 2), ((height - iconSize) / 2)]
+        m.buttonIcon.translation = iconTranslation
+        m.buttonText.translation = [-5, height + 2]
+        m.buttonText.width = width + 10
+
+        m.circlePoster.width = iconSize
+        m.circlePoster.height = iconSize
+        m.circlePoster.translation = iconTranslation
+
+        m.circlePosterInner.width = iconSize - 4
+        m.circlePosterInner.height = iconSize - 4
+
+        m.letterLabel.width = iconSize - 4
+        m.letterLabel.height = iconSize - 4
+    end if
+end function
+
+function onHeightChanged()
+    m.buttonBackground.height = m.top.height
+    setIconSize()
+end function
+
+function onWidthChanged()
+    m.buttonBackground.width = m.top.width - 10
+    m.buttonBackground.translation = [5, 0]
+    setIconSize()
+end function
+
+function onPaddingChanged()
+    setIconSize()
+end function
+
+function OnCurrentProfile() as void
+    currentProfile = m.profilesService.currentProfile
+    if currentProfile = invalid
+        m.circlePoster.visible = false
+        m.buttonIcon.visible = true
+        return
+    end if
+
+    username = currentProfile.username
+    if not StringUtils.IsNullOrEmpty(username)
+        m.LetterLabel.text = UCase(username.Left(1))
+    else
+        m.LetterLabel.text = ""
+    end if
+    m.circlePosterInner.blendColor = currentProfile.color
+
+    m.circlePoster.visible = true
+    m.buttonIcon.visible = false
+end function

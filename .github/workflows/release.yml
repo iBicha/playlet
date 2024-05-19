@@ -17,26 +17,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18.x
-        uses: actions/setup-node@v3
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build tests
-        run: npm run test:build
+      - name: Run tests
+        run: npm run test
+        env:
+          ROKU_DEV_TARGET: ${{ secrets.ROKU_DEV_TARGET }}
+          ROKU_DEV_TARGET_PORT: ${{ secrets.ROKU_DEV_TARGET_PORT }}
+          ROKU_DEVPASSWORD: ${{ secrets.ROKU_DEVPASSWORD }}
+          ROKU_DEV_TARGET_TELNET_PORT: ${{ secrets.ROKU_DEV_TARGET_TELNET_PORT }}
 
-      - name: Build Playlet
-        run: npm run build:release:ci
+      - name: Build Playlet for release
+        run: npm run build:release
+        env:
+          ROKU_DEV_TARGET: ${{ secrets.ROKU_DEV_TARGET }}
+          ROKU_DEV_TARGET_PORT: ${{ secrets.ROKU_DEV_TARGET_PORT }}
+          ROKU_DEVPASSWORD: ${{ secrets.ROKU_DEVPASSWORD }}
+          ROKU_SIGN_PASSWORD: ${{ secrets.ROKU_SIGN_PASSWORD }}
 
-      - name: Use Java 17
-        uses: actions/setup-java@v3
+      - name: Use Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
 
       - name: Download the Static Channel Analysis CLI
         run: |
@@ -70,6 +80,6 @@ jobs:
         run: sleep 10
 
       - name: Create Canary release
-        run: gh release create canary ./release/playlet.zip ./release/playlet-lib.zip --notes-file docs/canary-changelog.md --prerelease --title Canary
+        run: gh release create canary ./release/playlet.zip ./release/playlet.squashfs.pkg ./release/playlet-lib.zip ./release/playlet-lib.squashfs.pkg --notes-file docs/canary-changelog.md --prerelease --title Canary
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
