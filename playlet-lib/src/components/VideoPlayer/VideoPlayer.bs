@@ -242,13 +242,15 @@ function OnVideoPlayerStateChange() as void
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
                     LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
+                    ' TODO:P2 handle SeekToEndOfStream for live videos on error
+                    m.top.UnobserveField("duration")
+
                     content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
-                    ' TODO:P2 handle SeekToEndOfStream for live videos on error
                     timestamp = content.timestamp
                     hasTimestamp = IsInt(timestamp)
 
@@ -298,7 +300,8 @@ end function
 function SeekToEndOfStream()
     m.top.UnobserveField("duration")
     duration = m.top.duration
-    if duration > 0
+    ' If the stream is less than 30 seconds, it's not worth seeking to the end
+    if duration > 30
         LogInfo("Seeking to end of live stream", duration)
         m.top.seek = duration
     end if
