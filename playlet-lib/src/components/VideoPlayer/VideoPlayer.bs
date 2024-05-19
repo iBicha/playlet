@@ -80,7 +80,7 @@ function PlayWithContent(contentNode as object)
     if not StringUtils.IsNullOrEmpty(contentNode.videoId)
         videoContentNode.AddFields({ videoId: contentNode.videoId })
     end if
-    if IsInt(contentNode.timestamp)
+    if ValidInt(contentNode.timestamp) <> -1
         videoContentNode.AddFields({ timestamp: contentNode.timestamp })
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.title)
@@ -140,11 +140,25 @@ function OnVideoContentTaskResults(output as object) as void
         return
     end if
 
-    SponsorBlock.FetchSponsorBlock(m.top.content.metadata)
+    content = m.top.content
+    SponsorBlock.FetchSponsorBlock(content.metadata)
+
+    timestamp = content.timestamp
+    hasTimestamp = IsInt(timestamp)
+
+    if IsLiveVideo() and not hasTimestamp
+        duration = m.top.duration
+        if duration > 0
+            SeekToEndOfStream()
+        else
+            m.top.ObserveField("duration", FuncName(SeekToEndOfStream))
+        end if
+    end if
 
     m.top.control = "play"
-    if ValidInt(m.top.content.timestamp) > 0
-        m.top.seek = m.top.content.timestamp
+
+    if hasTimestamp and timestamp > 0
+        m.top.seek = content.timestamp
     end if
 end function
 
@@ -228,13 +242,19 @@ function OnVideoPlayerStateChange() as void
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
                     LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
+                    ' TODO:P2 handle SeekToEndOfStream for live videos on error
+                    m.top.UnobserveField("duration")
+
                     content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
-                    if ValidInt(content.timestamp) > 0
+                    timestamp = content.timestamp
+                    hasTimestamp = IsInt(timestamp)
+
+                    if hasTimestamp and timestamp > 0
                         m.top.seek = content.timestamp
                     end if
                     return
@@ -277,6 +297,16 @@ function OnVideoPlayerStateChange() as void
     end if
 end function
 
+function SeekToEndOfStream()
+    m.top.UnobserveField("duration")
+    duration = m.top.duration
+    ' If the stream is less than 30 seconds, it's not worth seeking to the end
+    if duration > 30
+        LogInfo("Seeking to end of live stream", duration)
+        m.top.seek = duration
+    end if
+end function
+
 function OnVideoFinished() as void
     if not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
         m.videoQueue.closePlayer = true
@@ -284,10 +314,8 @@ function OnVideoFinished() as void
 end function
 
 function IsLiveVideo() as boolean
-    if m.top.content <> invalid
-        return m.top.content.live
-    end if
-    return false
+    content = m.top.content
+    return content <> invalid and content.Live = true
 end function
 
 function ShowUIAndStartTimer()
