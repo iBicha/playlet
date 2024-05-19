@@ -1,0 +1,36 @@
+import "pkg:/source/QrCode/QrImage.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+@asynctask
+function GenerateQrCodeTask(input as object) as object
+    poster = input.poster
+    mode = input.mode
+    text = input.text
+    size = input.size
+    padding = input.padding
+
+    if mode = invalid
+        mode = QrCode.QRMode.Byte
+    end if
+
+    if size = invalid
+        size = 200
+    end if
+
+    if padding = invalid
+        padding = 0
+    end if
+
+    qr = new QrCode.QRImage()
+    imagePath = qr.Generate(text, size, padding, mode)
+
+    if m.top.cancel
+        return invalid
+    end if
+
+    if not StringUtils.IsNullOrEmpty(imagePath)
+        poster.uri = imagePath
+    end if
+
+    return invalid
+end function

@@ -2,10 +2,149 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.23.5] - 2024-05-19
+
+### Fixed
+
+- a bug where trending and search wouldn't work in certain countries (web app)
+- A crash when lounge session is lost and fails to recover
+- A bug where live videos to not start at the "edge" of the stream
+
+## [0.23.4] - 2024-05-04
+
+### Added
+
+- An invidious instance "fetch with CORS" test
+
+### Fixed
+
+- a bug where public Invidious instances all showed `N/A` in the health column
+- a bug where trending and search wouldn't work in certain countries
+
+## [0.23.3] - 2024-04-28
+
+### Changed
+
+- Removed announcement - most public instances are now updated
+
+## [0.23.2] - 2024-04-27
+
+### Changed
+
+- Updated announcement
+
+## [0.23.1] - 2024-04-24
+
+### Added
+
+- Announcement dialog to indicate outage
+
+## [0.23.0] - 2024-04-04
+
+### Added
+
+- Loading Playlet lib as squashfs, with fallback to the zip file. This significantly decreases load times.
+
+### Changed
+
+- Bumped minimum OS version to 11, this is required for squashfs-zstd
+
+## [0.22.3] - 2024-03-31
+
+### Changed
+
+- Removed announcement
+
+## [0.22.2] - 2024-03-31
+
+### Changed
+
+- Updated announcement
+
+## [0.22.1] - 2024-03-30
+
+### Added
+
+- Announcement dialog to indicate outage
+
+### Fixed
+
+- [Attempt] A bug where the lounge would randomly lose the session id, making it unable to cast, and spam the same error over and over
+- Dialog with timer now stops as expected if any button is pressed
+
+## [0.22.0] - 2024-03-24
+
+### Added
+
+- Context menu sort options for channel videos and playlists
+- Localization support and French translations
+- Channel releases
+
+### Changed
+
+- Colors to be more broadcast safe
+
+### Fixed
+
+- A bug where instance testing is not immediately cancelled when the testing page is closed
+- A bug in the web app where "upcoming" videos show up as "live"
+- Search sort filters
+
+## [0.21.2] - 2024-03-10
+
+### Fixed
+
+- Deeplinking required for certification
+
+## [0.21.1] - 2024-03-09
+
+### Added
+
+- Subscriber count in the channel page
+
+### Fixed
+
+- A bug where videos that did not premiere yet would error with a playback error
+- A bug where a playback error dialog is dismissed too fast before playing the next video
+
+## [0.21.0] - 2024-03-07
+
+### Added
+
+- Support for multiple profiles. You can now use multiple Invidious accounts.
+- When a video error dialog shows, a timer with 10 seconds starts to play the next video
+
+### Fixed
+
+- A bug where the loading screen does not disappear if search results are empty.
+- Empty invidious instance in preferences when default instance is being used
+
+## [0.20.2] - 2024-02-26
+
+### Added
+
+- Small improvement in the context menu of the Playlist view
+- Videos can be paused and resumed using the `OK` remote button
+
+### Fixed
+
+- `Device connected` notification only show once every 30 minutes per device to avoid spam
+- SponsorBlock category "highlight" was not visible in chapter label
+
+### Changed
+
+- UI focus images are now with rounded corners, and with a slight glow
+
+## [0.20.1] - 2024-02-23
+
+### Fixed
+
+- `Device connected` notification showing repeatedly
+
+## [0.20.0] - 2024-02-21
 
 ### Added
 
@@ -90,7 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - If you like to add these two feeds to your bookmarks:
     - Search for `Funny` (or `News`)
     - Set the `Sort by` filter to `Upload date`
-    - Press and hold the `Ok` button while a video from the search result is selected
+    - Press and hold the `OK` button while a video from the search result is selected
     - Choose the `Add to "Search - Funny"` option
 
 ## [0.18.0] - 2023-12-28
@@ -335,7 +474,7 @@ This version went through a major refactor, which resulted in a different arcite
   - It reads the response data, headers, error codes and etc even if they are not needed
   - Excessive logging without a way to toggle it, or redirect it to a file
 - Some unused parts of the code (Like basic auth in the server, WebSockets, RegistryRouter, Kanji QR Code)
-  - These were unsued and/or feature flagged features. Things can be restored as needed.
+  - These were unused and/or feature flagged features. Things can be restored as needed.
 - The video player loading spinner when the video is minimized: this added too much hacky code with minimum value.
 
 ### Fixed

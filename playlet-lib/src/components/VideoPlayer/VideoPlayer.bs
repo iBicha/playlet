@@ -16,6 +16,8 @@ function Init()
     m.fullScreenHintLabel = m.top.findNode("fullScreenHintLabel")
     m.fullScreenHintTimer = m.top.findNode("fullScreenHintTimer")
     m.fullScreenHintTimer.ObserveField("fire", FuncName(OnFullScreenHintTimer))
+    m.trickplayUITimer = m.top.findNode("trickplayUITimer")
+    m.trickplayUITimer.ObserveField("fire", FuncName(OnTrickplayUITimer))
 
     ' videoPlayingSuccess indicates if we started playing a video successfully
     ' We use it to detect if we should try another link for a video, or if another error
@@ -23,8 +25,17 @@ function Init()
     m.videoPlayingSuccess = false
     ' ignoreNextFinishedState indicates if we should ignore the next finished state
     ' This is used to prevent the video from playing the next video when we are
-    ' still trying to find a working stream url
+    ' still trying to find a working stream url.
+    ' This is also used to prevent playing the next video when we're still displaying
+    ' an error dialog.
     m.ignoreNextFinishedState = false
+
+    ' Indicates that we're currently paused and seeking position
+    m.isSeekingPosition = false
+
+    ' Checks if current RokuOS version has showUI field in Video node
+    m.showUIEnabled = m.top.hasField("showUI")
+    LogInfo(`Custom OK handler is ${m.showUIEnabled ? "enabled" : "disabled"}`)
 
     ' asyncStopSemantics available since Roku OS 12.5
     ' It is set to true because stopping synchronously causes timeout and crash
@@ -35,6 +46,9 @@ function Init()
     if m.top.hasField("asyncStopSemantics")
         m.top.asyncStopSemantics = true
     end if
+
+    httpAgent = m.top.getHttpAgent()
+    httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0")
 end function
 
 function OnNodeReady()
@@ -50,6 +64,7 @@ function OnNodeReady()
     m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
 
     ' TODO:P2 show a loading spinner if video is loading minimized
+    ' Probably only worth doing after the video player is redone
     m.top.enableUI = m.container.fullscreen
     m.top.showFullScreenHint = not m.container.fullscreen
 
@@ -65,7 +80,7 @@ function PlayWithContent(contentNode as object)
     if not StringUtils.IsNullOrEmpty(contentNode.videoId)
         videoContentNode.AddFields({ videoId: contentNode.videoId })
     end if
-    if IsInt(contentNode.timestamp)
+    if ValidInt(contentNode.timestamp) <> -1
         videoContentNode.AddFields({ timestamp: contentNode.timestamp })
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.title)
@@ -113,20 +128,50 @@ function OnVideoContentTaskResults(output as object) as void
         error = ErrorUtils.Format(error)
         LogError(error)
         videoId = output.task.input.content.videoId
-        message = `Failed to load video information for ${videoId}\n${error}`
-        DialogUtils.ShowDialog(message, "Video load fail", true)
-        ' TODO:P1 play next video in the queue after showing the error dialog
-        m.videoQueue.closePlayer = true
+
+        title = Tr(Locale.VideoPlayer.VideoLoadError)
+        message = Tr(Locale.VideoPlayer.VideoLoadErrorMessage).Replace("%1", videoId) + `\n${error}`
+        buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
+
+        dialog = DialogUtils.ShowTimedDialogButtons(message, title, buttons, 0, 10, true)
+        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+
         Lounge.SendOnStateChange()
         return
     end if
 
-    SponsorBlock.FetchSponsorBlock(m.top.content.metadata)
+    content = m.top.content
+    SponsorBlock.FetchSponsorBlock(content.metadata)
+
+    timestamp = content.timestamp
+    hasTimestamp = IsInt(timestamp)
+
+    if IsLiveVideo() and not hasTimestamp
+        duration = m.top.duration
+        if duration > 0
+            SeekToEndOfStream()
+        else
+            m.top.ObserveField("duration", FuncName(SeekToEndOfStream))
+        end if
+    end if
 
     m.top.control = "play"
-    if ValidInt(m.top.content.timestamp) > 0
-        m.top.seek = m.top.content.timestamp
+
+    if hasTimestamp and timestamp > 0
+        m.top.seek = content.timestamp
     end if
+end function
+
+function OnVideoContentTaskErrorDialogResponse(event as object)
+    dialog = event.getRoSGNode()
+    dialog.unobserveFieldScoped("wasClosed")
+    shouldPlayNext = dialog.actualButtonSelected = 0
+
+    if not shouldPlayNext or not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
+        m.videoQueue.closePlayer = true
+    end if
+
+    Lounge.SendOnStateChange()
 end function
 
 function MarkVideoWatched(videoId as string)
@@ -158,7 +203,7 @@ function Close(_unused as dynamic)
     try
         m.top.control = "stop"
     catch error
-        DialogUtils.ShowDialog(ErrorUtils.Format(error), "Error closing video", true)
+        DialogUtils.ShowDialog(ErrorUtils.Format(error), Tr(Locale.VideoPlayer.ErrorClosingVideo), true)
     end try
 
     m.top.content = invalid
@@ -169,6 +214,12 @@ function OnVideoPlayerStateChange() as void
 
     state = m.top.state
     content = m.top.content
+
+    ' Reset isSeekingPosition when started to play the video
+    if state = "playing"
+        m.isSeekingPosition = false
+    end if
+
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
     ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
     if state = "playing" and not m.videoPlayingSuccess
@@ -191,13 +242,19 @@ function OnVideoPlayerStateChange() as void
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
                     LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
 
+                    ' TODO:P2 handle SeekToEndOfStream for live videos on error
+                    m.top.UnobserveField("duration")
+
                     content.url = nextUrl
                     ' This video errored, and is about to finish, so don't close the video yet
                     ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
-                    if ValidInt(content.timestamp) > 0
+                    timestamp = content.timestamp
+                    hasTimestamp = IsInt(timestamp)
+
+                    if hasTimestamp and timestamp > 0
                         m.top.seek = content.timestamp
                     end if
                     return
@@ -229,11 +286,24 @@ function OnVideoPlayerStateChange() as void
             end for
         end if
 
-        title = `Error playing video ${content.videoId}`
+        title = Tr(Locale.VideoPlayer.ErrorPlayingVideo).Replace("%1", content.videoId)
         LogError(title, messageLines)
-        DialogUtils.ShowDialog(messageLines, title, true)
-        ' TODO:P1 play next video in the queue after showing the error dialog
-        m.videoQueue.closePlayer = true
+
+        buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
+
+        dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, buttons, 0, 10, true)
+        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+        m.ignoreNextFinishedState = true
+    end if
+end function
+
+function SeekToEndOfStream()
+    m.top.UnobserveField("duration")
+    duration = m.top.duration
+    ' If the stream is less than 30 seconds, it's not worth seeking to the end
+    if duration > 30
+        LogInfo("Seeking to end of live stream", duration)
+        m.top.seek = duration
     end if
 end function
 
@@ -241,6 +311,67 @@ function OnVideoFinished() as void
     if not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
         m.videoQueue.closePlayer = true
     end if
+end function
+
+function IsLiveVideo() as boolean
+    content = m.top.content
+    return content <> invalid and content.Live = true
+end function
+
+function ShowUIAndStartTimer()
+    if m.showUIEnabled
+        m.top.showUI = { "show": true, "trickPlaybar": true, "titleAndTime": true, "trickplayBackgroundOverlay": true, "focusTrickplayBar": false }
+        m.trickplayUITimer.control = "start"
+    end if
+end function
+
+function HideUIAndStopTimer()
+    if m.showUIEnabled
+        m.top.showUI = { "show": false, "focusTrickplayBar": false }
+        m.trickplayUITimer.control = "stop"
+    end if
+end function
+
+function HandleOKPress() as boolean
+    if not m.showUIEnabled
+        return false
+    end if
+
+    handled = false
+    state = m.top.state
+    uiVisible = m.top.trickPlaybar.visible
+    isLive = IsLiveVideo()
+    LogInfo(`Handling OK button: state = ${state}, uiVisible = ${uiVisible} isLive = ${isLive}`)
+    if state = "playing"
+        if not uiVisible
+            ' Video is playing and UI is not visible, show it
+            ShowUIAndStartTimer()
+        else if not isLive
+            ' Trickplay bar is visible and video is currently played, pause it and retain the UI
+            m.trickplayUITimer.control = "stop"
+            m.top.control = "pause"
+            ShowUIAndStartTimer()
+        else
+            HideUIAndStopTimer()
+        end if
+        handled = true
+    else if state = "paused"
+        ' Exit early if we're in seeking mode to avoid messing up internal Video node state
+        if m.isSeekingPosition
+            return false
+        end if
+
+        if not uiVisible
+            ' Video is paused and UI is not visible, show it
+            ShowUIAndStartTimer()
+        else
+            ' Video is currently paused with visible UI, resume it and hide UI
+            HideUIAndStopTimer()
+            m.top.control = "resume"
+        end if
+        handled = true
+    end if
+    return handled
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
@@ -260,6 +391,19 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         m.videoQueue.closePlayer = true
         return true
     end if
+
+    if key = "OK"
+        return HandleOKPress()
+    end if
+
+    if key = "left" or key = "right" or key = "rewind" or key = "fastforward"
+        ' We're paused and one of the buttons is pressed: left, right ff, rw.
+        ' That means we're seeking position. Check that in HandleOKPress and exit early
+        m.isSeekingPosition = true
+    end if
+
+    ' Always stop UI timer when pressing any button to avoid UI being hidden twice
+    m.trickplayUITimer.control = "stop"
     return false
 end function
 
@@ -281,6 +425,8 @@ function SetupAnimation()
 end function
 
 function OnFullScreenChange()
+    HideUIAndStopTimer()
+
     m.widthInterpolator.reverse = m.container.fullscreen
     m.heightInterpolator.reverse = m.container.fullscreen
     m.translationInterpolator.reverse = m.container.fullscreen
@@ -310,6 +456,10 @@ function OnShowFullScreenHint() as void
     end if
 
     m.fullScreenHintTimer.control = "start"
+end function
+
+function OnTrickplayUITimer()
+    HideUIAndStopTimer()
 end function
 
 function OnFullScreenHintTimer()

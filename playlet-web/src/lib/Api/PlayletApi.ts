@@ -8,6 +8,11 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getLocale(locale: string) {
+        const response = await fetch(`${PlayletApi.host()}/locale/${locale}/translations.ts`);
+        return await response.text();
+    }
+
     static async getPreferencesFile() {
         const response = await fetch(`${PlayletApi.host()}/config/preferences.json5`);
         return await response.json();
@@ -45,8 +50,17 @@ export class PlayletApi {
         return await response;
     }
 
-    static async logout() {
-        await fetch(`${PlayletApi.host()}/invidious/logout`);
+    static async getProfiles() {
+        const response = await fetch(`${PlayletApi.host()}/api/profiles`);
+        return await response.json();
+    }
+
+    static async activateProfile(profileId) {
+        await this.postJson(`${PlayletApi.host()}/api/profiles/activate`, { id: profileId });
+    }
+
+    static async logout(profileId) {
+        return await fetch(`${PlayletApi.host()}/api/profiles?id=${profileId}`, { method: "DELETE" });
     }
 
     static async playVideo(args) {
@@ -80,16 +94,14 @@ export class PlayletApi {
                 args.timestamp = parseInt(args.timestamp);
             }
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
-        return await response.json();
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 
     static async queuePlaylist(args) {
         if (!args.playlistId) {
             return;
         }
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
-        return await response.json();
+        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 
     static async openPlaylist(playlistId) {
@@ -128,6 +140,9 @@ export class PlayletApi {
     static async setPlayletLibVersion(tag) {
         if (tag !== "") {
             const urls = [{
+                link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.squashfs.pkg`,
+                type: 'custom'
+            }, {
                 link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
                 type: 'custom'
             }]
@@ -135,6 +150,9 @@ export class PlayletApi {
             // To avoid the "not found" error, we fallback to the default "latest" release.
             if (tag === "canary") {
                 urls.push({
+                    link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.squashfs.pkg`,
+                    type: 'custom'
+                }, {
                     link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip`,
                     type: 'custom'
                 })

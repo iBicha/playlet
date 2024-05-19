@@ -71,6 +71,8 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
 
         const options = {
             host: config.ROKU_DEV_TARGET,
+            packagePort: config.ROKU_DEV_TARGET_PORT || 80,
+            telnetPort: config.ROKU_DEV_TARGET_TELNET_PORT || 8085,
             password: config.ROKU_DEVPASSWORD,
             outDir: packageFolder,
             outFile: packageFile,
@@ -85,7 +87,7 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
         }
 
         console.log('Starting telnet process');
-        telnet = await startTelnetProcessAsync(options.host);
+        telnet = await startTelnetProcessAsync(options.host, options.telnetPort);
 
         console.log('Publishing package');
         await rokuDeploy.publish(options);
@@ -115,7 +117,7 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
     process.exit(success ? 0 : 1);
 })();
 
-function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
+function startTelnetProcessAsync(host, port, timeoutSeconds = 2) {
     return new Promise((resolve, reject) => {
         const telnet = spawn('telnet', [host, port]);
         childProcesses.push(telnet);
@@ -126,7 +128,6 @@ function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
         }
 
         telnet.stdout.on('data', (data) => {
-            console.log(data.toString());
             clearTimeout(timeoutID);
             timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
         });
@@ -140,7 +141,7 @@ function startTelnetProcessAsync(host, port = 8085, timeoutSeconds = 2) {
     });
 }
 
-function readFromProcessUntil(process, timeoutSeconds = 20, endToken = 'AppExitComplete') {
+function readFromProcessUntil(proc, timeoutSeconds = 20, endToken = 'AppExitComplete') {
     return new Promise((resolve, reject) => {
         let data = '';
 
@@ -148,22 +149,23 @@ function readFromProcessUntil(process, timeoutSeconds = 20, endToken = 'AppExitC
 
         function timeoutReached() {
             reject(`Timeout of ${timeoutSeconds} seconds waiting for ${endToken}`);
-            process.kill();
+            proc.kill();
         }
 
-        process.stdout.on('data', (chunk) => {
-            console.log(data.toString());
+        proc.stdout.on('data', (chunk) => {
+            process.stdout.write(chunk);
             clearTimeout(timeoutID);
+
             data += chunk;
             if (data.includes(endToken)) {
                 resolve(data);
-                process.kill();
+                proc.kill();
                 return;
             }
             timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
         });
 
-        process.stderr.on('data', (data) => {
+        proc.stderr.on('data', (data) => {
             clearTimeout(timeoutID);
             console.error(`stderr: ${data}`);
             reject()

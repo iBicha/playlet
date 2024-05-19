@@ -13,16 +13,11 @@ These are mostly the steps when releasing a new version:
 
 ## Playlet lib
 
-- Create local branch `release/$VERSION` e.g. `release/0.10.0`
-- Set version in package.json
-- Update CHANGELOG.md section from `[Unreleased]` to `[$VERSION] - DATE`
-- `npm run build:release`
-  - This should fail because there are uncommitted changes. This is expected.
-- Commit changes
-- Create pull request
-  - Title: `Release v$VERSION`
-  - Comment: `Release $VERSION \nIt should contain everything planned from #6`
-- Wait for CI and merge
+- Use the [Release trigger](https://github.com/iBicha/playlet/actions/workflows/release-trigger.yml) to trigger a release
+  - Run workflow from **main** branch
+  - Set the new version in the format X.Y.Z
+- Wait for the PR to be created
+- Inspect PR, wait for CI and merge
 - Wait for CI on main branch to create the `canary` release
 - Edit `canary` release
   - Tag: `v$VERSION`
@@ -40,11 +35,4 @@ These are mostly the steps when releasing a new version:
 
 ## Playlet
 
-For releasing to the store (when needed), this is done following a Playlet lib release:
-
-- Switch to main branch and pull changes, **including tags** - **match commit corresponding to the release.**
-- `npm run build:release:ci`
-  - This makes sure to have a valid app in the staging folder
-- `npm run sign-released-package`
-  - This should create the signed package under `release/playlet.pkg`
-- Upload to dashboard, and schedule a release (takes a couple of days)
+For releasing to the store (when needed), signed packages are attached to Github releases, ready to publish

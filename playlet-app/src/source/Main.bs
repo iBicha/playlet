@@ -22,6 +22,7 @@ function Main(args as object) as void
     Logger.Init()
 
     Registry.ClearPlayletLibUrlsIfNeeded(args)
+    Registry.ClearRegistryIfNeeded(args)
 
     scene = screen.CreateScene("BootstrapScene")
     screen.show()
@@ -33,9 +34,9 @@ function Main(args as object) as void
         ' These vars are needed to pass certification.
         ' The actual work is done in Playlet Lib
         ' bs:disable-next-line LINT1005
-        contentId = args.contentId
+        _contentId = args.contentId
         ' bs:disable-next-line LINT1005
-        mediaType = args.mediaType
+        _mediaType = args.mediaType
 
         ' Do not signal app launch complete here, we're doing it over at Playlet Lib
         ' This is needed to pass cetification
@@ -45,10 +46,9 @@ function Main(args as object) as void
     input = CreateObject("roInput")
     input.setMessagePort(port)
 
-    ' TODO:P2 follow up on bug where roSystemLog does not fire for a video player in ComponentLibrary
-    ' https://community.roku.com/t5/Roku-Developer-Program/BUG-roSystemLog-not-firing-with-ComponentLibrary/td-p/906075
     systemLog = CreateObject("roSystemLog")
     systemLog.SetMessagePort(port)
+    ' Although all types are enabled, they are filtered in Playlet Lib to avoid spamming the logs
     systemLog.EnableType("http.connect")
     systemLog.EnableType("http.error")
     systemLog.EnableType("http.complete")

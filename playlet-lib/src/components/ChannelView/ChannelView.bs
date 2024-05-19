@@ -1,8 +1,11 @@
+import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -16,6 +19,7 @@ function Init()
     m.banner = m.top.findNode("banner")
     m.thumbnail = m.top.findNode("thumbnail")
     m.authorLabel = m.top.findNode("authorLabel")
+    m.subCountLabel = m.top.findNode("subCountLabel")
     m.subscribeButton = m.top.findNode("subscribeButton")
     m.rowList = m.top.FindNode("rowList")
     m.rowList.focusable = true
@@ -26,6 +30,7 @@ function Init()
     m.authorId = ""
 
     InitializeTabs()
+    InitializeSortOptions()
 end function
 
 function OnNodeready()
@@ -34,7 +39,7 @@ function OnNodeready()
     SetNavigation(m.rowList, "up", m.subscribeButton)
     SetNavigation(m.subscribeButton, "down", m.rowList)
 
-    m.subscribeButton.text = "Subscribe"
+    m.subscribeButton.text = Tr(Locale.Buttons.Subscribe)
     DisposableObserveFieldScoped(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
 
     SetSubscribeButtonVisibility()
@@ -60,6 +65,7 @@ function OnContentSet() as void
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     m.authorLabel.text = content._author
+    m.subCountLabel.text = content.subCountText
     m.banner.uri = content.banner
     if StringUtils.IsNullOrEmpty(content.thumbnail)
         m.thumbnail.uri = ""
@@ -170,25 +176,51 @@ end function
 
 function InitializeTabs()
     m.tabs = {
-        videos: function(authorId as string, author as string) as object
-            return CreateChannelFeed("Latest videos", "channel_videos", authorId, author)
+        "videos": function(authorId as string, author as string) as object
+            return CreateChannelFeed("Videos", "channel_videos", authorId, author)
         end function
-        shorts: function(authorId as string, author as string) as object
+        "shorts": function(authorId as string, author as string) as object
             return CreateChannelFeed("Shorts", "channel_shorts", authorId, author)
         end function
-        streams: function(authorId as string, author as string) as object
+        "streams": function(authorId as string, author as string) as object
             return CreateChannelFeed("Live", "channel_streams", authorId, author)
         end function
-        podcasts: function(authorId as string, author as string) as object
+        "releases": function(authorId as string, author as string) as object
+            return CreateChannelFeed("Releases", "channel_releases", authorId, author)
+        end function
+        "podcasts": function(authorId as string, author as string) as object
             return CreateChannelFeed("Podcasts", "channel_podcasts", authorId, author)
         end function
-        playlists: function(authorId as string, author as string) as object
+        "playlists": function(authorId as string, author as string) as object
             return CreateChannelFeed("Playlists", "channel_playlists", authorId, author)
         end function
     }
 end function
 
+function InitializeSortOptions()
+    m.sortOptions = {
+        "channel_videos": [{
+            "id": "newest"
+            "title": "Latest"
+        }, {
+            "id": "popular"
+            "title": "Popular"
+        }, {
+            "id": "oldest"
+            "title": "Oldest"
+        }]
+        "channel_playlists": [{
+            "id": "newest"
+            "title": "Date added (newest)"
+        }, {
+            "id": "last"
+            "title": "Last video added"
+        }]
+    }
+end function
+
 function CreateChannelFeed(title as string, endpoint as string, ucid as string, author as string) as object
+    title = Tr(title)
     return {
         title: title
         feedSources: [{
@@ -207,7 +239,32 @@ function GetContextMenuOptionsForItem(video as object) as object
     if StringUtils.IsNullOrEmpty(m.top.authorId)
         return []
     end if
-    return m.bookmarks@.GetMenuForChannel(m.top.content)
+    options = m.bookmarksService@.GetMenuForChannel(m.top.content)
+    options.Append(GetSortingContextMenuOptionsForItem(video))
+    return options
+end function
+
+function GetSortingContextMenuOptionsForItem(video as object) as object
+    feedContentNode = video.getParent()
+    if feedContentNode = invalid or not feedContentNode.hasField("feedSources")
+        return []
+    end if
+
+    feedSources = feedContentNode.feedSources
+    if feedSources = invalid or feedSources.Count() = 0
+        return []
+    end if
+
+    feedSource = feedSources[0]
+    endpoint = feedSource.endpoint
+    if not m.sortOptions.DoesExist(endpoint)
+        return []
+    end if
+
+    title = Tr(Locale.Dialogs.SortFeedBy).replace("%1", `"${feedSource.title}"`)
+    sortOptions = m.sortOptions[endpoint]
+
+    return [ContextMenuUtils.CreateOption(title + "...", m.top, "ShowSortDialog", [title, sortOptions, feedContentNode])]
 end function
 
 function IsLoggedIn() as boolean
@@ -236,10 +293,10 @@ function OnAuthorIdChange()
 end function
 
 function SetSubscribeButtonVisibility()
-    isLogged = IsLoggedIn()
-    m.subscribeButton.visible = isLogged and not StringUtils.IsNullOrEmpty(m.top.authorId)
-    m.subscribeButton.focusable = m.subscribeButton.visible
-    if not m.subscribeButton.visible and m.subscribeButton.hasFocus()
+    isEnabled = IsLoggedIn() and not StringUtils.IsNullOrEmpty(m.top.authorId)
+    m.subscribeButton.visible = isEnabled
+    m.subscribeButton.focusable = isEnabled
+    if not isEnabled and m.subscribeButton.hasFocus()
         NodeSetFocus(m.rowList, true)
     end if
 end function
@@ -247,8 +304,56 @@ end function
 function OnSubscriptionChanged()
     isSubbed = IsSubscribed()
     if isSubbed
-        m.subscribeButton.text = "Unsubscribe"
+        m.subscribeButton.text = Tr(Locale.Buttons.Unsubscribe)
     else
-        m.subscribeButton.text = "Subscribe"
+        m.subscribeButton.text = Tr(Locale.Buttons.Subscribe)
     end if
+end function
+
+function ShowSortDialog(title as string, sortOptions as object, feedContentNode as object)
+    buttons = []
+    for i = 0 to sortOptions.Count() - 1
+        buttons.Push(Tr(sortOptions[i].title))
+    end for
+
+    dialog = DialogUtils.ShowDialogButtons("", title, buttons)
+    dialog.addFields({
+        "feedContentNode": feedContentNode
+        "sortOptions": sortOptions
+    })
+    dialog.observeField("buttonSelected", FuncName(OnSortDialogResult), ["buttonSelected"])
+end function
+
+function OnSortDialogResult(event as object) as void
+    dialog = event.getRoSGNode()
+    sortOptions = dialog.sortOptions
+    buttonIndex = event.GetData()
+
+    if not IsInt(buttonIndex) or buttonIndex < 0 or buttonIndex >= sortOptions.Count()
+        return
+    end if
+
+    selected = sortOptions[buttonIndex]
+
+    feedContentNode = dialog.feedContentNode
+    feedSources = feedContentNode.feedSources
+    if feedSources = invalid or feedSources.Count() = 0
+        return
+    end if
+    selectedFeedSource = feedSources[0]
+
+    currentFeeds = m.rowList.feeds
+    for i = 0 to currentFeeds.Count() - 1
+        feed = currentFeeds[i]
+        feedSource = feed.feedSources[0]
+        if feedSource.id = selectedFeedSource.id
+            if feedSource.queryParams = invalid
+                feedSource.queryParams = {}
+            end if
+
+            feedSource.queryParams["sort_by"] = selected.id
+            m.rowList.feeds = currentFeeds
+            return
+        end if
+    end for
 end function

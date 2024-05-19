@@ -294,13 +294,19 @@ This is mostly useful to QA the `canary` release (see [Canary release](https://e
 
 #### In case of a softlock
 
-If the dev menu is used to load a custom Playlet lib url, but the lib does not have a functionality to revert back:
+If the dev menu is used to load a custom Playlet lib url, but you couldn't revert back:
 
 ```bash
-curl -d '' "http://$ROKU_DEV_TARGET:8060/launch/dev?clearPlayletLibUrls=true"
+curl -d '' "http://$ROKU_DEV_TARGET:8060/launch/693751?clearPlayletLibUrls=true"
 ```
 
 This will remove the custom lib, and revert to using default (latest release from Github).
+
+If you need to clear all the data from the registry, use
+
+```bash
+curl -d '' "http://$ROKU_DEV_TARGET:8060/launch/693751?clearRegistry=true"
+```
 
 ## CI/CD
 

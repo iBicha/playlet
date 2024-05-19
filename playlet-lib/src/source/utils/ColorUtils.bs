@@ -7,25 +7,16 @@ namespace ColorUtils
             color = color.mid(1)
         end if
 
-        value = Val(color.mid(0, 2), 16) * 16777216 + Val(color.mid(2, 2), 16) * 65536 + Val(color.mid(4, 2), 16) * 256
-        if color.Len() = 6
-            value += 255
-        else if color.Len() = 8
-            value += Val(color.mid(6, 2), 16)
-        end if
-
-        return value
+        return Val(color, 16)
     end function
 
     function IntToHex(color as integer) as string
-        hexDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F"]
-        hexString = "#"
-
-        for i = 7 to 0 step -1
-            hexString = hexString + hexDigits[(color >> (i * 4)) and &hF]
+        hex = UCase(StrI(color, 16))
+        length = Len(hex)
+        for i = 0 to 7 - length
+            hex = "0" + hex
         end for
-
-        return hexString
+        return "#" + hex
     end function
 
     function RgbaToInt(r as integer, g as integer, b as integer, a = 255 as integer) as integer
@@ -38,6 +29,10 @@ namespace ColorUtils
 
     function RandomSoftColorInt() as integer
         return RgbaToInt(Rnd(100) + 100, Rnd(100) + 100, Rnd(100) + 100)
+    end function
+
+    function RandomSoftColorHex() as string
+        return IntToHex(RandomSoftColorInt())
     end function
 
 end namespace

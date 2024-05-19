@@ -1,0 +1,34 @@
+namespace Tests
+
+    @suite
+    class XmlObjectTests extends Rooibos.BaseTestSuite
+
+        @describe("XmlObject")
+
+        @it("creates valid XML")
+        function _()
+            xml = new XmlObject()
+            if xml.Node("Person", { "name": `John "Joker" Doe`, "age": 30 })
+                xml.EmptyNode("Address", { "street": "123 Main St", "city": "Anytown", "state": "NY" })
+                if xml.Node("Metadata")
+                    xml.TextNode("Data", "Some data")
+                    xml.End()
+                end if
+                xml.End()
+            end if
+
+            expected = `<?xml version="1.0" encoding="UTF-8"?>
+<Person age="30" name="John &quot;Joker&quot; Doe">
+  <Address city="Anytown" state="NY" street="123 Main St" />
+  <Metadata>
+    <Data>Some data</Data>
+  </Metadata>
+</Person>
+`
+
+            m.assertEqual(xml.ToXmlString(), expected)
+        end function
+
+    end class
+
+end namespace

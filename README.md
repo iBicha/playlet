@@ -7,7 +7,10 @@
   </a>
   <a href="https://github.com/iBicha/playlet/releases">
     <img alt="Current Release" src="https://img.shields.io/github/release/iBicha/playlet.svg"/>
-    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.zip.svg"/>
+    <img alt="Total Downloads" src="https://img.shields.io/github/downloads/iBicha/playlet/latest/playlet-lib.squashfs.pkg.svg"/>
+  </a>
+  <a href="https://hosted.weblate.org/engage/playlet/">
+    <img src="https://hosted.weblate.org/widget/playlet/svg-badge.svg" alt="Translation status" />
   </a>
   <a href="/LICENSE">
     <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
@@ -42,16 +45,16 @@ More under [Screenshots](./docs/screenshots/README.md)
 - 🕵️ No Tracking
 - 🛡️ Privacy driven (uses Invidious backend)
 - ⚔️ SponsorBlock integration (skips undesirable sections in videos)
-- 📱 Browse, search, and cast from phone using the web app
+- 📱 Browse, search, and cast from phone using the YouTube app or the browser
 - 🔮 Picture-in-picture mode
 - ⚡ Fast! [Check out how we compare with the official YouTube app](https://youtu.be/qmSvA-QQW20)
 
 ### Cast from phone
 
-1. Open "Web app" tab in Playlet
-1. Scan QR Code with Phone
-1. Browse or search videos
-1. Click the video and choose the "Play on TV" option
+- Open "Remote" tab in Playlet
+  - Scan QR Code with Phone, and use the browser; OR
+  - Use the YouTube app to connect using the same Wi-Fi; OR
+  - Use the `Link with TV code` to connect
 
 ### Picture-in-picture
 
@@ -63,7 +66,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 1. Open settings in Playlet
 1. Select Invidious -> Instance
-1. Set a custom instance, or choose a public one hosted by volunteers (from https://api.invidious.io/)
+1. Set a custom instance, or choose a public one hosted by volunteers (from [api.invidious.io](https://api.invidious.io/))
 1. Optionally, Select `Test instance` to make sure it works
 1. Hit save
 

@@ -1,0 +1,22 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@asynctask
+function ProfilesInvidiousUnregisterTokenTask(input as object) as object
+    profileContentNodes = input.profileNodes
+    invidiousNode = input.invidious
+
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    for each profileNode in profileContentNodes
+        authToken = {
+            instance: profileNode.serverUrl
+            token: profileNode.accessToken
+        }
+        response = service.UnregisterToken(authToken)
+        if not response.IsSuccess()
+            LogWarn(`Failed to unregister token: ${response.ErrorMessage()}`)
+        end if
+    end for
+
+    return invalid
+end function

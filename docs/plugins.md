@@ -12,6 +12,7 @@
 - [Logger](#logger)
 - [Type Gen](#type-gen)
 - [Web Server](#web-server)
+- [Locale validation](#locale-validation)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
 
@@ -602,3 +603,23 @@ There one special annotation, and one special route:
 - `*` matches all paths
 
 So `@all(*)` would be a middleware that will be matched with any request.
+
+## Locale validation
+
+**[Source](/tools/bs-plugins/locale-validation-plugin.ts)**
+
+### Why
+
+Roku's built-in localization system has some undesired side effects: for example, it might translate node ids, which would break the relationship between the nodes.
+This plugin enforces some rules to ensure translation files are kept up to date with code implementation.
+See the next section for the validation rules.
+
+### How
+
+The plugin checks for the following:
+
+- Translated words and sentenses are defined in an enum annotated with `@locale`
+- All the values in the `@locale` enums must be provided in the English (`en_US`) translation. This is because `en_US` is the fallback translation when the current localte translations are not complete.
+- `en_US` must have matching source and translation values, so it can act as a fallback translation.
+- All `source` translations from all languages must be present in the `@locale` enums. This is to prevent renaming the values in the code without updating translation files.
+- Translation `source` keys can't be used except for certain fields such as `"text"` and `"title"`. This is to prevent the accidental localization of non-display fields, such as node ids.

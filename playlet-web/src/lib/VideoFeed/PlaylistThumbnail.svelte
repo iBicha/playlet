@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { getPluralString } from "lib/Api/Locale";
+
   export let title: string | undefined = undefined;
   export let videoCount: number | undefined = undefined;
   export let playlistThumbnail: string | undefined = undefined;
@@ -33,6 +35,14 @@
     }
     thumbnailUrl = url;
   }
+
+  function getVideoCountText() {
+    if (isNaN(videoCount) || videoCount < 0) {
+      return "";
+    }
+
+    return getPluralString(videoCount, "0 videos", "1 video", "^n videos");
+  }
 </script>
 
 <figure class="relative">
@@ -47,6 +57,6 @@
   <div
     class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2"
   >
-    {videoCount} videos
+    {getVideoCountText()}
   </div>
 </figure>

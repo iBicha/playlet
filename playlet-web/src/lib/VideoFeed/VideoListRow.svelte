@@ -1,6 +1,6 @@
 <script lang="ts">
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import { invidiousVideoApiStore, playletStateStore } from "lib/Stores";
+  import { invidiousVideoApiStore, playletStateStore, tr } from "lib/Stores";
   import VideoCell from "./VideoCell.svelte";
   import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
@@ -83,8 +83,12 @@
 
   playletStateStore.subscribe((value) => {
     invidiousApi.instance = value?.invidious?.current_instance;
-    invidiousApi.userCountryCode = value?.device?.user_country_code ?? "US";
-    invidiousApi.isLoggedIn = value.invidious?.logged_in ?? false;
+    let userCountryCode = value?.device?.user_country_code;
+    if (!userCountryCode || userCountryCode === "OT") {
+      userCountryCode = "US";
+    }
+    invidiousApi.userCountryCode = userCountryCode;
+    invidiousApi.isLoggedIn = !!(value.profiles?.currentProfile ?? false);
     loadRow();
   });
 
@@ -209,7 +213,7 @@
           videos = [...(videos || []), ...newVideos];
 
           totalFetchedItems += result.items.length;
-          if (totalFetchedItems >= 3) {
+          if (totalFetchedItems >= 6) {
             break;
           }
         }
@@ -257,13 +261,13 @@
   }
 </script>
 
-<!-- Hide rows that are loaded but have no videos. Typically a 
-     disabled feed (like popular) or unauthenticated. 
-     TODO:P1 show action nodes (action to login)
+<!-- 
+  Hide rows that are loaded but have no videos. Typically a 
+  disabled feed (like popular) or unauthenticated. 
 -->
 {#if feedLoadState !== FeedLoadState.Loaded || videos.length !== 0}
   <div class="text-lg font-semibold ml-4">
-    {feed.title}
+    {$tr(feed.title)}
   </div>
   <div
     class="carousel carousel-center rounded-box w-full space-x-4"

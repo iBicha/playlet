@@ -60,9 +60,6 @@
   onMount(() => {
     screen.addEventListener("keydown", onKeyDown);
     screen.addEventListener("keyup", onKeyUp);
-    // TODO:P1 support navigator.mediaSession
-    // media buttons, such as play/pause, next, and previous track.
-    // metadata, like title, artist, album, artwork
   });
 
   onDestroy(() => {

@@ -1,14 +1,24 @@
 <script lang="ts">
+  import { tr } from "lib/Stores";
+
   let modal;
 
-  export let label = "Filters";
+  export function show() {
+    modal.showModal();
+  }
+
+  export function close() {
+    modal.close();
+  }
+
+  export let label = $tr("Filters");
 
   export const filters = {
     date: "",
     type: "",
     duration: "",
     features: [],
-    sort_by: "",
+    sort: "",
   };
 
   let features_kv: any = {};
@@ -26,9 +36,9 @@
     count += filters.type ? 1 : 0;
     count += filters.duration ? 1 : 0;
     count += filters.features.length;
-    count += filters.sort_by ? 1 : 0;
+    count += filters.sort ? 1 : 0;
 
-    label = `Filters` + `${count > 0 ? ` (${count})` : ""}`;
+    label = $tr("Filters") + `${count > 0 ? ` (${count})` : ""}`;
   }
 
   const options = {
@@ -78,10 +88,6 @@
       {
         title: "Movie",
         value: "movie",
-      },
-      {
-        title: "Show",
-        value: "show",
       },
     ],
     duration: [
@@ -148,18 +154,18 @@
         value: "location",
       },
     ],
-    sort_by: [
+    sort: [
       {
         title: "Relevance",
         value: "",
       },
       {
         title: "Upload date",
-        value: "upload_date",
+        value: "date",
       },
       {
         title: "View count",
-        value: "view_count",
+        value: "views",
       },
       {
         title: "Rating",
@@ -167,10 +173,6 @@
       },
     ],
   };
-
-  export function open() {
-    modal.showModal();
-  }
 </script>
 
 <dialog bind:this={modal} id="modal_search_filters" class="modal">
@@ -179,37 +181,37 @@
       <h2 class="text-xl font-bold mb-4">{label}</h2>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Date</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Upload date")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.date}>
           {#each options.date as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Type</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Type")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.type}>
           {#each options.type as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Duration</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Duration")}</h3>
         <select
           class="input input-bordered w-full"
           bind:value={filters.duration}
         >
           {#each options.duration as { title, value }}
-            <option {value}>{title}</option>
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Features</h3>
+        <h3 class="text-lg font-bold mb-2">{$tr("Features")}</h3>
         {#each options.features as { title, value }}
           <label class="flex items-center">
             <input
@@ -218,33 +220,26 @@
               class="form-checkbox"
               bind:checked={features_kv[value]}
             />
-            <span class="ml-2">{title}</span>
+            <span class="ml-2">{$tr(title)}</span>
           </label>
         {/each}
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">Sort By</h3>
-        <select
-          class="input input-bordered w-full"
-          bind:value={filters.sort_by}
-        >
-          {#each options.sort_by as { title, value }}
-            <option {value}>{title}</option>
+        <h3 class="text-lg font-bold mb-2">{$tr("Sort by")}</h3>
+        <select class="input input-bordered w-full" bind:value={filters.sort}>
+          {#each options.sort as { title, value }}
+            <option {value}>{$tr(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="flex justify-end">
-        <button
-          class="btn btn-outline"
-          type="button"
-          on:click={() => modal.close()}>Close</button
-        >
+        <button class="btn btn-outline">{$tr("Close")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>Close</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>

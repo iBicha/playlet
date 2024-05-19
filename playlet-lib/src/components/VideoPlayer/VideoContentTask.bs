@@ -34,6 +34,17 @@ function VideoContentTask(input as object) as object
 
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
+    contentNode.live = metadata.liveNow
+
+    if IsString(metadata.error)
+        ' Adding metadata allows us to play next recommended video after displaying the error
+        contentNode.addFields({ metadata: metadata })
+
+        return {
+            success: false
+            error: metadata.error
+        }
+    end if
 
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode, playletServerPort)
     contentNode.url = streamUrls[0]
@@ -46,6 +57,10 @@ function VideoContentTask(input as object) as object
         playletStreamUrls: streamUrls
         playletStreamUrlIndex: 0
     })
+
+    if metadata.liveNow = true
+        contentNode.Live = true
+    end if
 
     return {
         success: true
@@ -156,10 +171,6 @@ function AddInstanceToUrlIfNeeded(streamUrls as object, instance as string)
     end for
 end function
 
-' TODO:P2
-' Captions are rate limited https://github.com/iv-org/invidious/issues/2567
-' It's possible to loop through a list of backup instances hoping to find working subtitles.
-' Caveat: searching for a working caption could cause a delay in the video player start.
 function SetCaptions(metadata as object, service as object, contentNode as object) as void
     if metadata.captions.Count() = 0
         return

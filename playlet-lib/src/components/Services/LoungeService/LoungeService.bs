@@ -1,7 +1,5 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
-' TODO:P0
-' 1. Add a section about the lounge in the privacy policy
 
 function Init()
     m.top.functionName = "LoungeServiceLoop"
@@ -51,14 +49,14 @@ function LoungeServiceLoop() as void
 
     screenId = api.GetScreenId()
     if StringUtils.IsNullOrEmpty(screenId)
-        m.top.isRunning = false
+        Shutdown("No screen ID found")
         return
     end if
     m.top.screenId = screenId
 
     loungeToken = api.GetToken()
     if StringUtils.IsNullOrEmpty(loungeToken)
-        m.top.isRunning = false
+        Shutdown("No lounge token found")
         return
     end if
     m.top.loungeToken = loungeToken
@@ -66,8 +64,7 @@ function LoungeServiceLoop() as void
     m.top.observeField("outgoingMessages", messagePort)
 
     if not api.GetSessionData()
-        m.top.unobserveField("outgoingMessages", messagePort)
-        m.top.isRunning = false
+        Shutdown("Failed to get session data")
         return
     end if
 
@@ -119,14 +116,47 @@ function LoungeServiceLoop() as void
         isOpen = api.Poll(socketMessages, outgoingLoungeMessages)
 
         api.SendMessages(outgoingLoungeMessages)
-        api.ProcessPendingOutgoingMessages()
+        outgoingLoungeMessagesResults = api.ProcessPendingOutgoingMessages()
 
         if not isOpen
             sleep(3000)
+
+            unknownSid = false
+            ' TODO:P2 move this check somewhere else
+            if api.poller.status_code = 400 and ValidString(api.poller.status_text) = "Unknown SID"
+                api.poller.status_code = 0
+                unknownSid = true
+            end if
+
+            if not unknownSid
+                for each result in outgoingLoungeMessagesResults
+                    if result.status = 400 and result.error.InStr("Unknown SID") <> -1
+                        unknownSid = true
+                        exit for
+                    end if
+                end for
+            end if
+
+            if unknownSid
+                ' We lost the session for some reason, so we need to rejoin the lounge
+                LogWarn("Lost session, rejoining")
+                if not api.GetSessionData()
+                    Shutdown("Failed to rejoin session data")
+                    return
+                end if
+
+                api.SaveCurrentLoungeData()
+            end if
+
             api.FetchCommandsRpc(messagePort)
         end if
     end while
 
-    m.top.unobserveField("outgoingMessages", messagePort)
+    Shutdown("Service stopped")
+end function
+
+function Shutdown(reason as string)
+    LogInfo("Shutting down:", reason)
+    m.top.unobserveField("outgoingMessages")
     m.top.isRunning = false
 end function

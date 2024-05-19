@@ -2,6 +2,7 @@
   import {
     homeLayoutFileStore,
     homeLayoutStore,
+    tr,
     userPreferencesStore,
   } from "lib/Stores";
   import ArrowUpIcon from "assets/remote-control/arrow-up.svg.svelte";
@@ -55,6 +56,10 @@
     }
   }
 
+  export function close() {
+    modal.close();
+  }
+
   function onClose() {
     // Reset value to original value to avoid weird animation on show
     value = JSON.parse(JSON.stringify(originalValue));
@@ -84,14 +89,14 @@
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{displayText}</div>
-  <div class="text-xs text-gray-500">{@html description}</div>
+  <div class={textSizes[level]}>{$tr(displayText)}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
   <button class="btn m-1" on:click={openHomeScreenEditor}
-    >Edit home screen</button
+    >{$tr("Edit home screen")}</button
   >
 </div>
 
-<dialog bind:this={modal} on:close={onClose} class="modal">
+<dialog bind:this={modal} class="modal" on:close={onClose}>
   <div class="modal-box bg-base-100">
     {#if value && homeLayout}
       <table class="w-full">
@@ -110,7 +115,7 @@
             </td>
             <td>
               <label class="label p-0 cursor-pointer">
-                <div class="label-text">{homeLayout[item.id].title}</div>
+                <div class="label-text">{$tr(homeLayout[item.id].title)}</div>
                 <input
                   type="checkbox"
                   name={item.id}
@@ -134,12 +139,12 @@
         {/each}
       </table>
       <form method="dialog" class="flex justify-center space-x-2">
-        <button class="btn btn-primary" on:click={save}>Save</button>
-        <button class="btn btn-primary">Close</button>
+        <button class="btn btn-primary" on:click={save}>{$tr("Save")}</button>
+        <button class="btn btn-primary">{$tr("Close")}</button>
       </form>
     {/if}
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>Close</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>

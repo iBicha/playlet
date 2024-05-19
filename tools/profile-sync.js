@@ -293,8 +293,8 @@ async function deleteAccessToken(invidiousInstance, token) {
             console.log("Updating subscriptions")
             profile.subscriptions = await extractYtDlp("https://www.youtube.com/feed/channels", browser, -1)
 
-            console.log("Updating watch history")
-            profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser, playlistLimit)
+            // console.log("Updating watch history")
+            // profile.watch_history = await extractYtDlp("https://www.youtube.com/feed/history", browser, playlistLimit)
 
             const playlists = await extractYtDlpPlaylists(browser);
             for (let i = 0; i < playlists.length; i++) {

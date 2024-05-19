@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import VideoStartAt from "./VideoStartAt.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
 
@@ -11,6 +11,8 @@
   export let lengthSeconds: number = undefined;
   export let liveNow: boolean = undefined;
   export let viewCount: number | undefined = undefined;
+  export let isUpcoming: boolean = undefined;
+  export let premiereTimestamp: number | undefined = undefined;
 
   export let videoStartAtChecked;
   export let videoStartAtTimestamp;
@@ -21,6 +23,9 @@
 
   export function close() {
     modal.close();
+  }
+
+  export function onClose() {
     videoStartAtChecked = false;
     videoStartAtTimestamp = 0;
   }
@@ -81,7 +86,7 @@
   }
 </script>
 
-<dialog bind:this={modal} class="modal">
+<dialog bind:this={modal} class="modal" on:close={onClose}>
   <form method="dialog" class="modal-box bg-base-100">
     <div class="flex flex-col items-center">
       <div class="w-64">
@@ -92,6 +97,8 @@
           bind:liveNow
           bind:lengthSeconds
           bind:viewCount
+          bind:isUpcoming
+          bind:premiereTimestamp
           bind:invidiousInstance
         />
       </div>
@@ -105,19 +112,19 @@
       />
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>
-          Play on {tvName}
+          {$tr("Play on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={queueOnTv}>
-          Queue on {tvName}
+          {$tr("Queue on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
-          Open in Invidious
+          {$tr("Open in Invidious")}
         </button>
-        <button class="btn join-item hover:btn-accent">Cancel</button>
+        <button class="btn join-item hover:btn-accent">{$tr("Cancel")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>Close</button>
+    <button>{$tr("Close")}</button>
   </form>
 </dialog>

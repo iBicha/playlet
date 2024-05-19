@@ -37,17 +37,23 @@ namespace Invidious
     const ERROR_NOT_AUTHENTICATED = "Not authenticated"
 
     class InvidiousService
-        public node as object
+        public invidiousNode as object
 
-        function new(node as object)
-            m.node = node
+        function new(invidiousNode as object)
+            m.invidiousNode = invidiousNode
         end function
 
-        function GetUserRegion() as string
-            if m._userRegion = invalid
-                m._userRegion = m.node.applicationInfo@.GetUserCountryCode()
+        function GetUserCountryCode() as string
+            if m._userCountryCode = invalid
+                m._userCountryCode = m.invidiousNode.applicationInfo@.GetUserCountryCode()
+
+                ' GetUserCountryCode() can return OT, which is not a valid country code.
+                ' https://github.com/iBicha/playlet/issues/372
+                if ValidString(m._userCountryCode) = "OT"
+                    m._userCountryCode = "US"
+                end if
             end if
-            return m._userRegion
+            return m._userCountryCode
         end function
 
         function GetAuthenticationHeaders(token as string) as object
@@ -57,7 +63,10 @@ namespace Invidious
         end function
 
         function GetInstance() as string
-            instance = m.node.preferences["invidious.instance"]
+            if m.preferences = invalid
+                m.preferences = m.invidiousNode.preferences
+            end if
+            instance = m.preferences["invidious.instance"]
             if not StringUtils.IsNullOrEmpty(instance)
                 return instance
             end if
@@ -70,7 +79,7 @@ namespace Invidious
                 return
             end if
 
-            authToken = m.node.authToken
+            authToken = m.invidiousNode.authToken
             if authToken = invalid
                 return
             end if
@@ -86,7 +95,7 @@ namespace Invidious
             url = `${instance}${Invidious.SEARCH_SUGGEST_ENDPOINT}`
 
             request = HttpClient.Get(url)
-            request.QueryParam("region", m.GetUserRegion())
+            request.QueryParam("region", m.GetUserCountryCode())
             request.QueryParam("q", q)
             request.CacheSeconds(60 * 60 * 24)
 
@@ -154,7 +163,7 @@ namespace Invidious
         end function
 
         function GetPlaylist(playlistId as string, index = 0 as integer, cancellation = invalid as object) as object
-            authToken = m.node.authToken
+            authToken = m.invidiousNode.authToken
             if authToken = invalid
                 instance = m.GetInstance()
                 url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
@@ -199,7 +208,7 @@ namespace Invidious
             feedSource = feedSources[feedSourcesIndex]
 
             if m.endpoints = invalid
-                m.endpoints = m.node.apiDefinitions
+                m.endpoints = m.invidiousNode.apiDefinitions
             end if
 
             endpoint = m.endpoints[feedSource.endpoint]
@@ -236,7 +245,7 @@ namespace Invidious
 
         function MakeRequest(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
             if m.endpoints = invalid
-                m.endpoints = m.node.apiDefinitions
+                m.endpoints = m.invidiousNode.apiDefinitions
             end if
 
             endpoint = m.endpoints[feedSource.endpoint]
@@ -251,8 +260,10 @@ namespace Invidious
 
             request = HttpClient.Get(instance + endpoint.url)
 
+            authToken = invalid
+
             if endpoint.authenticated = true
-                authToken = m.node.authToken
+                authToken = m.invidiousNode.authToken
                 if authToken = invalid
                     return {
                         success: false
@@ -269,7 +280,7 @@ namespace Invidious
                     if queryParam.default <> invalid
                         if IsString(queryParam.type) and queryParam.type = "#ISO3166"
                             if queryParam.default = "GetUserCountryCode"
-                                request.QueryParam(queryParamKey, m.node.applicationInfo@.GetUserCountryCode())
+                                request.QueryParam(queryParamKey, m.GetUserCountryCode())
                             else
                                 request.QueryParam(queryParamKey, queryParam.default)
                             end if
@@ -310,23 +321,18 @@ namespace Invidious
 
             response = request.Await()
 
-            if m.responseHandlers = invalid
-                m.responseHandlers = {
-                    DefaultHandler: m.DefaultHandler
-                    AuthFeedHandler: m.AuthFeedHandler
-                    PlaylistHandler: m.PlaylistHandler
-                    VideoInfoHandler: m.VideoInfoHandler
-                    PlaylistInfoHandler: m.PlaylistInfoHandler
-                    ChannelInfoHandler: m.ChannelInfoHandler
-                    ChannelVideosHandler: m.ChannelVideosHandler
-                    ChannelPlaylistsHandler: m.ChannelPlaylistsHandler
-                    WatchHistoryHandler: m.WatchHistoryHandler
-                }
+            responseHandler = invalid
+            if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
+                responseHandler = endpoint.responseHandler
+            else
+                responseHandler = "DefaultHandler"
             end if
 
-            responseHandler = endpoint.responseHandler <> invalid ? m.responseHandlers[endpoint.responseHandler] : m.responseHandlers["DefaultHandler"]
-
-            result = responseHandler(m, feedSource, response)
+            result = m[responseHandler]({
+                feedSource: feedSource
+                response: response
+                authToken: authToken
+            })
 
             if response.IsSuccess() and result <> invalid
                 return {
@@ -341,7 +347,9 @@ namespace Invidious
             end if
         end function
 
-        function DefaultHandler(m as object, feedSource as object, response as object) as object
+        function DefaultHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -351,7 +359,9 @@ namespace Invidious
             return invalid
         end function
 
-        function PlaylistHandler(m as object, feedSource as object, response as object) as object
+        function PlaylistHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -361,7 +371,9 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelVideosHandler(m as object, feedSource as object, response as object) as object
+        function ChannelVideosHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -372,7 +384,9 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelPlaylistsHandler(m as object, feedSource as object, response as object) as object
+        function ChannelPlaylistsHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 return {
@@ -383,7 +397,10 @@ namespace Invidious
             return invalid
         end function
 
-        function VideoInfoHandler(m as object, feedSource as object, response as object) as object
+        function VideoInfoHandler(context as object) as object
+            response = context.response
+            feedSource = context.feedSource
+
             statusCode = response.StatusCode()
             if statusCode >= 500
                 ' In some cases, such as a video became private, or a live stream ended,
@@ -391,8 +408,7 @@ namespace Invidious
                 ' with just a video id, which will allow us to show a valid thumbnail if possible.
                 ' This is to makes it possible to load a bookmarked video and delete it even if
                 ' it is no longer valid.
-                ' TODO:P2 access to private property
-                response._statusCode = 200
+                response.OverrideStatusCode(200)
                 return {
                     items: [{
                         "videoId": feedSource.pathParams.id
@@ -412,7 +428,9 @@ namespace Invidious
             return invalid
         end function
 
-        function PlaylistInfoHandler(m as object, feedSource as object, response as object) as object
+        function PlaylistInfoHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 json.type = "playlist"
@@ -423,7 +441,9 @@ namespace Invidious
             return invalid
         end function
 
-        function ChannelInfoHandler(m as object, feedSource as object, response as object) as object
+        function ChannelInfoHandler(context as object) as object
+            response = context.response
+
             if response.StatusCode() = 200
                 json = response.Json()
                 json.type = "channel"
@@ -434,8 +454,11 @@ namespace Invidious
             return invalid
         end function
 
-        function AuthFeedHandler(m as object, feedSource as object, response as object) as object
-            m.DeleteExpiredToken(response)
+        function AuthFeedHandler(context as object) as object
+            response = context.response
+            authToken = context.authToken
+
+            m.DeleteExpiredToken(response, authToken)
 
             if response.StatusCode() <> 200
                 return invalid
@@ -461,8 +484,11 @@ namespace Invidious
             }
         end function
 
-        function WatchHistoryHandler(m as object, feedSource as object, response as object) as object
-            m.DeleteExpiredToken(response)
+        function WatchHistoryHandler(context as object) as object
+            response = context.response
+            authToken = context.authToken
+
+            m.DeleteExpiredToken(response, authToken)
 
             if response.StatusCode() <> 200
                 return invalid
@@ -486,53 +512,19 @@ namespace Invidious
             }
         end function
 
-        function DeleteExpiredToken(response as object)
-            if response.StatusCode() = 403
-                LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
-                LogWarn("Deleting Invidious token...")
-                m.DeleteAuthToken()
+        function DeleteExpiredToken(response as object, authToken as object) as void
+            if response.StatusCode() <> 403
+                return
             end if
-        end function
 
-        function GetAuthToken() as object
-            tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
-            if tokenPayload = invalid
-                return invalid
+            LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
+            if not IsAssociativeArray(authToken) or not IsString(authToken.token)
+                LogWarn("No valid token to delete")
+                return
             end if
-            authToken = ParseJson(tokenPayload)
-            if authToken = invalid or authToken.instance = invalid or authToken.token = invalid
-                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
-                return invalid
-            end if
-            if not m.VerifyTokenScope(authToken.token)
-                ' Right now we're probably in a UI thread, and we can't unregister the token
-                ' Without a Task
-                AsyncTask.Start(Tasks.InvidiousUnregisterTokenTask, {
-                    invidious: m.node
-                    authToken: authToken
-                })
-                RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
-                message = `It looks like you are logged in to Invidious, but your access token does not have the required permissions.
-For that reason, we have logged you out. Please log in again.
-This can happen when Playlet is updated with new features.
-We apologize for the inconvenience.`
-                DialogUtils.ShowDialog(message, "User logged out")
-                return invalid
-            end if
-            return authToken
-        end function
 
-        function SetAuthToken(token as string, instance as string, username as dynamic)
-            obj = {
-                token: token
-                instance: instance
-                username: username
-            }
-
-            json = FormatJson(obj)
-            RegistryUtils.Write(RegistryUtils.INVIDIOUS_TOKEN, json)
-
-            m.node.authToken = obj
+            LogInfo("Deleting Invidious token...")
+            m.invidiousNode.profilesService@.LogoutWithAccessToken(authToken.token)
         end function
 
         function VerifyTokenScope(token as string) as boolean
@@ -556,30 +548,14 @@ We apologize for the inconvenience.`
             return validScopes
         end function
 
-        function DeleteAuthToken()
-            m.node.authToken = invalid
-            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
-        end function
-
-        function Logout() as boolean
-            authToken = m.node.authToken
-            if authToken = invalid
-                return false
-            end if
-
-            m.UnregisterToken(authToken)
-            m.DeleteAuthToken()
-            return true
-        end function
-
-        function UnregisterToken(authToken as object) as void
+        function UnregisterToken(authToken as object) as object
             url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
 
             request = HttpClient.Post(url, authToken.token)
             request.Headers(m.GetAuthenticationHeaders(authToken.token))
             request.Header("Content-Type", "application/json")
 
-            request.Await()
+            return request.Await()
         end function
 
         function GetAuthorizeTokenLink() as dynamic
@@ -587,7 +563,7 @@ We apologize for the inconvenience.`
             ' Make sure the host is not on https, because https cannot redirect to http, which is our local server
             invidiousHost = instance.Replace("https://", "http://")
 
-            address = m.node.webServer@.GetServerAddress()
+            address = m.invidiousNode.webServer@.GetServerAddress()
             if address = invalid
                 return invalid
             end if
@@ -600,7 +576,7 @@ We apologize for the inconvenience.`
         end function
 
         function GetSubscriptions(cancellation = invalid as object) as object
-            authToken = m.node.authToken
+            authToken = m.invidiousNode.authToken
             if authToken = invalid
                 return invalid
             end if
@@ -614,7 +590,7 @@ We apologize for the inconvenience.`
         end function
 
         function Subscribe(channelId as string, cancellation = invalid as object) as object
-            authToken = m.node.authToken
+            authToken = m.invidiousNode.authToken
             if authToken = invalid
                 return invalid
             end if
@@ -628,7 +604,7 @@ We apologize for the inconvenience.`
         end function
 
         function Unsubscribe(channelId as string, cancellation = invalid as object) as object
-            authToken = m.node.authToken
+            authToken = m.invidiousNode.authToken
             if authToken = invalid
                 return invalid
             end if

@@ -17,10 +17,14 @@ export class ImageGenPlugin implements CompilerPlugin {
     public name = 'ImageGenPlugin';
 
     beforePrepublish(builder: ProgramBuilder, files: FileObj[]) {
+        // Force generate flag
+        // @ts-ignore
+        const forceGenerateImages = !!builder.options.forceGenerateImages;
         // Debug flag
         // @ts-ignore
         const debug = !!builder.options.debug;
-        if (debug) {
+
+        if (debug && !forceGenerateImages) {
             // Since the plugin does a lot of scanning of files, it is fine not to run it in debug mode
             // The change will be picked up on release
             return;
@@ -43,7 +47,7 @@ export class ImageGenPlugin implements CompilerPlugin {
 
             const meta = json5.parse(readFileSync(metafile, 'utf8'));
 
-            this.generateImages(svgFile, meta, metafile, rootDir, files);
+            this.generateImages(svgFile, meta, metafile, rootDir, files, forceGenerateImages);
         });
     }
 
@@ -61,7 +65,7 @@ export class ImageGenPlugin implements CompilerPlugin {
         writeFileSync(metafile, json5.stringify(meta, null, 2));
     }
 
-    generateImages(svgFile: string, meta: any, metafile: string, rootDir: string, files: FileObj[]) {
+    generateImages(svgFile: string, meta: any, metafile: string, rootDir: string, files: FileObj[], forceGenerateImages: boolean) {
         let metaChanged = false;
         const inputHash = this.checkFileHash(joinPath(rootDir, svgFile), meta.inputHash);
         if (!inputHash.valid) {
@@ -75,7 +79,7 @@ export class ImageGenPlugin implements CompilerPlugin {
             const outputFilePath = joinPath(rootDir, output.outputFilePath);
             let outputHash = this.checkFileHash(outputFilePath, output.outputHash);
 
-            if (inputHash.valid && outputHash.valid) {
+            if (inputHash.valid && outputHash.valid && !forceGenerateImages) {
                 continue;
             }
 

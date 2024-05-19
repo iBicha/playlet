@@ -2,6 +2,7 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
+' TODO:P1 handle case where all feedSources are empty
 @asynctask
 function VideoRowListRowContentTask(input as object) as object
     try
@@ -14,6 +15,8 @@ function VideoRowListRowContentTask(input as object) as object
 
         totalfetchedItems = 0
 
+        someContentReadySet = false
+
         while true
             if m.top.cancel
                 feedContentNode.loadState = FeedLoadState.None
@@ -25,6 +28,10 @@ function VideoRowListRowContentTask(input as object) as object
 
             if feedSourcesIndex >= feedSources.Count()
                 feedContentNode.loadState = FeedLoadState.Loaded
+
+                if not someContentReadySet
+                    rowList.someContentReady = false
+                end if
                 return {
                     success: true
                 }
@@ -36,6 +43,9 @@ function VideoRowListRowContentTask(input as object) as object
                 feedSourcesIndex += 1
                 if feedSourcesIndex >= feedSources.Count()
                     feedContentNode.loadState = FeedLoadState.Loaded
+                    if not someContentReadySet
+                        rowList.someContentReady = false
+                    end if
                     return {
                         success: true
                     }
@@ -50,23 +60,19 @@ function VideoRowListRowContentTask(input as object) as object
 
             if not response.success
                 if response.error = Invidious.ERROR_NOT_AUTHENTICATED
-                    RemovePlaceHolderItems(feedContentNode)
-                    actionNode = CreateObject("roSGNode", "ActionContentNode")
-                    actionNode.title = `Login to view ${feedSource.title}`
-                    actionNode.action = "LoginDialog"
-
-                    feedSource.state.loadState = FeedLoadState.Loaded
-                    feedSources[feedSourcesIndex] = feedSource
-                    feedContentNode.feedSources = feedSources
-
-                    feedContentNode.appendChild(actionNode)
-                    feedContentNode.loadState = FeedLoadState.Loaded
+                    if feedSources.Count() = 1
+                        parent = feedContentNode.getParent()
+                        parent.removeChild(feedContentNode)
+                        return {
+                            success: true
+                        }
+                    end if
 
                     continue while
                 end if
 
-                ' Invidious returns 500 and "{"error":"Closed stream"}" when the Popular feed is disabled
-                if feedSource.endpoint = "popular" and response.error.instr("Closed stream") > -1
+                ' Invidious returns 400 and "{"error":"Administrator has disabled this endpoint."}" when the Popular feed is disabled
+                if feedSource.endpoint = "popular" and response.error.instr("Administrator has disabled this endpoint.") > -1
                     LogWarn("Popular feedSource not available:", response.error)
                     if feedSources.Count() = 1
                         parent = feedContentNode.getParent()
@@ -130,7 +136,8 @@ function VideoRowListRowContentTask(input as object) as object
                 feedContentNode.loadState = FeedLoadState.LoadedPage
             end if
 
-            if itemNodes.Count() > 0
+            if itemNodes.Count() > 0 and not someContentReadySet
+                someContentReadySet = true
                 rowList.someContentReady = true
             end if
 
@@ -183,5 +190,5 @@ function HandleFeedLoadErrorDialog(error as object, rowList as object) as void
     if rowList.hasField("dispose") and rowList.dispose
         return
     end if
-    DialogUtils.ShowDialog(error, "Failed to load feed", true)
+    DialogUtils.ShowDialog(error, Tr(Locale.Dialogs.FailedToLoadFeed), true)
 end function

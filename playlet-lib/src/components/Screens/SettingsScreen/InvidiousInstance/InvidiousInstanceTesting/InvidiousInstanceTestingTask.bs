@@ -2,6 +2,7 @@ import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 @asynctask
@@ -16,7 +17,7 @@ function InvidiousInstanceTestingTask(input as object) as object
     content = PrepareTests()
     listNode.content = content
 
-    RunTests(instance, content)
+    RunTests(instance, content, m.top.cancellation)
 
     return invalid
 end function
@@ -25,12 +26,13 @@ function PrepareTests() as object
     content = CreateObject("roSGNode", "ContentNode")
     ' TODO:P2 test if video data is reachable (head?)
     ' TODO:P2 test if video data is reachable in proxy mode (local=true)
-    content.AppendChild(CreateTestNode("Valid url", IsValidUrl))
-    content.AppendChild(CreateTestNode("Instance reachable", IsReachable))
-    content.AppendChild(CreateTestNode("Fetch video details", CanFetchVideoDetails))
-    content.AppendChild(CreateTestNode("Fetch video comments", CanFetchVideoComments))
-    content.AppendChild(CreateTestNode("Fetch video captions", CanFetchVideoCaptions))
-    content.AppendChild(CreateTestNode("Fetch video thumbnails", CanFetchVideoThumbails))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.ValidUrl), IsValidUrl))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.InstanceReachable), IsReachable))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoDetails), CanFetchVideoDetails))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoComments), CanFetchVideoComments))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoCaptions), CanFetchVideoCaptions))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchVideoThumbnails), CanFetchVideoThumbails))
+    content.AppendChild(CreateTestNode(Tr(Locale.InvidiousTesting.FetchWithCors), CanFetchWithCors))
     return content
 end function
 
@@ -47,14 +49,14 @@ function CreateTestNode(title as string, func as function) as object
     return testNode
 end function
 
-function RunTests(instance as string, content as object) as void
+function RunTests(instance as string, content as object, cancellation as object) as void
     testNodes = content.getChildren(-1, 0)
 
     timer = CreateObject("roTimespan")
 
     for each testNode in testNodes
         timer.Mark()
-        m[testNode.func](instance, testNode)
+        m[testNode.func](instance, testNode, cancellation)
 
         testNode.duration = timer.TotalMilliseconds()
         testNode.title = `${testNode.title} (${testNode.duration}ms)`
@@ -69,31 +71,31 @@ function RunTests(instance as string, content as object) as void
     end for
 end function
 
-function IsValidUrl(instance as string, testNode as object) as void
+function IsValidUrl(instance as string, testNode as object, _cancellation as object) as void
     try
         if not instance.StartsWith("http://") and not instance.StartsWith("https://")
             testNode.state = "failed"
-            testNode.details = "Url must start with http:// or https://"
+            testNode.details = Tr(Locale.InvidiousTesting.UrlMustStartWith)
             return
         end if
         if instance.EndsWith("/")
             testNode.state = "failed"
-            testNode.details = "Url must not end with /"
+            testNode.details = Tr(Locale.InvidiousTesting.UrlMustNotEndWith)
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = "The url seems to be of a valid format"
+        testNode.details = Tr(Locale.InvidiousTesting.UrlSeemsValid)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
     end try
 end function
 
-function IsReachable(instance as string, testNode as object) as void
+function IsReachable(instance as string, testNode as object, cancellation as object) as void
     try
         url = `${instance}${Invidious.STATS_ENDPOINT}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
         if not response.IsSuccess()
             testNode.state = "failed"
             testNode.details = response.ErrorMessage()
@@ -103,33 +105,33 @@ function IsReachable(instance as string, testNode as object) as void
         json = response.Json()
         if json = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
             return
         end if
 
         software = json.software
         if software = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read $.software)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.software")
             return
         end if
 
         name = software.name
         if not IsString(name)
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read $.software.name)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.software.name")
             return
         end if
 
         version = software.version
         if not IsString(version)
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read software.version)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.software.version")
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = `The instance is reachable and running ${name} version ${version}`
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceIsReachableAndRunning).Replace("%1", name).Replace("%2", version)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
@@ -137,11 +139,11 @@ function IsReachable(instance as string, testNode as object) as void
 
 end function
 
-function CanFetchVideoDetails(instance as string, testNode as object) as void
+function CanFetchVideoDetails(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -152,30 +154,30 @@ function CanFetchVideoDetails(instance as string, testNode as object) as void
         json = response.Json()
         if json = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
             return
         end if
 
         title = json.title
         if not IsString(title)
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read title)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.title")
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = `The instance can fetch video details for id "${videoId}" (${title})`
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchVideoDetails).Replace("%1", videoId).Replace("%2", title)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
     end try
 end function
 
-function CanFetchVideoComments(instance as string, testNode as object) as void
+function CanFetchVideoComments(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}/api/v1/comments/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -186,38 +188,38 @@ function CanFetchVideoComments(instance as string, testNode as object) as void
         json = response.Json()
         if json = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
             return
         end if
 
         commentCount = json.commentCount
         if not IsInt(commentCount)
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read commentCount)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.commentCount")
             return
         end if
 
         comments = json.comments
         if not IsArray(comments)
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url} (couldn't read comments)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFromCouldntRead).Replace("%1", url).Replace("%2", "$.comments")
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = `The instance can fetch video comments for id "${videoId}" (${commentCount} comments)`
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchVideoComments).Replace("%1", videoId).Replace("%2", `${commentCount}`)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
     end try
 end function
 
-function CanFetchVideoCaptions(instance as string, testNode as object) as void
+function CanFetchVideoCaptions(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         label = "English"
         url = `${instance}/api/v1/captions/${videoId}?label=${label}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -229,36 +231,36 @@ function CanFetchVideoCaptions(instance as string, testNode as object) as void
         contentType = headers["Content-Type"]
         if StringUtils.IsNullOrEmpty(contentType) or not contentType.StartsWith("text/vtt")
             testNode.state = "failed"
-            testNode.details = `Invalid caption data ${url} (Content-Type is not text/vtt)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidCaptionDataContentType).Replace("%1", url)
             return
         end if
 
         text = response.Text()
         if StringUtils.IsNullOrEmpty(text) or not text.StartsWith("WEBVTT")
             testNode.state = "failed"
-            testNode.details = `Invalid caption data from ${url} (response is not a valid vtt file)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidCaptionDataNotWebVtt).Replace("%1", url)
             return
         end if
 
         if text.InStr(`All right, so here we are, in front of the\nelephants`) = -1
             testNode.state = "failed"
-            testNode.details = `Did not find expected text in caption data from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.ExpectedTextNotFoundInCaptionData).Replace("%1", url)
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = `The instance can fetch video ${label} captions for id "${videoId}"`
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchVideoCaptions).Replace("%1", label).Replace("%2", videoId)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
     end try
 end function
 
-function CanFetchVideoThumbails(instance as string, testNode as object) as void
+function CanFetchVideoThumbails(instance as string, testNode as object, cancellation as object) as void
     try
         videoId = "jNQXAC9IVRw"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-        response = HttpClient.Get(url).NoCache().Await()
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
         if not response.IsSuccess()
             testNode.state = "failed"
@@ -269,14 +271,14 @@ function CanFetchVideoThumbails(instance as string, testNode as object) as void
         json = response.Json()
         if json = invalid
             testNode.state = "failed"
-            testNode.details = `Invalid json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
             return
         end if
 
         videoThumbnails = json.videoThumbnails
         if not IsArray(videoThumbnails) or videoThumbnails.Count() = 0
             testNode.state = "failed"
-            testNode.details = `No thumbnails found in json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.NoThumbnailsFoundInJson).Replace("%1", url)
             return
         end if
 
@@ -284,28 +286,62 @@ function CanFetchVideoThumbails(instance as string, testNode as object) as void
         thumbnail = contentNode.thumbnail
         if StringUtils.IsNullOrEmpty(thumbnail)
             testNode.state = "failed"
-            testNode.details = `No thumbnail found in json from ${url}`
+            testNode.details = Tr(Locale.InvidiousTesting.NoThumbnailsFoundInJson).Replace("%1", url)
             return
         end if
 
         ' Note: we could do a HEAD request, but Invidious returns 200 even for invalid thumbnails
         ' To make sure we don't get a 200 for an invalid thumbnail, we do a GET request instead
-        response = HttpClient.Get(thumbnail).NoCache().Await()
+        response = HttpClient.Get(thumbnail).NoCache().Cancellation(cancellation).Await()
         if not response.IsSuccess()
             testNode.state = "failed"
-            testNode.details = `${thumbnail} is not reachable\n${response.ErrorMessage(false)}`
+            testNode.details = Tr(Locale.InvidiousTesting.ThumbnailNotReachable).Replace("%1", thumbnail) + `\n` + response.ErrorMessage(false)
             return
         end if
 
         contentType = response.Headers()["Content-Type"]
         if StringUtils.IsNullOrEmpty(contentType) or not contentType.StartsWith("image/")
             testNode.state = "failed"
-            testNode.details = `Invalid thumbnail data ${thumbnail} (Content-Type is not image/*)`
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidThumbnailData).Replace("%1", thumbnail)
             return
         end if
 
         testNode.state = "passed"
-        testNode.details = `The instance can fetch video thumbnail for id "${videoId}" (${thumbnail})`
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchVideoThumbnails).Replace("%1", videoId).Replace("%2", thumbnail)
+    catch e
+        testNode.state = "failed"
+        testNode.details = ErrorUtils.Format(e)
+    end try
+end function
+
+function CanFetchWithCors(instance as string, testNode as object, cancellation as object) as void
+    try
+        url = `${instance}/api/v1/trending`
+        response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
+
+        if not response.IsSuccess()
+            testNode.state = "failed"
+            testNode.details = response.ErrorMessage()
+            return
+        end if
+
+        json = response.Json()
+        if json = invalid
+            testNode.state = "failed"
+            testNode.details = Tr(Locale.InvidiousTesting.InvalidJsonFrom).Replace("%1", url)
+            return
+        end if
+
+        headers = response.Headers()
+        corsHeader = headers["Access-Control-Allow-Origin"]
+        if not IsString(corsHeader) or corsHeader <> "*"
+            testNode.state = "failed"
+            testNode.details = Tr(Locale.InvidiousTesting.CorsHeaderNotSetCorrectly).Replace("%1", url)
+            return
+        end if
+
+        testNode.state = "passed"
+        testNode.details = Tr(Locale.InvidiousTesting.TheInstanceCanFetchWithCors).Replace("%1", url)
     catch e
         testNode.state = "failed"
         testNode.details = ErrorUtils.Format(e)
