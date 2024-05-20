@@ -222,13 +222,13 @@ function InitContent() as void
         node: m.top
         feeds: m.top.feeds
     }, OnVideoRowListContentTaskResult)
-    m.pendingLoadTasks[task.id] = task
+    m.pendingLoadTasks[task.id] = { task: task }
 end function
 
 function CancelCurrentTasks()
     pendingLoadTasks = m.pendingLoadTasks
     for each id in pendingLoadTasks
-        task = pendingLoadTasks[id]
+        task = pendingLoadTasks[id].task
         task.cancel = true
     end for
     m.pendingLoadTasks = {}
@@ -287,7 +287,16 @@ function GetRowsToLoad() as object
     return subContentNodes
 end function
 
-function LoadRowContent(contentNode as object)
+function LoadRowContent(contentNode as object) as void
+    ' Do not spin up multiple tasks for the same content node
+    for each id in m.pendingLoadTasks
+        pendingTask = m.pendingLoadTasks[id]
+        if contentNode.isSameNode(pendingTask.content) and pendingTask.task.state = "run"
+            LogInfo("Row content already loading:", contentNode.title)
+            return
+        end if
+    end for
+
     LogInfo("Loading row content:", contentNode.title)
 
     contentNode.loadState = FeedLoadState.Loading
@@ -296,7 +305,7 @@ function LoadRowContent(contentNode as object)
         feedContentNode: contentNode
         invidious: m.invidious
     }, OnVideoRowListRowContentTaskResult)
-    m.pendingLoadTasks[task.id] = task
+    m.pendingLoadTasks[task.id] = { task: task, content: contentNode }
 end function
 
 function OnVideoRowListRowContentTaskResult(output as object) as void
