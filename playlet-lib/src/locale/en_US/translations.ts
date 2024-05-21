@@ -1256,5 +1256,17 @@
             <source>Rating</source>
             <translation>Rating</translation>
         </message>
+        <message>
+            <source>Clear cache</source>
+            <translation>Clear cache</translation>
+        </message>
+        <message>
+            <source>Clear cache from cachefs: and tmp:</source>
+            <translation>Clear cache from cachefs: and tmp:</translation>
+        </message>
+        <message>
+            <source>Cache cleared.</source>
+            <translation>Cache cleared.</translation>
+        </message>
     </context>
 </TS>

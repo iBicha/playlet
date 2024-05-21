@@ -1,0 +1,33 @@
+import "pkg:/source/utils/Logging.bs"
+
+@asynctask
+function ClearCacheTask() as object
+    fs = CreateObject("roFileSystem")
+    if fs = invalid
+        LogError("Failed to create roFileSystem object")
+        return invalid
+    end if
+
+    ClearVolume(fs, "tmp:/")
+    ClearVolume(fs, "cachefs:/")
+
+    return invalid
+end function
+
+function ClearVolume(fs as object, volume as string)
+    items = fs.GetDirectoryListing(volume)
+    for each item in items
+        fullpath = volume + item
+
+        ' Skip logs directory
+        if fullpath = "cachefs:/logs"
+            continue for
+        end if
+
+        if not fs.Delete(fullpath)
+            LogError("Failed to delete:", fullpath)
+        end if
+    end for
+
+    LogInfo("Cleared:", volume)
+end function

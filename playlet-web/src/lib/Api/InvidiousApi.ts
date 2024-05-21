@@ -265,6 +265,15 @@ export class InvidiousApi {
         }
     }
 
+    public static clearCache() {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("v1:")) {
+                localStorage.removeItem(key);
+            }
+        }
+    }
+
     // TODO:P2 use more appropriate cache storage
     private getCache(url: string, cacheSeconds: number) {
         const cacheKey = this.getCacheKey(url);

@@ -7,6 +7,7 @@
   import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
   import NumberControl from "./SettingControls/NumberControl.svelte";
   import { tr } from "lib/Stores";
+  import ClearCacheControl from "./SettingControls/ClearCacheControl.svelte";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -30,6 +31,7 @@
 
   const customComponents = {
     ClearSearchHistoryControl,
+    ClearCacheControl,
     EditHomeScreenControl,
     PlayletLibVersionControl,
   };

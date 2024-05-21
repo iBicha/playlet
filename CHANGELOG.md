@@ -7,10 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A dev setting to clear the cache
+
 ### Fixed
 
 - A bug where bookmarked channels can be duplicated
 - A bug where video cast from web app would not play if there's an error dialog on screen
+
+### Changed
+
+- Font weight to be less bold
 
 ## [0.23.5] - 2024-05-19
 
