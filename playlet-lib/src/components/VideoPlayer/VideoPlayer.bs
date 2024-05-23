@@ -155,10 +155,48 @@ function OnVideoContentTaskResults(output as object) as void
         end if
     end if
 
-    m.top.control = "play"
+    PlayAfterPreviousPlayerHasStopped()
 
     if hasTimestamp and timestamp > 0
         m.top.seek = content.timestamp
+    end if
+end function
+
+function PlayAfterPreviousPlayerHasStopped() as void
+    previousPlayer = m.top.previousPlayer
+    m.top.previousPlayer = invalid
+
+    if previousPlayer = invalid
+        m.top.control = "play"
+        return
+    end if
+
+    previousPlayerState = previousPlayer.state
+    LogInfo("Previous player state:", previousPlayerState)
+
+    if previousPlayerState = "stopping"
+        previousPlayer.observeFieldScoped("state", FuncName(OnPreviousPlayerState))
+        return
+    end if
+
+    m.top.control = "play"
+end function
+
+function OnPreviousPlayerState(event as object) as void
+    previousPlayer = event.getRoSGNode()
+
+    if m.onCloseCalled = true
+        previousPlayer.unobserveFieldScoped("state")
+        return
+    end if
+
+    previousPlayerState = previousPlayer.state
+    LogInfo("Previous player state change:", previousPlayerState)
+
+    if previousPlayerState = "stopped" or previousPlayerState = "error" or previousPlayerState = "finished" or previousPlayerState = "none"
+        previousPlayer.unobserveFieldScoped("state")
+
+        m.top.control = "play"
     end if
 end function
 
@@ -185,7 +223,11 @@ function MarkVideoWatched(videoId as string)
     end if
 end function
 
-function Close(_unused as dynamic)
+function OnClose()
+    m.onCloseCalled = true
+
+    m.top.previousPlayer = invalid
+
     if m.videoContentTask <> invalid
         m.videoContentTask.cancel = true
         m.videoContentTask = invalid
