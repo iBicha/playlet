@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A bug where bookmarked channels can be duplicated
 - A bug where video cast from web app would not play if there's an error dialog on screen
+- failed to create media player error, by waiting for previous video to stop before starting a new one
 
 ### Changed
 
