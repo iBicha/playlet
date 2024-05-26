@@ -9,11 +9,24 @@ function Init()
     m.dateTime = CreateObject("roDateTime")
     Update()
 
-    ' TODO: delay the first update to the next minute
+    seconds = m.dateTime.GetSeconds()
     m.timer = CreateObject("roSGNode", "Timer")
+    ' add 2 seconds delay between real clock time and the displayed time to in case of inaccuracy of the timer
+    m.timer.duration = 60 - seconds + 2
+    m.timer.repeat = false
+    m.timer.ObserveField("fire", FuncName(FirstUpdate))
+    m.timer.control = "start"
+end function
+
+function FirstUpdate()
+    m.timer.control = "stop"
+    m.timer.unobserveField("fire")
+    m.timer.ObserveField("fire", FuncName(Update))
     m.timer.duration = 60
     m.timer.repeat = true
-    m.timer.ObserveField("fire", FuncName(Update))
+    m.timer.control = "start"
+
+    Update()
 end function
 
 ' format time HH:MM AM/PM
