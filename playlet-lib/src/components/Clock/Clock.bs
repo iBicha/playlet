@@ -1,0 +1,49 @@
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.top.font.size = 18
+    m.top.horizAlign = "right"
+    m.top.translation = [1034, 34]
+    m.top.width = 200
+
+    m.dateTime = CreateObject("roDateTime")
+    Update()
+
+    ' TODO: delay the first update to the next minute
+    m.timer = CreateObject("roSGNode", "Timer")
+    m.timer.duration = 60
+    m.timer.repeat = true
+    m.timer.ObserveField("fire", FuncName(Update))
+end function
+
+' format time HH:MM AM/PM
+function Update()
+    m.dateTime.Mark()
+    m.dateTime.ToLocalTime()
+
+    hours = m.dateTime.GetHours()
+    minutes = m.dateTime.GetMinutes()
+
+    if hours >= 12
+        ampm = "PM"
+    else
+        ampm = "AM"
+    end if
+
+    if hours > 12
+        hours = hours - 12
+    end if
+
+    hoursStr = hours.ToStr()
+    minutesStr = minutes.ToStr()
+
+    if hours < 10
+        hoursStr = "0" + hoursStr
+    end if
+
+    if minutes < 10
+        minutesStr = "0" + minutesStr
+    end if
+
+    m.top.text = hoursStr + ":" + minutesStr + " " + ampm
+end function
