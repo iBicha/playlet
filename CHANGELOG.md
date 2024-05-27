@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A clock to show the time
 
+### Fixed
+
+- Attempt to fix a race condition when closing player
+
 ## [0.23.6] - 2024-05-23
 
 ### Added
