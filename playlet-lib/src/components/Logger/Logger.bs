@@ -62,6 +62,17 @@ function LoggerLoop()
         buffer.AppendFile(logsFile)
     end if
 
+    appMemoryMonitor = CreateObject("roAppMemoryMonitor")
+    if appMemoryMonitor <> invalid and FindMemberFunction(appMemoryMonitor, "EnableMemoryWarningEvent") <> invalid
+        appMemoryMonitor.SetMessagePort(port)
+        appMemoryMonitor.EnableMemoryWarningEvent(true)
+    end if
+
+    deviceInfo = CreateObject("roDeviceInfo")
+    deviceInfo.SetMessagePort(port)
+    deviceInfo.EnableLowGeneralMemoryEvent(true)
+    m.lastDeviceInfoMemoryLevel = ""
+
     while true
         msg = wait(0, port)
         msgType = type(msg)
@@ -72,6 +83,10 @@ function LoggerLoop()
             else if field = "systemLogEvent"
                 OnLineSysLog(msg, dateTime, logsFile, buffer)
             end if
+        else if msgType = "roAppMemoryNotificationEvent"
+            OnLineLogMonitorMemoryWarning(msg, dateTime, logsFile, buffer)
+        else if msgType = "roDeviceInfoEvent"
+            OnLineLogDeviceInfoMemoryWarning(msg, dateTime, logsFile, buffer)
         end if
     end while
 end function
@@ -91,6 +106,38 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
         return
     end if
     line = FormatTime(dateTime) + "[ERROR][SysLog] " + ToString(info)
+    ' bs:disable-next-line LINT3012
+    print line
+
+    buffer.FromAsciiString(line + `\n`)
+    buffer.AppendFile(logsFile)
+end function
+
+function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
+    info = event.getInfo()
+    line = FormatTime(dateTime) + "[WARN][AppMonitorMemory] " + ToString(info)
+
+    ' bs:disable-next-line LINT3012
+    print line
+
+    buffer.FromAsciiString(line + `\n`)
+    buffer.AppendFile(logsFile)
+end function
+
+function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
+    info = event.getInfo()
+    if not IsString(info.generalMemoryLevel)
+        return
+    end if
+
+    ' roDeviceInfoEvent can be a bit spammy, so only log if the memory level has changed
+    if info.generalMemoryLevel = m.lastDeviceInfoMemoryLevel
+        return
+    end if
+    m.lastDeviceInfoMemoryLevel = info.generalMemoryLevel
+
+    line = FormatTime(dateTime) + "[WARN][DeviceInfoMemory] " + ToString(info)
+
     ' bs:disable-next-line LINT3012
     print line
 
