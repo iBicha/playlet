@@ -383,7 +383,7 @@
     </message>
     <message>
         <source>Invalid json from %1 (couldn&apos;t read %2)</source>
-        <translation>JSON invalide de %1 (impossible de lire %2)</translation>
+        <translation type="unfinished">JSON invalide de %1 (impossible de lire %2)</translation>
     </message>
     <message>
         <source>The instance is reachable and running %1 version %2</source>
