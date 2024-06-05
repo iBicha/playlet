@@ -877,7 +877,7 @@
         <translation>Ungültiges JSON von %1</translation>
     </message>
     <message>
-        <source>Invalid json from %1 (couldn&apos;t read %2)</source>
+        <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>
         <translation>Ungültiges JSON von %1 (%2 konnte nicht gelesen werden)</translation>
     </message>
     <message>
@@ -901,7 +901,7 @@
         <translation>Ungültige Untertiteldaten von %1 (Antwort ist keine gültige vtt-Datei)</translation>
     </message>
     <message>
-        <source>No thumbnails found in json from %1</source>
+        <source>No thumbnails found in JSON from %1</source>
         <translation>Keine Vorschaubilder im JSON von 1% gefunden</translation>
     </message>
     <message>

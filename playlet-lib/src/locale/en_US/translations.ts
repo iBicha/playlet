@@ -389,7 +389,7 @@
         <translation>Invalid JSON from %1</translation>
     </message>
     <message>
-        <source>Invalid json from %1 (couldn&apos;t read %2)</source>
+        <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>
         <translation>Invalid JSON from %1 (couldn&apos;t read %2)</translation>
     </message>
     <message>
@@ -421,8 +421,8 @@
         <translation>The instance can fetch video %1 captions for ID %2</translation>
     </message>
     <message>
-        <source>No thumbnails found in json from %1</source>
-        <translation>No thumbnails found in json from %1</translation>
+        <source>No thumbnails found in JSON from %1</source>
+        <translation>No thumbnails found in JSON from %1</translation>
     </message>
     <message>
         <source>%1 is not reachable</source>
