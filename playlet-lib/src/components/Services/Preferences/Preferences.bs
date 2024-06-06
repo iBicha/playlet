@@ -93,26 +93,51 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
     isDirty = false
 
     ' v0 -> v1
-    instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
-    if instances <> invalid
-        currentInstance = userPrefs["invidious.instance"]
-        if currentInstance = invalid or currentInstance = ""
-            instances = ParseJson(instances)
-            if instances.Count() > 0
-                instance = instances[0]
-                if instance <> invalid and instance <> ""
-                    userPrefs["invidious.instance"] = instance
-                    isDirty = true
+    if not userPrefs.DoesExist("__version")
+        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+        if instances <> invalid
+            currentInstance = userPrefs["invidious.instance"]
+            if currentInstance = invalid or currentInstance = ""
+                instances = ParseJson(instances)
+                if instances.Count() > 0
+                    instance = instances[0]
+                    if instance <> invalid and instance <> ""
+                        userPrefs["invidious.instance"] = instance
+                    end if
+                end if
+            end if
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
+        end if
+    end if
+
+    '  v1 -> v2
+    if ValidInt(userPrefs.__version) = 1
+        if userPrefs.DoesExist("misc.home_screen_layout")
+            homeScreenLayout = userPrefs["misc.home_screen_layout"]
+            if IsArray(homeScreenLayout)
+                containsChannels = false
+                for each item in homeScreenLayout
+                    if item.id = "channels"
+                        containsChannels = true
+                        exit for
+                    end if
+                end for
+                if not containsChannels
+                    ' channels was added in v2, and should be the last item in the array
+                    homeScreenLayout.push({
+                        id: "channels"
+                        enabled: false
+                    })
+                    userPrefs["misc.home_screen_layout"] = homeScreenLayout
                 end if
             end if
         end if
-        RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
+        userPrefs.__version = 2
     end if
 
-    ' v1 -> v2 goes here (if needed)
-    ' if userPrefs.__version = 1
-    '   'do stuff
-    ' end if
+    if ValidInt(userPrefs.__version) <> m.top.__version
+        isDirty = true
+    end if
 
     ' TODO:P2 handle case where saved preferences version is higher than current version (e.g. user downgraded)
     return isDirty
