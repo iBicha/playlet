@@ -2,40 +2,57 @@ import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    m.container = m.top.findNode("Container")
+    m.top.focusable = true
+
     m.displayTextLabel = m.top.findNode("DisplayTextLabel")
     m.descriptionLabel = m.top.findNode("DescriptionLabel")
+    m.container = m.top.findNode("Container")
+    m.background = m.top.findNode("Background")
+    m.backgroundFocused = m.top.findNode("BackgroundFocused")
 
-    m.displayTextLabel.color = m.top.textColor
-    m.descriptionLabel.color = m.top.textColor2
-
-    m.top.iconUri = ""
-    m.top.focusedIconUri = ""
-    m.top.focusBitmapUri = "pkg:/images/white.9.png"
-    m.top.focusFootprintBitmapUri = "pkg:/images/white-border.9.png"
-    m.top.showFocusFootprint = true
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
+    Resize()
+    OnFocusedChildChange()
 end function
 
 function Resize()
+    padding = m.top.padding
+    maxWidth = m.top.maxWidth
+    minWidth = m.top.minWidth
+
+    m.displayTextLabel.width = 0
+    rect = m.displayTextLabel.boundingRect()
+
+    width = rect.width + padding * 2
+    width = MathUtils.Min(MathUtils.Max(width, minWidth), maxWidth)
+
+    m.displayTextLabel.width = width - padding * 2
+    m.descriptionLabel.width = width - padding * 2
+
     rect = m.container.boundingRect()
-    width = rect.width + m.top.padding * 2
-    height = rect.height + m.top.padding * 2
+
+    height = rect.height + padding * 2
 
     m.top.contentWidth = width
     m.top.contentHeight = height
 
-    m.top.minWidth = MathUtils.Max(m.top.minimumWidth, width)
-    m.top.height = height
+    m.background.width = width
+    m.background.height = height
+    m.backgroundFocused.width = width
+    m.backgroundFocused.height = height
 
-    m.container.translation = [m.top.padding, m.top.padding]
+    m.container.translation = [padding, padding]
 end function
 
 function OnFocusedChildChange()
     if m.top.hasFocus()
+        m.background.visible = false
+        m.backgroundFocused.visible = true
         m.displayTextLabel.color = m.top.focusedTextColor
         m.descriptionLabel.color = m.top.focusedTextColor2
     else
+        m.background.visible = true
+        m.backgroundFocused.visible = false
         m.displayTextLabel.color = m.top.textColor
         m.descriptionLabel.color = m.top.textColor2
     end if
