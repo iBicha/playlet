@@ -1,134 +1,92 @@
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
 
+' TODO:P1
+' - Add support for Profile icon
+' - Add screen offset when navbar is selected
+' - Add sliding animation for the side bar
+' - NavBar flexible width based on text size
+
 function Init()
+    m.top.focusable = true
+    m.sideBar = m.top.findNode("SideBar")
+    m.itemsList = m.top.findNode("ItemsList")
 end function
 
 function OnNodeReady()
-    PopulateButtons()
+    m.lastItemFocused = m.itemsList.itemFocused
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
-    m.top.observeField("items", FuncName(PopulateButtons))
+    m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
+    initialFocus = m.top.initialFocus
+    if initialFocus > -1
+        m.itemsList.jumpToItem = initialFocus
+    end if
 end function
 
 function OnFocusedChildChange()
-    m.top.focusIndex = m.top.focusIndex
+    m.sideBar.visible = m.top.isInFocusChain()
 end function
 
-function PopulateButtons() as void
-    buttonCount = m.buttonGroup.getChildCount()
-    if buttonCount > 0
-        m.buttonGroup.removeChildrenIndex(buttonCount, 0)
+function OnFocusChange() as void
+    if not m.top.focus
+        return
     end if
+    NodeSetFocus(m.itemsList, true)
+end function
 
-    if m.top.items = invalid
-        m.top.focusable = false
+function OnItemFocused() as void
+    index = m.itemsList.itemFocused
+    item = GetItem(index)
+    if item = invalid
         return
     end if
 
-    navBarItems = m.top.items.getChildren(-1, 0)
+    if m.lastItemFocused <> index
+        UnfocusItem(m.lastItemFocused)
+    end if
+    m.lastItemFocused = index
 
-    buttons = []
-    for each item in navBarItems
-        button = CreateObject("roSGNode", item.componentName)
-        button.background = "#242424FF"
-        button.focusBackground = "#FF1C30FF"
-        button.height = 50
-        button.width = 90
-
-        button.icon = item.icon
-        button.text = Tr(item.text)
-        button.padding = item.padding
-
-        buttons.push(button)
-    end for
-    m.buttonGroup.appendChildren(buttons)
-
-    m.top.focusable = buttons.Count() > 0
-
-    m.top.focusIndex = m.top.focusIndex
-
-    CenterButtons()
+    m.appController@.ShowRootScreen(item.screen)
 end function
 
-function CenterButtons()
-    parent = m.buttonGroup.getParent()
-    parentWidth = parent.width
-    parentHeight = parent.height
+function UnfocusItem(index as integer) as void
+    item = GetItem(index)
+    if item = invalid
+        return
+    end if
 
-    rect = m.buttonGroup.boundingRect()
-
-    m.buttonGroup.translation = [parentWidth / 2 - rect.width / 2, parentHeight / 2 - rect.height / 2]
+    m.appController@.HideRootScreen(item.screen)
 end function
 
 function onKeyEvent(key as string, press as boolean) as boolean
-    if not press
+    if key <> "right" or not press
         return false
     end if
-    if key = "down"
-        i = m.top.focusIndex
-        target = i + 1
-        if target >= m.buttonGroup.getChildCount()
-            return false
-        end if
-        m.top.focusIndex = target
-        return true
-    else if key = "up"
-        i = m.top.focusIndex
-        target = i - 1
-        if target < 0
-            return false
-        end if
-        m.top.focusIndex = target
-        return true
-    else if key = "right"
-        if m.top.items = invalid or m.top.focusIndex = -1 or m.top.focusIndex >= m.top.items.getChildCount()
-            return false
-        end if
-        navBarItem = m.top.items.getChild(m.top.focusIndex)
-        screen = m.appController@.GetRootScreen(navBarItem.screen)
-        if screen = invalid
-            return false
-        end if
-        if not screen.focusable
-            return false
-        end if
-        NodeSetFocus(screen, true)
-        return true
+
+    item = GetItem(m.itemsList.itemFocused)
+    if item = invalid
+        return false
     end if
 
-    return false
+    screen = m.appController@.GetRootScreen(item.screen)
+    if screen = invalid or not screen.focusable
+        return false
+    end if
+
+    NodeSetFocus(screen, true)
+    return true
 end function
 
-function OnFocusIndexChange() as void
-    if m.top.items = invalid
-        return
+function GetItem(index as integer) as dynamic
+    content = m.itemsList.content
+    if content = invalid
+        return invalid
     end if
 
-    buttonCount = m.buttonGroup.getChildCount()
-    if buttonCount = 0
-        return
-    end if
-    focusIndex = m.top.focusIndex
-    if focusIndex < 0
-        m.top.focusIndex = 0
-        return
-    end if
-    if focusIndex >= buttonCount
-        m.top.focusIndex = buttonCount - 1
-        return
+    childCount = content.getChildCount()
+    if childCount = 0 or index < 0 or index >= childCount
+        return invalid
     end if
 
-    navBarItems = m.top.items.getChildren(-1, 0)
-
-    buttons = m.buttonGroup.getChildren(-1, 0)
-    for i = 0 to buttonCount - 1
-        if i <> focusIndex
-            buttons[i].focus = false
-            m.appController@.HideRootScreen(navBarItems[i].screen)
-        end if
-    end for
-    if focusIndex <> -1
-        m.buttonGroup.getChild(focusIndex).focus = m.top.hasFocus()
-        m.appController@.ShowRootScreen(navBarItems[focusIndex].screen)
-    end if
+    return content.getChild(index)
 end function
