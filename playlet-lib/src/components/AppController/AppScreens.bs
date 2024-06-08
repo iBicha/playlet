@@ -3,6 +3,8 @@ import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 this is a duplicate of AppRoot, refactor to use the same code
 function Init()
+    m.scrollAnimation = m.top.findNode("scrollAnimation")
+    m.scrollAnimationInterpolator = m.scrollAnimation.findNode("scrollAnimationInterpolator")
     m.lastFocusedChild = invalid
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
 end function
@@ -28,4 +30,18 @@ function OnFocusedChildChange() as void
     if m.top.focusedChild <> invalid
         m.lastFocusedChild = m.top.focusedChild
     end if
+end function
+
+function OnAnimateToPosition() as void
+    m.scrollAnimation.control = "stop"
+
+    current = m.top.translation[0]
+    destination = m.top.animateToPosition
+
+    if current = destination
+        return
+    end if
+
+    m.scrollAnimationInterpolator.keyValue = [[current, 0], [(current + destination) / 2, 0], [destination, 0]]
+    m.scrollAnimation.control = "start"
 end function
