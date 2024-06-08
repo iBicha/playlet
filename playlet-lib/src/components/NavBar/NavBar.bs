@@ -1,9 +1,5 @@
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
-import "pkg:/source/utils/Logging.bs"
-
-' TODO:P0
-' - Fix initialFocus
 
 function Init()
     m.lastIsInFocusChain = false
@@ -20,11 +16,7 @@ end function
 function OnNodeReady()
     m.lastItemFocused = m.itemsList.itemFocused
     m.top.observeField("focusedChild", FuncName(OnFocusedChildChange))
-    m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
-    initialFocus = m.top.initialFocus
-    if initialFocus > -1
-        m.itemsList.jumpToItem = initialFocus
-    end if
+    m.itemsList.observeField("focusedChild", FuncName(OnListFirstFocus))
     ResizeNavBar()
 end function
 
@@ -51,6 +43,19 @@ function ResizeNavBar() as void
     offset = minWidth - m.background.width + 30
     m.top.screenOffset = offset
     m.sideBar.width = offset
+end function
+
+function OnListFirstFocus() as void
+    if not m.itemsList.hasFocus()
+        return
+    end if
+
+    m.itemsList.unobserveField("focusedChild")
+    initialFocus = m.top.initialFocus
+    if initialFocus > -1
+        m.itemsList.jumpToItem = initialFocus
+    end if
+    m.itemsList.observeField("itemFocused", FuncName(OnItemFocused))
 end function
 
 function OnFocusedChildChange() as void
