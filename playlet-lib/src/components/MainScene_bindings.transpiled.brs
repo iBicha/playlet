@@ -6,12 +6,14 @@ function InitializeBindings()
         },
         childProps: {
             "AppController": {
+                "screensContainer": "./AppScreens", 
                 "root": "./AppRoot", 
                 "stack": "./Stack", 
                 "videoQueue": "./VideoQueue"
             }, 
             "NavBar": {
-                "appController": "/AppController"
+                "appController": "/AppController", 
+                "screensContainer": "../AppScreens"
             }, 
             "VideoQueue": {
                 "appController": "/AppController", 

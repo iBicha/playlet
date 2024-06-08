@@ -1,0 +1,36 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.buttonIcon = m.top.findNode("buttonIcon")
+    m.circlePoster = m.top.findNode("circlePoster")
+    m.circlePosterInner = m.top.findNode("circlePosterInner")
+    m.letterLabel = m.top.findNode("letterLabel")
+
+    profilesService = m.top.getScene().findNode("ProfilesService")
+    if profilesService <> invalid
+        m.profilesService = profilesService
+        profilesService.observeField("currentProfile", FuncName(OnCurrentProfile))
+        OnCurrentProfile()
+    end if
+end function
+
+function OnCurrentProfile() as void
+    currentProfile = m.profilesService.currentProfile
+    if currentProfile = invalid
+        m.circlePoster.visible = false
+        m.buttonIcon.visible = true
+        return
+    end if
+
+    username = currentProfile.username
+    if not StringUtils.IsNullOrEmpty(username)
+        m.letterLabel.text = UCase(username.Left(1))
+    else
+        m.letterLabel.text = ""
+    end if
+    m.circlePosterInner.blendColor = currentProfile.color
+
+    m.circlePoster.visible = true
+    m.buttonIcon.visible = false
+end function

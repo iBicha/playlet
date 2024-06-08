@@ -26,8 +26,7 @@
     </message>
     <message>
         <source>Remote</source>
-        <comment>Télécommande is too long for the UI</comment>
-        <translation>Commande</translation>
+        <translation>Télécommande</translation>
     </message>
     <message>
         <source>Info</source>
@@ -382,7 +381,7 @@
         <translation>JSON invalide de %1</translation>
     </message>
     <message>
-        <source>Invalid json from %1 (couldn&apos;t read %2)</source>
+        <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>
         <translation>JSON invalide de %1 (impossible de lire %2)</translation>
     </message>
     <message>
@@ -414,7 +413,7 @@
         <translation>L&apos;instance peut récupérer les sous-titres %1 de la vidéo pour l&apos;ID %2</translation>
     </message>
     <message>
-        <source>No thumbnails found in json from %1</source>
+        <source>No thumbnails found in JSON from %1</source>
         <translation>Aucune vignette trouvée dans JSON de %1</translation>
     </message>
     <message>
@@ -1244,10 +1243,6 @@
     <message>
         <source>OK</source>
         <translation>OK</translation>
-    </message>
-    <message>
-        <source>Remote</source>
-        <translation>Commande</translation>
     </message>
     <message>
         <source>Fetch with CORS</source>

@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Low memory warnings to the app logs for easier memory issue debugging
+- German translations (Thanks to Lacey Anaya)
+- Sliding navbar (primarily to support German as it has longer words for the menu screens)
+
+### Changed
+
+- Some UI refactors to support the different languages (English, French, German)
 
 ## [0.23.7] - 2024-05-28
 
