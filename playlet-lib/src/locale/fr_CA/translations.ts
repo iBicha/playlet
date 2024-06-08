@@ -1256,5 +1256,17 @@
         <source>The instance can fetch with CORS from %1</source>
         <translation>L&apos;instance peut récupérer avec CORS depuis %1</translation>
     </message>
+    <message>
+        <source>Clear cache</source>
+        <translation>Vider le cache</translation>
+    </message>
+    <message>
+        <source>Clear cache from cachefs: and tmp:</source>
+        <translation>Effacer le cache de cachefs: et tmp:</translation>
+    </message>
+    <message>
+        <source>Cache cleared.</source>
+        <translation>Cache effacé.</translation>
+    </message>
 </context>
 </TS>
