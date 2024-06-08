@@ -26,8 +26,7 @@
     </message>
     <message>
         <source>Remote</source>
-        <comment>Télécommande is too long for the UI</comment>
-        <translation>Commande</translation>
+        <translation>Télécommande</translation>
     </message>
     <message>
         <source>Info</source>
@@ -1244,10 +1243,6 @@
     <message>
         <source>OK</source>
         <translation>OK</translation>
-    </message>
-    <message>
-        <source>Remote</source>
-        <translation>Commande</translation>
     </message>
     <message>
         <source>Fetch with CORS</source>

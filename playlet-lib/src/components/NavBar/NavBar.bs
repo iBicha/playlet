@@ -1,14 +1,15 @@
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/Logging.bs"
 
 ' TODO:P0
-' - NavBar flexible width based on text size
-' - Fix any spacing issues (test different languages)
+' - Fix initialFocus
 
 function Init()
     m.lastIsInFocusChain = false
     m.top.focusable = true
     m.sideBar = m.top.findNode("SideBar")
+    m.background = m.top.findNode("Background")
     m.itemsList = m.top.findNode("ItemsList")
 
     m.fadeAnimation = m.top.findNode("FadeAnimation")
@@ -24,6 +25,32 @@ function OnNodeReady()
     if initialFocus > -1
         m.itemsList.jumpToItem = initialFocus
     end if
+    ResizeNavBar()
+end function
+
+function ResizeNavBar() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    component = CreateObject("roSGNode", m.itemsList.itemComponentName)
+    itemSize = m.itemsList.itemSize
+    minWidth = itemSize[0]
+    items = content.getChildren(-1, 0)
+    for each item in items
+        component.itemContent = item
+        rect = component.boundingRect()
+        ' Add 35 to account for padding
+        width = rect.width + 35
+        if width > minWidth
+            minWidth = width
+        end if
+    end for
+    m.itemsList.itemSize = [minWidth, itemSize[1]]
+    offset = minWidth - m.background.width + 30
+    m.top.screenOffset = offset
+    m.sideBar.width = offset
 end function
 
 function OnFocusedChildChange() as void
