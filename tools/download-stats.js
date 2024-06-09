@@ -176,12 +176,17 @@ imap.once('ready', async () => {
             title: 'Viewership Summary',
             filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString)
         })
+        images.push({
+            title: 'Channel Stability',
+            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString)
+        })
 
         writeMarkDownFile(images);
 
         await moveToTrash('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString);
         await moveToTrash('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString);
         await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString);
 
         imap.end();
     } catch (error) {
