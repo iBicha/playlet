@@ -134,13 +134,15 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         const rootDir = program.options.rootDir!;
         const translationFiles = globSync(`locale/**/translations.ts`, { cwd: rootDir });
         translationFiles.forEach((translationFile) => {
-            const filePath = pathJoin(rootDir, translationFile);
-            this.validateTranslations(filePath, program, this.localeValues, this.enums[0].file);
+            const srcPath = pathJoin(rootDir, translationFile);
+            const pkgPath = pathJoin('pkg:/', translationFile);
+            const xmlFile = new XmlFile(srcPath, pkgPath, program);
+            this.validateTranslations(xmlFile, program, this.localeValues, this.enums[0].file);
         });
     }
 
-    validateTranslations(translationFile: string, program: Program, localeValues: string[], file: BrsFile) {
-        const translations = this.loadTranslationsFile(translationFile);
+    validateTranslations(translationFile: XmlFile, program: Program, localeValues: string[], file: BrsFile) {
+        const translations = this.loadTranslationsFile(program, translationFile);
         if (!translations) {
             return;
         }
@@ -161,8 +163,11 @@ export class LocaleValidationPlugin implements CompilerPlugin {
     }
 
     validateEnglishTranslations(program: Program, localeValues: string[], file: BrsFile) {
-        const filePath = pathJoin(program.options.rootDir!, "locale/en_US/translations.ts");
-        const englishTranslations = this.loadTranslationsFile(filePath);
+        const translationFile = 'locale/en_US/translations.ts';
+        const srcPath = pathJoin(program.options.rootDir!, translationFile);
+        const pkgPath = pathJoin('pkg:/', translationFile);
+        const xmlFile = new XmlFile(srcPath, pkgPath, program);
+        const englishTranslations = this.loadTranslationsFile(program, xmlFile);
 
         if (!englishTranslations) {
             return;
@@ -209,12 +214,12 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         }
     }
 
-    loadTranslationsFile(filePath: string) {
+    loadTranslationsFile(program: Program, translationFile: XmlFile) {
         // load xml ts translation file
-        if (!existsSync(filePath)) {
+        if (!existsSync(translationFile.srcPath)) {
             return null;
         }
-        const content = readFileSync(filePath, 'utf8');
+        const content = readFileSync(translationFile.srcPath, 'utf8');
         const xml = this.parseXml(content);
         if (!xml || !xml.TS || !xml.TS.context || !xml.TS.context[0].message) {
             return null;
@@ -223,6 +228,20 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         return xml.TS.context[0].message.reduce((acc: any, message: any) => {
             const source = message.source[0];
             const translation = message.translation[0];
+
+            if (acc[source]) {
+                program.addDiagnostics([{
+                    file: translationFile,
+                    range: {
+                        start: { line: 0, character: 0 },
+                        end: { line: 0, character: 0 }
+                    },
+                    message: `Duplicate translation key: ${source}`,
+                    severity: DiagnosticSeverity.Error,
+                    code: 'LOCALE_DUPLICATE_TRANSLATION_KEY',
+                }]);
+            }
+
             acc[source] = translation;
             return acc;
         }, {} as Record<string, string>);
