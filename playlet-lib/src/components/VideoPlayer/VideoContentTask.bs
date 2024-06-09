@@ -26,9 +26,16 @@ function VideoContentTask(input as object) as object
     metadata = response.Json()
 
     if not response.IsSuccess() or metadata = invalid
+        errorMessage = response.ErrorMessage()
+        knownIssue = `{"error":"This helps protect our community. Learn more"}`
+
+        if errorMessage.InStr(knownIssue) <> -1
+            errorMessage += `\nNOTE: Please see the following link for more information about the error\nhttps://github.com/iBicha/playlet/issues/400`
+        end if
+
         return {
             success: false
-            error: response.ErrorMessage()
+            error: errorMessage
         }
     end if
 
