@@ -10,14 +10,17 @@ function getArgumentParser() {
         description: 'Take a screenshot of the Roku device'
     });
 
-    parser.add_argument('filename', { help: 'Path where the screenshot will be saved (without extension)' });
+    parser.add_argument('filename', { help: 'Path where the screenshot will be saved (without extension)', nargs: '?' });
 
     return parser;
 }
 
 const parser = getArgumentParser();
 const args = parser.parse_args()
-const filename = args.filename;
+let filename = args.filename;
+if (!filename) {
+    filename = 'screenshot';
+}
 
 const config = getEnvVars(['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD']);
 
