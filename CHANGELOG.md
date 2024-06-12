@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- An issue where pause/play would not work with picture-in-picture on certain views
 
 ## [0.24.1] - 2024-06-09
 
