@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Partial Spanish translations (Thanks to Jean Carton)
+
 ### Fixed
 
 - An issue where pause/play would not work with picture-in-picture on certain views
