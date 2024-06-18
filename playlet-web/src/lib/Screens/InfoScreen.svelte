@@ -149,6 +149,8 @@ ${JSON.stringify(profilesInfo, null, 2)}
 
 <div class={visibility ? "" : "hidden"}>
   <div class="text-base text-center m-8">
+    {$tr("Thank you for using Playlet.")}
+    <br />
     {@html $tr(feedbackMessageRaw)
       .replace(
         "%IssueStart%",
