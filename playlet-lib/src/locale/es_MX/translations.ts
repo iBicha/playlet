@@ -154,7 +154,7 @@
     </message>
     <message>
         <source>Clear</source>
-        <translation>Borrar</translation>
+        <translation>Limpiar</translation>
     </message>
     <message>
         <source>Press &apos;OK&apos; for details</source>
@@ -458,7 +458,7 @@
     </message>
     <message>
         <source>Use Playlet Remote in the browser</source>
-        <translation>Usa Playlet Remoto en el navegador</translation>
+        <translation>Usa Playlet de forma remota en el navegador</translation>
     </message>
     <message>
         <source>Link with TV code</source>
@@ -827,6 +827,130 @@
     <message>
         <source>Any date</source>
         <translation>Cualquier fecha</translation>
+    </message>
+    <message>
+        <source>Failed to load channel %1</source>
+        <translation>Error al cargar canal %1</translation>
+    </message>
+    <message>
+        <source>Playlist load error</source>
+        <translation>Error al cargar la playlist</translation>
+    </message>
+    <message>
+        <source>User logged out</source>
+        <translation>Usuario cerró sesión</translation>
+    </message>
+    <message>
+        <source>Failed to load playlist %1</source>
+        <translation>Error al cargar la playlist %1</translation>
+    </message>
+    <message>
+        <source>Invidious public instances load error</source>
+        <translation>Error al cargar las instancias públicas de Invidious</translation>
+    </message>
+    <message>
+        <source>Failed to load Invidious public instances</source>
+        <translation>No se pudieron cargar las instancias públicas de Invidious</translation>
+    </message>
+    <message>
+        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
+        <translation>No se pudo obtener el ID de tu pantalla. Por favor reinicia Playlet para usar la función de transmitir.</translation>
+    </message>
+    <message>
+        <source>Not a valid screen id: %1</source>
+        <translation>La ID de pantalla no es válida: %1</translation>
+    </message>
+    <message>
+        <source>Invalid response: %1</source>
+        <translation>Respuesta inválida: %1</translation>
+    </message>
+    <message>
+        <source>Invidious public instances</source>
+        <translation>Instancias públicas de Invidious</translation>
+    </message>
+    <message>
+        <source>name</source>
+        <translation>nombre</translation>
+    </message>
+    <message>
+        <source>version</source>
+        <translation>versión</translation>
+    </message>
+    <message>
+        <source>users</source>
+        <translation>usuarios</translation>
+    </message>
+    <message>
+        <source>health</source>
+        <translation>salud</translation>
+    </message>
+    <message>
+        <source>Play next video</source>
+        <translation>Reproducir el siguiente video</translation>
+    </message>
+    <message>
+        <source>Test</source>
+        <translation>Probar</translation>
+    </message>
+    <message>
+        <source>Testing %1</source>
+        <translation>Probando %1</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>Estado</translation>
+    </message>
+    <message>
+        <source>Test duration</source>
+        <translation>Duración del test</translation>
+    </message>
+    <message>
+        <source>Details</source>
+        <translation>Detalles</translation>
+    </message>
+    <message>
+        <source>Valid URL</source>
+        <translation>URL válida</translation>
+    </message>
+    <message>
+        <source>Cast from the YouTube app to Playlet</source>
+        <translation>Transmite de la app de Youtube a Playlet</translation>
+    </message>
+    <message>
+        <source>Playlet Web App</source>
+        <translation>Aplicación Web Playlet</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon.</source>
+        <translation>Presiona el ícono de transmisión.</translation>
+    </message>
+    <message>
+        <source>TV code error</source>
+        <translation>Error de código de TV</translation>
+    </message>
+    <message>
+        <source>Tap &apos;Link with TV code&apos; and enter the code below.</source>
+        <translation>Presiona &quot;Vincular con código de TV&quot;, y luego, ingresa el código que se muestra abajo.</translation>
+    </message>
+    <message>
+        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
+        <translation>Parece que has iniciado sesión en Invidious, pero no tienes los permisos necesarios.\nPor esta razón, hemos cerrado tu sesión en los siguientes perfiles: %1\nPor favor, accede de nuevo.\nEsto puede pasar cuando Playlet es actualizado con nuevas características.\nLo sentimos por la inconveniencia.</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon and select %1</source>
+        <translation>Presiona el ícono de transmisión y selecciona %1</translation>
+    </message>
+    <message>
+        <source>Failed to generate manual pairing code</source>
+        <translation>Error al generar código de emparejamiento manual</translation>
+    </message>
+    <message>
+        <source>Playback</source>
+        <translation>Reproducción</translation>
+    </message>
+    <message>
+        <source>Medium</source>
+        <translation>Media</translation>
     </message>
 </context>
 </TS>
