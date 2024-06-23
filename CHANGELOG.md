@@ -9,20 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Additional Spanish translations (Thanks to Jean Carton)
-- Partial Portuguese translations (Thanks to Bruno Fernandes)
+- Additional Spanish (Mexico) translations (Thanks to Jean Carton)
+- Partial Portuguese (Brazil) translations (Thanks to Bruno Fernandes)
 
 ## [0.24.3] - 2024-06-20
 
 ### Added
 
-- Additional Spanish translations (Thanks to Jean Carton)
+- Additional Spanish (Mexico) translations (Thanks to Jean Carton)
 
 ## [0.24.2] - 2024-06-16
 
 ### Added
 
-- Partial Spanish translations (Thanks to Jean Carton)
+- Partial Spanish (Mexico) translations (Thanks to Jean Carton)
 
 ### Fixed
 
