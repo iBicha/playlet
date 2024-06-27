@@ -48,6 +48,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 - 📱 Browse, search, and cast from phone using the YouTube app or the browser
 - 🔮 Picture-in-picture mode
 - ⚡ Fast! [Check out how we compare with the official YouTube app](https://youtu.be/qmSvA-QQW20)
+- 🔤 Translated using [Weblate](https://hosted.weblate.org/projects/playlet/playlet/)
 
 ### Cast from phone
 
