@@ -1,7 +1,9 @@
-import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -12,6 +14,42 @@ function Init()
 
     httpAgent = m.top.getHttpAgent()
     httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0")
+
+    m.clock = m.top.findNode("Clock")
+
+    m.titleLabel = m.top.findNode("TitleLabel")
+    m.secondaryTitleLabel = m.top.findNode("SecondaryTitleLabel")
+
+    m.previousButton = m.top.findNode("PreviousButton")
+    m.playButton = m.top.findNode("PlayButton")
+    m.nextButton = m.top.findNode("NextButton")
+
+    DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
+
+    DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
+
+    SetNavigation(m.previousButton, "right", m.playButton)
+    SetNavigation(m.playButton, "left", m.previousButton)
+    SetNavigation(m.playButton, "right", m.nextButton)
+    SetNavigation(m.nextButton, "left", m.playButton)
+end function
+
+function OnNodeReady()
+    DisposableObserveFieldScoped(m.videoQueue, "hasPrevious", FuncName(OnHasPreviousChange))
+    DisposableObserveFieldScoped(m.videoQueue, "hasNext", FuncName(OnHasNextChange))
+    OnHasPreviousChange()
+    OnHasNextChange()
+
+    DisposableObserveFieldScoped(m.previousButton, "buttonSelected", FuncName(OnPreviousButtonSelected))
+    DisposableObserveFieldScoped(m.nextButton, "buttonSelected", FuncName(OnNextButtonSelected))
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.playButton, true)
 end function
 
 function PlayWithContent(contentNode as object)
@@ -39,6 +77,8 @@ function StartVideoContentTask(videoContentNode as object)
     m.top.content = videoContentNode
 
     m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTaskDev, {
+        titleLabel: m.titleLabel
+        secondaryTitleLabel: m.secondaryTitleLabel
         content: videoContentNode
         invidious: m.top.invidious
     }, OnVideoContentTaskResults)
@@ -81,9 +121,15 @@ function OnClose()
 
     m.top.control = "stop"
     m.top.content = invalid
+
+    m.top.dispose = true
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
     if press = false
         return false
     end if
@@ -94,4 +140,43 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     end if
 
     return false
+end function
+
+function OnHasPreviousChange()
+    m.previousButton.disabled = not m.videoQueue.hasPrevious
+end function
+
+function OnHasNextChange()
+    m.nextButton.disabled = not m.videoQueue.hasNext
+end function
+
+function OnPlayButtonSelected()
+    state = m.top.state
+    if state = "playing"
+        m.top.control = "pause"
+    else if state = "paused"
+        m.top.control = "resume"
+    end if
+end function
+
+function OnPreviousButtonSelected()
+    m.videoQueue.previous = true
+end function
+
+function OnNextButtonSelected()
+    m.videoQueue.next = true
+end function
+
+function OnPlayerStateChange()
+    state = m.top.state
+    if state = "playing"
+        m.playButton.iconUri = "pkg:/images/icons/player/pause.png"
+    else if state = "paused"
+        m.playButton.iconUri = "pkg:/images/icons/player/play.png"
+    end if
+end function
+
+function OnDispose()
+    m.clock.dispose = true
+    DisposeObservers()
 end function
