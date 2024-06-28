@@ -23,6 +23,8 @@ function Init()
     m.playButton = m.top.findNode("PlayButton")
     m.nextButton = m.top.findNode("NextButton")
     m.minimizeButton = m.top.findNode("MinimizeButton")
+    m.trickPlayBar = m.top.findNode("TrickPlayBar")
+    m.progressTimer = m.top.findNode("ProgressTimer")
 
     SetupLoadingSpinner()
 end function
@@ -42,6 +44,8 @@ function OnNodeReady()
 
     DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
     DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
+
+    DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
 
     SetNavigation(m.previousButton, "right", m.playButton)
     SetNavigation(m.playButton, "right", m.nextButton)
@@ -186,12 +190,24 @@ function OnMinimizeButtonSelected()
     VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
 end function
 
-function OnPlayerStateChange()
+function OnPlayerStateChange() as void
     state = m.top.state
+
+    if state = "stopping" or state = "stopped"
+        m.top.videoUiVisible = false
+        return
+    end if
+
     if state = "playing"
         m.playButton.toggleState = false ' Pause icon
+        m.playButton.disabled = false
+
+        m.progressTimer.control = "start"
     else if state = "paused"
         m.playButton.toggleState = true ' Play icon
+        m.playButton.disabled = false
+    else
+        m.playButton.disabled = true
     end if
 
     if state = "buffering"
@@ -211,6 +227,16 @@ function OnBufferingStatusChange() as void
     end if
 
     m.loadingPercentLabel.text = `${bufferingStatus.percentage}%`
+end function
+
+function OnProgress() as void
+    duration = m.top.duration
+    if duration = 0
+        m.trickPlayBar.progress = 0
+        return
+    end if
+
+    m.trickPlayBar.progress = m.top.position / duration
 end function
 
 function OnDispose()
