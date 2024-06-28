@@ -17,29 +17,14 @@ function Init()
     httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0")
 
     m.clock = m.top.findNode("Clock")
-
     m.titleLabel = m.top.findNode("TitleLabel")
     m.secondaryTitleLabel = m.top.findNode("SecondaryTitleLabel")
-
     m.previousButton = m.top.findNode("PreviousButton")
     m.playButton = m.top.findNode("PlayButton")
     m.nextButton = m.top.findNode("NextButton")
     m.minimizeButton = m.top.findNode("MinimizeButton")
 
-    DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
-    DisposableObserveFieldScoped(m.minimizeButton, "buttonSelected", FuncName(OnMinimizeButtonSelected))
-
-    DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
-
-    SetNavigation(m.previousButton, "right", m.playButton)
-    SetNavigation(m.playButton, "right", m.nextButton)
-    SetNavigation(m.nextButton, "right", m.minimizeButton)
-    SetNavigation(m.playButton, "right", m.minimizeButton)
-
-    SetNavigation(m.minimizeButton, "left", m.nextButton)
-    SetNavigation(m.minimizeButton, "left", m.playButton)
-    SetNavigation(m.nextButton, "left", m.playButton)
-    SetNavigation(m.playButton, "left", m.previousButton)
+    SetupLoadingSpinner()
 end function
 
 function OnNodeReady()
@@ -51,7 +36,22 @@ function OnNodeReady()
     OnHasNextChange()
 
     DisposableObserveFieldScoped(m.previousButton, "buttonSelected", FuncName(OnPreviousButtonSelected))
+    DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
     DisposableObserveFieldScoped(m.nextButton, "buttonSelected", FuncName(OnNextButtonSelected))
+    DisposableObserveFieldScoped(m.minimizeButton, "buttonSelected", FuncName(OnMinimizeButtonSelected))
+
+    DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
+    DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
+
+    SetNavigation(m.previousButton, "right", m.playButton)
+    SetNavigation(m.playButton, "right", m.nextButton)
+    SetNavigation(m.nextButton, "right", m.minimizeButton)
+    SetNavigation(m.playButton, "right", m.minimizeButton)
+
+    SetNavigation(m.minimizeButton, "left", m.nextButton)
+    SetNavigation(m.minimizeButton, "left", m.playButton)
+    SetNavigation(m.nextButton, "left", m.playButton)
+    SetNavigation(m.playButton, "left", m.previousButton)
 end function
 
 function OnFocusChange() as void
@@ -85,6 +85,11 @@ function StartVideoContentTask(videoContentNode as object)
     end if
 
     m.top.content = videoContentNode
+
+    m.loadingLabel.text = "Loading"
+    m.loadingPercentLabel.text = ""
+    m.loadingSpinner.visible = true
+    m.loadingSpinner.control = "start"
 
     m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTaskDev, {
         titleLabel: m.titleLabel
@@ -188,11 +193,48 @@ function OnPlayerStateChange()
     else if state = "paused"
         m.playButton.toggleState = true ' Play icon
     end if
+
+    if state = "buffering"
+        m.loadingLabel.text = "Buffering"
+        m.loadingSpinner.control = "start"
+        m.loadingSpinner.visible = true
+    else
+        m.loadingSpinner.control = "stop"
+        m.loadingSpinner.visible = false
+    end if
+end function
+
+function OnBufferingStatusChange() as void
+    bufferingStatus = m.top.bufferingStatus
+    if bufferingStatus = invalid
+        return
+    end if
+
+    m.loadingPercentLabel.text = `${bufferingStatus.percentage}%`
 end function
 
 function OnDispose()
+    m.fullScreenHintTimer.control = "stop"
+    m.loadingSpinner.control = "stop"
     m.clock.dispose = true
     DisposeObservers()
+end function
+
+function SetupLoadingSpinner()
+    m.loadingSpinner = m.top.findNode("LoadingSpinner")
+    poster = m.loadingSpinner.poster
+
+    size = 150
+    poster.width = size
+    poster.height = size
+    centerx = (1280 - size) / 2
+    centery = (720 - size) / 2
+    m.loadingSpinner.translation = [centerx, centery]
+    poster.opacity = 0.8
+    poster.uri = "pkg:/images/spinner.png"
+
+    m.loadingLabel = m.loadingSpinner.findNode("LoadingLabel")
+    m.loadingPercentLabel = m.loadingSpinner.findNode("LoadingPercentLabel")
 end function
 
 function SetupMinimizeAnimation()
