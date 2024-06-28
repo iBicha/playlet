@@ -877,6 +877,14 @@
         <translation>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</translation>
     </message>
     <message>
+        <source>Loading</source>
+        <translation>Loading</translation>
+    </message>
+    <message>
+        <source>Buffering</source>
+        <translation>Buffering</translation>
+    </message>
+    <message>
         <source>Press Options (*) for full screen</source>
         <translation>Press Options (*) for full screen</translation>
     </message>
