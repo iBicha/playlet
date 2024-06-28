@@ -1,4 +1,5 @@
 import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
@@ -23,18 +24,27 @@ function Init()
     m.previousButton = m.top.findNode("PreviousButton")
     m.playButton = m.top.findNode("PlayButton")
     m.nextButton = m.top.findNode("NextButton")
+    m.minimizeButton = m.top.findNode("MinimizeButton")
 
     DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
+    DisposableObserveFieldScoped(m.minimizeButton, "buttonSelected", FuncName(OnMinimizeButtonSelected))
 
     DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
 
     SetNavigation(m.previousButton, "right", m.playButton)
-    SetNavigation(m.playButton, "left", m.previousButton)
     SetNavigation(m.playButton, "right", m.nextButton)
+    SetNavigation(m.nextButton, "right", m.minimizeButton)
+    SetNavigation(m.playButton, "right", m.minimizeButton)
+
+    SetNavigation(m.minimizeButton, "left", m.nextButton)
+    SetNavigation(m.minimizeButton, "left", m.playButton)
     SetNavigation(m.nextButton, "left", m.playButton)
+    SetNavigation(m.playButton, "left", m.previousButton)
 end function
 
 function OnNodeReady()
+    SetupMinimizeAnimation()
+
     DisposableObserveFieldScoped(m.videoQueue, "hasPrevious", FuncName(OnHasPreviousChange))
     DisposableObserveFieldScoped(m.videoQueue, "hasNext", FuncName(OnHasNextChange))
     OnHasPreviousChange()
@@ -167,6 +177,10 @@ function OnNextButtonSelected()
     m.videoQueue.next = true
 end function
 
+function OnMinimizeButtonSelected()
+    VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+end function
+
 function OnPlayerStateChange()
     state = m.top.state
     if state = "playing"
@@ -179,4 +193,81 @@ end function
 function OnDispose()
     m.clock.dispose = true
     DisposeObservers()
+end function
+
+function SetupMinimizeAnimation()
+    m.fullScreenHint = m.top.findNode("fullScreenHint")
+    m.fullScreenHintLabel = m.top.findNode("fullScreenHintLabel")
+    m.fullScreenHintTimer = m.top.findNode("fullScreenHintTimer")
+    m.fullScreenHintTimer.ObserveField("fire", FuncName(OnFullScreenHintTimer))
+
+    m.minimizeAnimation = m.top.findNode("minimizeAnimation")
+    m.widthInterpolator = m.top.findNode("widthInterpolator")
+    m.heightInterpolator = m.top.findNode("heightInterpolator")
+    m.translationInterpolator = m.top.findNode("translationInterpolator")
+
+    minRect = m.top.minRect
+    maxRect = m.top.maxRect
+
+    m.widthInterpolator.keyValue = [maxRect.width, (maxRect.width + minRect.width) / 2, minRect.width]
+    m.heightInterpolator.keyValue = [maxRect.height, (maxRect.height + minRect.height) / 2, minRect.height]
+    maxTranslation = [maxRect.x, maxRect.y]
+    minTranslation = [minRect.x, minRect.y]
+    midTranslation = [(maxRect.x + minRect.x) / 2, (maxRect.y + minRect.y) / 2]
+    m.translationInterpolator.keyValue = [maxTranslation, midTranslation, minTranslation]
+
+    fullscreen = m.container.fullscreen
+    rect = fullscreen ? maxRect : minRect
+
+    m.top.width = rect.width
+    m.top.height = rect.height
+    m.top.translation = [rect.x, rect.y]
+
+    m.fullScreenHint.width = minRect.width
+    m.fullScreenHintLabel.width = minRect.width
+    m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
+
+    m.top.showFullScreenHint = not fullscreen
+    m.top.videoUiVisible = fullscreen
+
+    m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
+end function
+
+function OnFullScreenChange()
+    fullscreen = m.container.fullscreen
+
+    m.widthInterpolator.reverse = fullscreen
+    m.heightInterpolator.reverse = fullscreen
+    m.translationInterpolator.reverse = fullscreen
+    m.minimizeAnimation.control = "start"
+
+    m.top.videoUiVisible = fullscreen
+    m.top.showFullScreenHint = not fullscreen
+end function
+
+function OnFullScreenHintTimer()
+    showFullScreenHint = m.top.showFullScreenHint
+    m.fullScreenHint.visible = showFullScreenHint
+    if showFullScreenHint
+        m.top.showFullScreenHint = false
+    end if
+end function
+
+function OnShowFullScreenHint() as void
+    m.fullScreenHintTimer.control = "stop"
+
+    if m.container.fullscreen
+        m.fullScreenHint.visible = false
+        return
+    end if
+
+    if m.top.showFullScreenHint
+        ' Take 1 second until the shrink animation finishes to show the hint
+        m.fullScreenHintTimer.duration = 1
+    else
+        ' Wait 5 seconds then hide the hint
+        m.fullScreenHintTimer.duration = 5
+    end if
+
+    m.fullScreenHintTimer.control = "start"
 end function
