@@ -861,6 +861,10 @@
         <translation>La version de Playlet Lib à utiliser. Celles-ci correspondent aux versions taguées sur Github. Les versions qui n&apos;ont pas de fichier playlet-lib.zip sont désactivées.</translation>
     </message>
     <message>
+        <source>Loading</source>
+        <translation>Chargement</translation>
+    </message>
+    <message>
         <source>Press Options (*) for full screen</source>
         <translation>Appuyez sur Options (*) pour plein écran</translation>
     </message>

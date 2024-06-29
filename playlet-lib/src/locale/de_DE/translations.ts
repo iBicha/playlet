@@ -1101,6 +1101,10 @@
         <translation>Playlet Library Version</translation>
     </message>
     <message>
+        <source>Loading</source>
+        <translation>Lädt</translation>
+    </message>
+    <message>
         <source>Press Options (*) for full screen</source>
         <translation>Für Vollbild auf Optionen (*) drücken</translation>
     </message>

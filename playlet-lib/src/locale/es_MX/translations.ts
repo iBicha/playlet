@@ -253,6 +253,10 @@
         <translation>Historial de búsqueda borrado.</translation>
     </message>
     <message>
+        <source>Loading</source>
+        <translation>Cargando</translation>
+    </message>
+    <message>
         <source>Press Options (*) for full screen</source>
         <translation>Presiona Opciones (*) para pantalla completa</translation>
     </message>
