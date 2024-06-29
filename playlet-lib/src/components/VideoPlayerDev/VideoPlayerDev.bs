@@ -24,7 +24,11 @@ function Init()
     m.nextButton = m.top.findNode("NextButton")
     m.minimizeButton = m.top.findNode("MinimizeButton")
     m.trickPlayBar = m.top.findNode("TrickPlayBar")
+    m.videoUi = m.top.findNode("VideoUI")
     m.progressTimer = m.top.findNode("ProgressTimer")
+    m.hideVideoUiTimer = m.top.findNode("HideVideoUiTimer")
+    m.fadeAnimation = m.top.findNode("FadeAnimation")
+    m.fadeOpacityInterpolator = m.top.findNode("FadeOpacityInterpolator")
 
     SetupLoadingSpinner()
 end function
@@ -46,6 +50,7 @@ function OnNodeReady()
     DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
 
     DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
+    DisposableObserveField(m.hideVideoUiTimer, "fire", FuncName(OnHideVideoUiTimer))
 
     SetNavigation(m.previousButton, "right", m.playButton)
     SetNavigation(m.playButton, "right", m.nextButton)
@@ -56,14 +61,10 @@ function OnNodeReady()
     SetNavigation(m.minimizeButton, "left", m.playButton)
     SetNavigation(m.nextButton, "left", m.playButton)
     SetNavigation(m.playButton, "left", m.previousButton)
-end function
 
-function OnFocusChange() as void
-    if not m.top.focus
-        return
+    if m.top.hasFocus() and m.videoUi.visible and m.videoUi.opacity = 1
+        NodeSetFocus(m.playButton, true)
     end if
-
-    NodeSetFocus(m.playButton, true)
 end function
 
 function PlayWithContent(contentNode as object)
@@ -145,6 +146,12 @@ function OnClose()
 end function
 
 function OnkeyEvent(key as string, press as boolean) as boolean
+    m.hideVideoUiTimer.control = "stop"
+    m.hideVideoUiTimer.control = "start"
+    if ShowVideoUi()
+        return true
+    end if
+
     if NavigationKeyHandler(key, press).handled
         return true
     end if
@@ -194,7 +201,7 @@ function OnPlayerStateChange() as void
     state = m.top.state
 
     if state = "stopping" or state = "stopped"
-        m.top.videoUiVisible = false
+        m.videoUi.Visible = false
         return
     end if
 
@@ -239,7 +246,13 @@ function OnProgress() as void
     m.trickPlayBar.progress = m.top.position / duration
 end function
 
+function OnHideVideoUiTimer()
+    HideVideoUi()
+end function
+
 function OnDispose()
+    m.fadeAnimation.control = "stop"
+    m.hideVideoUiTimer.control = "stop"
     m.fullScreenHintTimer.control = "stop"
     m.loadingSpinner.control = "stop"
     m.clock.dispose = true
@@ -296,7 +309,7 @@ function SetupMinimizeAnimation()
     m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
 
     m.top.showFullScreenHint = not fullscreen
-    m.top.videoUiVisible = fullscreen
+    m.videoUi.visible = fullscreen
 
     DisposableObserveFieldScoped(m.container, "fullscreen", FuncName(OnFullScreenChange))
 end function
@@ -309,7 +322,7 @@ function OnFullScreenChange()
     m.translationInterpolator.reverse = fullscreen
     m.minimizeAnimation.control = "start"
 
-    m.top.videoUiVisible = fullscreen
+    m.videoUi.visible = fullscreen
     m.top.showFullScreenHint = not fullscreen
 end function
 
@@ -338,4 +351,37 @@ function OnShowFullScreenHint() as void
     end if
 
     m.fullScreenHintTimer.control = "start"
+end function
+
+function ShowVideoUi() as boolean
+    if m.fadeAnimation.state = "stopped"
+        if m.videoUi.opacity = 1
+            return false
+        end if
+    end if
+
+    m.fadeAnimation.control = "stop"
+    m.fadeOpacityInterpolator.reverse = false
+    m.fadeAnimation.control = "start"
+
+    if m.top.hasFocus()
+        NodeSetFocus(m.playButton, true)
+    end if
+
+    return true
+end function
+
+function HideVideoUi() as void
+    if m.fadeAnimation.state = "stopped"
+        if m.videoUi.opacity = 0
+            return
+        end if
+    end if
+    m.fadeAnimation.control = "stop"
+    m.fadeOpacityInterpolator.reverse = true
+    m.fadeAnimation.control = "start"
+
+    if m.top.isInFocusChain()
+        NodeSetFocus(m.top, true)
+    end if
 end function
