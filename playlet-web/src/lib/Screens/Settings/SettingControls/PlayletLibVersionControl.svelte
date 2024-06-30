@@ -49,10 +49,19 @@
   }
 
   async function fetchReleaseTags() {
-    const response = await fetch(
-      "https://api.github.com/repos/iBicha/playlet/releases"
-    );
-    const releases = await response.json();
+    const releases = [];
+    let page = 1;
+    const perPage = 100;
+    while (true) {
+      const response = await fetch(
+        `https://api.github.com/repos/iBicha/playlet/releases?per_page=${perPage}&page=${page++}`
+      );
+      const responseReleases = await response.json();
+      releases.push(...responseReleases);
+      if (responseReleases.length < perPage) {
+        break;
+      }
+    }
     return releases.map((release) => {
       return {
         name: release.tag_name,
