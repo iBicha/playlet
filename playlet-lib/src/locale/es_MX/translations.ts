@@ -286,7 +286,7 @@
     </message>
     <message>
         <source>On your phone, connect to the same Wi-Fi network as this device.</source>
-        <translation>En tu teléfono, conéctate a la misma red Wi.Fi que este dispositivo.</translation>
+        <translation>En tu teléfono, conéctate a la misma red Wi-Fi que este dispositivo.</translation>
     </message>
     <message>
         <source>Open the YouTube app on your phone.</source>
@@ -955,6 +955,266 @@
     <message>
         <source>Medium</source>
         <translation>Media</translation>
+    </message>
+    <message>
+        <source>Request cancelled.</source>
+        <translation>Solicitud cancelada.</translation>
+    </message>
+    <message>
+        <source>Playlet Library version changed. Playlet will now restart.</source>
+        <translation>Versión de Playlet Library cambiada. Playlet ahora se reiniciará.</translation>
+    </message>
+    <message>
+        <source>Latest (default)</source>
+        <translation>Más reciente (por defecto)</translation>
+    </message>
+    <message>
+        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
+        <translation>No se ha podido obtener el token de Lounge. Por favor reinicia Playlet para usar la función de transmión.</translation>
+    </message>
+    <message>
+        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
+        <translation>No se han podido obtener los datos de sesión. Por favor reinicia Playlet para usar la función de transmisión.</translation>
+    </message>
+    <message>
+        <source>Invidious custom instance</source>
+        <translation>Instancia personalizada de Invidious</translation>
+    </message>
+    <message>
+        <source>Instance reachable</source>
+        <translation>Instancia accesible</translation>
+    </message>
+    <message>
+        <source>Fetch video details</source>
+        <translation>Obtener detalles del video</translation>
+    </message>
+    <message>
+        <source>Fetch video comments</source>
+        <translation>Obtener comentarios del video</translation>
+    </message>
+    <message>
+        <source>Fetch video captions</source>
+        <translation>Obtener subtítulos del video</translation>
+    </message>
+    <message>
+        <source>Fetch video thumbnails</source>
+        <translation>Obtener miniaturas del video</translation>
+    </message>
+    <message>
+        <source>Url must start with http:// or https://</source>
+        <translation>La URL debe empezar con http:// o https://</translation>
+    </message>
+    <message>
+        <source>Url must not end with /</source>
+        <translation>La URL no debe terminar con /</translation>
+    </message>
+    <message>
+        <source>The url seems to be of a valid format</source>
+        <translation>La URL parece tener un formato válido</translation>
+    </message>
+    <message>
+        <source>Invalid JSON from %1</source>
+        <translation>JSON inválido de %1</translation>
+    </message>
+    <message>
+        <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>
+        <translation>JSON inválido de %1 (no se puede leer %2)</translation>
+    </message>
+    <message>
+        <source>Profiles</source>
+        <translation>Perfiles</translation>
+    </message>
+    <message>
+        <source>Failed to load feed</source>
+        <translation>No se ha podido cargar el feed</translation>
+    </message>
+    <message>
+        <source>The instance is reachable and running %1 version %2</source>
+        <translation>La instancia es accesible y está utilizando %1 versión %2</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video details for ID %1 (%2)</source>
+        <translation>La instancia puede obtener detalles del video para ID %1 (%2)</translation>
+    </message>
+    <message>
+        <source>Invalid caption data from %1 (Content-Type is not text/vtt)</source>
+        <translation>Datos de subtítulos inválidos de %1 (Content-Type no es texto/vtt)</translation>
+    </message>
+    <message>
+        <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
+        <translation>Datos de subtítulos inválidos de %1 (la respuesta no es un archivo vtt válido)</translation>
+    </message>
+    <message>
+        <source>Lounge service setup error</source>
+        <translation>Error de configuración del servicio Lounge</translation>
+    </message>
+    <message>
+        <source>signup</source>
+        <translation>registro</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video comments for ID %1 (%2 comments)</source>
+        <translation>La instancia puede obtener los comentarios del video para ID %1 (%2 comentarios)</translation>
+    </message>
+    <message>
+        <source>Did not find expected text in caption data from %1</source>
+        <translation>No se encontró el texto esperado en los datos de subtítulos de %1</translation>
+    </message>
+    <message>
+        <source>Passed</source>
+        <translation>Superado</translation>
+    </message>
+    <message>
+        <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
+        <translation>Datos de la miniatura inválidos %1 (Content-Type no es una imagen/*)</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+        <translation>La instancia puede obtener la miniatura del video para el ID %1 (%2)</translation>
+    </message>
+    <message>
+        <source>%1 is not reachable</source>
+        <translation>%1 no es accesible</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Fallido</translation>
+    </message>
+    <message>
+        <source>UPCOMING</source>
+        <translation>PRÓXIMAMENTE</translation>
+    </message>
+    <message>
+        <source>Auto (DASH)</source>
+        <translation>Automática (DASH)</translation>
+    </message>
+    <message>
+        <source>SponsorBlock</source>
+        <translation>SponsorBlock</translation>
+    </message>
+    <message>
+        <source>Misc. preferences</source>
+        <translation>Otras preferencias</translation>
+    </message>
+    <message>
+        <source>Developer preferences</source>
+        <translation>Preferencias de desarrollador</translation>
+    </message>
+    <message>
+        <source>Use dev video player</source>
+        <translation>Usar reproductor de video de desarrollador</translation>
+    </message>
+    <message>
+        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
+        <translation>Habilita el reproductor de video para desarrollador. Este es un reproductor de video sin terminar con el fin de probar nuevas funciones.</translation>
+    </message>
+    <message>
+        <source>Playlet Library version</source>
+        <translation>Versión de Playlet Library</translation>
+    </message>
+    <message>
+        <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
+        <translation>La versión de Playlet Library a utilizar. Estas corresponden a versiones etiquetadas en Github. Las versiones que no tienen un archivo playlet-lib.zip están deshabilitadas.</translation>
+    </message>
+    <message>
+        <source>Failed to load video information for %1</source>
+        <translation>No se pudo cargar la información del video para %1</translation>
+    </message>
+    <message>
+        <source>Video load error</source>
+        <translation>Error al cargar el video</translation>
+    </message>
+    <message>
+        <source>Error closing video</source>
+        <translation>Error al cerrar el video</translation>
+    </message>
+    <message>
+        <source>Exclusive Access</source>
+        <translation>Acceso Exclusivo</translation>
+    </message>
+    <message>
+        <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
+        <translation>Tienes algún comentario? Háznoslo saber %IssueStart%creando un &quot;issue&quot; en Github%IssueEnd% o al %EmailStart%enviarnos un email%EmailEnd%.</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to change the Playlet Library version to %1?</source>
+        <translation>Estás seguro de que quieres cambiar la versión de Playlet Library a %1?</translation>
+    </message>
+    <message>
+        <source>This will restart Playlet.</source>
+        <translation>Esto reiniciará Playlet.</translation>
+    </message>
+    <message>
+        <source>Queue on %1</source>
+        <translation>Añadir a la cola en %1</translation>
+    </message>
+    <message>
+        <source>Play on %1</source>
+        <translation>Reproducir en %1</translation>
+    </message>
+    <message>
+        <source>Open in Invidious</source>
+        <translation>Abrir en Invidious</translation>
+    </message>
+    <message>
+        <source>Start at</source>
+        <translation>Empezar en</translation>
+    </message>
+    <message>
+        <source>No thumbnails found in JSON from %1</source>
+        <translation>No se encontraron miniaturas en JSON de %1</translation>
+    </message>
+    <message>
+        <source>Error playing video %1</source>
+        <translation>Error al reproducir video %1</translation>
+    </message>
+    <message>
+        <source>Request not sent.</source>
+        <translation>Solicitud no enviada.</translation>
+    </message>
+    <message>
+        <source>Request timed out.</source>
+        <translation>Se agotó el tiempo de espera de la solicitud.</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Razón</translation>
+    </message>
+    <message>
+        <source>Skipped</source>
+        <translation>Omitido</translation>
+    </message>
+    <message>
+        <source>Open on %1</source>
+        <translation>Abrir en %1</translation>
+    </message>
+    <message>
+        <source>Fetch with CORS</source>
+        <translation>Obtener con CORS</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video %1 captions for ID %2</source>
+        <translation>La instancia puede obtener los subtítulos %1 del video para el ID %2</translation>
+    </message>
+    <message>
+        <source>CORS header not set correctly from %1</source>
+        <translation>Encabezado CORS de %1 no se estableció correctamente</translation>
+    </message>
+    <message>
+        <source>Could not get IP address: are we connected to the internet?</source>
+        <translation>No se ha podido obtener la dirección IP: estás conectado a internet?</translation>
+    </message>
+    <message>
+        <source>Miscellaneous</source>
+        <translation>Otros</translation>
+    </message>
+    <message>
+        <source>Drop a YouTube link here</source>
+        <translation>Pon un enlace de Youtube aquí</translation>
+    </message>
+    <message>
+        <source>The instance can fetch with CORS from %1</source>
+        <translation>La instancia puede obtener con CORS desde %1</translation>
     </message>
 </context>
 </TS>
