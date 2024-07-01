@@ -1,15 +1,3 @@
-<svg name="fast-forward-right" width="14px" height="14px" viewBox="0 0 21 15"
-  ><g
-    ><g fill="currentColor" transform="translate(-344 -886)"
-      ><g transform="translate(111 553)"
-        ><g transform="translate(15 49)"
-          ><g transform="translate(185.1 270)"
-            ><path
-              d="M53.449 20.73l-9.474-6.666a.35.35 0 00-.553.287v6.237l-9.272-6.52a.352.352 0 00-.552.287V27.68a.351.351 0 00.552.287l9.272-6.52v6.237a.351.351 0 00.553.287l9.474-6.667a.35.35 0 000-.573z"
-            /></g
-          ></g
-        ></g
-      ></g
-    ></g
-  ></svg
->
+<svg width="14" height="14" viewBox="0 0 21 15">
+    <path fill="currentColor" d="M20.549 6.73 11.075.064a.35.35 0 0 0-.553.287v6.237L1.25.068a.352.352 0 0 0-.552.287V13.68a.351.351 0 0 0 .552.287l9.272-6.52v6.237a.351.351 0 0 0 .553.287l9.474-6.667a.35.35 0 0 0 0-.573z"/>
+</svg>
