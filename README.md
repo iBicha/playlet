@@ -18,6 +18,9 @@
   <a href="https://channelstore.roku.com/en-ca/details/840aec36f51bfe6d96cf6db9055a372a/playlet">
     <img alt="Roku Channel Store" src="https://img.shields.io/badge/Roku%20Store-Install-blueviolet?logo=roku&logoColor=blueviolet&labelColor=white"/>
   </a>
+  <a href="https://github.com/iBicha/playlet/wiki">
+    <img alt="Channel Stats" src="https://img.shields.io/badge/%F0%9F%93%88-channel_stats-blue"/>
+  </a>
 </p>
 
 # Playlet
