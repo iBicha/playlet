@@ -561,8 +561,8 @@
         <translation>Sin Favoritos</translation>
     </message>
     <message>
-        <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
-        <translation>Instancia de Invidious a usar. Ejemplo: https://example.com. Encuentra más instancias en $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
+        <translation>Instancia de Invidious a usar. Ejemplo: https://example.com. Encuentra más instancias en %INVIDIOUS_PUBLIC_INSTANCES%</translation>
     </message>
     <message>
         <source>Apply</source>

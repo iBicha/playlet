@@ -1021,8 +1021,8 @@
         <translation>To add bookmarks, select a video, playlist or channel, and add a bookmark.</translation>
     </message>
     <message>
-        <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
-        <translation>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
+        <translation>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</translation>
     </message>
     <message>
         <source>Thank you for using Playlet.</source>

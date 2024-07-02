@@ -1161,8 +1161,8 @@
         <translation>Gerät</translation>
     </message>
     <message>
-        <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
-        <translation>Invidious Instanz, die genutzt werden soll. Beispiel: https://beispiel.com. Mehr Instanzen finden Sie hier: $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
+        <translation>Invidious Instanz, die genutzt werden soll. Beispiel: https://beispiel.com. Mehr Instanzen finden Sie hier: %INVIDIOUS_PUBLIC_INSTANCES%</translation>
     </message>
     <message>
         <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>

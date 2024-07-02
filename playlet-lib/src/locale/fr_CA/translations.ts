@@ -1001,8 +1001,8 @@
         <translation>Pour ajouter des favoris, sélectionnez une vidéo, une playlist ou une chaîne, et ajoutez un favori.</translation>
     </message>
     <message>
-        <source>Invidious instance to use. Example: https://example.com. Find more instances at $INVIDIOUS_PUBLIC_INSTANCES</source>
-        <translation>Instance Invidious à utiliser. Exemple : https://example.com. Trouvez plus d&apos;instances sur $INVIDIOUS_PUBLIC_INSTANCES</translation>
+        <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
+        <translation>Instance Invidious à utiliser. Exemple : https://example.com. Trouvez plus d&apos;instances sur %INVIDIOUS_PUBLIC_INSTANCES%</translation>
     </message>
     <message>
         <source>Thank you for using Playlet.</source>

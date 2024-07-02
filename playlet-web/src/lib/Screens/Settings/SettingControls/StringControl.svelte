@@ -31,7 +31,7 @@
   <div class="text-xs text-gray-500">
     <!-- TODO:P2 this should not be hardcoded here -->
     {@html $tr(description).replace(
-      "$INVIDIOUS_PUBLIC_INSTANCES",
+      "%INVIDIOUS_PUBLIC_INSTANCES%",
       invidiousPublicInstancesLink
     )}
   </div>
