@@ -71,7 +71,65 @@ function OnNodeReady()
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
 
+    m.top.ObserveField("streamingSegment", FuncName(OnStreamingSegment))
+    ' TODO: use fields for detecting playback quality change
+    m.lastVideoSegment = ""
+    m.lastAudioSegment = ""
+    m.lastLiveVideoQuality = ""
+
     SponsorBlock.SetupSponsorBlock()
+end function
+
+function OnStreamingSegment() as void
+    segment = m.top.streamingSegment
+    ' LogInfo(segment)
+
+    if IsLiveVideo()
+        if segment.height = 0
+            return
+        end if
+        ' Not exact quality label, but probably good enough since live videos won't have a quality selector (for now)
+        quality = `${segment.height}p`
+        if quality = m.lastLiveVideoQuality
+            return
+        end if
+        m.lastLiveVideoQuality = quality
+        LogInfo("Live video quality:", quality)
+    else
+        if segment.SegType = 1
+            if segment.SegUrl = m.lastAudioSegment
+                return
+            end if
+            m.lastAudioSegment = segment.SegUrl
+            LogInfo("Audio quality:", GetLabelForSegUrl(segment.SegUrl))
+        else if segment.SegType = 2
+            if segment.SegUrl = m.lastVideoSegment
+                return
+            end if
+            m.lastVideoSegment = segment.SegUrl
+            LogInfo("Video quality:", GetLabelForSegUrl(segment.SegUrl))
+        end if
+    end if
+end function
+
+function GetLabelForSegUrl(segUrl as string) as dynamic
+    return m.segUrlLabelMap[segUrl]
+end function
+
+function CreateSegUrlToLabelMap(metadata as object)
+    segUrlLabelMap = {}
+    for each stream in metadata.adaptiveFormats
+        if stream.qualityLabel <> invalid
+            segUrlLabelMap[stream.url] = stream.qualityLabel
+            continue for
+        end if
+
+        if stream.audioQuality <> invalid
+            segUrlLabelMap[stream.url] = stream.audioQuality
+            continue for
+        end if
+    end for
+    m.segUrlLabelMap = segUrlLabelMap
 end function
 
 function PlayWithContent(contentNode as object)
@@ -141,6 +199,9 @@ function OnVideoContentTaskResults(output as object) as void
     end if
 
     content = m.top.content
+
+    CreateSegUrlToLabelMap(content.metadata)
+
     SponsorBlock.FetchSponsorBlock(content.metadata)
 
     timestamp = content.timestamp
