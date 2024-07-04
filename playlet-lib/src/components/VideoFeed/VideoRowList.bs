@@ -20,6 +20,7 @@ end function
 function OnNodeReady()
     DisposableObserveField(m.top, "itemFocused", FuncName(OnItemFocused))
     DisposableObserveField(m.top, "rowItemFocused", FuncName(OnRowItemFocused))
+    DisposableObserveField(m.top, "rowItemSelected", FuncName(OnRealRowItemSelected))
     DisposableObserveField(m.top, "focusedChild", FuncName(OnFocusedChildChange))
     DisposableObserveField(m.top, "visible", FuncName(OnVisibilityChange))
 
@@ -317,9 +318,18 @@ function OnVideoRowListRowContentTaskResult(output as object) as void
     LoadRowsIfNeeded()
 end function
 
+function OnRealRowItemSelected()
+    ' This is the event that fires when m.top.rowItemSelected changes
+    LongPressHandler("OK", true)
+end function
+
 function OnkeyEvent(key as string, press as boolean) as boolean
-    if LongPressHandler(key, press)
-        return true
+    ' This OnkeyEvent should not handle OK/true, because that will block rowItemSelected from firing
+    ' Do not pass OK/true to LongPressHandler, since we did that in OnRealRowItemSelected
+    if not (key = "OK" and press)
+        if LongPressHandler(key, press)
+            return true
+        end if
     end if
 
     if key = OK_LONG_PRESS_KEY and press
@@ -328,9 +338,8 @@ function OnkeyEvent(key as string, press as boolean) as boolean
     end if
 
     if key = "OK" and not press
-        ' TODO:P1: rowItemFocused doesn't update fast enough. If direction then Ok are pressed quickly, the wrong item is selected
-        ' Use currFocusColumn
-        OnRowItemSelected(m.top.rowItemFocused)
+        ' item was selected, but was not a long press, this is a request to open the video/channel/playlist
+        OnRowItemSelected(m.top.rowItemSelected)
         return true
     end if
     return false
