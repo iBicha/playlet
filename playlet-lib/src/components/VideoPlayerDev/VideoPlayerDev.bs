@@ -1,4 +1,5 @@
 import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/VideoPlayerDev/PictureInPicture.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
@@ -37,7 +38,7 @@ function Init()
 end function
 
 function OnNodeReady()
-    SetupMinimizeAnimation()
+    InitializePitctureInPicture()
 
     DisposableObserveFieldScoped(m.videoQueue, "hasPrevious", FuncName(OnHasPreviousChange))
     DisposableObserveFieldScoped(m.videoQueue, "hasNext", FuncName(OnHasNextChange))
@@ -269,9 +270,9 @@ function OnHideVideoUiTimer()
 end function
 
 function OnDispose()
+    ShutDownPitctureInPicture()
     m.fadeAnimation.control = "stop"
     m.hideVideoUiTimer.control = "stop"
-    m.fullScreenHintTimer.control = "stop"
     m.loadingSpinner.control = "stop"
     m.clock.dispose = true
     DisposeObservers()
@@ -299,83 +300,6 @@ function SetupLoadingSpinner()
 
     m.loadingLabel = m.loadingSpinner.findNode("LoadingLabel")
     m.loadingPercentLabel = m.loadingSpinner.findNode("LoadingPercentLabel")
-end function
-
-function SetupMinimizeAnimation()
-    m.fullScreenHint = m.top.findNode("fullScreenHint")
-    m.fullScreenHintLabel = m.top.findNode("fullScreenHintLabel")
-    m.fullScreenHintTimer = m.top.findNode("fullScreenHintTimer")
-    DisposableObserveFieldScoped(m.fullScreenHintTimer, "fire", FuncName(OnFullScreenHintTimer))
-
-    m.minimizeAnimation = m.top.findNode("minimizeAnimation")
-    m.widthInterpolator = m.top.findNode("widthInterpolator")
-    m.heightInterpolator = m.top.findNode("heightInterpolator")
-    m.translationInterpolator = m.top.findNode("translationInterpolator")
-
-    minRect = m.top.minRect
-    maxRect = m.top.maxRect
-
-    m.widthInterpolator.keyValue = [maxRect.width, (maxRect.width + minRect.width) / 2, minRect.width]
-    m.heightInterpolator.keyValue = [maxRect.height, (maxRect.height + minRect.height) / 2, minRect.height]
-    maxTranslation = [maxRect.x, maxRect.y]
-    minTranslation = [minRect.x, minRect.y]
-    midTranslation = [(maxRect.x + minRect.x) / 2, (maxRect.y + minRect.y) / 2]
-    m.translationInterpolator.keyValue = [maxTranslation, midTranslation, minTranslation]
-
-    fullscreen = m.container.fullscreen
-    rect = fullscreen ? maxRect : minRect
-
-    m.top.width = rect.width
-    m.top.height = rect.height
-    m.top.translation = [rect.x, rect.y]
-
-    m.fullScreenHint.width = minRect.width
-    m.fullScreenHintLabel.width = minRect.width
-    m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
-
-    m.top.showFullScreenHint = not fullscreen
-    m.videoUi.visible = fullscreen
-
-    DisposableObserveFieldScoped(m.container, "fullscreen", FuncName(OnFullScreenChange))
-end function
-
-function OnFullScreenChange()
-    fullscreen = m.container.fullscreen
-
-    m.widthInterpolator.reverse = fullscreen
-    m.heightInterpolator.reverse = fullscreen
-    m.translationInterpolator.reverse = fullscreen
-    m.minimizeAnimation.control = "start"
-
-    m.videoUi.visible = fullscreen
-    m.top.showFullScreenHint = not fullscreen
-end function
-
-function OnFullScreenHintTimer()
-    showFullScreenHint = m.top.showFullScreenHint
-    m.fullScreenHint.visible = showFullScreenHint
-    if showFullScreenHint
-        m.top.showFullScreenHint = false
-    end if
-end function
-
-function OnShowFullScreenHint() as void
-    m.fullScreenHintTimer.control = "stop"
-
-    if m.container.fullscreen
-        m.fullScreenHint.visible = false
-        return
-    end if
-
-    if m.top.showFullScreenHint
-        ' Take 1 second until the shrink animation finishes to show the hint
-        m.fullScreenHintTimer.duration = 1
-    else
-        ' Wait 5 seconds then hide the hint
-        m.fullScreenHintTimer.duration = 5
-    end if
-
-    m.fullScreenHintTimer.control = "start"
 end function
 
 function ShowVideoUi() as boolean
