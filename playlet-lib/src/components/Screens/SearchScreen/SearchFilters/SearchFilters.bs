@@ -1,6 +1,7 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -127,10 +128,10 @@ function Init()
 
     navigationNodes = [m.controls.date, m.controls.type, m.controls.duration, m.controls.features, m.controls.sort]
     for i = 0 to navigationNodes.count() - 2
-        SetNavigation(navigationNodes[i], "right", navigationNodes[i + 1])
+        SetNavigation(navigationNodes[i], RemoteKeys.Right, navigationNodes[i + 1])
     end for
     for i = 1 to navigationNodes.count() - 1
-        SetNavigation(navigationNodes[i], "left", navigationNodes[i - 1])
+        SetNavigation(navigationNodes[i], RemoteKeys.Left, navigationNodes[i - 1])
     end for
 end function
 
@@ -243,19 +244,19 @@ function SetFilterArray(control as object) as void
     m.searchScreen.filters = state
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         m.currentNavigtionNode = navigation.node
         return true
     end if
 
-    if key = "options" or key = "play" or key = "pause" or key = "playonly"
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
         ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
         return false
     end if
 
-    if key = "back" and press
+    if key = RemoteKeys.Back and press
         Close()
         return true
     end if

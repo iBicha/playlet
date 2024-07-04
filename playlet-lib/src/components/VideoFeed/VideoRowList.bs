@@ -9,6 +9,7 @@ import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
 ' TODO:P1 add the option to remove a row if it does not have any content
@@ -20,6 +21,7 @@ end function
 function OnNodeReady()
     DisposableObserveField(m.top, "itemFocused", FuncName(OnItemFocused))
     DisposableObserveField(m.top, "rowItemFocused", FuncName(OnRowItemFocused))
+    DisposableObserveField(m.top, "rowItemSelected", FuncName(OnRealRowItemSelected))
     DisposableObserveField(m.top, "focusedChild", FuncName(OnFocusedChildChange))
     DisposableObserveField(m.top, "visible", FuncName(OnVisibilityChange))
 
@@ -317,20 +319,28 @@ function OnVideoRowListRowContentTaskResult(output as object) as void
     LoadRowsIfNeeded()
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
-    if LongPressHandler(key, press)
-        return true
+function OnRealRowItemSelected()
+    ' This is the event that fires when m.top.rowItemSelected changes
+    LongPressHandler(RemoteKeys.Ok, true)
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    ' This OnKeyEvent should not handle OK/true, because that will block rowItemSelected from firing
+    ' Do not pass OK/true to LongPressHandler, since we did that in OnRealRowItemSelected
+    if not (key = RemoteKeys.Ok and press)
+        if LongPressHandler(key, press)
+            return true
+        end if
     end if
 
-    if key = OK_LONG_PRESS_KEY and press
+    if key = RemoteKeys.OkLongPress and press
         OnRowItemLongPressed(m.top.rowItemFocused)
         return true
     end if
 
-    if key = "OK" and not press
-        ' TODO:P1: rowItemFocused doesn't update fast enough. If direction then Ok are pressed quickly, the wrong item is selected
-        ' Use currFocusColumn
-        OnRowItemSelected(m.top.rowItemFocused)
+    if key = RemoteKeys.Ok and not press
+        ' item was selected, but was not a long press, this is a request to open the video/channel/playlist
+        OnRowItemSelected(m.top.rowItemSelected)
         return true
     end if
     return false

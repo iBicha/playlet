@@ -1,6 +1,7 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Navigation/ScrollTo.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -36,22 +37,22 @@ function OnNodeReady()
             m.currentNavigtionNode = m.firstCategory
         end if
         if previousCategory <> invalid
-            SetNavigation(previousCategory.node, "down", category.node)
-            SetNavigation(category.node, "up", previousCategory.node)
+            SetNavigation(previousCategory.node, RemoteKeys.Down, category.node)
+            SetNavigation(category.node, RemoteKeys.Up, previousCategory.node)
         end if
         controls = CreateControls(item, container, startX + controlsX, startY, controlSpacing)
 
         if controls <> invalid
             if controls.nodes.Count() > 0
-                SetNavigation(category.node, "right", controls.nodes[0])
+                SetNavigation(category.node, RemoteKeys.Right, controls.nodes[0])
             end if
 
             for each control in controls.nodes
-                SetNavigation(control, "left", category.node)
+                SetNavigation(control, RemoteKeys.Left, category.node)
 
                 if previousControl <> invalid
-                    SetNavigation(previousControl, "down", control)
-                    SetNavigation(control, "up", previousControl)
+                    SetNavigation(previousControl, RemoteKeys.Down, control)
+                    SetNavigation(control, RemoteKeys.Up, previousControl)
                 end if
 
                 previousControl = control
@@ -66,8 +67,8 @@ function OnNodeReady()
         previousCategory = category
     end for
 
-    SetNavigation(invalid, "back", m.navBar)
-    SetNavigation(invalid, "left", m.navBar)
+    SetNavigation(invalid, RemoteKeys.Back, m.navBar)
+    SetNavigation(invalid, RemoteKeys.Left, m.navBar)
 end function
 
 function CreateCategoryNode(item as object, container as object, startX as integer, startY as integer) as object
@@ -197,7 +198,7 @@ function CreateRokuComponent(item as object, container as object) as object
     return node
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         m.currentNavigtionNode = navigation.node

@@ -9,6 +9,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/LoadingScreen.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 function Init()
@@ -50,30 +51,30 @@ function OnNodeReady()
     m.top.ObserveField("visible", FuncName(OnVisibilityChange))
     m.rowlist.ObserveFieldScoped("onError", FuncName(OnSearchError))
 
-    SetNavigation(invalid, "back", m.navBar, function()
+    SetNavigation(invalid, RemoteKeys.Back, m.navBar, function()
         ScrollUp()
     end function)
-    SetNavigation(m.suggestions, "right", m.keyboard)
-    SetNavigation(m.filtersButton, "right", m.keyboard)
-    SetNavigation(m.keyboard, "left", m.suggestions)
-    SetNavigation(m.suggestions, "left", m.navBar)
-    SetNavigation(m.filtersButton, "left", m.navBar)
-    SetNavigation(m.keyboard, "left", m.navBar)
-    SetNavigation(m.rowList, "left", m.navBar, function()
+    SetNavigation(m.suggestions, RemoteKeys.Right, m.keyboard)
+    SetNavigation(m.filtersButton, RemoteKeys.Right, m.keyboard)
+    SetNavigation(m.keyboard, RemoteKeys.Left, m.suggestions)
+    SetNavigation(m.suggestions, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.filtersButton, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.keyboard, RemoteKeys.Left, m.navBar)
+    SetNavigation(m.rowList, RemoteKeys.Left, m.navBar, function()
         ScrollUp()
     end function)
-    SetNavigation(m.filtersButton, "down", m.suggestions)
-    SetNavigation(m.filtersButton, "down", m.keyboard)
+    SetNavigation(m.filtersButton, RemoteKeys.Down, m.suggestions)
+    SetNavigation(m.filtersButton, RemoteKeys.Down, m.keyboard)
 
-    SetNavigation(invalid, "down", m.rowList, function()
+    SetNavigation(invalid, RemoteKeys.Down, m.rowList, function()
         ScrollDown()
     end function)
-    SetNavigation(m.rowList, "up", m.suggestions, function()
+    SetNavigation(m.rowList, RemoteKeys.Up, m.suggestions, function()
         ScrollUp()
     end function)
 
-    SetNavigation(m.suggestions, "up", m.filtersButton)
-    SetNavigation(m.keyboard, "up", m.filtersButton)
+    SetNavigation(m.suggestions, RemoteKeys.Up, m.filtersButton)
+    SetNavigation(m.keyboard, RemoteKeys.Up, m.filtersButton)
 
     m.currentNavigtionNode = m.suggestions
     ' Trigger suggestions
@@ -310,7 +311,7 @@ function ScrollDown() as void
     m.scrollAnimation.control = "start"
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         m.currentNavigtionNode = navigation.node

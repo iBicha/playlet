@@ -8,6 +8,7 @@ import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 
 function Init()
     SetPlayerStyle()
@@ -420,29 +421,29 @@ function HandleOKPress() as boolean
     return handled
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
     end if
     ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
     ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
     ' Because of that, the button "down" is used to shrink the video for picture in picture mode
-    if key = "down"
+    if key = RemoteKeys.Down
         if VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
             return true
         end if
     end if
 
-    if key = "back"
+    if key = RemoteKeys.Back
         m.videoQueue.closePlayer = true
         return true
     end if
 
-    if key = "OK"
+    if key = RemoteKeys.Ok
         return HandleOKPress()
     end if
 
-    if key = "left" or key = "right" or key = "rewind" or key = "fastforward"
+    if key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
         ' We're paused and one of the buttons is pressed: left, right ff, rw.
         ' That means we're seeking position. Check that in HandleOKPress and exit early
         m.isSeekingPosition = true

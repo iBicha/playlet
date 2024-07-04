@@ -7,6 +7,7 @@ import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
@@ -39,13 +40,13 @@ function Init()
 end function
 
 function OnNodeReady()
-    SetNavigation(m.webAppButton, "down", m.linkWithWifiButton)
-    SetNavigation(m.linkWithWifiButton, "down", m.linkWithTvButton)
-    SetNavigation(m.linkWithTvButton, "up", m.linkWithWifiButton)
-    SetNavigation(m.linkWithWifiButton, "up", m.webAppButton)
+    SetNavigation(m.webAppButton, RemoteKeys.Down, m.linkWithWifiButton)
+    SetNavigation(m.linkWithWifiButton, RemoteKeys.Down, m.linkWithTvButton)
+    SetNavigation(m.linkWithTvButton, RemoteKeys.Up, m.linkWithWifiButton)
+    SetNavigation(m.linkWithWifiButton, RemoteKeys.Up, m.webAppButton)
 
-    SetNavigation(invalid, "back", m.navBar)
-    SetNavigation(invalid, "left", m.navBar)
+    SetNavigation(invalid, RemoteKeys.Back, m.navBar)
+    SetNavigation(invalid, RemoteKeys.Left, m.navBar)
 
     address = m.webserver@.GetServerAddress()
     isValidAddress = not StringUtils.IsNullOrEmpty(address)
@@ -102,7 +103,7 @@ function OnButtonSizeChange()
     m.linkWithTvButton.minWidth = width
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         ShowTab(navigation.node)

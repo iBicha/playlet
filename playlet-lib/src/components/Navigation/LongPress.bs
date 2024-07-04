@@ -1,11 +1,10 @@
-const OK_LONG_PRESS_KEY = "OK_LONG_PRESS"
-const OPTIONS_LONG_PRESS_KEY = "OPTIONS_LONG_PRESS"
+import "pkg:/source/utils/RemoteKeys.bs"
 
 function InitializeLongPress(keys as object, duration = 1.0 as float)
-    longPressKeyMap = {
-        "OK": OK_LONG_PRESS_KEY
-        "options": OPTIONS_LONG_PRESS_KEY
-    }
+    longPressKeyMap = {}
+    longPressKeyMap[RemoteKeys.Ok] = RemoteKeys.OkLongPress
+    longPressKeyMap[RemoteKeys.Options] = RemoteKeys.OptionsLongPress
+
     m._longPressKeyMap = {}
     for each key in keys
         m._longPressKeyMap[key] = longPressKeyMap[key]
@@ -16,10 +15,9 @@ function InitializeLongPress(keys as object, duration = 1.0 as float)
         ' Using the keyboard:
         ' - press K to simulate an "OK" long press on the remote.
         ' - press O to simulate an "options" long press on the remote.
-        simulatedLongPressKeyMap = {
-            "OK": "Lit_k"
-            "options": "Lit_o"
-        }
+        simulatedLongPressKeyMap = {}
+        simulatedLongPressKeyMap[RemoteKeys.Ok] = "Lit_k"
+        simulatedLongPressKeyMap[RemoteKeys.Options] = "Lit_o"
 
         m._simulatedLongPressKeyMap = {}
         for each key in keys
@@ -43,7 +41,7 @@ function LongPressHandler(key as string, press as boolean) as boolean
             LogInfo(`[${subtype}] Simulating`, simulatedKey, "long press using key:", key, "press:", press)
             longPressKey = m._longPressKeyMap[simulatedKey]
             m._longPressFired = true
-            return OnkeyEvent(longPressKey, press)
+            return OnKeyEvent(longPressKey, press)
         end if
     #end if
 
@@ -87,5 +85,5 @@ function LongPressTimerFired() as void
         return
     end if
 
-    OnkeyEvent(m._longPressKeyMap[m._longPressKey], true)
+    OnKeyEvent(m._longPressKeyMap[m._longPressKey], true)
 end function
