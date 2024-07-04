@@ -155,7 +155,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                     start: { line: 0, character: 0 },
                     end: { line: 0, character: 0 }
                 },
-                message: `Missing keys in enum from ${translationFile}: ${missingKeys.join(', ')}`,
+                message: `Missing keys in enum from ${translationFile.srcPath}: ${missingKeys.join(', ')}`,
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_MISSING_ENUM_KEYS',
             }]);
