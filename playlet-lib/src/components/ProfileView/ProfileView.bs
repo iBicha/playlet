@@ -2,6 +2,7 @@ import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -16,10 +17,10 @@ function Init()
 end function
 
 function OnNodeReady()
-    SetNavigation(m.activateButton, "down", m.logoutButton)
-    SetNavigation(m.logoutButton, "down", m.closeButton)
-    SetNavigation(m.closeButton, "up", m.logoutButton)
-    SetNavigation(m.logoutButton, "up", m.activateButton)
+    SetNavigation(m.activateButton, RemoteKeys.Down, m.logoutButton)
+    SetNavigation(m.logoutButton, RemoteKeys.Down, m.closeButton)
+    SetNavigation(m.closeButton, RemoteKeys.Up, m.logoutButton)
+    SetNavigation(m.logoutButton, RemoteKeys.Up, m.activateButton)
 
     DisposableObserveFieldScoped(m.profilesService, "currentProfile", FuncName(OnCunrrentProfileChanged))
     DisposableObserveFieldScoped(m.profilesService, "onProfileLogout", FuncName(OnProfileLogout))
@@ -57,17 +58,17 @@ function OnFocusChange() as void
     end if
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     if NavigationKeyHandler(key, press).handled
         return true
     end if
 
-    if key = "options" or key = "play" or key = "pause" or key = "playonly"
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
         ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
         return false
     end if
 
-    if key = "back" and press
+    if key = RemoteKeys.Back and press
         Close()
         return true
     end if

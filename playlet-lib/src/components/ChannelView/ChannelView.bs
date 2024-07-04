@@ -7,6 +7,7 @@ import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -36,8 +37,8 @@ end function
 function OnNodeready()
     m.rowList@.BindNode()
 
-    SetNavigation(m.rowList, "up", m.subscribeButton)
-    SetNavigation(m.subscribeButton, "down", m.rowList)
+    SetNavigation(m.rowList, RemoteKeys.Up, m.subscribeButton)
+    SetNavigation(m.subscribeButton, RemoteKeys.Down, m.rowList)
 
     m.subscribeButton.text = Tr(Locale.Buttons.Subscribe)
     DisposableObserveFieldScoped(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
@@ -104,7 +105,7 @@ function CreateChannelFeeds(authorId as string, author as string, tabs as object
     return feeds
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     if NavigationKeyHandler(key, press).handled
         return true
     end if
@@ -113,7 +114,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return false
     end if
 
-    if key = "back"
+    if key = RemoteKeys.Back
         Close()
         return true
     end if

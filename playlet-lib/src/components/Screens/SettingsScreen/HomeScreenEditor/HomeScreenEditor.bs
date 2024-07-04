@@ -2,6 +2,7 @@ import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -17,17 +18,17 @@ function Init()
     m.closeButton = m.top.findNode("closeButton")
     m.saveButton = m.top.findNode("saveButton")
 
-    SetNavigation(m.checkList, "down", m.saveButton)
-    SetNavigation(m.saveButton, "up", m.checkList)
-    SetNavigation(m.closeButton, "up", m.checkList)
-    SetNavigation(m.saveButton, "right", m.closeButton)
-    SetNavigation(m.closeButton, "left", m.saveButton)
-    SetNavigation(m.moveUpButton, "left", m.checkList)
-    SetNavigation(m.moveDownButton, "left", m.checkList)
-    SetNavigation(m.checkList, "right", m.moveUpButton)
-    SetNavigation(m.moveUpButton, "down", m.moveDownButton)
-    SetNavigation(m.moveDownButton, "up", m.moveUpButton)
-    SetNavigation(m.moveDownButton, "down", m.closeButton)
+    SetNavigation(m.checkList, RemoteKeys.Down, m.saveButton)
+    SetNavigation(m.saveButton, RemoteKeys.Up, m.checkList)
+    SetNavigation(m.closeButton, RemoteKeys.Up, m.checkList)
+    SetNavigation(m.saveButton, RemoteKeys.Right, m.closeButton)
+    SetNavigation(m.closeButton, RemoteKeys.Left, m.saveButton)
+    SetNavigation(m.moveUpButton, RemoteKeys.Left, m.checkList)
+    SetNavigation(m.moveDownButton, RemoteKeys.Left, m.checkList)
+    SetNavigation(m.checkList, RemoteKeys.Right, m.moveUpButton)
+    SetNavigation(m.moveUpButton, RemoteKeys.Down, m.moveDownButton)
+    SetNavigation(m.moveDownButton, RemoteKeys.Up, m.moveUpButton)
+    SetNavigation(m.moveDownButton, RemoteKeys.Down, m.closeButton)
 
     m.moveUpButton.observeField("buttonSelected", FuncName(OnMoveUpButtonSelected))
     m.moveDownButton.observeField("buttonSelected", FuncName(OnMoveDownButtonSelected))
@@ -55,17 +56,17 @@ function OnFocusChange() as void
     NodeSetFocus(m.checkList, true)
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     if NavigationKeyHandler(key, press).handled
         return true
     end if
 
-    if key = "options" or key = "play" or key = "pause" or key = "playonly"
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
         ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
         return false
     end if
 
-    if key = "back" and press
+    if key = RemoteKeys.Back and press
         Close()
         return true
     end if

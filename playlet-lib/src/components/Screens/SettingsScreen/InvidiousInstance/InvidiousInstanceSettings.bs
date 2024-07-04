@@ -2,6 +2,7 @@ import "pkg:/components/Dialog/DialogPalette.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -17,19 +18,19 @@ function Init()
     m.testButton.observeField("buttonSelected", FuncName(OnTestButtonSelected))
     m.publicInstances.observeField("instance", FuncName(OnPublicInstanceSelected))
 
-    SetNavigation(m.editButton, "down", m.publicInstances)
-    SetNavigation(m.editButton, "down", m.testButton)
-    SetNavigation(m.publicInstances, "up", m.editButton)
+    SetNavigation(m.editButton, RemoteKeys.Down, m.publicInstances)
+    SetNavigation(m.editButton, RemoteKeys.Down, m.testButton)
+    SetNavigation(m.publicInstances, RemoteKeys.Up, m.editButton)
 
-    SetNavigation(m.publicInstances, "down", m.testButton)
+    SetNavigation(m.publicInstances, RemoteKeys.Down, m.testButton)
 
-    SetNavigation(m.testButton, "up", m.publicInstances)
-    SetNavigation(m.testButton, "up", m.editButton)
-    SetNavigation(m.saveButton, "up", m.publicInstances)
-    SetNavigation(m.saveButton, "up", m.editButton)
+    SetNavigation(m.testButton, RemoteKeys.Up, m.publicInstances)
+    SetNavigation(m.testButton, RemoteKeys.Up, m.editButton)
+    SetNavigation(m.saveButton, RemoteKeys.Up, m.publicInstances)
+    SetNavigation(m.saveButton, RemoteKeys.Up, m.editButton)
 
-    SetNavigation(m.saveButton, "left", m.testButton)
-    SetNavigation(m.testButton, "right", m.saveButton)
+    SetNavigation(m.saveButton, RemoteKeys.Left, m.testButton)
+    SetNavigation(m.testButton, RemoteKeys.Right, m.saveButton)
 
     m.currentNavigtionNode = m.editButton
     m.textEditBox.hintText = `e.g. ${Invidious.DEFAULT_INSTANCE}`
@@ -65,19 +66,19 @@ function OnFocusChange() as void
     NodeSetFocus(m.currentNavigtionNode, true)
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         m.currentNavigtionNode = navigation.node
         return true
     end if
 
-    if key = "options" or key = "play" or key = "pause" or key = "playonly"
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
         ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
         return false
     end if
 
-    if key = "back" and press
+    if key = RemoteKeys.Back and press
         Close()
         return true
     end if

@@ -6,6 +6,7 @@ import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -52,15 +53,15 @@ function OnNodeReady()
     DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
     DisposableObserveField(m.hideVideoUiTimer, "fire", FuncName(OnHideVideoUiTimer))
 
-    SetNavigation(m.previousButton, "right", m.playButton)
-    SetNavigation(m.playButton, "right", m.nextButton)
-    SetNavigation(m.nextButton, "right", m.minimizeButton)
-    SetNavigation(m.playButton, "right", m.minimizeButton)
+    SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton)
+    SetNavigation(m.playButton, RemoteKeys.Right, m.nextButton)
+    SetNavigation(m.nextButton, RemoteKeys.Right, m.minimizeButton)
+    SetNavigation(m.playButton, RemoteKeys.Right, m.minimizeButton)
 
-    SetNavigation(m.minimizeButton, "left", m.nextButton)
-    SetNavigation(m.minimizeButton, "left", m.playButton)
-    SetNavigation(m.nextButton, "left", m.playButton)
-    SetNavigation(m.playButton, "left", m.previousButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.nextButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.playButton)
+    SetNavigation(m.nextButton, RemoteKeys.Left, m.playButton)
+    SetNavigation(m.playButton, RemoteKeys.Left, m.previousButton)
 
     if m.top.hasFocus() and m.videoUi.visible and m.videoUi.opacity = 1
         NodeSetFocus(m.playButton, true)
@@ -145,7 +146,7 @@ function OnClose()
     m.top.dispose = true
 end function
 
-function OnkeyEvent(key as string, press as boolean) as boolean
+function OnKeyEvent(key as string, press as boolean) as boolean
     m.hideVideoUiTimer.control = "stop"
     m.hideVideoUiTimer.control = "start"
     if ShowVideoUi()
@@ -160,7 +161,7 @@ function OnkeyEvent(key as string, press as boolean) as boolean
         return false
     end if
 
-    if key = "back"
+    if key = RemoteKeys.Back
         m.videoQueue.closePlayer = true
         return true
     end if
