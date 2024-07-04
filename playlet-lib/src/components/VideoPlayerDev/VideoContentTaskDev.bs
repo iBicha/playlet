@@ -5,19 +5,25 @@ import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 function VideoContentTaskDev(input as object) as object
     titleLabel = input.titleLabel
     secondaryTitleLabel = input.secondaryTitleLabel
+    backgroundPoster = input.backgroundPoster
     contentNode = input.content
     invidiousNode = input.invidious
 
     titleLabel.text = contentNode.title
     secondaryTitleLabel.text = contentNode.secondaryTitle
 
-    if StringUtils.IsNullOrEmpty(contentNode.videoId)
+    videoId = contentNode.videoId
+
+    if StringUtils.IsNullOrEmpty(videoId)
         throw "Can't load video information: videoId is missing"
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
+    instance = service.GetInstance()
 
-    response = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+    backgroundPoster.uri = `${instance}/vi/${videoId}/maxresdefault.jpg`
+
+    response = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
 
     if m.top.cancel
         return invalid

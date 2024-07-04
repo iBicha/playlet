@@ -20,6 +20,8 @@ function Init()
     m.clock = m.top.findNode("Clock")
     m.titleLabel = m.top.findNode("TitleLabel")
     m.secondaryTitleLabel = m.top.findNode("SecondaryTitleLabel")
+    m.backgroundPoster = m.top.findNode("BackgroundPoster")
+    m.backgroundPosterSmall = m.top.findNode("BackgroundPosterSmall")
     m.previousButton = m.top.findNode("PreviousButton")
     m.playButton = m.top.findNode("PlayButton")
     m.nextButton = m.top.findNode("NextButton")
@@ -71,15 +73,25 @@ end function
 function PlayWithContent(contentNode as object)
     videoContentNode = CreateObject("roSGNode", "ContentNode")
 
-    if not StringUtils.IsNullOrEmpty(contentNode.videoId)
-        videoContentNode.AddFields({ videoId: contentNode.videoId })
+    videoId = contentNode.videoId
+    title = contentNode.title
+    author = contentNode._author
+    thumbnail = contentNode.thumbnail
+
+    if not StringUtils.IsNullOrEmpty(videoId)
+        videoContentNode.AddFields({ videoId: videoId })
     end if
-    if not StringUtils.IsNullOrEmpty(contentNode.title)
-        videoContentNode.title = contentNode.title
+    if not StringUtils.IsNullOrEmpty(title)
+        videoContentNode.title = title
     end if
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    if not StringUtils.IsNullOrEmpty(contentNode._author)
-        videoContentNode.secondaryTitle = contentNode._author
+    if not StringUtils.IsNullOrEmpty(author)
+        videoContentNode.secondaryTitle = author
+    end if
+
+    if not StringUtils.IsNullOrEmpty(thumbnail)
+        videoContentNode.thumbnail = thumbnail
+        m.backgroundPosterSmall.uri = thumbnail
     end if
 
     StartVideoContentTask(videoContentNode)
@@ -94,7 +106,7 @@ function StartVideoContentTask(videoContentNode as object)
 
     m.loadingLabel.text = Tr(Locale.VideoPlayer.Loading)
     m.loadingPercentLabel.text = ""
-    m.loadingSpinner.visible = true
+    m.loadingUi.visible = true
     m.loadingSpinner.control = "start"
 
     m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTaskDev, {
@@ -102,6 +114,7 @@ function StartVideoContentTask(videoContentNode as object)
         secondaryTitleLabel: m.secondaryTitleLabel
         content: videoContentNode
         invidious: m.top.invidious
+        backgroundPoster: m.backgroundPoster
     }, OnVideoContentTaskResults)
 end function
 
@@ -202,7 +215,7 @@ function OnPlayerStateChange() as void
     state = m.top.state
 
     if state = "stopping" or state = "stopped"
-        m.videoUi.Visible = false
+        m.videoUi.visible = false
         return
     end if
 
@@ -221,10 +234,14 @@ function OnPlayerStateChange() as void
     if state = "buffering"
         m.loadingLabel.text = Tr(Locale.VideoPlayer.Buffering)
         m.loadingSpinner.control = "start"
-        m.loadingSpinner.visible = true
+        m.loadingUi.visible = true
+        m.backgroundPoster.visible = true
+        m.backgroundPosterSmall.visible = true
     else
         m.loadingSpinner.control = "stop"
-        m.loadingSpinner.visible = false
+        m.loadingUi.visible = false
+        m.backgroundPoster.visible = false
+        m.backgroundPosterSmall.visible = false
     end if
 end function
 
@@ -261,7 +278,9 @@ function OnDispose()
 end function
 
 function SetupLoadingSpinner()
-    m.loadingSpinner = m.top.findNode("LoadingSpinner")
+    m.loadingUi = m.top.findNode("LoadingUI")
+    m.loadingSpinnerBackground = m.loadingUi.findNode("LoadingSpinnerBackground")
+    m.loadingSpinner = m.loadingUi.findNode("LoadingSpinner")
     poster = m.loadingSpinner.poster
 
     size = 150
@@ -272,6 +291,11 @@ function SetupLoadingSpinner()
     m.loadingSpinner.translation = [centerx, centery]
     poster.opacity = 0.8
     poster.uri = "pkg:/images/spinner.png"
+
+    size = 80
+    centerx = (1280 - size) / 2
+    centery = (720 - size) / 2
+    m.loadingSpinnerBackground.translation = [centerx, centery]
 
     m.loadingLabel = m.loadingSpinner.findNode("LoadingLabel")
     m.loadingPercentLabel = m.loadingSpinner.findNode("LoadingPercentLabel")
