@@ -46,8 +46,8 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 - 🔥 No Ads (Not now, not ever)
 - 🕵️ No Tracking
-- 🛡️ Privacy driven (uses Invidious backend)
-- ⚔️ SponsorBlock integration (skips undesirable sections in videos)
+- 🛡️ Privacy driven (uses [Invidious](https://invidious.io/) backend)
+- ⚔️ [SponsorBlock](https://sponsor.ajay.app/) integration (skips undesirable sections in videos)
 - 📱 Browse, search, and cast from phone using the YouTube app or the browser
 - 🔮 Picture-in-picture mode
 - ⚡ Fast! [Check out how we compare with the official YouTube app](https://youtu.be/qmSvA-QQW20)
