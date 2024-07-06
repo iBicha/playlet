@@ -1,5 +1,6 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/VideoPlayerDev/PictureInPicture.bs"
+import "pkg:/components/VideoPlayerDev/PlayerUi.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
@@ -12,29 +13,11 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    m.top.enableUI = false
-    m.top.enableTrickPlay = false
+    InitializePlayerUi()
+
 
     httpAgent = m.top.getHttpAgent()
     httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0")
-
-    m.clock = m.top.findNode("Clock")
-    m.titleLabel = m.top.findNode("TitleLabel")
-    m.secondaryTitleLabel = m.top.findNode("SecondaryTitleLabel")
-    m.backgroundPoster = m.top.findNode("BackgroundPoster")
-    m.backgroundPosterSmall = m.top.findNode("BackgroundPosterSmall")
-    m.previousButton = m.top.findNode("PreviousButton")
-    m.playButton = m.top.findNode("PlayButton")
-    m.nextButton = m.top.findNode("NextButton")
-    m.minimizeButton = m.top.findNode("MinimizeButton")
-    m.trickPlayBar = m.top.findNode("TrickPlayBar")
-    m.videoUi = m.top.findNode("VideoUI")
-    m.progressTimer = m.top.findNode("ProgressTimer")
-    m.hideVideoUiTimer = m.top.findNode("HideVideoUiTimer")
-    m.fadeAnimation = m.top.findNode("FadeAnimation")
-    m.fadeOpacityInterpolator = m.top.findNode("FadeOpacityInterpolator")
-
-    SetupLoadingSpinner()
 end function
 
 function OnNodeReady()
@@ -54,7 +37,6 @@ function OnNodeReady()
     DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
 
     DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
-    DisposableObserveField(m.hideVideoUiTimer, "fire", FuncName(OnHideVideoUiTimer))
 
     SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton)
     SetNavigation(m.playButton, RemoteKeys.Right, m.nextButton)
@@ -160,18 +142,40 @@ function OnClose()
 end function
 
 function OnKeyEvent(key as string, press as boolean) as boolean
-    m.hideVideoUiTimer.control = "stop"
-    m.hideVideoUiTimer.control = "start"
-    if ShowVideoUi()
-        return true
+    if press = false
+        return false
+    end if
+
+    state = m.top.state
+    uiState = m.top.playerUiState
+
+    if key = RemoteKeys.Play
+        if state = "paused" and uiState = PlayerUiState.Hidden
+            ' If we pressed play and the state is paused, the player is about to resume.
+            ' Return false to let the default behavior resume video.
+            return false
+        end if
+    end if
+
+    if key = RemoteKeys.Play or key = RemoteKeys.PlayOnly
+        if state = "playing" and uiState = PlayerUiState.Hidden
+            ' If we pressed play and the state is playing, the player is about to pause.
+            ' Return false to let the default behavior pause video.
+            m.top.playerUiState = PlayerUiState.FadingIn
+            return false
+        end if
+    end if
+
+    if uiState = PlayerUiState.Visible
+        StartHideVideoUiTimer()
+    end if
+
+    if uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut
+        m.top.playerUiState = PlayerUiState.FadingIn
     end if
 
     if NavigationKeyHandler(key, press).handled
         return true
-    end if
-
-    if press = false
-        return false
     end if
 
     if key = RemoteKeys.Back
@@ -264,72 +268,8 @@ function OnProgress() as void
     m.trickPlayBar.progress = m.top.position / duration
 end function
 
-function OnHideVideoUiTimer()
-    HideVideoUi()
-end function
-
 function OnDispose()
     ShutDownPitctureInPicture()
-    m.fadeAnimation.control = "stop"
-    m.hideVideoUiTimer.control = "stop"
-    m.loadingSpinner.control = "stop"
-    m.clock.dispose = true
+    ShutDownPlayerUi()
     DisposeObservers()
-end function
-
-function SetupLoadingSpinner()
-    m.loadingUi = m.top.findNode("LoadingUI")
-    m.loadingSpinnerBackground = m.loadingUi.findNode("LoadingSpinnerBackground")
-    m.loadingSpinner = m.loadingUi.findNode("LoadingSpinner")
-    poster = m.loadingSpinner.poster
-
-    size = 150
-    poster.width = size
-    poster.height = size
-    centerx = (1280 - size) / 2
-    centery = (720 - size) / 2
-    m.loadingSpinner.translation = [centerx, centery]
-    poster.opacity = 0.8
-    poster.uri = "pkg:/images/spinner.png"
-
-    size = 80
-    centerx = (1280 - size) / 2
-    centery = (720 - size) / 2
-    m.loadingSpinnerBackground.translation = [centerx, centery]
-
-    m.loadingLabel = m.loadingSpinner.findNode("LoadingLabel")
-    m.loadingPercentLabel = m.loadingSpinner.findNode("LoadingPercentLabel")
-end function
-
-function ShowVideoUi() as boolean
-    if m.fadeAnimation.state = "stopped"
-        if m.videoUi.opacity = 1
-            return false
-        end if
-    end if
-
-    m.fadeAnimation.control = "stop"
-    m.fadeOpacityInterpolator.reverse = false
-    m.fadeAnimation.control = "start"
-
-    if m.top.hasFocus()
-        NodeSetFocus(m.playButton, true)
-    end if
-
-    return true
-end function
-
-function HideVideoUi() as void
-    if m.fadeAnimation.state = "stopped"
-        if m.videoUi.opacity = 0
-            return
-        end if
-    end if
-    m.fadeAnimation.control = "stop"
-    m.fadeOpacityInterpolator.reverse = true
-    m.fadeAnimation.control = "start"
-
-    if m.top.isInFocusChain()
-        NodeSetFocus(m.top, true)
-    end if
 end function
