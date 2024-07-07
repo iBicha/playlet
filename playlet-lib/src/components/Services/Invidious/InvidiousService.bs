@@ -354,7 +354,20 @@ namespace Invidious
         function PlaylistHandler(context as object) as object
             response = context.response
 
-            if response.StatusCode() = 200
+            statusCode = response.StatusCode()
+            if statusCode = 404
+                response.OverrideStatusCode(200)
+                return {
+                    isLastPage: true
+                    items: [{
+                        "type": "playlist"
+                        "playlistId": context.feedSource.pathParams.plid
+                        "title": "[Playlist not found]"
+                    }]
+                }
+            end if
+
+            if statusCode = 200
                 json = response.Json()
                 return {
                     items: json.videos
@@ -391,7 +404,6 @@ namespace Invidious
 
         function VideoInfoHandler(context as object) as object
             response = context.response
-            feedSource = context.feedSource
 
             statusCode = response.StatusCode()
             if statusCode >= 500
@@ -403,8 +415,9 @@ namespace Invidious
                 response.OverrideStatusCode(200)
                 return {
                     items: [{
-                        "videoId": feedSource.pathParams.id
                         "type": "video"
+                        "videoId": context.feedSource.pathParams.id
+                        "title": "[Video not available]"
                     }]
                 }
             end if
@@ -423,7 +436,19 @@ namespace Invidious
         function PlaylistInfoHandler(context as object) as object
             response = context.response
 
-            if response.StatusCode() = 200
+            statusCode = response.StatusCode()
+            if statusCode = 404
+                response.OverrideStatusCode(200)
+                return {
+                    items: [{
+                        "type": "playlist"
+                        "playlistId": context.feedSource.pathParams.plid
+                        "title": "[Playlist not found]"
+                    }]
+                }
+            end if
+
+            if statusCode = 200
                 json = response.Json()
                 json.type = "playlist"
                 return {
