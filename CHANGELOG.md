@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A bug where a the right video will not play if selected too quickly
+- A bug where the right video will not play if selected too quickly
 - A bug where a bookmarked but deleted playlist can't be removed from bookmarks
 
 ## [0.24.5] - 2024-07-03
