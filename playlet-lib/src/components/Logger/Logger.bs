@@ -53,15 +53,6 @@ function LoggerLoop()
         buffer.AppendFile(logsFile)
     end if
 
-    lastExitInfo = GetLastExitInfo()
-    if not StringUtils.IsNullOrEmpty(lastExitInfo)
-        line = `************ Last Exit Info ************\n${lastExitInfo}\n********** End Last Exit Info **********\n`
-        ' bs:disable-next-line LINT3012
-        print line
-        buffer.FromAsciiString(line)
-        buffer.AppendFile(logsFile)
-    end if
-
     appMemoryMonitor = CreateObject("roAppMemoryMonitor")
     if appMemoryMonitor <> invalid and FindMemberFunction(appMemoryMonitor, "EnableMemoryWarningEvent") <> invalid
         appMemoryMonitor.SetMessagePort(port)
@@ -174,20 +165,4 @@ function FormatTime(dateTime as object) as string
     end if
 
     return "[" + hours + ":" + minutes + ":" + seconds + "." + milliseconds + "]"
-end function
-
-function GetLastExitInfo() as dynamic
-    ' roAppManager.GetLastExitInfo() is only available on Roku OS 13 and above
-    appManager = CreateObject("roAppManager")
-    hasMethod = FindMemberFunction(appManager, "GetLastExitInfo") <> invalid
-    if not hasMethod
-        return invalid
-    end if
-
-    lastExitInfo = appManager.GetLastExitInfo()
-    if lastExitInfo = invalid
-        return invalid
-    end if
-
-    return ToString(lastExitInfo)
 end function

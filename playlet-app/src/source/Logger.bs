@@ -17,4 +17,33 @@ namespace Logger
         buffer.AppendFile(LOGS_FILE_PATH)
     end function
 
+    function LogLastExitInfo() as void
+        ' roAppManager.GetLastExitInfo() is only available on Roku OS 13 and above
+        appManager = CreateObject("roAppManager")
+        hasMethod = FindMemberFunction(appManager, "GetLastExitInfo") <> invalid
+        if not hasMethod
+            return
+        end if
+
+        lastExitInfo = appManager.GetLastExitInfo()
+        if lastExitInfo = invalid
+            return
+        end if
+
+        msg = `************ Last Exit Info ************\n`
+        msg += `exit_code: ${lastExitInfo.exit_code}\n`
+        msg += `timestamp: ${lastExitInfo.timestamp}\n`
+        msg += `app_state: ${lastExitInfo.app_state}\n`
+        msg += `media_player_state: ${lastExitInfo.media_player_state}\n`
+        msg += `mem_limit: ${lastExitInfo.mem_limit}\n`
+        msg += `console_log:\n${lastExitInfo.console_log}\n`
+        msg += `********** End Last Exit Info **********\n`
+
+        ' bs:disable-next-line LINT3012
+        print(msg)
+
+        buffer = CreateObject("roByteArray")
+        buffer.FromAsciiString(msg + `\n`)
+        buffer.AppendFile(LOGS_FILE_PATH)
+    end function
 end namespace
