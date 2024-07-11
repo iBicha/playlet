@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+## Added
+
+- Sort options to channel live streams
 
 ## [0.24.6] - 2024-07-08
 
