@@ -1,77 +1,85 @@
 // This plugin generates a task component for each function annotated with @asynctask
 
 import {
-    CompilerPlugin,
+    AfterFileAddEvent,
+    BeforeProgramValidateEvent,
+    BrsFile,
     BscFile,
-    isBrsFile,
-    WalkMode,
+    CompilerPlugin,
     createVisitor,
-    Program,
-    FunctionStatement,
     DiagnosticSeverity,
+    FunctionStatement,
+    isBrsFile,
+    ParseMode,
+    Program,
+    WalkMode,
+    XmlFile,
 } from 'brighterscript';
 
 export class AsyncTaskPlugin implements CompilerPlugin {
     public name = 'AsyncTaskPlugin';
 
-    afterFileParse(file: BscFile) {
-        if (!isBrsFile(file)) {
-            return
+    afterFileAdd(event: AfterFileAddEvent) {
+        if (!isBrsFile(event.file)) {
+            return;
         }
 
-        const program = file.program
+        const program = event.program;
 
-        file.ast.walk(createVisitor({
-            FunctionExpression: (func) => {
-                if (!this.isAsyncTask(func.functionStatement)) {
-                    return
+        event.file.ast.walk(createVisitor({
+            FunctionStatement: (funcStmt) => {
+                if (!this.isAsyncTask(funcStmt)) {
+                    return;
                 }
 
-                const functionName = func.functionStatement!.name.text
-                const hasParams = func.functionStatement!.func.parameters.length > 0
-                const taskName = `${functionName}_AsyncTask`
+                const functionName = funcStmt.getName(ParseMode.BrightScript);
+                const hasParams = funcStmt.func.parameters.length > 0;
+                const taskName = `${functionName}_AsyncTask`;
 
-                const bs = this.generateBsTask(functionName, hasParams, file)
-                const bsFile = `components/AsyncTask/generated/${taskName}.bs`
+                const bs = this.generateBsTask(functionName, hasParams, event.file);
+                const bsFile = `components/AsyncTask/generated/${taskName}.bs`;
 
-                const xml = this.generateXmlTask(taskName, bsFile)
-                const xmlFile = `components/AsyncTask/generated/${taskName}.xml`
+                const xml = this.generateXmlTask(taskName, bsFile);
+                const xmlFile = `components/AsyncTask/generated/${taskName}.xml`;
+
+                // clear existing diagnostics
+                program.diagnostics.clearByFilter({ file: event.file, tag: this.name });
 
                 if (program.hasFile(xmlFile)) {
-                    const currentContent = program.getFile(xmlFile).fileContents
+                    const currentContent = (program.getFile(xmlFile) as XmlFile).fileContents;
                     if (currentContent !== xml) {
-                        file.addDiagnostics([{
-                            file: file,
-                            range: func.range,
+                        program.diagnostics.register({
+                            file: event.file,
+                            range: funcStmt.tokens.name.location.range,
                             message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
                             severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
-                        }]);
+                        }, { tags: [this.name] });
                     }
                 }
-                file.program.setFile(xmlFile, xml)
+                program.setFile(xmlFile, xml);
 
                 if (program.hasFile(bsFile)) {
-                    const currentContent = program.getFile(bsFile).fileContents
+                    const currentContent = (program.getFile(bsFile) as BrsFile).fileContents;
                     if (currentContent !== bs) {
-                        file.addDiagnostics([{
-                            file: file,
-                            range: func.range,
+                        program.diagnostics.register({
+                            file: event.file,
+                            range: funcStmt.tokens.name.location.range,
                             message: `AsyncTaskPlugin: file ${bsFile} already exists`,
                             severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
-                        }]);
+                        }, { tags: [this.name] });
                     }
                 }
-                file.program.setFile(bsFile, bs)
-            },
+                program.setFile(bsFile, bs);
+            }
         }), {
-            walkMode: WalkMode.visitExpressionsRecursive
+            walkMode: WalkMode.visitStatements
         });
     }
 
-    beforeProgramValidate(program: Program) {
-        this.generateTaskListEnum(program);
+    beforeProgramValidate(event: BeforeProgramValidateEvent) {
+        this.generateTaskListEnum(event.program);
     }
 
     isAsyncTask(functionStatement: FunctionStatement | undefined) {
@@ -153,7 +161,7 @@ end function
                         return
                     }
 
-                    acc.add(func.functionStatement!.name.text)
+                    acc.add(func.functionStatement!.getName(ParseMode.BrightScript))
                 },
             }), {
                 walkMode: WalkMode.visitExpressionsRecursive
