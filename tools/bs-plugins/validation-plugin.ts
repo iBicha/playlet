@@ -2,10 +2,11 @@
 // Rules are defined in the `validation` property of the `bsconfig.json` file.
 
 import {
+    BeforeProgramValidateEvent,
     BscFile,
     CompilerPlugin,
+    DiagnosticSeverity,
     OnFileValidateEvent,
-    Program,
     Range,
     isBrsFile
 } from 'brighterscript';
@@ -20,21 +21,21 @@ type Validation = {
 export class ValidationPlugin implements CompilerPlugin {
     public name = 'ValidationPlugin';
 
-    private validation?: Validation[];
-
-    beforeProgramValidate(program: Program) {
-        // @ts-ignore
-        this.validation = program.options.validation as Validation[] | undefined;
-    }
-
     onFileValidate(event: OnFileValidateEvent<BscFile>) {
         const file = event.file;
-
-        if (!this.validation || !isBrsFile(file)) {
+        if (!isBrsFile(file)) {
             return;
         }
 
-        this.validation.forEach((validation) => {
+        // @ts-ignore
+        const validation = event.program.options.validation as Validation[] | undefined;
+        if (!validation) {
+            return;
+        }
+
+        event.program.diagnostics.clearByFilter({ file: file, tag: this.name });
+
+        validation.forEach((validation) => {
             const regex = new RegExp(validation.regex, validation.regexFlags);
             const fileContents = file.fileContents;
 
@@ -42,12 +43,14 @@ export class ValidationPlugin implements CompilerPlugin {
             while ((match = regex.exec(fileContents)) !== null) {
                 const line = fileContents.substring(0, match.index).split('\n').length - 1;
                 const column = match.index - fileContents.lastIndexOf('\n', match.index) - 1;
-                file.diagnostics.push({
-                    code: validation.code,
-                    message: validation.message,
+
+                event.program.diagnostics.register({
                     file: file,
-                    range: Range.create(line, column, line, column + match[0].length)
-                });
+                    range: Range.create(line, column, line, column + match[0].length),
+                    message: validation.message,
+                    code: validation.code,
+                    severity: DiagnosticSeverity.Error
+                }, { tags: [this.name] });
             }
         });
     }
