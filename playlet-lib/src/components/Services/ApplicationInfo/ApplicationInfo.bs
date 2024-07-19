@@ -31,12 +31,14 @@ function GetLatestPlayletLibVersion(_unused as dynamic) as dynamic
         return invalid
     end if
 
-    m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, function(output as object) as void
-        m.latestLibVersionTask = invalid
-        if output.success and output.result.latest <> invalid
-            m.top.lib_version_latest = output.result.latest
-        end if
-    end function)
+    m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, OnLatestLibVersionTaskResult)
 
     return invalid
+end function
+
+function OnLatestLibVersionTaskResult(output as object) as void
+    m.latestLibVersionTask = invalid
+    if output.success and output.result.latest <> invalid
+        m.top.lib_version_latest = output.result.latest
+    end if
 end function
