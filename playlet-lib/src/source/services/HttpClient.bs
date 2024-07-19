@@ -1,10 +1,3 @@
-' DISABLE_CACHE will disable all caching for all requests.
-' Only use this for debugging purposes.
-#const DISABLE_CACHE = false
-' NETWORK_THROTTLE will add a random delay to all requests to simulate network latency.
-' Only use this for debugging purposes.
-#const NETWORK_THROTTLE = false
-
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -12,6 +5,13 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+
+' DISABLE_CACHE will disable all caching for all requests.
+' Only use this for debugging purposes.
+#const DISABLE_CACHE = false
+' NETWORK_THROTTLE will add a random delay to all requests to simulate network latency.
+' Only use this for debugging purposes.
+#const NETWORK_THROTTLE = false
 
 namespace HttpClient
 
@@ -121,7 +121,29 @@ namespace HttpClient
 
     class HttpRequest
 
-        public urlTransfer as object
+        public urlTransfer as roUrlTransfer
+
+        public _cache as object
+        public _noCache as boolean
+        public _sent as boolean
+        public _cacheLocation as string
+        public _expireSeconds as integer
+        public _method as string
+        public _headers as roAssociativeArray
+        public _fileSystem as roFileSystem
+
+        private _timeoutSeconds as integer
+        private _tryCount as integer
+        private _url as string
+        private _queryParams as roAssociativeArray
+        private _pathParams as roAssociativeArray
+        private _body as string
+        private _retryCallback as function
+        private _useHttp2 as boolean
+        private _cancellation as object
+        private _timer as roTimeSpan
+        private _cancelled as boolean
+        private _fullUrl as string
 
         function new()
             m._timeoutSeconds = 30
@@ -568,9 +590,15 @@ namespace HttpClient
     class HttpResponse
 
         public request as HttpRequest
-        public event as object
+        public event as roUrlEvent
 
-        function new(request as HttpRequest, event as object)
+        private _statusCode as integer
+        private _text as string
+        private _json as object
+        private _headers as object
+        private _errorMessage as string
+
+        function new(request as HttpRequest, event as roUrlEvent)
             m.request = request
             m.event = event
         end function
