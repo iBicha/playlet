@@ -7,12 +7,16 @@
 //   - For that reason, only certain attributes (like "text" and "title") are allowed to have localized values
 
 import {
+    AfterFileValidateEvent,
+    AfterProgramValidateEvent,
+    BeforeProgramValidateEvent,
     BrsFile,
-    BscFile,
     CompilerPlugin,
     DiagnosticSeverity,
     EnumStatement,
+    LiteralExpression,
     Program,
+    Range,
     WalkMode,
     XmlFile,
     createVisitor,
@@ -33,8 +37,8 @@ export class LocaleValidationPlugin implements CompilerPlugin {
     private enums: { file: BrsFile, enumStatement: EnumStatement }[] = [];
     private localeValues: string[] = [];
 
-    beforeProgramValidate(program: Program) {
-        this.enums = this.getEnumsWithLocaleAnnotation(program);
+    beforeProgramValidate(event: BeforeProgramValidateEvent) {
+        this.enums = this.getEnumsWithLocaleAnnotation(event.program);
         if (this.enums.length === 0) {
             this.localeValues = [];
             return;
@@ -43,7 +47,10 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         this.localeValues = this.getLocaleValues(this.enums);
     }
 
-    afterFileValidate(file: BscFile) {
+    afterFileValidate(event: AfterFileValidateEvent) {
+        const file = event.file;
+        const program = event.program;
+
         if (!isXmlFile(file)) {
             return;
         }
@@ -52,81 +59,81 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             return;
         }
 
-        if (!file.ast.component) {
+        if (!file.ast.componentElement) {
             return;
         }
 
-        const localeValues = this.localeValues;
-        const component = file.ast.component;
+        program.diagnostics.clearByFilter({ file: file, tag: this.name });
 
-        if (component.api && component.api.fields) {
-            component.api.fields.forEach((field) => {
+        const localeValues = this.localeValues;
+        const componentElement = file.ast.componentElement;
+        const fields = componentElement.interfaceElement?.fields;
+        const children = componentElement.childrenElement;
+
+        if (fields) {
+            fields.forEach((field) => {
                 const value = field.value;
                 if (value && localeValues.includes(value)) {
                     const id = field.id;
                     if (!allowedXmlAttributes.includes(id)) {
-                        file.addDiagnostics([{
+                        program.diagnostics.register({
                             file: file,
-                            range: field.range!,
+                            range: field.attributes.find((attr) => attr.key === 'value')?.tokens.value?.location?.range || field.tokens.startTagName.location!.range,
                             message: `Locale value found in xml component "${value}" but the attribute "${id}" is not allowed to be localized.`,
                             severity: DiagnosticSeverity.Error,
                             code: 'LOCALE_VALUE_IN_XML',
-                        }]);
+                        }, { tags: [this.name] });
                     }
                 }
             });
         }
 
-        if (component.children) {
-            component.children.children.forEach((child) => {
-                this.validateSgNode(child, localeValues, file);
+        if (children) {
+            children.elements.forEach((child) => {
+                this.validateSgNode(program, child, localeValues, file);
             });
         }
     }
 
-    validateSgNode(node: SGNode, localeValues: string[], file: XmlFile) {
+    validateSgNode(program: Program, node: SGNode, localeValues: string[], file: XmlFile) {
         node.attributes.forEach((attribute) => {
-            const value = attribute.value.text;
+            const value = attribute.value;
             if (value && localeValues.includes(value)) {
-                const key = attribute.key.text;
+                const key = attribute.key;
                 if (!allowedXmlAttributes.includes(key)) {
-                    file.addDiagnostics([{
+                    program.diagnostics.register({
                         file: file,
-                        range: attribute.value.range!,
+                        range: attribute.tokens.value!.location!.range,
                         message: `Locale value found in xml component: "${value}" but the attribute "${key}" is not allowed to be localized.`,
                         severity: DiagnosticSeverity.Error,
                         code: 'LOCALE_VALUE_IN_XML',
-                    }]);
+                    });
                 }
             }
         });
 
-        if (!node.children) {
-            return;
-        }
-        node.children.forEach((child) => {
-            this.validateSgNode(child, localeValues, file);
+        node.elements.forEach((child) => {
+            this.validateSgNode(program, child, localeValues, file);
         });
     }
 
-    afterProgramValidate(program: Program) {
+    afterProgramValidate(event: AfterProgramValidateEvent) {
         if (this.enums.length === 0 || this.localeValues.length === 0) {
             return;
         }
 
+        const program = event.program;
         const uniqueLocaleValues = Array.from(new Set(this.localeValues));
         if (uniqueLocaleValues.length !== this.localeValues.length) {
             const duplicates = this.localeValues.filter((value, index) => this.localeValues.indexOf(value) !== index);
-            program.addDiagnostics([{
+
+            program.diagnostics.register({
                 file: this.enums[0].file,
-                range: {
-                    start: { line: 0, character: 0 },
-                    end: { line: 0, character: 0 }
-                },
+                range: Range.create(0, 0, 0, 0),
                 message: `Duplicate values in locale enums: ${duplicates.join(', ')}`,
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_DUPLICATE_VALUES',
-            }]);
+            });
         }
 
         this.validateEnglishTranslations(program, this.localeValues, this.enums[0].file);
@@ -135,8 +142,11 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         const translationFiles = globSync(`locale/**/translations.ts`, { cwd: rootDir });
         translationFiles.forEach((translationFile) => {
             const srcPath = pathJoin(rootDir, translationFile);
-            const pkgPath = pathJoin('pkg:/', translationFile);
-            const xmlFile = new XmlFile(srcPath, pkgPath, program);
+            const xmlFile = new XmlFile({
+                srcPath: srcPath,
+                destPath: translationFile,
+                program: program,
+            });
             this.validateTranslations(xmlFile, program, this.localeValues, this.enums[0].file);
         });
     }
@@ -149,24 +159,25 @@ export class LocaleValidationPlugin implements CompilerPlugin {
 
         const missingKeys = Object.keys(translations).filter((key) => !localeValues.includes(key));
         if (missingKeys.length > 0) {
-            program.addDiagnostics([{
+
+            program.diagnostics.register({
                 file: file,
-                range: {
-                    start: { line: 0, character: 0 },
-                    end: { line: 0, character: 0 }
-                },
-                message: `Missing keys in enum from ${translationFile.srcPath}: ${missingKeys.join(', ')}`,
+                range: Range.create(0, 0, 0, 0),
+                message: `Missing keys in locale enum from ${translationFile.srcPath}: ${missingKeys.join(', ')}`,
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_MISSING_ENUM_KEYS',
-            }]);
+            });
         }
     }
 
     validateEnglishTranslations(program: Program, localeValues: string[], file: BrsFile) {
         const translationFile = 'locale/en_US/translations.ts';
         const srcPath = pathJoin(program.options.rootDir!, translationFile);
-        const pkgPath = pathJoin('pkg:/', translationFile);
-        const xmlFile = new XmlFile(srcPath, pkgPath, program);
+        const xmlFile = new XmlFile({
+            srcPath: srcPath,
+            destPath: translationFile,
+            program: program,
+        });
         const englishTranslations = this.loadTranslationsFile(program, xmlFile);
 
         if (!englishTranslations) {
@@ -177,30 +188,25 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         const mismatchedKeys = Object.keys(englishTranslations).filter((key) => englishTranslations[key] !== key);
         if (mismatchedKeys.length > 0) {
             const mismatchedTranslations = mismatchedKeys.map((key) => `${key}=${englishTranslations[key]}`);
-            program.addDiagnostics([{
+
+            program.diagnostics.register({
                 file: file,
-                range: {
-                    start: { line: 0, character: 0 },
-                    end: { line: 0, character: 0 }
-                },
+                range: Range.create(0, 0, 0, 0),
                 message: `Mismatched translations in en_US: ${mismatchedTranslations.join(', ')}`,
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_MISMATCHED_EN_TRANSLATIONS',
-            }]);
+            });
         }
 
         const missingLocaleValues = localeValues.filter((value) => !englishTranslations[value]);
         if (missingLocaleValues.length > 0) {
-            program.addDiagnostics([{
+            program.diagnostics.register({
                 file: file,
-                range: {
-                    start: { line: 0, character: 0 },
-                    end: { line: 0, character: 0 }
-                },
+                range: Range.create(0, 0, 0, 0),
                 message: `Missing translations in en_US: ${missingLocaleValues.join(', ')}`,
                 severity: DiagnosticSeverity.Error,
                 code: 'LOCALE_MISSING_TRANSLATIONS',
-            }]);
+            });
 
             const xml = missingLocaleValues.reduce((acc, value) => {
                 acc += `<message>
@@ -230,16 +236,13 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             const translation = message.translation[0];
 
             if (acc[source]) {
-                program.addDiagnostics([{
+                program.diagnostics.register({
                     file: translationFile,
-                    range: {
-                        start: { line: 0, character: 0 },
-                        end: { line: 0, character: 0 }
-                    },
+                    range: Range.create(0, 0, 0, 0),
                     message: `Duplicate translation key: ${source}`,
                     severity: DiagnosticSeverity.Error,
                     code: 'LOCALE_DUPLICATE_TRANSLATION_KEY',
-                }]);
+                });
             }
 
             acc[source] = translation;
@@ -264,15 +267,15 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         return enums.reduce((acc, e) => {
             e.enumStatement.walk(createVisitor({
                 EnumMemberStatement: (enumMemberStatement) => {
-                    const value = enumMemberStatement.getValue();
+                    const value = (enumMemberStatement.value as LiteralExpression).tokens.value.text;
                     if (!value.startsWith('"') || !value.endsWith('"')) {
-                        e.file.addDiagnostics([{
+                        e.file.program.diagnostics.register({
                             file: e.file,
-                            range: enumMemberStatement.range,
+                            range: enumMemberStatement.tokens.name.location.range,
                             message: `Locale value should be a string literal`,
                             severity: DiagnosticSeverity.Error,
                             code: 'LOCALE_VALUE_NOT_STRING_LITERAL',
-                        }]);
+                        });
                         return;
                     }
                     acc.push(value.slice(1, -1));
@@ -289,8 +292,8 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             if (!isBrsFile(file)) {
                 return acc;
             }
-            if (file.fileContents.includes('@locale')) {
-                program.logger.info('break');
+            if (!file.fileContents.includes('@locale')) {
+                return acc;
             }
             file.ast.walk(createVisitor({
                 EnumStatement: (enumStatement) => {
