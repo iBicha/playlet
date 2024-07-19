@@ -1,6 +1,17 @@
+import "QRMaskFunctions.bs"
+
 namespace QrCode
 
     class QRUtil
+
+        private math as QRMath
+        private PATTERN_POSITION_TABLE as roArray
+
+        private G15 as integer
+        private G18 as integer
+        private G15_MASK as integer
+        private G15_BCHDigit as integer
+        private G18_BCHDigit as integer
 
         function new(math as QRMath)
             m.math = math
@@ -53,7 +64,6 @@ namespace QrCode
 
             m.G15_BCHDigit = m.getBCHDigit(m.G15)
             m.G18_BCHDigit = m.getBCHDigit(m.G18)
-
         end function
 
         function getBCHDigit(data as integer) as integer
@@ -87,19 +97,19 @@ namespace QrCode
         end function
 
         function getMaskFunction(maskPattern as integer) as function
-            masks = QRMaskFunctions()
+            masks = new QRMaskFunctions()
             patterns = QRMaskPatterns()
 
             maskId = patterns[maskPattern]
             if maskId = invalid or masks[maskId] = invalid
-                ' print "Invalid maskPattern", maskPattern
-                return function(_i as dynamic, _j as dynamic) as boolean
-                    ' print "Invalid maskPattern used"
-                    return false
-                end function
+                return m.InvalidMaskFunction
             end if
 
             return masks[maskId]
+        end function
+
+        function InvalidMaskFunction(_i as dynamic, _j as dynamic) as boolean
+            return false
         end function
 
         function getErrorCorrectPolynomial(errorCorrectLength as integer) as object
@@ -113,35 +123,35 @@ namespace QrCode
         function getLengthInBits(mode as integer, typeNumber as integer) as integer
             if 1 <= typeNumber and typeNumber < 10
                 ' 1 - 9
-                if mode = QrCode.QrMode.Numeric
+                if mode = QrMode.Numeric
                     return 10
                 end if
-                if mode = QrCode.QrMode.AlphaNumeric
+                if mode = QrMode.AlphaNumeric
                     return 9
                 end if
-                if mode = QrCode.QrMode.Byte
+                if mode = QrMode.Byte
                     return 8
                 end if
             else if typeNumber < 27
                 ' 10 - 26
-                if mode = QrCode.QrMode.Numeric
+                if mode = QrMode.Numeric
                     return 12
                 end if
-                if mode = QrCode.QrMode.AlphaNumeric
+                if mode = QrMode.AlphaNumeric
                     return 11
                 end if
-                if mode = QrCode.QrMode.Byte
+                if mode = QrMode.Byte
                     return 16
                 end if
             else if typeNumber < 41
                 ' 27 - 40
-                if mode = QrCode.QrMode.Numeric
+                if mode = QrMode.Numeric
                     return 14
                 end if
-                if mode = QrCode.QrMode.AlphaNumeric
+                if mode = QrMode.AlphaNumeric
                     return 13
                 end if
-                if mode = QrCode.QrMode.Byte
+                if mode = QrMode.Byte
                     return 16
                 end if
             end if

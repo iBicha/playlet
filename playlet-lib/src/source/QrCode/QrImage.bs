@@ -1,14 +1,14 @@
+import "pkg:/source/utils/CryptoUtils.bs"
+import "QRCode.bs"
+
 ' DISABLE_CACHE will force the generation of the QRCode every time.
 ' Only use this for debugging purposes.
 #const DISABLE_CACHE = false
 
-import "pkg:/source/utils/CryptoUtils.bs"
-import "QRCode.bs"
-
 namespace QrCode
 
     class QRImage
-        function Generate(text as string, size as integer, padding as integer, mode = QrCode.QrMode.Byte as QrCode.QrMode) as string
+        function Generate(text as string, size as integer, padding as integer, mode = QrMode.Byte as QrMode) as string
             fileName = m.GetFileName(text, mode, size, padding)
 
             #if DEBUG
@@ -22,7 +22,7 @@ namespace QrCode
                 #end if
             #end if
 
-            qr = new QrCode.QRCode()
+            qr = new QRCode()
             qr.addData(text, mode)
             qr.make()
 
@@ -33,7 +33,7 @@ namespace QrCode
             return ""
         end function
 
-        function GetFileName(text as string, mode as QrCode.QrMode, size as integer, padding as integer) as string
+        function GetFileName(text as string, mode as QrMode, size as integer, padding as integer) as string
             key = `v1-${text}-${mode}-${size}-${padding}`
             key = CryptoUtils.GetMd5(key)
             return "cachefs:/" + key + ".png"
