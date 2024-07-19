@@ -1,16 +1,16 @@
 // This plugin takes functions annotated with @oninit and adds them to the component's Init function
 
 import {
+    AfterFileValidateEvent,
     AnnotationExpression,
-    BeforeFileTranspileEvent,
+    BeforePrepareFileEvent,
+    BeforeScopeValidateEvent,
     BrsFile,
-    BscFile,
     Callable,
-    CallableContainerMap,
     CompilerPlugin,
     DiagnosticSeverity,
     FunctionStatement,
-    Scope,
+    ParseMode,
     XmlScope,
     isBrsFile,
     isXmlScope,
@@ -28,7 +28,8 @@ import { RawCodeStatement } from './Classes/RawCodeStatement';
 export class OnInitPlugin implements CompilerPlugin {
     public name = 'OnInitPlugin';
 
-    afterScopeValidate(scope: Scope, files: BscFile[], callables: CallableContainerMap) {
+    afterScopeValidate(event: BeforeScopeValidateEvent) {
+        const scope = event.scope;
         if (!isXmlScope(scope)) {
             return;
         }
@@ -38,21 +39,25 @@ export class OnInitPlugin implements CompilerPlugin {
             return;
         }
 
+        const program = event.program;
+        program.diagnostics.clearByFilter({ file: scope.xmlFile, tag: this.name });
+
         const initFunction = this.getInitCallableInScope(scope);
         if (!initFunction) {
             onInitCallables.forEach((onInitCallable) => {
-                scope.xmlFile.addDiagnostics([{
+                program.diagnostics.register({
                     file: scope.xmlFile,
-                    range: onInitCallable.annotation!.range,
-                    message: `function ${onInitCallable.callable.functionStatement.name.text} with @oninit annotation is included in ${scope.name}, but no Init function was found in the component.`,
+                    range: onInitCallable.annotation!.location!.range,
+                    message: `function ${onInitCallable.callable.functionStatement.getName(ParseMode.BrightScript)} with @oninit annotation is included in ${scope.name}, but no Init function was found in the component.`,
                     severity: DiagnosticSeverity.Error,
-                    code: 1818
-                }]);
+                    code: "ONINIT_NO_INIT_FUNCTION"
+                });
             });
         }
     }
 
-    afterFileValidate(file: BscFile) {
+    afterFileValidate(event: AfterFileValidateEvent) {
+        const file = event.file;
         if (!isBrsFile(file)) {
             return
         }
@@ -71,34 +76,47 @@ export class OnInitPlugin implements CompilerPlugin {
             return;
         }
 
+        program.diagnostics.clearByFilter({ file: file, tag: this.name });
+
         const initFunction = this.getInitCallableInFile(file);
         if (initFunction && scopes.length > 1 && onInitCallables.length > 0) {
-            file.addDiagnostics([{
+            program.diagnostics.register({
                 file,
-                range: initFunction.functionStatement!.func.range,
+                range: initFunction.functionStatement.location!.range,
                 message: `Init function will call @oninit functions, but is included in multiple scopes.`,
                 severity: DiagnosticSeverity.Error,
-                code: 1819
-            }]);
+                code: "ONINIT_INIT_FUNCTION_MULTIPLE_SCOPES"
+            });
         }
 
         for (let i = 0; i < onInitCallables.length; i++) {
             const onInitCallable = onInitCallables[i];
 
-            const functionName = onInitCallable.callable.functionStatement?.name.text;
+            const functionName = onInitCallable.callable.functionStatement.getName(ParseMode.BrightScript);
             if (!functionName) {
-                file.addDiagnostics([{
+                program.diagnostics.register({
                     file: onInitCallable.callable.file,
-                    range: onInitCallable.annotation!.range,
+                    range: onInitCallable.annotation!.location!.range,
                     message: `function with @oninit annotation must have a name`,
                     severity: DiagnosticSeverity.Error,
-                    code: 1820
-                }]);
+                    code: "ONINIT_FUNCTION_NO_NAME"
+                });
+            }
+
+            const paramCount = onInitCallable.callable.functionStatement.func.parameters.length;
+            if (paramCount > 0) {
+                program.diagnostics.register({
+                    file: onInitCallable.callable.file,
+                    range: onInitCallable.annotation!.location!.range,
+                    message: `function ${functionName} with @oninit annotation must not have parameters`,
+                    severity: DiagnosticSeverity.Error,
+                    code: "ONINIT_FUNCTION_PARAMETERS"
+                });
             }
         }
     }
 
-    beforeFileTranspile(event: BeforeFileTranspileEvent) {
+    beforePrepareFile(event: BeforePrepareFileEvent) {
         if (!isBrsFile(event.file)) {
             return
         }
@@ -138,7 +156,7 @@ export class OnInitPlugin implements CompilerPlugin {
         for (let i = 0; i < onInitCallables.length; i++) {
             const onInitCallable = onInitCallables[i];
 
-            const functionName = onInitCallable.callable.functionStatement?.name.text;
+            const functionName = onInitCallable.callable.functionStatement.getName(ParseMode.BrightScript);
             if (!functionName) {
                 continue;
             }
@@ -171,13 +189,13 @@ export class OnInitPlugin implements CompilerPlugin {
 
     getInitCallableInFile(file: BrsFile): Callable | undefined {
         return file.callables.find((callable) => {
-            return callable.functionStatement?.name.text === "Init";
+            return callable.functionStatement.getName(ParseMode.BrightScript) === "Init";
         });
     }
 
     getInitCallableInScope(scope: XmlScope): Callable | undefined {
         return scope.getOwnCallables().find((callable) => {
-            return callable.callable.functionStatement?.name.text === "Init";
+            return callable.callable.functionStatement.getName(ParseMode.BrightScript) === "Init";
         })?.callable;
     }
 
