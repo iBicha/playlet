@@ -1,15 +1,18 @@
 // This plugin generates logging functions based on the usage of the LogError, LogWarn, LogInfo, and LogDebug functions.
 
 import {
-    AstEditor,
-    BeforeFileTranspileEvent,
-    BscFile,
+    BeforeBuildProgramEvent,
+    BeforePrepareFileEvent,
+    BrsFile,
+    CallExpression,
     CompilerPlugin,
+    DottedGetExpression,
+    ParseMode,
     Program,
     SourceLiteralExpression,
     TokenKind,
-    TranspileObj,
     WalkMode,
+    createIdentifier,
     createToken,
     createVisitor,
     isBrsFile,
@@ -48,48 +51,43 @@ export class LoggerPlugin implements CompilerPlugin {
 
     private hasLogger = false;
 
-    beforeProgramTranspile(program: Program, entries: TranspileObj[], editor: AstEditor) {
-        this.hasLogger = program.hasFile(loggingFilePath);
+    beforeBuildProgram(event: BeforeBuildProgramEvent) {
+        this.hasLogger = event.program.hasFile(loggingFilePath);
         if (!this.hasLogger) {
             return;
         }
 
         const usedLogFunctions = new Map<string, LogFunction>();
+        const visitor = createVisitor({
+            ExpressionStatement: (statement) => {
+                const expression = statement.expression as CallExpression;
+                const callee = expression.callee as DottedGetExpression;
+                const funcName = callee.getName(ParseMode.BrightScript);
+                if (funcName && logFunctionKeys.includes(funcName)) {
+                    const argCount = expression.args.length + 1; // +1 for the file path
+                    const newFuncName = `${funcName}${argCount}`;
+                    usedLogFunctions.set(newFuncName, {
+                        name: funcName,
+                        argCount: argCount,
+                    });
+                }
+            },
+        });
 
-        for (const entry of entries) {
-            if (!isBrsFile(entry.file)) {
+        for (const file of event.files) {
+            if (!isBrsFile(file)) {
                 continue;
             }
 
-            const visitor = createVisitor({
-                ExpressionStatement: (statement) => {
-                    // @ts-ignore
-                    const funcName = statement.expression.callee?.name?.text;
-                    if (funcName && logFunctionKeys.includes(funcName)) {
-                        // @ts-ignore
-                        const argCount = statement.expression.args.length + 1; // +1 for the file path
-                        const newFuncName = `${funcName}${argCount}`;
-                        usedLogFunctions.set(newFuncName, {
-                            name: funcName,
-                            argCount: argCount,
-                        });
-                    }
-                },
+            file.ast.walk(visitor, {
+                walkMode: WalkMode.visitStatementsRecursive
             });
-
-            for (const func of entry.file.parser.references.functionExpressions) {
-                func.body.walk(visitor, {
-                    walkMode: WalkMode.visitStatements
-                });
-            }
         }
 
-        // @ts-ignore
-        const isDebug = !!program.options.debug;
-        this.generateLoggingFile(program, usedLogFunctions, isDebug);
+        this.generateLoggingFile(event.program, usedLogFunctions);
     }
 
-    beforeFileTranspile(event: BeforeFileTranspileEvent<BscFile>) {
+    beforePrepareFile(event: BeforePrepareFileEvent) {
         if (!this.hasLogger) {
             return;
         }
@@ -103,40 +101,41 @@ export class LoggerPlugin implements CompilerPlugin {
 
         const visitor = createVisitor({
             ExpressionStatement: (statement) => {
-                // @ts-ignore
-                const funcName = statement.expression.callee?.name?.text;
+                const expression = statement.expression as CallExpression;
+                const callee = expression.callee as DottedGetExpression;
+                const funcName = callee.getName(ParseMode.BrightScript);
                 if (funcName && logFunctionKeys.includes(funcName)) {
-                    // @ts-ignore
-                    const args = statement.expression.args;
+                    const args = expression.args;
                     if (isDebug) {
-                        const t = createToken(TokenKind.SourceLocationLiteral, '', statement.expression.range);
-                        let sourceExpression = new SourceLiteralExpression(t);
+                        const t = createToken(TokenKind.SourceLocationLiteral, '', statement.expression.location);
+                        const sourceExpression = new SourceLiteralExpression({ value: t });
                         event.editor.addToArray(args, 0, sourceExpression);
                     } else {
-                        const fileName = path.basename(event.file.pkgPath);
-                        const line = statement.range!.start.line;
-                        const t = createToken(TokenKind.StringLiteral, `\"[${fileName}:${line}]\"`, statement.expression.range);
-                        let sourceExpression = new SourceLiteralExpression(t);
+                        const fileName = path.basename(event.file.srcPath);
+                        const line = statement.location!.range.start.line + 1; // range.start.line is 0-based
+                        const t = createToken(TokenKind.StringLiteral, `\"[${fileName}:${line}]\"`, statement.expression.location);
+                        const sourceExpression = new SourceLiteralExpression({ value: t });
                         event.editor.addToArray(args, 0, sourceExpression);
                     }
 
                     const newFuncName = `${funcName}${args.length}`;
+                    const newFuncIdentifier = createIdentifier(newFuncName, callee.location);
                     event.program.logger.info(this.name, `Replacing ${funcName} with ${newFuncName}`);
-                    // @ts-ignore
-                    event.editor.setProperty(statement.expression.callee?.name, 'text', `${newFuncName}`)
+                    event.editor.setProperty(callee.tokens, 'name', newFuncIdentifier);
                 }
             },
         });
 
-        for (const func of event.file.parser.references.functionExpressions) {
-            func.body.walk(visitor, {
-                walkMode: WalkMode.visitStatements
-            });
-        }
+        event.file.ast.walk(visitor, {
+            walkMode: WalkMode.visitStatementsRecursive
+        });
     }
 
-    generateLoggingFile(program: Program, usedLogFunctions: Map<string, LogFunction>, isDebug: boolean) {
-        const file = program.getFile(loggingFilePath);
+    generateLoggingFile(program: Program, usedLogFunctions: Map<string, LogFunction>) {
+        // @ts-ignore
+        const isDebug = !!program.options.debug;
+
+        const file = program.getFile(loggingFilePath) as BrsFile;
         let content = file.fileContents;
 
         content += '\n\' Start of auto-generated functions\n'
@@ -145,7 +144,7 @@ export class LoggerPlugin implements CompilerPlugin {
         });
         content += '\n\' End of auto-generated functions\n'
 
-        program.setFile(loggingFilePath, content)
+        file.parse(content);
     }
 
     generateLoggingFunction(newFunctionName: string, level: string, argCount: number, isDebug: boolean) {
