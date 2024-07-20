@@ -1,15 +1,16 @@
 // Plugin to allow including other components in a component
 
 import {
-    BscFile,
+    AfterProvideFileEvent,
     CompilerPlugin,
     DiagnosticSeverity,
     Program,
     XmlFile,
+    createSGScript,
     isXmlFile,
     util,
 } from 'brighterscript';
-import { SGChildren, SGComponent, SGInterface, SGScript } from 'brighterscript/dist/parser/SGTypes';
+import { SGChildren, SGComponent } from 'brighterscript/dist/parser/SGTypes';
 import { globSync } from 'glob';
 import fs from 'fs-extra'
 import path from 'path';
@@ -17,53 +18,67 @@ import path from 'path';
 export class ComponentIncludesPlugin implements CompilerPlugin {
     public name = 'ComponentIncludesPlugin';
 
-    afterFileParse(file: BscFile) {
+    afterProvideFile(event: AfterProvideFileEvent) {
+        if (event.files.length !== 1) {
+            return;
+        }
+
+        const file = event.files[0];
         if (!isXmlFile(file)) {
             return;
         }
         const program = file.program;
 
-        const component = file.parser.ast.component;
+        const component = file.parser.ast.componentElement;
         if (!component) {
             return;
         }
+
         const includes = this.getIncludes(component);
         if (includes.length === 0) {
             return;
         }
+
+        program.diagnostics.clearByFilter({ file: file, tag: this.name });
 
         includes.forEach((include) => {
             const rootDir = program.options.rootDir!;
 
             const includePaths = globSync(`**/${include.name}.part.xml`, { cwd: rootDir });
             if (includePaths.length === 0) {
-                file.addDiagnostics([{
+                program.diagnostics.register({
                     file: file,
                     range: include.range!,
                     message: `Could not find include: ${include.name}`,
                     severity: DiagnosticSeverity.Error,
                     code: 'INCLUDE_NOT_FOUND',
-                }]);
+                }, { tags: [this.name] });
                 return;
             }
+
             if (includePaths.length > 1) {
-                file.addDiagnostics([{
+                program.diagnostics.register({
                     file: file,
                     range: include.range!,
-                    message: `Found multiple include files for include: ${include}`,
+                    message: `Found multiple include files for include: ${include.name}`,
                     severity: DiagnosticSeverity.Error,
                     code: 'MULTIPLE_INCLUDES_FOUND',
-                }]);
+                }, { tags: [this.name] });
                 return;
             }
 
             const includePath = includePaths[0];
             const srcPath = path.join(rootDir, includePath);
-            const xmlFile = new XmlFile(srcPath, includePath, program);
+
+            const xmlFile = new XmlFile({
+                srcPath: srcPath,
+                program: program,
+                destPath: includePath,
+            });
             const includeFileContents = fs.readFileSync(srcPath, 'utf8');
             xmlFile.parse(includeFileContents);
 
-            const includeComponent = xmlFile.ast.component;
+            const includeComponent = xmlFile.ast.componentElement;
             if (!includeComponent) {
                 return;
             }
@@ -74,15 +89,17 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
             this.addChildren(component, includeComponent);
         });
 
-        component.attributes = component.attributes.filter((attr) => {
-            return attr.key.text !== 'includes';
-        });
-
+        component.removeAttribute('includes');
         file.parser.invalidateReferences();
     }
 
     addScripts(component: SGComponent, includeComponent: SGComponent, includePath: string, program: Program) {
-        component.scripts.push(...includeComponent.scripts);
+        const includeScripts = includeComponent.scriptElements;
+        for (let i = 0; i < includeScripts.length; i++) {
+            const script = includeScripts[i];
+            component.addChild(script);
+        }
+
         if (program.options.autoImportComponentScript) {
             const possibleCodeBehindPkgPaths = [
                 includePath.replace('.xml', '.bs'),
@@ -91,55 +108,81 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
             possibleCodeBehindPkgPaths.forEach((scriptPkgPath) => {
                 const scriptFilePath = path.join(program.options.rootDir!, scriptPkgPath);
                 if (fs.existsSync(scriptFilePath)) {
-                    const scriptTag = new SGScript();
-                    scriptTag.type = "text/brightscript"
-                    scriptTag.uri = util.getRokuPkgPath(scriptPkgPath);
-
-                    component.scripts.push(scriptTag);
+                    const scriptTag = createSGScript({
+                        type: "text/brightscript",
+                        uri: util.sanitizePkgPath(scriptPkgPath),
+                    })
+                    component.addChild(scriptTag);
                 }
             });
         }
     }
 
     addFields(component: SGComponent, includeComponent: SGComponent) {
-        if (!includeComponent.api) {
+        const interfaceElement = includeComponent.interfaceElement;
+        if (!interfaceElement) {
             return;
         }
-        if (!includeComponent.api.fields || includeComponent.api.fields.length === 0) {
+
+        const fields = interfaceElement.fields;
+        if (!fields || fields.length === 0) {
             return;
         }
-        if (!component.api) {
-            component.api = new SGInterface({ text: 'interface' }, [])
+        for (let i = 0; i < fields.length; i++) {
+            const field = fields[i];
+            let alwaysNotify: boolean | undefined = undefined;
+            if (field.alwaysNotify) {
+                alwaysNotify = field.alwaysNotify === 'true';
+            }
+            component.setInterfaceField(field.id, field.type, field.onChange, alwaysNotify, field.alias);
         }
-        component.api.fields.push(...includeComponent.api.fields);
     }
 
     addFunctions(component: SGComponent, includeComponent: SGComponent) {
-        if (!includeComponent.api) {
+        const interfaceElement = includeComponent.interfaceElement;
+        if (!interfaceElement) {
             return;
         }
-        if (!includeComponent.api.functions || includeComponent.api.functions.length === 0) {
+
+        const functions = interfaceElement.functions;
+        if (!functions || functions.length === 0) {
             return;
         }
-        if (!component.api) {
-            component.api = new SGInterface({ text: 'interface' }, [])
+
+        for (let i = 0; i < functions.length; i++) {
+            const func = functions[i];
+            component.setInterfaceFunction(func.name);
         }
-        component.api.functions.push(...includeComponent.api.functions);
     }
 
     addChildren(component: SGComponent, includeComponent: SGComponent) {
-        if (!includeComponent.children) {
+        const includeChildren = includeComponent.childrenElement;
+        if (!includeChildren) {
             return;
         }
-        if (!includeComponent.children.children || includeComponent.children.children.length === 0) {
-            return;
-        }
-        if (!component.children) {
-            component.children = new SGChildren({ text: 'children' }, [])
-        }
-        component.children.children.push(...includeComponent.children.children);
-    }
 
+        if (includeChildren.elements.length === 0) {
+            return;
+        }
+
+        let componentChildren = component.childrenElement;
+        if (!componentChildren) {
+            componentChildren = new SGChildren({
+                startTagOpen: { text: '<' },
+                startTagName: { text: 'children' },
+                startTagClose: { text: '>' },
+                elements: [],
+                endTagOpen: { text: '</' },
+                endTagName: { text: 'children' },
+                endTagClose: { text: '>' }
+            });
+            component.addChild(componentChildren);
+        }
+        for (let i = 0; i < includeChildren.elements.length; i++) {
+            const child = includeChildren.elements[i];
+            componentChildren.elements.push(child);
+        }
+    }
 
     getIncludes(component?: SGComponent) {
         if (!component || !component.attributes) {
@@ -147,12 +190,15 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         }
 
         return component.attributes.filter((attr) => {
-            return attr.key.text === 'includes';
+            return attr.key === 'includes';
         }).map((attr) => {
-            return attr.value.text.split(',').map((item) => {
+            if (!attr.value) {
+                return [];
+            }
+            return attr.value.split(',').map((item) => {
                 return {
                     name: item.trim(),
-                    range: attr.value.range,
+                    range: attr.tokens.value?.location?.range,
                 }
             });
         }).flat();
