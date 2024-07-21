@@ -29,6 +29,8 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         }
         const program = file.program;
 
+        program.diagnostics.clearByFilter({ file: file, tag: this.name });
+
         const component = file.parser.ast.componentElement;
         if (!component) {
             return;
@@ -38,8 +40,6 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
         if (includes.length === 0) {
             return;
         }
-
-        program.diagnostics.clearByFilter({ file: file, tag: this.name });
 
         includes.forEach((include) => {
             const rootDir = program.options.rootDir!;
