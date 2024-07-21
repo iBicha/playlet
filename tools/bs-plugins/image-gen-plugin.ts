@@ -1,7 +1,9 @@
 // This plugin converts svg files to png/jpeg files 
 
 import {
-    CompilerPlugin, FileObj, ProgramBuilder,
+    BeforeBuildProgramEvent,
+    BscFile,
+    CompilerPlugin,
 } from 'brighterscript';
 import { readFileSync, writeFileSync } from 'fs';
 import { existsSync } from 'fs-extra';
@@ -9,6 +11,7 @@ import { globSync } from 'glob';
 import md5 from 'crypto-js/md5';
 import { join as joinPath } from 'path';
 import json5 from 'json5';
+import { AssetFile } from 'brighterscript/dist/files/AssetFile';
 const shell = require('shelljs');
 
 const META_EXT = '.meta.json5';
@@ -16,13 +19,13 @@ const META_EXT = '.meta.json5';
 export class ImageGenPlugin implements CompilerPlugin {
     public name = 'ImageGenPlugin';
 
-    beforePrepublish(builder: ProgramBuilder, files: FileObj[]) {
-        // Force generate flag
+    beforeBuildProgram(event: BeforeBuildProgramEvent) {
+        const options = event.program.options;
         // @ts-ignore
-        const forceGenerateImages = !!builder.options.forceGenerateImages;
+        const forceGenerateImages = !!options.forceGenerateImages;
         // Debug flag
         // @ts-ignore
-        const debug = !!builder.options.debug;
+        const debug = !!options.debug;
 
         if (debug && !forceGenerateImages) {
             // Since the plugin does a lot of scanning of files, it is fine not to run it in debug mode
@@ -30,8 +33,7 @@ export class ImageGenPlugin implements CompilerPlugin {
             return;
         }
 
-        const rootDir = builder.options.rootDir!;
-
+        const rootDir = options.rootDir!;
         const svgFiles = globSync(`**/*.svg`, { cwd: rootDir });
 
         svgFiles.forEach((svgFile) => {
@@ -47,7 +49,7 @@ export class ImageGenPlugin implements CompilerPlugin {
 
             const meta = json5.parse(readFileSync(metafile, 'utf8'));
 
-            this.generateImages(svgFile, meta, metafile, rootDir, files, forceGenerateImages);
+            this.generateImages(svgFile, meta, metafile, rootDir, event.files, forceGenerateImages);
         });
     }
 
@@ -65,7 +67,7 @@ export class ImageGenPlugin implements CompilerPlugin {
         writeFileSync(metafile, json5.stringify(meta, null, 2));
     }
 
-    generateImages(svgFile: string, meta: any, metafile: string, rootDir: string, files: FileObj[], forceGenerateImages: boolean) {
+    generateImages(svgFile: string, meta: any, metafile: string, rootDir: string, files: BscFile[], forceGenerateImages: boolean) {
         let metaChanged = false;
         const inputHash = this.checkFileHash(joinPath(rootDir, svgFile), meta.inputHash);
         if (!inputHash.valid) {
@@ -86,7 +88,13 @@ export class ImageGenPlugin implements CompilerPlugin {
             this.generateImage(svgFile, output, rootDir);
             outputHash = this.checkFileHash(outputFilePath, output.outputHash);
 
-            files.push({ src: outputFilePath, dest: output.outputFilePath })
+            const file = new AssetFile({
+                srcPath: outputFilePath,
+                destPath: outputFilePath.replace(rootDir, ''),
+                data: () => readFileSync(outputFilePath),
+            });
+
+            files.push(file)
 
             output.outputHash = outputHash.hash;
             metaChanged = true;
