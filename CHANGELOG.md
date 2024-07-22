@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Added
 
 - Sort options to channel live streams
+- Video width and height to DASH manifest
 
 ## [0.24.6] - 2024-07-08
 
