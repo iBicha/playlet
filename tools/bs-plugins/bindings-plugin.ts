@@ -190,7 +190,7 @@ export class BindingsPlugin implements CompilerPlugin {
             return;
         }
         if (node.attributes) {
-            for (let i = 0; i < node.attributes.length; i++) {
+            for (let i = node.attributes.length - 1; i >= 0; i--) {
                 const attr = node.attributes[i];
                 if (attr.value?.startsWith('bind:')) {
                     node.removeAttribute(attr.key);

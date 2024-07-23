@@ -61,7 +61,13 @@ export class LoggerPlugin implements CompilerPlugin {
         const visitor = createVisitor({
             ExpressionStatement: (statement) => {
                 const expression = statement.expression as CallExpression;
+                if (!expression) {
+                    return;
+                }
                 const callee = expression.callee as DottedGetExpression;
+                if (!callee || !callee.getName) {
+                    return;
+                }
                 const funcName = callee.getName(ParseMode.BrightScript);
                 if (funcName && logFunctionKeys.includes(funcName)) {
                     const argCount = expression.args.length + 1; // +1 for the file path
@@ -102,7 +108,13 @@ export class LoggerPlugin implements CompilerPlugin {
         const visitor = createVisitor({
             ExpressionStatement: (statement) => {
                 const expression = statement.expression as CallExpression;
+                if (!expression) {
+                    return;
+                }
                 const callee = expression.callee as DottedGetExpression;
+                if (!callee || !callee.getName) {
+                    return;
+                }
                 const funcName = callee.getName(ParseMode.BrightScript);
                 if (funcName && logFunctionKeys.includes(funcName)) {
                     const args = expression.args;
