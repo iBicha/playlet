@@ -9,15 +9,23 @@ namespace Http
     const BUFSIZE = 65536
 
     class HttpConnection
+        public state = HttpConnectionState.INIT as HttpConnectionState
+        public socket as roStreamSocket
+        public id = "<uninit>"
+        public close = true
+        public ws_upgrade = false
+
         private total_received = 0
         private total_sent = 0
-        private id = "<uninit>"
-        private close = true
-        private ws_upgrade = false
-        private state = Http.HttpConnectionState.INIT
 
         private server as HttpServer
         private settings as HttpSettings
+        private addr as roSocketAddress
+        private last_active as roTimespan
+        private request as HttpRequest
+        private response as HttpResponse
+        private header_only as boolean
+        private client as string
 
         function new(server as HttpServer, settings as HttpSettings)
             m.server = server
@@ -36,24 +44,23 @@ namespace Http
             ' re-initializes members for next request-response
             m.last_active = CreateObject("roTimespan")
             m.request = new HttpRequest()
-            m.header = invalid
             m.response = invalid
             m.header_only = false
             m.close = true
             m.ws_upgrade = false
-            m.SetState(Http.HttpConnectionState.INIT)
+            m.SetState(HttpConnectionState.INIT)
         end function
 
         function Recycle()
             LogDebug("recycle")
             m.Restart()
-            m.SetState(Http.HttpConnectionState.RECV_REQUEST) ' ready for another
+            m.SetState(HttpConnectionState.RECV_REQUEST) ' ready for another
         end function
 
         function Accepted(server as HttpServer, socket as object)
             m.socket = socket
             m.id = socket.getID().ToStr()
-            m.SetState(Http.HttpConnectionState.RECV_REQUEST)
+            m.SetState(HttpConnectionState.RECV_REQUEST)
             m.client = m.socket.getReceivedFromAddress().getAddress()
 
             LogInfo("accepted connection @" + m.client)
@@ -64,7 +71,7 @@ namespace Http
         end function
 
         function PollRequest(server as HttpServer)
-            if m.state <> Http.HttpConnectionState.RECV_REQUEST
+            if m.state <> HttpConnectionState.RECV_REQUEST
                 LogError("illegal request state @" + m.client)
             end if
 
@@ -84,32 +91,32 @@ namespace Http
             m.request.Add(rcvStr, maybeUnicode)
 
             if m.request.ProcessNext(m)
-                if m.request.state = Http.HttpRequestState.DONE
+                if m.request.state = HttpRequestState.DONE
                     server.num_requests = validint(server.num_requests) + 1
                     m.response = new HttpResponse(m.request, m.server, m.settings)
                     m.response.Process(m)
-                    m.SetState(Http.HttpConnectionState.SEND_HEADER)
+                    m.SetState(HttpConnectionState.SEND_HEADER)
                 else
-                    m.setState(Http.HttpConnectionState.DONE)
+                    m.setState(HttpConnectionState.DONE)
                     m.close = true
                     LogError("couldn't process request or response, closing @" + m.client)
                 end if
             else if m.request.buffer.len() > m.settings.MaxRequestLength ' die if it's too long
                 m.response = new HttpResponse(m.request, m.server, m.settings)
                 m.response.Default(413, "Your request was dropped because it was too long.")
-                m.SetState(Http.HttpConnectionState.SEND_HEADER)
+                m.SetState(HttpConnectionState.SEND_HEADER)
             end if
 
             ' if we've moved on to the next state, try to send right away, instead of
             ' going through another iteration of the poll loop.
             '
-            if m.state = Http.HttpConnectionState.SEND_HEADER
+            if m.state = HttpConnectionState.SEND_HEADER
                 m.PollHeader(server)
             end if
         end function
 
         function PollHeader(server as HttpServer) as void
-            if m.state <> Http.HttpConnectionState.SEND_HEADER
+            if m.state <> HttpConnectionState.SEND_HEADER
                 LogError("illegal header state @" + m.client)
             end if
 
@@ -122,16 +129,16 @@ namespace Http
 
             if m.response.DoneHeader()
                 if m.response.header_only
-                    m.SetState(Http.HttpConnectionState.DONE)
+                    m.SetState(HttpConnectionState.DONE)
                 else
-                    m.SetState(Http.HttpConnectionState.SEND_RESPONSE)
+                    m.SetState(HttpConnectionState.SEND_RESPONSE)
                     m.PollResponse(server)
                 end if
             end if
         end function
 
         function PollResponse(server as HttpServer)
-            if m.state <> Http.HttpConnectionState.SEND_RESPONSE or m.response.header_only
+            if m.state <> HttpConnectionState.SEND_RESPONSE or m.response.header_only
                 LogError("illegal response state @" + m.client)
             end if
 
@@ -142,14 +149,14 @@ namespace Http
             end if
 
             if m.response.Done()
-                m.SetState(Http.HttpConnectionState.DONE)
+                m.SetState(HttpConnectionState.DONE)
             end if
         end function
 
         function CheckTimeout(timeoutInMs as integer)
             if m.last_active.TotalMilliseconds() > timeoutInMs
                 m.close = true
-                m.SetState(Http.HttpConnectionState.DONE)
+                m.SetState(HttpConnectionState.DONE)
             end if
         end function
 
@@ -167,12 +174,12 @@ namespace Http
                     LogError(op + " transfer error @" + m.client, m.socket.status())
                 end if
                 m.close = true
-                m.SetState(Http.HttpConnectionState.DONE)
+                m.SetState(HttpConnectionState.DONE)
             end if
             return gotSome
         end function
 
-        function SetState(newState as Http.HttpConnectionState)
+        function SetState(newState as HttpConnectionState)
             if m.state <> newState
                 ' LogDebug("state change" + Stri(m.state) + " ->" + Stri(newState))
                 m.state = newState
