@@ -1,17 +1,19 @@
 // Plugin to generate node bindings for AutoBind components
 
 import {
-    BeforeFileTranspileEvent,
-    BscFile,
+    AfterProvideFileEvent,
+    BeforePrepareFileEvent,
     CompilerPlugin,
+    ParseMode,
     XmlFile,
+    createSGScript,
     isBrsFile,
     isXmlFile,
     isXmlScope,
     util
 } from "brighterscript";
 import path from "path";
-import { SGNode, SGScript } from "brighterscript/dist/parser/SGTypes";
+import { SGNode } from "brighterscript/dist/parser/SGTypes";
 import { RawCodeStatement } from "./Classes/RawCodeStatement";
 
 
@@ -39,7 +41,12 @@ export class BindingsPlugin implements CompilerPlugin {
 
     private bindingsForFile: { [key: string]: Bindings } = {};
 
-    afterFileParse(file: BscFile) {
+    afterProvideFile(event: AfterProvideFileEvent) {
+        if (event.files.length !== 1) {
+            return;
+        }
+
+        const file = event.files[0];
         if (!isXmlFile(file)) {
             return;
         }
@@ -57,22 +64,19 @@ export class BindingsPlugin implements CompilerPlugin {
             program.setFile(bindingsFilePath, bindings_script_template);
         }
 
-        const scriptTag = new SGScript();
-        scriptTag.type = "text/brightscript"
-        scriptTag.uri = util.getRokuPkgPath(bindingsFilePath);
-        if (!file.ast.component!.scripts) {
-            file.ast.component!.scripts = [];
-        }
-        file.ast.component!.scripts.push(scriptTag);
+        const scriptTag = createSGScript({
+            type: "text/brightscript",
+            uri: util.sanitizePkgPath(bindingsFilePath)
+        });
+        file.ast.componentElement!.addChild(scriptTag);
 
         this.deleteBindingsInFields(file);
-        this.deleteBindingsInChildPropsNode(file.ast.component!.children);
-
+        this.deleteBindingsInChildPropsNode(file.ast.componentElement!.childrenElement);
         file.parser.invalidateReferences();
     }
 
-    beforeFileTranspile(event: BeforeFileTranspileEvent) {
-        if (!isBrsFile(event.file) || !event.file.pkgPath.endsWith('_bindings.bs')) {
+    beforePrepareFile(event: BeforePrepareFileEvent) {
+        if (!isBrsFile(event.file) || !event.file.pkgPath.endsWith('_bindings.brs')) {
             return
         }
 
@@ -92,7 +96,7 @@ export class BindingsPlugin implements CompilerPlugin {
         }
 
         const bindingsFunction = event.file.callables[0];
-        if (bindingsFunction.functionStatement.name.text !== bindings_function_name) {
+        if (bindingsFunction.functionStatement.getName(ParseMode.BrightScript) !== bindings_function_name) {
             throw new Error(`Bindings file ${event.file.pkgPath} should have exactly one function named ${bindings_function_name}`);
         }
 
@@ -125,7 +129,7 @@ export class BindingsPlugin implements CompilerPlugin {
     }
 
     getBindingsForXmlFile(xmlFile: XmlFile): Bindings {
-        const isAutoBindComponent = !!xmlFile.ast.component?.api?.fields?.find((field) => {
+        const isAutoBindComponent = !!xmlFile.ast.componentElement?.interfaceElement?.fields?.find((field) => {
             return field.id === 'binding_done';
         }) && xmlFile.componentName.text !== 'AutoBind';
 
@@ -133,16 +137,16 @@ export class BindingsPlugin implements CompilerPlugin {
             return { isAutoBindComponent, fields: {}, childProps: {} };
         }
 
-        const fields = xmlFile.ast.component?.api?.fields?.filter((field) => {
-            return field.attributes.find((attr) => attr.key.text === 'bind');
+        const fields = xmlFile.ast.componentElement?.interfaceElement?.fields?.filter((field) => {
+            return field.attributes.find((attr) => attr.key === 'bind');
         });
 
         const childProps: ChildProps = {};
-        this.getChildBindings(childProps, xmlFile.ast.component?.children);
+        this.getChildBindings(childProps, xmlFile.ast.componentElement?.childrenElement);
 
         const bindingFields = fields?.reduce((acc, field) => {
-            const bindAttr = field.attributes.find((attr) => attr.key.text === 'bind');
-            acc[field.id] = bindAttr!.value.text;
+            const bindAttr = field.attributes.find((attr) => attr.key === 'bind');
+            acc[field.id] = bindAttr!.value!;
             return acc;
         }, {} as { [key: string]: string }) || {};
 
@@ -154,30 +158,30 @@ export class BindingsPlugin implements CompilerPlugin {
             return;
         }
         if (node.id) {
-            const props = node.attributes.filter((attr) => attr.value.text.startsWith('bind:'));
+            const props = node.attributes.filter((attr) => attr.value!.startsWith('bind:'));
             if (props.length) {
                 if (!bindings[node.id]) {
                     bindings[node.id] = {};
                 }
                 for (let i = 0; i < props.length; i++) {
                     const prop = props[i];
-                    bindings[node.id][prop.key.text] = prop.value.text.replace('bind:', '');
+                    bindings[node.id][prop.key] = prop.value!.replace('bind:', '');
                 }
             }
         }
-        if (node.children) {
-            for (let i = 0; i < node.children.length; i++) {
-                const child = node.children[i];
-                this.getChildBindings(bindings, child);
-            }
+        for (let i = 0; i < node.elements.length; i++) {
+            const child = node.elements[i];
+            this.getChildBindings(bindings, child);
         }
     }
 
     deleteBindingsInFields(xmlFile: XmlFile) {
-        xmlFile.ast.component!.api!.fields.forEach((field) => {
-            field.attributes = field.attributes.filter((attr) => {
-                return attr.key.text !== 'bind';
-            });
+        const fields = xmlFile.ast.componentElement?.interfaceElement?.fields;
+        if (!fields) {
+            return;
+        }
+        fields.forEach((field) => {
+            field.removeAttribute('bind');
         });
     }
 
@@ -185,14 +189,17 @@ export class BindingsPlugin implements CompilerPlugin {
         if (!node) {
             return;
         }
-        node.attributes = node.attributes.filter((attr) => {
-            return !attr.value.text.startsWith('bind:');
-        });
-        if (node.children) {
-            for (let i = 0; i < node.children.length; i++) {
-                const child = node.children[i];
-                this.deleteBindingsInChildPropsNode(child);
+        if (node.attributes) {
+            for (let i = 0; i < node.attributes.length; i++) {
+                const attr = node.attributes[i];
+                if (attr.value?.startsWith('bind:')) {
+                    node.removeAttribute(attr.key);
+                }
             }
+        }
+        for (let i = 0; i < node.elements.length; i++) {
+            const child = node.elements[i];
+            this.deleteBindingsInChildPropsNode(child);
         }
     }
 }
