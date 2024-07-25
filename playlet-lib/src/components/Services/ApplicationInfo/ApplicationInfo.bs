@@ -39,14 +39,14 @@ function GetLatestPlayletLibVersion() as dynamic
         return invalid
     end if
 
-    m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, OnLatestLibVersionTaskResult)
+    ' TODO:P2 remove after fix
+    ' bs:disable-next-line LINT1001
+    m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, function(output as object) as void
+        m.latestLibVersionTask = invalid
+        if output.success and output.result.latest <> invalid
+            m.top.lib_version_latest = output.result.latest
+        end if
+    end function)
 
     return invalid
-end function
-
-function OnLatestLibVersionTaskResult(output as object) as void
-    m.latestLibVersionTask = invalid
-    if output.success and output.result.latest <> invalid
-        m.top.lib_version_latest = output.result.latest
-    end if
 end function
