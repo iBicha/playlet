@@ -3,16 +3,16 @@ import "pkg:/source/utils/StringUtils.bs"
 namespace Http
 
     class HttpStaticFilesRouter extends HttpRouter
-        private root
-        private route
-        private etags
+        private root as string
+        private route as string
+        private etags as EtagUtils
 
-        private showDirectories
-        private showHidden
-        private fsCheck
-        private staticFiles
+        private showDirectories as boolean
+        private showHidden as boolean
+        private fsCheck as boolean
+        private staticFiles as boolean
 
-        function new(route as string, root as string, etags as object, options = {} as object)
+        function new(route as string, root as string, etags as EtagUtils, options = {} as object)
             super()
 
             m.root = root
@@ -79,12 +79,14 @@ namespace Http
             if not path.isValid()
                 ' Skip, let next middleware handle it
                 return false
-            else if not fs.exists(path)
+            end if
+
+            if not fs.exists(full_path)
                 ' Skip, let next middleware handle it
                 return false
             end if
 
-            stat = fs.stat(path)
+            stat = fs.stat(full_path)
             if stat = invalid
                 response.Default(500, "fstat() failed.")
                 return true
@@ -96,7 +98,7 @@ namespace Http
                     return true
                 end if
                 response.ContentType("text/html")
-                m.GenerateDirectoryListing(path, request, response)
+                m.GenerateDirectoryListing(full_path, request, response)
                 if m.staticFiles
                     m.etags.AddEtagFromBody(request, response, full_path)
                 end if
@@ -104,9 +106,9 @@ namespace Http
             else if stat.type = "file"
                 mimetype = server.utils.MimeType(decoded_path)
                 response.ContentType(mimetype)
-                response.SetBodyDataFile(path)
+                response.SetBodyDataFile(full_path)
                 response.http_code = 200
-                LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", stat.size)
+                LogInfo("uri:", request.uri, "target:", full_path, "content-type:", mimetype, "content-length", stat.size)
                 if m.staticFiles
                     m.etags.AddEtagFromBody(request, response, full_path)
                 end if
@@ -117,7 +119,7 @@ namespace Http
             end if
         end function
 
-        function GenerateDirectoryListing(path as object, request as HttpRequest, response as HttpResponse) as boolean
+        function GenerateDirectoryListing(path as string, request as HttpRequest, response as HttpResponse) as boolean
             fs = CreateObject("roFilesystem")
             dirList = fs.GetDirectoryListing(path)
             if dirList = invalid
@@ -142,7 +144,7 @@ namespace Http
     <h1>${request.uri.DecodeUri()}</h1>
     <tt><pre>\n`
 
-            dir = path.getString()
+            dir = path
             if dir.len() > 0 and dir.right(1) <> "/"
                 dir = dir + "/"
             end if

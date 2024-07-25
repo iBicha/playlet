@@ -11,7 +11,8 @@
 // Can be caught by inspecting the diff in the transpiled files.
 
 import {
-    CompilerPlugin, FileObj, ProgramBuilder,
+    AfterBuildProgramEvent,
+    CompilerPlugin,
 } from 'brighterscript';
 import { globSync } from "glob";
 import path from 'path';
@@ -20,14 +21,14 @@ import fs from 'fs-extra'
 export class TrackTranspiledPlugin implements CompilerPlugin {
     public name = 'TrackTranspiledPlugin';
 
-    afterPublish(builder: ProgramBuilder, files: FileObj[]) {
+    afterBuildProgram(event: AfterBuildProgramEvent) {
         // @ts-ignore 
-        if (!builder.options.testMode) {
+        if (!event.program.options.testMode) {
             return;
         }
 
-        const stagingDir = builder.options.stagingDir!;
-        const rootDir = builder.rootDir;
+        const stagingDir = event.program.options.stagingDir!;
+        const rootDir = event.program.options.rootDir!;
 
         const transpiledFolders = globSync('**/*.transpiled', { cwd: rootDir });
         for (let i = 0; i < transpiledFolders.length; i++) {

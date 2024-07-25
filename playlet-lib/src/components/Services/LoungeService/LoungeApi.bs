@@ -33,11 +33,12 @@ class LoungeApi
     public sessionId
     public gSessionId
     public devices
+    public poller
 
     private ofs
     private lastProcessedCommandIndex = -1
-    private poller
     private outgoingMessagesRequests
+    private dateTime as roDateTime
 
     function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -242,8 +243,8 @@ class LoungeApi
         chunk = m.ConsumeNewLines(chunk)
         newLineIndex = chunk.InStr(`\n`)
         while newLineIndex > 0
-            payloadSize = chunk.Left(newLineIndex).trim()
-            payloadSize = payloadSize.ToInt()
+            payloadSizeStr = chunk.Left(newLineIndex).trim()
+            payloadSize = payloadSizeStr.ToInt()
             payload = chunk.Mid(newLineIndex + 1, payloadSize)
             commands = ParseJson(payload)
             m.ProcessCommands(commands, messagesToSend)
@@ -298,7 +299,8 @@ class LoungeApi
             end if
 
             handler = COMMAND_HANDLER_PREFIX + commandType
-            if m.DoesExist(handler)
+            ' bs:disable-next-line LINT1001
+            if (m as roAssociativeArray).DoesExist(handler)
                 LogInfo(commandIndex, commandType)
                 m[handler](commandIndex, commandType, commandArgs, messagesToSend)
             else
@@ -542,7 +544,7 @@ class LoungeApi
         end for
 
         loungeData = FormatJson(loungeData)
-        RegistryUtils.Write(RegistryUtils.LAST_LOUNGE_DATA, loungeData)
+        RegistryUtils.Write(RegistryUtils.LAST_LOUNGE_DATA, loungeData as string)
     end function
 
     function DisconnectFromLastLounge() as void

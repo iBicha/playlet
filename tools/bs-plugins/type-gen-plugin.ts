@@ -1,5 +1,5 @@
 // This plugin generates a file containing functions for type checking and type casting.
-import { CompilerPlugin, Program, SourceObj } from "brighterscript";
+import { BeforeProvideFileEvent, CompilerPlugin } from "brighterscript";
 
 const types = [
     { name: 'Bool', interface: 'ifBoolean', type: 'boolean', defaultValue: 'false' },
@@ -38,18 +38,13 @@ end function`;
 export class TypeGenPlugin implements CompilerPlugin {
     public name = 'TypeGenPlugin';
 
-    program: Program | undefined;
-
-    afterProgramCreate(program: Program) {
-        this.program = program;
-    }
-
-    beforeFileParse(source: SourceObj) {
-        if (!source.srcPath.endsWith(typesFilePath)) {
+    beforeProvideFile(event: BeforeProvideFileEvent) {
+        if (!event.srcPath.endsWith(typesFilePath)) {
             return;
         }
 
-        if (source.source.includes(generatedCodeHeader)) {
+        let content = event.data.value.toString();
+        if (content.includes(generatedCodeHeader)) {
             return;
         }
 
@@ -62,8 +57,15 @@ export class TypeGenPlugin implements CompilerPlugin {
             }
         });
 
-        const fileContents = source.source + generatedCode;
-        this.program!.setFile(source.srcPath, fileContents)
+        content += generatedCode;
+
+        const file = event.fileFactory.BrsFile({
+            srcPath: event.srcPath,
+            destPath: event.destPath,
+        });
+        file.fileContents = content;
+
+        event.files.push(file);
     }
 }
 

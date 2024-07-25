@@ -12,20 +12,21 @@ namespace Http
 
     class HttpRequest
         ' members
-        private method = invalid
-        private uri = invalid
-        private route = invalid
+        public method = invalid
+        public uri = invalid
+        public route = invalid
         private query = invalid
         private protocol = invalid
         private encoder = invalid
-        private buffer = invalid
+        public buffer = invalid
         private buffer_index = 0
         private headers = invalid
         private body = invalid
-        private state = Http.HttpRequestState.INIT
+        public state = HttpRequestState.INIT as HttpRequestState
         private id = 0
         ' copied members
         private ready_for_response = false
+        private maybe_unicode as boolean
 
         function new()
             m.id = Http.GetHttpRequestId()
@@ -42,18 +43,18 @@ namespace Http
         end function
 
         function ProcessNext(connection as HttpConnection) as boolean
-            if m.state = Http.HttpRequestState.DONE
+            if m.state = HttpRequestState.DONE
                 return m.ready_for_response
             end if
 
-            if m.state = Http.HttpRequestState.INIT
-                m.state = Http.HttpRequestState.READING_OPERATION
+            if m.state = HttpRequestState.INIT
+                m.state = HttpRequestState.READING_OPERATION
             end if
 
-            if m.state = Http.HttpRequestState.READING_OPERATION
+            if m.state = HttpRequestState.READING_OPERATION
                 if m.ParseOperation()
                     m.ProcessOperation()
-                    m.state = Http.HttpRequestState.READING_HEADERS
+                    m.state = HttpRequestState.READING_HEADERS
                 end if
             end if
 

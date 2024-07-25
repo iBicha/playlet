@@ -1,77 +1,84 @@
 // This plugin generates a task component for each function annotated with @asynctask
 
 import {
-    CompilerPlugin,
+    AfterFileAddEvent,
+    BeforeProgramValidateEvent,
+    BrsFile,
     BscFile,
-    isBrsFile,
-    WalkMode,
+    CompilerPlugin,
     createVisitor,
-    Program,
-    FunctionStatement,
     DiagnosticSeverity,
+    FunctionStatement,
+    isBrsFile,
+    ParseMode,
+    Program,
+    WalkMode,
+    XmlFile,
 } from 'brighterscript';
 
 export class AsyncTaskPlugin implements CompilerPlugin {
     public name = 'AsyncTaskPlugin';
 
-    afterFileParse(file: BscFile) {
-        if (!isBrsFile(file)) {
-            return
+    afterFileAdd(event: AfterFileAddEvent) {
+        if (!isBrsFile(event.file)) {
+            return;
         }
 
-        const program = file.program
-
-        file.ast.walk(createVisitor({
-            FunctionExpression: (func) => {
-                if (!this.isAsyncTask(func.functionStatement)) {
-                    return
+        const program = event.program;
+        event.file.ast.walk(createVisitor({
+            FunctionStatement: (funcStmt) => {
+                if (!this.isAsyncTask(funcStmt)) {
+                    return;
                 }
 
-                const functionName = func.functionStatement!.name.text
-                const hasParams = func.functionStatement!.func.parameters.length > 0
-                const taskName = `${functionName}_AsyncTask`
+                const functionName = this.getFunctionName(funcStmt);
+                const hasParams = funcStmt.func.parameters.length > 0;
+                const taskName = this.getTaskName(funcStmt);
 
-                const bs = this.generateBsTask(functionName, hasParams, file)
-                const bsFile = `components/AsyncTask/generated/${taskName}.bs`
+                const bsFileContent = this.generateBsTask(functionName, hasParams, event.file);
+                const bsFilePath = `components/AsyncTask/generated/${taskName}.bs`;
 
-                const xml = this.generateXmlTask(taskName, bsFile)
-                const xmlFile = `components/AsyncTask/generated/${taskName}.xml`
+                const xmlFileContent = this.generateXmlTask(taskName);
+                const xmlFilePath = `components/AsyncTask/generated/${taskName}.xml`;
 
-                if (program.hasFile(xmlFile)) {
-                    const currentContent = program.getFile(xmlFile).fileContents
-                    if (currentContent !== xml) {
-                        file.addDiagnostics([{
-                            file: file,
-                            range: func.range,
-                            message: `AsyncTaskPlugin: file ${xmlFile} already exists`,
+                program.diagnostics.clearByFilter({ file: event.file, tag: this.name });
+
+                if (program.hasFile(xmlFilePath)) {
+                    const currentContent = (program.getFile(xmlFilePath) as XmlFile).fileContents;
+                    if (currentContent !== xmlFileContent) {
+                        program.diagnostics.register({
+                            file: event.file,
+                            range: funcStmt.tokens.name.location.range,
+                            message: `AsyncTaskPlugin: file ${xmlFilePath} already exists`,
                             severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
-                        }]);
+                        }, { tags: [this.name] });
                     }
                 }
-                file.program.setFile(xmlFile, xml)
 
-                if (program.hasFile(bsFile)) {
-                    const currentContent = program.getFile(bsFile).fileContents
-                    if (currentContent !== bs) {
-                        file.addDiagnostics([{
-                            file: file,
-                            range: func.range,
-                            message: `AsyncTaskPlugin: file ${bsFile} already exists`,
+                if (program.hasFile(bsFilePath)) {
+                    const currentContent = (program.getFile(bsFilePath) as BrsFile).fileContents;
+                    if (currentContent !== bsFileContent) {
+                        program.diagnostics.register({
+                            file: event.file,
+                            range: funcStmt.tokens.name.location.range,
+                            message: `AsyncTaskPlugin: file ${bsFilePath} already exists`,
                             severity: DiagnosticSeverity.Error,
                             code: 'ASYNC_TASK_FILE_EXISTS',
-                        }]);
+                        }, { tags: [this.name] });
                     }
                 }
-                file.program.setFile(bsFile, bs)
-            },
+
+                event.program.setFile(xmlFilePath, xmlFileContent);
+                event.program.setFile(bsFilePath, bsFileContent);
+            }
         }), {
-            walkMode: WalkMode.visitExpressionsRecursive
+            walkMode: WalkMode.visitStatements
         });
     }
 
-    beforeProgramValidate(program: Program) {
-        this.generateTaskListEnum(program);
+    beforeProgramValidate(event: BeforeProgramValidateEvent) {
+        this.generateTaskListEnum(event.program);
     }
 
     isAsyncTask(functionStatement: FunctionStatement | undefined) {
@@ -88,9 +95,17 @@ export class AsyncTaskPlugin implements CompilerPlugin {
         return false
     }
 
+    getFunctionName(funcStmt: FunctionStatement) {
+        return funcStmt.getName(ParseMode.BrightScript);
+    }
+
+    getTaskName(funcStmt: FunctionStatement) {
+        return this.getFunctionName(funcStmt) + '_AsyncTask';
+    }
+
     generateBsTask(functionName: string, hasInput: boolean, file: BscFile): string {
         return `
-import "pkg:/${file.pkgPath}"
+import "pkg:/${file.destPath}"
 import "pkg:/source/utils/ErrorUtils.bs"
 
 function Init()
@@ -127,7 +142,7 @@ end function
 `
     }
 
-    generateXmlTask(taskName: string, bsFile: string): string {
+    generateXmlTask(taskName: string): string {
 
         return `<?xml version="1.0" encoding="UTF-8" ?>
 
@@ -148,22 +163,22 @@ end function
             }
 
             file.ast.walk(createVisitor({
-                FunctionExpression: (func) => {
-                    if (!this.isAsyncTask(func.functionStatement)) {
+                FunctionStatement: (funcStmt) => {
+                    if (!this.isAsyncTask(funcStmt)) {
                         return
                     }
 
-                    acc.add(func.functionStatement!.name.text)
+                    acc.add(funcStmt)
                 },
             }), {
-                walkMode: WalkMode.visitExpressionsRecursive
+                walkMode: WalkMode.visitStatements
             });
 
             return acc
-        }, new Set<string>());
+        }, new Set<FunctionStatement>());
 
         const enumItems = Array.from(asyncTasks).map((task) => {
-            return `${task} = "${task}_AsyncTask"`
+            return `${this.getFunctionName(task)} = "${this.getTaskName(task)}"`
         })
 
         const content = 'enum Tasks\n    ' + enumItems.join('\n    ') + '\nend enum\n';

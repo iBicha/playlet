@@ -2,15 +2,15 @@
 // associated functions with the router.
 
 import {
-    BeforeFileTranspileEvent,
-    BscFile,
+    BeforePrepareFileEvent,
     ClassStatement,
     CompilerPlugin,
+    DiagnosticSeverity,
     FunctionExpression,
     FunctionStatement,
     MethodStatement,
     OnFileValidateEvent,
-    TokenKind,
+    ParseMode,
     WalkMode,
     createVisitor,
     isBrsFile
@@ -23,10 +23,13 @@ const httpRouterBaseClass = 'HttpRouter';
 export class WebServerPlugin implements CompilerPlugin {
     public name = 'WebServerPlugin';
 
-    onFileValidate(event: OnFileValidateEvent<BscFile>) {
+    onFileValidate(event: OnFileValidateEvent) {
         if (!isBrsFile(event.file)) {
             return;
         }
+
+        const program = event.program;
+        program.diagnostics.clearByFilter({ file: event.file, tag: this.name });
 
         // Make sure each class that inherits from HttpRouter has a constructor
         event.file.ast.walk(createVisitor({
@@ -35,20 +38,20 @@ export class WebServerPlugin implements CompilerPlugin {
                     return;
                 }
 
-                const parentClass = classStmt.parentClassName.expression.name.text;
+                const parentClass = classStmt.parentClassName.getName();
                 if (parentClass !== httpRouterBaseClass) {
                     return;
                 }
 
                 const classConstructor = this.getClassConstructor(classStmt);
                 if (!classConstructor) {
-                    event.file.addDiagnostics([{
+                    program.diagnostics.register({
                         file: event.file,
-                        range: classStmt.name.range,
-                        message: `Class ${classStmt.name.text} extends ${httpRouterBaseClass} and must have a constructor`,
-                        severity: 1,
+                        range: classStmt.tokens.name.location.range,
+                        message: `Class ${classStmt.tokens.name.text} extends ${httpRouterBaseClass} and must have a constructor`,
+                        severity: DiagnosticSeverity.Error,
                         code: 'HTTP_ROUTER_NO_CONSTRUCTOR',
-                    }]);
+                    }, { tags: [this.name] });
                 }
             },
         }), {
@@ -56,7 +59,7 @@ export class WebServerPlugin implements CompilerPlugin {
         });
     }
 
-    beforeFileTranspile(event: BeforeFileTranspileEvent<BscFile>) {
+    beforePrepareFile(event: BeforePrepareFileEvent) {
         if (!isBrsFile(event.file)) {
             return;
         }
@@ -84,7 +87,7 @@ export class WebServerPlugin implements CompilerPlugin {
                 const classConstructor = this.getClassConstructor(classStmt) as MethodStatement;
 
                 const method = routeInfo.method === 'ALL' ? '*' : routeInfo.method;
-                const stmt = new RawCodeStatement(`m.routes.push({ method: "${method}", path: "${routeInfo.route}", router: m, func: "${func.functionStatement?.name.text}" })`)
+                const stmt = new RawCodeStatement(`m.routes.push({ method: "${method}", path: "${routeInfo.route}", router: m, func: "${func.functionStatement!.getName(ParseMode.BrighterScript)}" })`)
                 event.editor.arrayPush(classConstructor.func.body.statements, stmt);
             },
         }), {
@@ -98,7 +101,7 @@ export class WebServerPlugin implements CompilerPlugin {
             return false;
         }
 
-        const parentClass = classStmt.parentClassName.expression.name.text;
+        const parentClass = classStmt.parentClassName.getName();
         return parentClass === httpRouterBaseClass;
     }
 
@@ -140,8 +143,7 @@ export class WebServerPlugin implements CompilerPlugin {
     getClassConstructor(classStmt: ClassStatement) {
         return classStmt.body.find((stmt) => {
             const methodStmt = stmt as MethodStatement;
-            // @ts-ignore
-            if (methodStmt.name?.kind === TokenKind.New) {
+            if (methodStmt.tokens.name.text === 'new') {
                 return stmt;
             }
         });

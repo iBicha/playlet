@@ -10,24 +10,25 @@ namespace Http
 
     class HttpServer
         ' members
-        private connections = invalid
-        private sockin = invalid
-        private uptime = invalid
+        private connections as roAssociativeArray
+        private sockin as roStreamSocket
+        private uptime as roTimespan
 
         ' initializable (copied) members
-        private num_requests = 0
-        private total_in = 0
-        private total_out = 0
+        public num_requests = 0
+        public total_in = 0
+        public total_out = 0
 
-        private routers
-        private postRouters
+        public routers as HttpRouter[]
+        public postRouters as HttpRouter[]
+        public utils as Utils
 
         public success as boolean
         public settings as Http.HttpSettings
-        public task as object
+        public task as roSGNodePlayletWebServer
         public websocket as Web.WebSocketServer
 
-        function new(settings as HttpSettings, task as object)
+        function new(settings as HttpSettings, task as roSGNodePlayletWebServer)
             m.settings = settings
             m.task = task
             m.routers = []
@@ -93,7 +94,7 @@ namespace Http
         function PreWait()
             connections = m.connections
             for each id in connections
-                conn = connections[id]
+                conn = connections[id] as HttpConnection
                 conn.CheckTimeout(m.settings.TimeoutInMs)
                 cs = conn.state
                 if cs = Http.HttpConnectionState.DONE
@@ -118,13 +119,13 @@ namespace Http
         function PostWait()
             connections = m.connections
             if m.sockin.isReadable()
-                conn = m.AcceptHttpConnection()
+                conn = m.AcceptHttpConnection() as HttpConnection
                 if conn <> invalid
                     connections[conn.id] = conn
                 end if
             end if
             for each id in connections
-                conn = connections[id]
+                conn = connections[id] as HttpConnection
                 cs = conn.state
                 if cs = Http.HttpConnectionState.RECV_REQUEST
                     if conn.socket.isReadable()

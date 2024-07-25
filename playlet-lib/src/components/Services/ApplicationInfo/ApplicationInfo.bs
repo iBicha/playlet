@@ -2,27 +2,35 @@ import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/services/ApplicationInfo.bs"
 
+typecast m as ApplicationInfoRoSGNode
+
+interface ApplicationInfoRoSGNode
+    top as roSgNodeApplicationInfo
+    service as ApplicationInfo
+    latestLibVersionTask as AsyncTask.AsyncTaskComponent
+end interface
+
 function Init()
     m.service = new ApplicationInfo(m.top)
 end function
 
-function GetAppInfo(_unused as dynamic) as object
+function GetAppInfo() as roAssociativeArray
     return m.service.GetAppInfo()
 end function
 
-function GetDeviceInfo(_unused as dynamic) as object
+function GetDeviceInfo() as roAssociativeArray
     return m.service.GetDeviceInfo()
 end function
 
-function GetUserCountryCode(_unused as dynamic) as string
+function GetUserCountryCode() as string
     return m.service.GetUserCountryCode()
 end function
 
-function GetLocalIpAddress(_unused as dynamic) as dynamic
+function GetLocalIpAddress() as dynamic
     return m.service.GetLocalIpAddress()
 end function
 
-function GetLatestPlayletLibVersion(_unused as dynamic) as dynamic
+function GetLatestPlayletLibVersion() as dynamic
     if not StringUtils.IsNullOrEmpty(m.top.lib_version_latest)
         return m.top.lib_version_latest
     end if
@@ -31,6 +39,8 @@ function GetLatestPlayletLibVersion(_unused as dynamic) as dynamic
         return invalid
     end if
 
+    ' TODO:P2 remove after fix
+    ' bs:disable-next-line LINT1001
     m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, function(output as object) as void
         m.latestLibVersionTask = invalid
         if output.success and output.result.latest <> invalid

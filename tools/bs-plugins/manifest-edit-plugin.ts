@@ -8,10 +8,11 @@
 //    - This is only done when --debug is set
 
 import {
+    AfterBuildProgramEvent,
+    BeforeProgramCreateEvent,
     BeforeProgramDisposeEvent,
     CompilerPlugin,
     Program,
-    ProgramBuilder
 } from 'brighterscript';
 import path from 'path';
 import fs from 'fs';
@@ -22,7 +23,8 @@ export class ManifestEditPlugin implements CompilerPlugin {
 
     private originalManifestContent?: string;
 
-    beforeProgramCreate(builder: ProgramBuilder) {
+    beforeProgramCreate(event: BeforeProgramCreateEvent) {
+        const builder = event.builder;
         const manifestPath = path.join(builder.options.rootDir!, "manifest")
         let originalManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' })
 
@@ -52,8 +54,8 @@ export class ManifestEditPlugin implements CompilerPlugin {
         fs.writeFileSync(manifestPath, manifestContent)
     }
 
-    afterPublish(builder: ProgramBuilder) {
-        this.restoreManifest(builder.program!);
+    afterBuildProgram(event: AfterBuildProgramEvent) {
+        this.restoreManifest(event.program);
     }
 
     beforeProgramDispose(event: BeforeProgramDisposeEvent) {
