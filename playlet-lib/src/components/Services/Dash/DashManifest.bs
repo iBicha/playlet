@@ -317,6 +317,17 @@ class DashManifest
                     LogWarn("Invalid video stream index, itag:", stream.itag)
                     continue for
                 end if
+
+                if (stream.width = invalid or stream.height = invalid) and not StringUtils.IsNullOrEmpty(stream.size)
+                    if stream.size.instr("x") > 0
+                        parts = stream.size.Tokenize("x")
+                        if parts.Count() = 2
+                            stream.width = ValidInt(parts[0].toInt())
+                            stream.height = ValidInt(parts[1].toInt())
+                        end if
+                    end if
+                end if
+
                 videoStreams.Push(stream)
             end if
         end for
