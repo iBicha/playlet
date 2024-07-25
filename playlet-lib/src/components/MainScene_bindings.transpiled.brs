@@ -1,4 +1,3 @@
-' This method is auto-generated!
 function InitializeBindings()
     m.top.bindings = {
         fields: {

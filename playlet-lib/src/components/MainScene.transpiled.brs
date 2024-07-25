@@ -23,10 +23,10 @@ end function
 
 function StartWebServer()
     m.loungeService = m.top.findNode("LoungeService")
-    m.loungeService.callfunc("StartService", invalid)
+    m.loungeService.callfunc("StartService")
     m.webServer = m.top.findNode("WebServer")
-    m.webServer.callfunc("StartServer", invalid)
+    m.webServer.callfunc("StartServer")
     m.dialServer = m.top.findNode("DialServer")
-    m.dialServer.callfunc("StartServer", invalid)
+    m.dialServer.callfunc("StartServer")
 end function
 '//# sourceMappingURL=./MainScene.brs.map
