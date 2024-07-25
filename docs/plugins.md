@@ -13,6 +13,7 @@
 - [Type Gen](#type-gen)
 - [Web Server](#web-server)
 - [Locale validation](#locale-validation)
+- [Roku types](#roku-types)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
 
@@ -623,3 +624,15 @@ The plugin checks for the following:
 - `en_US` must have matching source and translation values, so it can act as a fallback translation.
 - All `source` translations from all languages must be present in the `@locale` enums. This is to prevent renaming the values in the code without updating translation files.
 - Translation `source` keys can't be used except for certain fields such as `"text"` and `"title"`. This is to prevent the accidental localization of non-display fields, such as node ids.
+
+## Roku types
+
+**[Source](/tools/bs-plugins/roku-types-plugin.ts)**
+
+### Why
+
+BrighterScript compiler contains a list of Roku types scraped from the documentation website. Sometimes documentation is not perfect, which causes false positives in validaiton. This plugin allows to patch the data types.
+
+### How
+
+We check if components/interfaces are linked correctly, and if not, override them. This is possible because the Roku types used by bsc are exported, and we're able to patch them before the program starts in the `beforeProgramCreate` hook. This is important because Roku types are populated on program creation.
