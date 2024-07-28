@@ -47,6 +47,6 @@ LeanBack, also known as Lounge API, also known as "cast from phone". Is a featur
 When this feature is used, all traffic related to the videos being watched, added to the queue, and the video player state is routed through YouTube servers.
 
 Playlet tries to preserve user privacy, to the best of its ability, by implementing several techniques, such as randomizing device id, using a fresh session on each start, and only providing necessary fields for the feature to function.
-Additionally, Playlet does not join a session/lounge, until a device is attempting to connect using DIAL (**DI**scovery **A**nd **L**aunch spec) also know sa "Connect with Wi-Fi", or when a `Link with TV code` is generated, by visiting the appropriate settings page.
+Additionally, Playlet does not join a session/lounge, until a device is attempting to connect using DIAL (**DI**scovery **A**nd **L**aunch spec) also known as "Connect with Wi-Fi", or when a `Link with TV code` is generated, by visiting the appropriate settings page.
 
 If you have privacy concerns and do not wish to use this functionality, simply do not connect from a local network using the YouTube app or the browser, and do not visit the `Link with TV code` tab.
