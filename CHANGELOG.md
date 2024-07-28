@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+## Fixed
+
+- Issue with focus in the video queue view
 
 ## [0.25.0] - 2024-07-22
 

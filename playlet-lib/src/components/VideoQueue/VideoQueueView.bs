@@ -49,12 +49,14 @@ function OnContentSet() as void
     end if
 
     index = content.index
+    videoCount = content.getChildCount()
     if IsInt(index) and index <> -1
-        m.queueLabel.text = Tr(Locale.VideoQueue.Queue) + ` (${index + 1}/${content.getChildCount()})`
+        m.queueLabel.text = Tr(Locale.VideoQueue.Queue) + ` (${index + 1}/${videoCount})`
     else
-        m.queueLabel.text = Tr(Locale.VideoQueue.Queue) + ` (${content.getChildCount()})`
+        m.queueLabel.text = Tr(Locale.VideoQueue.Queue) + ` (${videoCount})`
     end if
 
+    AdjustFocus(videoCount)
     LoadVideoDetailsIfNeeded()
 end function
 
@@ -144,6 +146,14 @@ function LoadVideoDetailsIfNeeded() as void
         invidious: m.top.invidious
         index: indexInLoadingArray
     })
+end function
+
+function AdjustFocus(videoCount as integer)
+    hasVideos = videoCount > 0
+    if not hasVideos and m.queueList.hasFocus()
+        NodeSetFocus(m.clearButton, true)
+    end if
+    m.queueList.focusable = hasVideos
 end function
 
 function OnDispose()
