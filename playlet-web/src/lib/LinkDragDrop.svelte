@@ -79,7 +79,7 @@
   async function searchForVideoById(videoId, timestamp) {
     try {
       isLoading = true;
-      videoMetadata = await invidiousApi.getVideoMetadata(videoId);
+      videoMetadata = await invidiousApi.getVideoMetadata(videoId, false);
       videoStartAtChecked = timestamp !== undefined;
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;

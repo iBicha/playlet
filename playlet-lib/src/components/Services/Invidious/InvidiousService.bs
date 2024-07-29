@@ -113,6 +113,7 @@ namespace Invidious
             cacheSeconds = 18000 ' 5 hours
             cancellation = invalid
             tryCount = 2
+            refresh = true
 
             if options <> invalid
                 if options.DoesExist("cacheSeconds")
@@ -124,12 +125,19 @@ namespace Invidious
                 if options.DoesExist("tryCount")
                     tryCount = options.tryCount
                 end if
+                if options.DoesExist("refresh")
+                    refresh = options.refresh
+                end if
             end if
 
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
             request = HttpClient.Get(url)
+
+            if not refresh
+                request.QueryParam("refresh", "false")
+            end if
 
             request.CacheSeconds(cacheSeconds)
             request.Cancellation(cancellation)

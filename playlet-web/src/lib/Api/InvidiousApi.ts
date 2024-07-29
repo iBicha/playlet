@@ -47,8 +47,8 @@ export class InvidiousApi {
         return await response.json();
     }
 
-    public async getVideoMetadata(videoId: string) {
-        const response = await fetch(`${this.instance}/api/v1/videos/${videoId}`);
+    public async getVideoMetadata(videoId: string, refresh: boolean = true) {
+        const response = await fetch(`${this.instance}/api/v1/videos/${videoId}?refresh=${refresh}`);
         return await response.json();
     }
 
