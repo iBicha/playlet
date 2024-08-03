@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## Fixed
+### Added
+
+- Partial Spanish translations (Thanks to gallegonovato)
+
+### Fixed
 
 - Issue with focus in the video queue view
 
 ## [0.25.0] - 2024-07-22
 
-## Added
+### Added
 
 - Sort options to channel live streams
 - Video width and height to DASH manifest
@@ -26,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A bug where a bookmarked but deleted playlist can't be removed from bookmarks
 
 ## [0.24.5] - 2024-07-03
+
+### Added
 
 - Additional Spanish (Mexico) translations (Thanks to Jean Carton)
 
