@@ -272,7 +272,11 @@ For debugging, choose the compound target `Playlet Web (Debug)`.
 
 The Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base styling library. Additionally, it uses [DaisyUI](https://daisyui.com/) as it offers a versatile set of components, and has built-in supports for themes.
 
-### API calls (proxy authenticated)
+### API calls
+
+The Playlet web app communicates with the Playlet Roku app using web APIs. Most of the APIs used are described in the OpenAPI spec [playlet-web-api.yml](./playlet-web-api.yml). The web app also uses Invidious apis documented at [https://docs.invidious.io/api](https://docs.invidious.io/api)
+
+#### API calls (proxy authenticated)
 
 When making authenticated calls to Invidious (for example to fetch the user Subscription feed) the Bearer token is needed.
 
@@ -286,9 +290,9 @@ For API calls that don't require authentication, the web app fetches data from I
 
 ### Developer settings
 
-The developer settings are only visible through the web app. They are found at the buttom of the settings page.
+The developer settings are found at the buttom of the settings page.
 
-For now, it allows you to point to a different Github release other than the default `latest`.
+One setting that is only available in the web app is `Playlet Library version`. It allows you to point to a different Github release other than the default `latest`.
 
 This is mostly useful to QA the `canary` release (see [Canary release](https://en.wikipedia.org/wiki/Feature_toggle#Canary_release)) in a "production" setting before making it available to all users as the official "latest" version.
 
