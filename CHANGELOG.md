@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- An announcement for the `This helps protect our community` error message
+
 ### Fixed
 
 - Few optimizations with texture loading to improve memory usage
