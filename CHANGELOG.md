@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Few optimizations with texture loading to improve memory usage
+- A rare crash in DIAL server
 
 ## [0.25.1] - 2024-08-03
 

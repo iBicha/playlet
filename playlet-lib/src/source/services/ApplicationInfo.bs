@@ -87,18 +87,42 @@ class ApplicationInfo
 
     function GetLibVersion() as string
         values = m.GetLibManifestValues()
+        if values = invalid
+            return "0.0.0"
+        end if
 
-        Major = values["major_version"].toInt()
-        Minor = values["minor_version"].toInt()
-        Build = values["build_version"].toInt()
+        major = 0
+        minor = 0
+        build = 0
 
-        return `${Major}.${Minor}.${Build}`
+        if values.DoesExist("major_version")
+            value = values["major_version"]
+            if IsString(value)
+                major = value.toInt()
+            end if
+        end if
+
+        if values.DoesExist("minor_version")
+            value = values["minor_version"]
+            if IsString(value)
+                minor = value.toInt()
+            end if
+        end if
+
+        if values.DoesExist("build_version")
+            value = values["build_version"]
+            if IsString(value)
+                build = value.toInt()
+            end if
+        end if
+
+        return `${major}.${minor}.${build}`
     end function
 
     function GetLibGitCommitHash() as string
         values = m.GetLibManifestValues()
 
-        if values.doesexist("git_commit_sha")
+        if values.DoesExist("git_commit_sha")
             return values["git_commit_sha"]
         end if
         return ""
