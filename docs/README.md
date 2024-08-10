@@ -145,7 +145,7 @@ There are a few reasons we made this separation:
 
 - Playlet relies on [Invidious](https://github.com/iv-org/invidious). Invidious tries to keep up with YouTube making changes to their platform, but sometimes, a breaking change happens that requires Playlet to react quickly. Releasing through the Roku Channel store can take days, or a week. During this time, Playlet would be not functional, and that's not acceptable.
 - The ability to roll back: Sometimes an app breaking bug gets released. Allowing users to choose a seperate version is a flexible way to keep things working. For example, it's possible to choose a different verrsion from the developer settings in the web app.
-- It is simply easier to release: Releasing Playlet Lib on Github, and everyone receives the latest version immediately, is very conveninct and less of a hassle, than going through the Roku Channel store.
+- It is simply easier to release: Releasing Playlet Lib on Github, and everyone receives the latest version immediately, is very convenient and less of a hassle, than going through the Roku Channel store.
   - I've had instances where I was trying to pass the certfication for Playlet to publish it. One of the criterias is to pass a some automated tests. But the tests were failing because their system could not connect to their Roku test devices (connection keeps timing out). My only option was to keep trying over and over until it worked.
   - It might sound that Playlet Lib is just a workaround for the Roku Channel release process. But phrased differently, Roku Channel release process is not good enough of what we need for Playlet.
 - Canary builds: The latest version of Playlet can be tested as soon as it lands in the main branch. This is a great way to test newer features in production, without affecting the stability of the released version. Roku has the concept of "beta" channels, but they are more cumbersome.
@@ -182,7 +182,8 @@ These are useful to see if the files and caching are working as expected.
 
 ### Releases from Github
 
-Since Component Libraries are simply zip files hosted at some https endpoint, Github releases are used to host and deliver Playet Lib to users. By default, Playlet grabs `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip` and loads it, but this can be pointed to somewhere else, if for some reason the Github repository becomes unavailable.
+Since Component Libraries are simply zip/squashfs files hosted at some HTTPS endpoint, Github releases are used to host and deliver Playet Lib to users. By default, Playlet grabs `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.squashfs.pkg` and loads it, but this can be pointed to somewhere else, if for some reason the Github repository becomes unavailable.
+Squashfs files are faster to load, but they require signing. Zip files can be used without signing if they are served from an HTTPS endpoint.
 
 ### Dev library hosted by VS Code Extension
 
