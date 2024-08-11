@@ -1,5 +1,6 @@
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -13,6 +14,8 @@ function Init()
     OnSizeChange()
 
     m.busySpinnerPoster.uri = "pkg:/images/spinner.png"
+
+    m.top.observeField("loadStatus", FuncName(OnLoadStatusChange))
 end function
 
 function OnSizeChange()
@@ -26,6 +29,21 @@ function OnSizeChange()
 end function
 
 function OnTextChange() as void
+    GenerateQrCode()
+end function
+
+function OnLoadStatusChange() as void
+    if m.top.loadStatus <> "failed"
+        return
+    end if
+
+    ' If the image failed to load, it might have been deleted from cachefs:
+    ' Try to generate it again
+    LogInfo("QrCode image failed to load, trying to generate it again")
+    GenerateQrCode()
+end function
+
+function GenerateQrCode() as void
     if m.qrCodeGenTask <> invalid
         m.qrCodeGenTask.cancel = true
     end if

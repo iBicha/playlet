@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- a bug where the web app qrcode doesn't show up
 
 ## [0.25.2] - 2024-08-05
 
