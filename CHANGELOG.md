@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - a bug where the web app qrcode doesn't show up
+- added `uri_resolution_autosub` to manifest (needed to fix 720p UI)
 
 ## [0.25.2] - 2024-08-05
 
