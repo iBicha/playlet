@@ -1126,7 +1126,7 @@
     </message>
     <message>
         <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
-        <translation>Dados de miniatura inválidos %1 (Content-Type não é uma imagem/*)</translation>
+        <translation>Dados de miniatura inválidos %1 (Content-Type não é uma image/*)</translation>
     </message>
     <message>
         <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
