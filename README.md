@@ -40,7 +40,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 ## Installation
 
-[Playlet on Roku channel store](https://channelstore.roku.com/en-ca/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
+[Playlet on Roku channel store](https://channelstore.roku.com/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
 
 ## Features
 
