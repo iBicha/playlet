@@ -6,7 +6,14 @@ namespace Http
         function MimeType(uri = "" as string) as string
             map = m.MimeTypes
             if map = invalid
-                map = ParseJson(ReadAsciiFile("libpkg:/config/mime-types.json5"))
+                json = ReadAsciiFile("libpkg:/config/mime-types.json5")
+                if StringUtils.IsNullOrEmpty(json)
+                    return "application/octet-stream"
+                end if
+                map = ParseJson(json)
+                if not IsAssociativeArray(map)
+                    return "application/octet-stream"
+                end if
                 m.MimeTypes = map
             end if
             ext = m.GetExtension(uri)
@@ -29,7 +36,14 @@ namespace Http
         function HttpTitle(code = 0 as integer) as string
             map = m.httpCodesMap
             if map = invalid
-                map = ParseJson(ReadAsciiFile("libpkg:/config/http-codes.json5"))
+                json = ReadAsciiFile("libpkg:/config/http-codes.json5")
+                if StringUtils.IsNullOrEmpty(json)
+                    return ""
+                end if
+                map = ParseJson(json)
+                if not IsAssociativeArray(map)
+                    return ""
+                end if
                 m.httpCodesMap = map
             end if
             return ValidString(map[`${code}`])
