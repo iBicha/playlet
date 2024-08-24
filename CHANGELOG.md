@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- A bug where channel view infinitely tries to load a `Topic` channel
 
 ## [0.25.4] - 2024-08-24
 
