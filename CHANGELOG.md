@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Portuguese (Brazil) translations (Thanks to davbrasan)
 
+### Fixed
+
+- Rare crash related to NavBar
+
 ## [0.25.3] - 2024-08-14
 
 ### Fixed
