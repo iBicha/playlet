@@ -2,7 +2,6 @@
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
-'import "pkg:/source/utils/Locale.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
@@ -20,7 +19,6 @@ function MainSceneContainerChanged()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
     CopyLoadingMessagesToCache()
-    ShowAnnouncement()
 end function
 
 function StartWebServer()
@@ -30,28 +28,5 @@ function StartWebServer()
     m.webServer.callfunc("StartServer", invalid)
     m.dialServer = m.top.findNode("DialServer")
     m.dialServer.callfunc("StartServer", invalid)
-end function
-
-function ShowAnnouncement()
-    title = "Announcement"
-    message = [
-        "Hello again!"
-        "Invidious servers are actively getting blocked by YouTube."
-        "If you see the error message " + chr(34) + "This helps protect our community. Learn more" + chr(34) + " when playing a video, try changing the Invidious instance in the settings."
-        "This is a known issue and the Invidious dev team is working to fix it."
-        "See more information at https://github.com/iv-org/invidious/issues/4734"
-        "We apologize for the inconvenience."
-    ]
-    buttons = [
-        Tr("OK")
-    ]
-    dialog = CreateObject("roSGNode", "SimpleDialog")
-    dialog.title = title
-    dialog.message = message
-    dialog.buttons = buttons
-    deviceInfo = CreateObject("roDeviceInfo")
-    displaySize = deviceInfo.GetDisplaySize()
-    dialog.width = displaySize.w - 180
-    m.top.getScene().dialog = dialog
 end function
 '//# sourceMappingURL=./MainScene.brs.map
