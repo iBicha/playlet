@@ -4,9 +4,11 @@
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
   import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
+  import PlaylistCastDialog from "./VideoFeed/PlaylistCastDialog.svelte";
 
   let videoModal;
   let channelModal;
+  let playlistModal;
   let isDragging;
   let isLoading;
   let dragEndTimeout;
@@ -16,6 +18,7 @@
 
   let videoMetadata;
   let channelMetadata;
+  let playlistMetadata;
 
   let invidiousApi = new InvidiousApi();
 
@@ -71,6 +74,9 @@
         if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_CHANNEL") {
           searchForChannelById(urlInfo.ucid);
           return;
+        } else if (urlInfo && urlInfo.pageType === "WEB_PAGE_TYPE_PLAYLIST") {
+          searchForPlaylistById(urlInfo.ucid);
+          return;
         }
       }
     }
@@ -95,6 +101,16 @@
       isLoading = true;
       channelMetadata = await invidiousApi.getChannelMetadata(channelId);
       channelModal.show();
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function searchForPlaylistById(playlistId) {
+    try {
+      isLoading = true;
+      playlistMetadata = await invidiousApi.getPlaylistMetadata(playlistId);
+      playlistModal.show();
     } finally {
       isLoading = false;
     }
@@ -183,8 +199,10 @@
   function closeModal() {
     videoModal?.close();
     channelModal?.close();
+    playlistModal?.close();
     videoMetadata = undefined;
     channelMetadata = undefined;
+    playlistMetadata = undefined;
   }
 </script>
 
@@ -220,4 +238,13 @@
   author={channelMetadata?.author}
   authorId={channelMetadata?.authorId}
   authorThumbnails={channelMetadata?.authorThumbnails}
+/>
+
+<PlaylistCastDialog
+  bind:this={playlistModal}
+  title={playlistMetadata?.title}
+  playlistId={playlistMetadata?.playlistId}
+  playlistThumbnail={playlistMetadata?.playlistThumbnail}
+  videoCount={playlistMetadata?.videoCount}
+  videos={playlistMetadata?.videos}
 />

@@ -57,6 +57,15 @@ export class InvidiousApi {
         return await response.json();
     }
 
+    public async getPlaylistMetadata(plid: string) {
+        if (plid.startsWith("VLPL")) {
+            plid = plid.substring(2);
+        }
+
+        const response = await fetch(`${this.instance}/api/v1/playlists/${plid}`);
+        return await response.json();
+    }
+
     public async resolveUrl(url: string) {
         const response = await fetch(`${this.instance}/api/v1/resolveurl?url=${encodeURIComponent(url)}`);
         return await response.json();
