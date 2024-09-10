@@ -183,10 +183,11 @@ imap.once('ready', async () => {
 
         writeMarkDownFile(images);
 
-        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString);
+        // TODO:P0 deleting emails hangs the process, so it's disabled for now
+        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString);
 
         imap.end();
     } catch (error) {
