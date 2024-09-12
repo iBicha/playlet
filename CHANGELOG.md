@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for parsing playlist urls in web app (`https://www.youtube.com/playlist?list=ID`)
+- Back the announcement for the `This helps protect our community` error message
 
 ## [0.25.5] - 2024-09-06
 
