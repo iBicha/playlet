@@ -67,6 +67,9 @@
       if (videoInfo.videoId) {
         searchForVideoById(videoInfo.videoId, videoInfo.timestamp);
         return;
+      } else if (videoInfo.clipId) {
+        searchVideoByClipId(videoInfo.clipId);
+        return;
       } else {
         // TODO:P2 make a HEAD request and check for a redirect, then
         // resolve the redirect url.
@@ -79,6 +82,26 @@
           return;
         }
       }
+    }
+  }
+
+  async function searchVideoByClipId(clipId) {
+    try {
+      isLoading = true;
+
+      const clipInfo = await invidiousApi.getClipMetadata(clipId);
+      const video = clipInfo.video;
+      if (clipInfo.clipTitle) {
+        video.title = `${clipInfo.clipTitle} (${video.title})`;
+      }
+      videoMetadata = video;
+      videoStartAtChecked = !!clipInfo.startTime;
+      if (videoStartAtChecked) {
+        videoStartAtTimestamp = clipInfo.startTime;
+      }
+      videoModal.show();
+    } finally {
+      isLoading = false;
     }
   }
 
@@ -147,6 +170,13 @@
       if (timestamp) {
         return timestamp.endsWith("s") ? timestamp.slice(0, -1) : timestamp;
       }
+    }
+
+    if (url.startsWith("https://www.youtube.com/clip/")) {
+      const clipId = url.substring("https://www.youtube.com/clip/".length);
+      return {
+        clipId,
+      };
     }
 
     // Share/Short url

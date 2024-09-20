@@ -52,6 +52,11 @@ export class InvidiousApi {
         return await response.json();
     }
 
+    public async getClipMetadata(clipId: string) {
+        const response = await fetch(`${this.instance}/api/v1/clips/${clipId}`);
+        return await response.json();
+    }
+
     public async getChannelMetadata(ucid: string) {
         const response = await fetch(`${this.instance}/api/v1/channels/${ucid}`);
         return await response.json();
