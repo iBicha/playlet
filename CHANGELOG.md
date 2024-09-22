@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for casting clips from web app
+- A workaround for video loading errors: uses Playlet Web app and [YouTube.js](https://github.com/LuanRT/YouTube.js) to load streaming data. This workaround is limited, and might not work. It doesn't have closed captions, nor trickplay thumbnails (storyboards).
+  - **How To use**: Open the web app, click on a video, and choose "Play on <TV_NAME> (HOT FIX)".
 
 ## [0.25.6] - 2024-09-12
 
