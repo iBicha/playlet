@@ -178,7 +178,13 @@ export class YoutubeJs {
 
     static async getVideoInfo(videoId: string) {
         await this.init();
-        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, 'ANDROID');
+        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, 'IOS');
+
+        console.log('[YTJS] info:', info);
+
+        if (info.playability_status.status !== 'OK') {
+            throw new Error(`Video not available: ${info.playability_status.reason}`);
+        }
 
         const formatStreams = info.streaming_data.formats.map(format => {
             return {

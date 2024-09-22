@@ -46,13 +46,18 @@
 
   async function playOnTvHotFix() {
     // measure length of time it takes to get video info
-    const start = performance.now();
-    const videoInfo = await YoutubeJs.getVideoInfo(videoId);
-    const end = performance.now();
-    console.log(`Time to get video info: ${end - start}ms`);
+    try {
+      const start = performance.now();
+      const videoInfo = await YoutubeJs.getVideoInfo(videoId);
+      const end = performance.now();
+      console.log(`Time to get video info: ${end - start}ms`);
 
-    await YoutubeJs.postCacheData(videoInfo);
-    await playOnTv();
+      await YoutubeJs.postCacheData(videoInfo);
+      await playOnTv();
+    } catch (e) {
+      console.error(e);
+      alert(e.toString());
+    }
   }
 
   async function queueOnTv() {
