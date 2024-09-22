@@ -1,0 +1,69 @@
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Http
+
+    class ProxyRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            task = server.task
+            m.invidiousNode = task.invidious
+            m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
+        end function
+
+        @post("/api/proxy")
+        function ProxyRequest(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            requestArgs = request.Json()
+            if requestArgs = invalid
+                response.Default(400, "Invalid request body")
+                return true
+            end if
+
+            httpReq = HttpClient.FromObject(requestArgs)
+            httpRes = httpReq.Await()
+
+            result = {
+                "status": httpRes.StatusCode()
+                "headers": httpRes.Headers()
+                "body": httpRes.Text()
+            }
+
+            response.Json(result)
+            return true
+        end function
+
+        @post("/api/ytjs-cache")
+        function CacheVideoInfo(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            json = request.Json()
+            if json = invalid
+                response.Default(400, "Invalid request body")
+                return true
+            end if
+
+            instance = m.invidiousService.GetInstance()
+            videoId = json.videoId
+
+            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
+
+            ' Place a fake cache so we can read it later
+            requestObj = HttpClient.Get(url)
+            requestObj.CacheSeconds(18000)
+            responseObj = new HttpClient.HttpResponse(requestObj, invalid)
+            responseObj.OverrideStatusCode(200)
+            responseObj.OverrideText(request.body)
+            HttpClientCache.Set(responseObj)
+
+            response.Default(204, "OK")
+            return true
+        end function
+
+    end class
+
+end namespace
