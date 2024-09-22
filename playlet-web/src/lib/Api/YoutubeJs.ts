@@ -174,8 +174,6 @@ export class YoutubeJs {
             YoutubeJs.initPromise = null;
         });
         await YoutubeJs.initPromise;
-        // for debugging
-        window['innerTube'] = YoutubeJs.innerTube;
     }
 
     static async getVideoInfo(videoId: string) {
@@ -286,5 +284,4 @@ export class YoutubeJs {
             body: JSON.stringify(payload)
         })
     }
-
 }
