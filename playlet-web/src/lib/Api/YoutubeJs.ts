@@ -277,16 +277,50 @@ export class YoutubeJs {
     }
 
     static async postCacheData(data) {
-        await YoutubeJs.postJson(`${YoutubeJs.host()}/api/ytjs-cache`, data);
+        const maxRetries = 2;
+        const timeout = 5000;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                await YoutubeJs.postJson(`${YoutubeJs.host()}/api/ytjs-cache`, data, timeout);
+                break;
+            } catch (error) {
+                if (attempt === maxRetries) {
+                    throw error;
+                }
+                console.warn(`Attempt ${attempt} failed. Retrying...`);
+            }
+        }
     }
 
-    private static postJson(url, payload) {
-        return fetch(url, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            method: "POST",
-            body: JSON.stringify(payload)
-        })
+    private static postJson(url, payload, timeout) {
+        return new Promise((resolve, reject) => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => {
+                controller.abort();
+                reject(new Error('Request timed out'));
+            }, timeout);
+
+            fetch(url, {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                method: "POST",
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            })
+                .then(response => {
+                    clearTimeout(timer);
+                    resolve(response);
+                })
+                .catch(err => {
+                    clearTimeout(timer);
+                    if (err.name === 'AbortError') {
+                        reject(new Error('Request was aborted'));
+                    } else {
+                        reject(err);
+                    }
+                });
+        });
     }
 }
