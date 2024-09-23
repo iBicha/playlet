@@ -203,7 +203,6 @@ export class YoutubeJs {
                 itag: `${format.itag}`,
                 type: format.mime_type,
                 clen: `${format.approx_duration_ms}`,
-                lmt: `${format.last_modified}`,
                 container: formatInfo?.ext,
                 encoding: formatInfo?.acodec ?? formatInfo?.vcodec,
             };
