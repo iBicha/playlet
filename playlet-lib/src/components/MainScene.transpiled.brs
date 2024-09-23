@@ -32,14 +32,28 @@ function StartWebServer()
     m.dialServer.callfunc("StartServer", invalid)
 end function
 
+function GetDeviceFriendlyName() as string
+    deviceInfo = CreateObject("roDeviceInfo")
+    deviceFriendlyName = deviceInfo.GetFriendlyName()
+    if StringUtils_IsNullOrEmpty(deviceFriendlyName)
+        deviceFriendlyName = "Roku TV"
+    end if
+    return deviceFriendlyName
+end function
+
 function ShowAnnouncement()
-    title = "Announcement"
+    title = "Announcement #2 - web app hot fix"
     message = [
-        "Hello again!"
-        "Invidious servers are actively getting blocked by YouTube."
-        "You might see the error message " + chr(34) + "This helps protect our community. Learn more" + chr(34) + " when playing a video."
-        "This is a known issue and the Invidious dev team is working to fix it."
-        "See more information at https://github.com/iv-org/invidious/issues/4734"
+        "Invidious servers continue being blocked by YouTube. https://github.com/iBicha/playlet/issues/400"
+        "A temporary workaround has been implemented which relies on your Roku device instead of Invidious for streaming data. This workaround is limited, doesn't always work, and doesn't have captions."
+        "How to use:"
+    ]
+    bulletText = [
+        "Go to the " + chr(34) + "Remote" + chr(34) + " screen, and open Playlet Web App in your browser"
+        "In the web app, tap the video you want to play"
+        ("Choose " + chr(34) + "Play on " + bslib_toString(GetDeviceFriendlyName()) + " (HOT FIX)" + chr(34))
+    ]
+    bottomMessage = [
         "We apologize for the inconvenience."
     ]
     buttons = [
@@ -48,6 +62,8 @@ function ShowAnnouncement()
     dialog = CreateObject("roSGNode", "SimpleDialog")
     dialog.title = title
     dialog.message = message
+    dialog.bulletText = bulletText
+    dialog.bottomMessage = bottomMessage
     dialog.buttons = buttons
     deviceInfo = CreateObject("roDeviceInfo")
     displaySize = deviceInfo.GetDisplaySize()
