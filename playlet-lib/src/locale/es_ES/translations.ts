@@ -400,5 +400,617 @@
         <source>The instance can fetch video details for ID %1 (%2)</source>
         <translation>La instancia puede obtener detalles del video para ID %1 (%2)</translation>
     </message>
+    <message>
+        <source>%1 is not reachable</source>
+        <translation>No se encuentra %1</translation>
+    </message>
+    <message>
+        <source>Invalid thumbnail data %1 (Content-Type is not image/*)</source>
+        <translation>Miniatura de %1 no válida (Content-Type no es image/*)</translation>
+    </message>
+    <message>
+        <source>0 subscribers</source>
+        <translation>0 suscriptores</translation>
+    </message>
+    <message>
+        <source>1 subscriber</source>
+        <translation>1 suscriptor</translation>
+    </message>
+    <message>
+        <source>^n subscribers</source>
+        <translation>^n suscriptores</translation>
+    </message>
+    <message>
+        <source>Updated 1 hour ago</source>
+        <translation>Actualizado hace 1 hora</translation>
+    </message>
+    <message>
+        <source>Updated ^n hours ago</source>
+        <translation>Actualizado hace ^n hora</translation>
+    </message>
+    <message>
+        <source>Updated 1 month ago</source>
+        <translation>Actualizado hace 1 mes</translation>
+    </message>
+    <message>
+        <source>Updated ^n months ago</source>
+        <translation>Actualizado hace ^n meses</translation>
+    </message>
+    <message>
+        <source>1 month ago</source>
+        <translation>Hace 1 mes</translation>
+    </message>
+    <message>
+        <source>^n months ago</source>
+        <translation>Hace ^n meses</translation>
+    </message>
+    <message>
+        <source>1 week ago</source>
+        <translation>Hace 1 semana</translation>
+    </message>
+    <message>
+        <source>^n minutes ago</source>
+        <translation>Hace ^n minutos</translation>
+    </message>
+    <message>
+        <source>1 hour ago</source>
+        <translation>Hace 1 hora</translation>
+    </message>
+    <message>
+        <source>^n hours ago</source>
+        <translation>Hace ^n horas</translation>
+    </message>
+    <message>
+        <source>1 minute ago</source>
+        <translation>Hace 1 minuto</translation>
+    </message>
+    <message>
+        <source>Premiering now</source>
+        <translation>Se estrena ahora</translation>
+    </message>
+    <message>
+        <source>Premieres in 1 second</source>
+        <translation>Se estrena en 1 segundo</translation>
+    </message>
+    <message>
+        <source>Premieres in ^n seconds</source>
+        <translation>Se estrena en ^n segundos</translation>
+    </message>
+    <message>
+        <source>Premieres in 1 minute</source>
+        <translation>Se estrena en 1 minuto</translation>
+    </message>
+    <message>
+        <source>Premieres in ^n hours</source>
+        <translation>Se estrena en ^n horas</translation>
+    </message>
+    <message>
+        <source>Premieres in 1 day</source>
+        <translation>Se estrena en 1 día</translation>
+    </message>
+    <message>
+        <source>Premieres in ^n days</source>
+        <translation>Se estrena en ^n días</translation>
+    </message>
+    <message>
+        <source>LIVE</source>
+        <translation>EN DIRECTO</translation>
+    </message>
+    <message>
+        <source>UPCOMING</source>
+        <translation>PRÓXIMAMENTE</translation>
+    </message>
+    <message>
+        <source>You currently have no bookmarks.</source>
+        <translation>En estos momentos no tienes marcadores.</translation>
+    </message>
+    <message>
+        <source>Channels</source>
+        <translation>Canales</translation>
+    </message>
+    <message>
+        <source>To add bookmarks, long-press &apos;OK&apos; on a video, playlist or channel.</source>
+        <translation>Para añadir marcadores, mantén pulsado &apos;De acuerdo&apos; en un vídeo, lista de reproducción o canal.</translation>
+    </message>
+    <message>
+        <source>Link with TV code</source>
+        <translation>Enlacar con código de TV</translation>
+    </message>
+    <message>
+        <source>Roku connected to:</source>
+        <translation>Roku conectado a:</translation>
+    </message>
+    <message>
+        <source>Preferred quality</source>
+        <translation>Calidad preferida</translation>
+    </message>
+    <message>
+        <source>Enabled</source>
+        <translation>Activado</translation>
+    </message>
+    <message>
+        <source>Search history preferences</source>
+        <translation>Ajustes de historial de búsqueda</translation>
+    </message>
+    <message>
+        <source>Enable search history</source>
+        <translation>Activar historial de búsqueda</translation>
+    </message>
+    <message>
+        <source>Clear search history</source>
+        <translation>Borrar historial de búsqueda</translation>
+    </message>
+    <message>
+        <source>Edit home screen</source>
+        <translation>Editar pantalla de inicio</translation>
+    </message>
+    <message>
+        <source>Request cancelled.</source>
+        <translation>Solicitud cancelada.</translation>
+    </message>
+    <message>
+        <source>Reason</source>
+        <translation>Motivo</translation>
+    </message>
+    <message>
+        <source>Chapter</source>
+        <translation>Capítulo</translation>
+    </message>
+    <message>
+        <source>Device connected</source>
+        <translation>Dispositivo conectado</translation>
+    </message>
+    <message>
+        <source>Queue</source>
+        <translation>Cola</translation>
+    </message>
+    <message>
+        <source>Device</source>
+        <translation>Dispositivo</translation>
+    </message>
+    <message>
+        <source>Load more</source>
+        <translation>Cargar más</translation>
+    </message>
+    <message>
+        <source>No Bookmarks</source>
+        <translation>No hay Marcadores</translation>
+    </message>
+    <message>
+        <source>This will restart Playlet.</source>
+        <translation>Esto reiniciará Playlet.</translation>
+    </message>
+    <message>
+        <source>Open Playlist</source>
+        <translation>Abrir lista de reproducción</translation>
+    </message>
+    <message>
+        <source>Open Video Channel</source>
+        <translation>Abrir canal del vídeo</translation>
+    </message>
+    <message>
+        <source>Type</source>
+        <translation>Tipo</translation>
+    </message>
+    <message>
+        <source>Duration</source>
+        <translation>Duración</translation>
+    </message>
+    <message>
+        <source>Last hour</source>
+        <translation>Última hora</translation>
+    </message>
+    <message>
+        <source>This year</source>
+        <translation>Este año</translation>
+    </message>
+    <message>
+        <source>Creative Commons</source>
+        <translation>Creative Commons</translation>
+    </message>
+    <message>
+        <source>360°</source>
+        <translation>360°</translation>
+    </message>
+    <message>
+        <source>No thumbnails found in JSON from %1</source>
+        <translation>No se han encontrado miniaturas de %1 en el JSON</translation>
+    </message>
+    <message>
+        <source>Buffering</source>
+        <translation>Almacenando en búfer</translation>
+    </message>
+    <message>
+        <source>Loading</source>
+        <translation>Cargando</translation>
+    </message>
+    <message>
+        <source>Unpaid/Self Promotion</source>
+        <translation>No remunerado/Autopromoción</translation>
+    </message>
+    <message>
+        <source>Exclusive Access</source>
+        <translation>Acesso exclusivo</translation>
+    </message>
+    <message>
+        <source>Highlight</source>
+        <translation>Destacar</translation>
+    </message>
+    <message>
+        <source>Preview/Recap</source>
+        <translation>Vista previa/Resumen</translation>
+    </message>
+    <message>
+        <source>Added to queue</source>
+        <translation>Añadir a la cola</translation>
+    </message>
+    <message>
+        <source>Thank you for using Playlet.</source>
+        <translation>Gracias por usar Playlet.</translation>
+    </message>
+    <message>
+        <source>Latest (default)</source>
+        <translation>Más reciente (predeterminado)</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Aplicar</translation>
+    </message>
+    <message>
+        <source>Play Video</source>
+        <translation>Reproducir vídeo</translation>
+    </message>
+    <message>
+        <source>Profiles</source>
+        <translation>Perfiles</translation>
+    </message>
+    <message>
+        <source>Start at</source>
+        <translation>Empezar en</translation>
+    </message>
+    <message>
+        <source>Open Playlist Channel</source>
+        <translation>Abrir canal de lista de reproducción</translation>
+    </message>
+    <message>
+        <source>Play Playlist</source>
+        <translation>Reproducir lista de reproducción</translation>
+    </message>
+    <message>
+        <source>Open Channel</source>
+        <translation>Abrir canal</translation>
+    </message>
+    <message>
+        <source>Upload date</source>
+        <translation>Fecha de subida</translation>
+    </message>
+    <message>
+        <source>Refresh Home</source>
+        <translation>Actualizar Inicio</translation>
+    </message>
+    <message>
+        <source>Refresh Bookmarks</source>
+        <translation>Actualizar Marcadores</translation>
+    </message>
+    <message>
+        <source>Sort by</source>
+        <translation>Ordenar por</translation>
+    </message>
+    <message>
+        <source>Any date</source>
+        <translation>Cualquier fecha</translation>
+    </message>
+    <message>
+        <source>Today</source>
+        <translation>Hoy</translation>
+    </message>
+    <message>
+        <source>This week</source>
+        <translation>Esta semana</translation>
+    </message>
+    <message>
+        <source>This month</source>
+        <translation>Este mes</translation>
+    </message>
+    <message>
+        <source>Video</source>
+        <translation>Vídeo</translation>
+    </message>
+    <message>
+        <source>Playlist</source>
+        <translation>Lista de reproducción</translation>
+    </message>
+    <message>
+        <source>Channel</source>
+        <translation>Canal</translation>
+    </message>
+    <message>
+        <source>Movie</source>
+        <translation>Película</translation>
+    </message>
+    <message>
+        <source>Under 4 minutes</source>
+        <translation>Menos de 4 minutos</translation>
+    </message>
+    <message>
+        <source>4 - 20 minutes</source>
+        <translation>Entre 4 y 20 minutos</translation>
+    </message>
+    <message>
+        <source>Over 20 minutes</source>
+        <translation>Más de 20 minutos</translation>
+    </message>
+    <message>
+        <source>4K</source>
+        <translation>4K</translation>
+    </message>
+    <message>
+        <source>HD</source>
+        <translation>HD</translation>
+    </message>
+    <message>
+        <source>Subtitles/CC</source>
+        <translation>Subtítulos/CC</translation>
+    </message>
+    <message>
+        <source>VR180</source>
+        <translation>VR180</translation>
+    </message>
+    <message>
+        <source>3D</source>
+        <translation>3D</translation>
+    </message>
+    <message>
+        <source>HDR</source>
+        <translation>HDR</translation>
+    </message>
+    <message>
+        <source>Purchased</source>
+        <translation>Comprado</translation>
+    </message>
+    <message>
+        <source>Location</source>
+        <translation>Ubicación</translation>
+    </message>
+    <message>
+        <source>Relevance</source>
+        <translation>Relevancia</translation>
+    </message>
+    <message>
+        <source>View count</source>
+        <translation>Contador de visualizaciones</translation>
+    </message>
+    <message>
+        <source>Rating</source>
+        <translation>Valoración</translation>
+    </message>
+    <message>
+        <source>Clear cache</source>
+        <translation>Limpiar caché</translation>
+    </message>
+    <message>
+        <source>Cache cleared.</source>
+        <translation>Caché borrada.</translation>
+    </message>
+    <message>
+        <source>1 view</source>
+        <translation>1 visualización</translation>
+    </message>
+    <message>
+        <source>1 video</source>
+        <translation>1 vídeo</translation>
+    </message>
+    <message>
+        <source>^n videos</source>
+        <translation>^n vídeos</translation>
+    </message>
+    <message>
+        <source>0 views</source>
+        <translation>0 visualizaciones</translation>
+    </message>
+    <message>
+        <source>^n views</source>
+        <translation>^n visualizaciones</translation>
+    </message>
+    <message>
+        <source>Updated 1 minute ago</source>
+        <translation>Actualizado hace 1 minuto</translation>
+    </message>
+    <message>
+        <source>Updated ^n minutes ago</source>
+        <translation>Actualizado hace ^n minutos</translation>
+    </message>
+    <message>
+        <source>Updated 1 week ago</source>
+        <translation>Actualizado hace 1 semana</translation>
+    </message>
+    <message>
+        <source>Updated 1 day ago</source>
+        <translation>Actualizado hace 1 día</translation>
+    </message>
+    <message>
+        <source>Updated ^n days ago</source>
+        <translation>Actualizado hace ^n días</translation>
+    </message>
+    <message>
+        <source>Updated ^n weeks ago</source>
+        <translation>Actualizado hace ^n semana</translation>
+    </message>
+    <message>
+        <source>Updated 1 year ago</source>
+        <translation>Actualizado hace 1 año</translation>
+    </message>
+    <message>
+        <source>Updated ^n years ago</source>
+        <translation>Actualizado hace ^n año</translation>
+    </message>
+    <message>
+        <source>^n years ago</source>
+        <translation>Hace ^n años</translation>
+    </message>
+    <message>
+        <source>^n weeks ago</source>
+        <translation>Hace ^n semanas</translation>
+    </message>
+    <message>
+        <source>1 day ago</source>
+        <translation>Hace 1 día</translation>
+    </message>
+    <message>
+        <source>^n days ago</source>
+        <translation>Hace ^n días</translation>
+    </message>
+    <message>
+        <source>Premieres in ^n minutes</source>
+        <translation>Se estrena en ^n minutos</translation>
+    </message>
+    <message>
+        <source>Premieres in 1 hour</source>
+        <translation>Se estrena en 1 hora</translation>
+    </message>
+    <message>
+        <source>Please note that Bookmarks is an experimental feature.</source>
+        <translation>Ten en cuenta que Marcadores es una función experimental.</translation>
+    </message>
+    <message>
+        <source>Could not get IP address: are we connected to the internet?</source>
+        <translation>No se pudo obtener la dirección IP: ¿estás conectado a internet?</translation>
+    </message>
+    <message>
+        <source>Playlet Web App</source>
+        <translation>Aplicación web de Playlet</translation>
+    </message>
+    <message>
+        <source>Use Playlet Remote in the browser</source>
+        <translation>Utiliza el control remoto de Playlet en el navegador</translation>
+    </message>
+    <message>
+        <source>Link with Wi-Fi</source>
+        <translation>Enlazar con Wi-Fi</translation>
+    </message>
+    <message>
+        <source>On your phone, connect to the same Wi-Fi network as this device.</source>
+        <translation>En el móvil, conéctate a la misma red Wi-Fi que este dispositivo.</translation>
+    </message>
+    <message>
+        <source>Open the YouTube app on your phone.</source>
+        <translation>Abre la aplicación de YouTube en tu móvil.</translation>
+    </message>
+    <message>
+        <source>Wired connection</source>
+        <translation>Conexión por cable</translation>
+    </message>
+    <message>
+        <source>On your phone, open the YouTube app.</source>
+        <translation>En tu teléfono, abre la aplicación de YouTube.</translation>
+    </message>
+    <message>
+        <source>Loading...</source>
+        <translation>Cargando...</translation>
+    </message>
+    <message>
+        <source>Preferred video quality</source>
+        <translation>Calidad de vídeo preferida</translation>
+    </message>
+    <message>
+        <source>720p</source>
+        <translation>720p</translation>
+    </message>
+    <message>
+        <source>Instance</source>
+        <translation>Instancia</translation>
+    </message>
+    <message>
+        <source>Always</source>
+        <translation>Siempre</translation>
+    </message>
+    <message>
+        <source>Only if needed</source>
+        <translation>Solo si es necesario</translation>
+    </message>
+    <message>
+        <source>Never</source>
+        <translation>Nunca</translation>
+    </message>
+    <message>
+        <source>Show notifications</source>
+        <translation>Mostrar notificaciones</translation>
+    </message>
+    <message>
+        <source>Search History</source>
+        <translation>Historial de búsqueda</translation>
+    </message>
+    <message>
+        <source>Search history cleared.</source>
+        <translation>Historial de búsqueda borrado.</translation>
+    </message>
+    <message>
+        <source>Developer</source>
+        <translation>Desarrollador</translation>
+    </message>
+    <message>
+        <source>Developer preferences</source>
+        <translation>Ajustes de desarrollador</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video comments for ID %1 (%2 comments)</source>
+        <translation>La instancia puede obtener los comentarios del video para ID %1 (%2 comentarios)</translation>
+    </message>
+    <message>
+        <source>Invalid caption data from %1 (Content-Type is not text/vtt)</source>
+        <translation>Subtítulos de %1 no válidos (Content-Type no es text/vtt)</translation>
+    </message>
+    <message>
+        <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
+        <translation>Subtítulos de %1 no válidos (la respuesta no es un archivo vtt válido)</translation>
+    </message>
+    <message>
+        <source>Did not find expected text in caption data from %1</source>
+        <translation>No se ha encontrado el texto esperado en los subtítulos de %1</translation>
+    </message>
+    <message>
+        <source>Passed</source>
+        <translation>Aprobado</translation>
+    </message>
+    <message>
+        <source>Failed</source>
+        <translation>Fallido</translation>
+    </message>
+    <message>
+        <source>0 videos</source>
+        <translation>0 vídeos</translation>
+    </message>
+    <message>
+        <source>1 year ago</source>
+        <translation>Hace 1 año</translation>
+    </message>
+    <message>
+        <source>Cast from the YouTube app to Playlet</source>
+        <translation>Transmitir desde la aplicación YouTube a Playlet</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon and select %1</source>
+        <translation>Toca el ícono de transmisión y selecciona %1</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video %1 captions for ID %2</source>
+        <translation>La instancia puede obtener subtítulos del vídeo %1 para el ID %2</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+        <translation>La instancia puede obtener la miniatura del vídeo para el ID %1 (%2)</translation>
+    </message>
+    <message>
+        <source>CORS header not set correctly from %1</source>
+        <translation>La cabecera CORS no se ha establecido correctamente desde %1</translation>
+    </message>
+    <message>
+        <source>The instance can fetch with CORS from %1</source>
+        <translation>La instancia puede buscar con CORS desde %1</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon.</source>
+        <translation>Presiona el ícono de transmisión.</translation>
+    </message>
 </context>
 </TS>
