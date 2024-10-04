@@ -984,5 +984,33 @@
         <source>1 year ago</source>
         <translation>Hace 1 año</translation>
     </message>
+    <message>
+        <source>Cast from the YouTube app to Playlet</source>
+        <translation>Transmitir desde la aplicación YouTube a Playlet</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon and select %1</source>
+        <translation>Toca el ícono de transmisión y selecciona %1</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video %1 captions for ID %2</source>
+        <translation>La instancia puede obtener subtítulos del vídeo %1 para el ID %2</translation>
+    </message>
+    <message>
+        <source>The instance can fetch video thumbnail for ID %1 (%2)</source>
+        <translation>La instancia puede obtener la miniatura del vídeo para el ID %1 (%2)</translation>
+    </message>
+    <message>
+        <source>CORS header not set correctly from %1</source>
+        <translation>La cabecera CORS no se ha establecido correctamente desde %1</translation>
+    </message>
+    <message>
+        <source>The instance can fetch with CORS from %1</source>
+        <translation>La instancia puede buscar con CORS desde %1</translation>
+    </message>
+    <message>
+        <source>Tap the cast icon.</source>
+        <translation>Presiona el ícono de transmisión.</translation>
+    </message>
 </context>
 </TS>
