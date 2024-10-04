@@ -1,0 +1,171 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+namespace InnertubeService
+
+    function GetVideoMetadata(videoId as string, options = invalid as object) as object
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player", FormatJson(MakePayload(videoId)))
+        request.Headers({
+            "accept": "*/*"
+            "accept-language": "*"
+            "content-type": "application/json"
+            "user-agent": "com.google.ios.youtube/18.06.35 (iPhone; CPU iPhone OS 14_4 like Mac OS X; en_US)"
+            "x-youtube-client-name": "5"
+            "x-youtube-client-version": "18.06.35"
+        })
+
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+
+        if not response.IsSuccess()
+            return response
+        end if
+
+        parsedResponse = ParseInnertubeVideoResponse(response.Json())
+
+        if parsedResponse <> invalid
+            if parsedResponse.Success
+                response.OverrideJson(parsedResponse.Metadata)
+            else
+                response.OverrideStatusCode(500)
+                response.OverrideErrorMessage(parsedResponse.Error)
+            end if
+        end if
+
+        return response
+    end function
+
+    function MakePayload(videoId as string) as object
+        return {
+            "playbackContext": {
+                "contentPlaybackContext": {
+                    "vis": 0
+                    "splay": false
+                    "referer": "https://www.youtube.com/watch?v=" + videoId
+                    "currentUrl": "/watch?v=" + videoId
+                    "autonavState": "STATE_ON"
+                    "autoCaptionsDefaultOn": false
+                    "html5Preference": "HTML5_PREF_WANTS"
+                    "lactMilliseconds": "-1"
+                }
+            }
+            "attestationRequest": {
+                "omitBotguardData": true
+            }
+            "racyCheckOk": true
+            "contentCheckOk": true
+            "videoId": videoId
+            "context": {
+                "client": {
+                    "hl": "en"
+                    "gl": "US"
+                    "remoteHost": ""
+                    "screenDensityFloat": 1
+                    "screenHeightPoints": 1440
+                    "screenPixelDensity": 1
+                    "screenWidthPoints": 2560
+                    "visitorData": ""
+                    "clientName": "iOS"
+                    "clientVersion": "18.06.35"
+                    "osName": "iOS"
+                    "osVersion": "10.0"
+                    "platform": "MOBILE"
+                    "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+                    "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
+                    "timeZone": "America/Toronto"
+                    "originalUrl": "https://www.youtube.com"
+                    "deviceMake": "Apple"
+                    "deviceModel": "iPhone10,6"
+                    "utcOffsetMinutes": -240
+                    "memoryTotalKbytes": "8000000"
+                    "mainAppWebInfo": {
+                        "graftUrl": "https://www.youtube.com"
+                        "pwaInstallabilityStatus": "PWA_INSTALLABILITY_STATUS_UNKNOWN"
+                        "webDisplayMode": "WEB_DISPLAY_MODE_BROWSER"
+                        "isWebNativeShareAvailable": true
+                    }
+                }
+                "user": {
+                    "enableSafetyMode": false
+                    "lockedSafetyMode": false
+                }
+                "request": {
+                    "useSsl": true
+                    "internalExperimentFlags": []
+                }
+            }
+        }
+    end function
+
+    function ParseInnertubeVideoResponse(payload as object) as object
+        if not IsAssociativeArray(payload)
+            return {
+                Success: false
+                Error: "Invalid payload"
+            }
+        end if
+
+        playabilityStatus = payload["playabilityStatus"]
+        if not IsAssociativeArray(playabilityStatus)
+            return {
+                Success: false
+                Error: "Invalid playability status"
+            }
+        end if
+
+        if playabilityStatus["status"] <> "OK"
+            return {
+                Success: false
+                Error: playabilityStatus["reason"]
+            }
+        end if
+
+        videoDetails = payload["videoDetails"]
+        if not IsAssociativeArray(videoDetails)
+            return {
+                Success: false
+                Error: "Invalid video details"
+            }
+        end if
+
+        streamingData = payload["streamingData"]
+        if not IsAssociativeArray(streamingData)
+            return {
+                Success: false
+                Error: "Invalid streaming data"
+            }
+        end if
+
+        videoInfo = {
+            "type": "video"
+            "title": videoDetails["title"]
+            "videoId": videoDetails["videoId"]
+            "videoThumbnails": videoDetails["thumbnail"]["thumbnails"]
+            "storyboards": []
+            "viewCount": videoDetails["viewCount"].ToInt()
+            "author": videoDetails["author"]
+            "authorId": videoDetails["channelId"]
+            "lengthSeconds": videoDetails["lengthSeconds"].ToInt()
+            "liveNow": videoDetails["isLiveContent"]
+            "hlsUrl": streamingData["hlsManifestUrl"]
+            "adaptiveFormats": []
+            "formatStreams": []
+            "captions": []
+            "recommendedVideos": []
+        }
+
+        return {
+            Success: true
+            Metadata: videoInfo
+        }
+    end function
+
+end namespace
