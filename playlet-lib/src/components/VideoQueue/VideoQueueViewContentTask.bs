@@ -1,3 +1,4 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/source/services/HttpClient.bs"
@@ -7,11 +8,14 @@ import "pkg:/source/utils/MathUtils.bs"
 function VideoQueueViewContentTask(input as object) as object
     videoNodes = input.videoNodes
     invidiousNode = input.invidious
+    preferencesNode = input.preferences
     service = new Invidious.InvidiousService(invidiousNode)
     instance = service.GetInstance()
     cancellation = m.top.cancellation
 
     index = MathUtils.Clamp(input.index - 2, 0, videoNodes.Count() - 1)
+
+    backend = preferencesNode["playback.backend"]
 
     requestOptions = {
         cacheSeconds: 8640000 ' 100 days
@@ -24,7 +28,7 @@ function VideoQueueViewContentTask(input as object) as object
     ' Need to change it to load on demand using render tracking
     for i = index to videoNodes.Count() - 1
         videoNode = videoNodes[i]
-        if not LoadVideoDetail(videoNode, service, instance, requestOptions)
+        if not LoadVideoDetail(videoNode, service, instance, requestOptions, backend)
             ' Sleep for a bit to avoid creating too much traffic
             sleep(500)
         end if
@@ -36,7 +40,7 @@ function VideoQueueViewContentTask(input as object) as object
 
     for i = index - 1 to 0 step -1
         videoNode = videoNodes[i]
-        if not LoadVideoDetail(videoNode, service, instance, requestOptions)
+        if not LoadVideoDetail(videoNode, service, instance, requestOptions, backend)
             ' Sleep for a bit to avoid creating too much traffic
             sleep(1000)
         end if
@@ -50,9 +54,15 @@ function VideoQueueViewContentTask(input as object) as object
 end function
 
 ' Returns true if the video was loaded from cache.
-function LoadVideoDetail(videoNode as object, service as object, instance as string, requestOptions as object) as boolean
+function LoadVideoDetail(videoNode as object, service as object, instance as string, requestOptions as object, backend as string) as boolean
     videoId = videoNode.videoId
-    response = service.GetVideoMetadata(videoId, requestOptions)
+
+    if backend = "playlet"
+        response = InnertubeService.GetVideoMetadata(videoId, requestOptions)
+    else
+        response = service.GetVideoMetadata(videoId, requestOptions)
+    end if
+
     metadata = response.Json()
 
     if not response.IsSuccess() or metadata = invalid
