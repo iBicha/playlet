@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Experimental Playlet backend to play videos using Innertube
 - Partial Spanish translations (Thanks to Kamborio and gallegonovato)
 
 ## [0.26.0] - 2024-09-23
