@@ -44,8 +44,8 @@ end function
 function ShowAnnouncement()
     title = "Announcement #3 - Playlet innertube backend"
     message = [
-        "Currently, most public Invidious instances don't currently work."
-        "Because of that, a new backend to play videos has been added to the settings, and it is enabled by default."
+        "Currently, most public Invidious instances don't work."
+        "Because of that, a new backend to play videos has been implemented and added to the settings, and it is enabled by default."
         "If you would like to use your Invidious instance for playback, you can change the backend in the settings."
         "Thank you."
     ]
