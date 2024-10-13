@@ -1,51 +1,65 @@
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
 namespace InnertubeService
 
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
-        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player", FormatJson(MakePayload(videoId)))
-        request.Headers({
-            "accept": "*/*"
-            "accept-language": "*"
-            "content-type": "application/json"
-            "user-agent": "com.google.ios.youtube/18.06.35 (iPhone; CPU iPhone OS 14_4 like Mac OS X; en_US)"
-            "x-youtube-client-name": "5"
-            "x-youtube-client-version": "18.06.35"
-        })
-
         cancellation = invalid
+        fetchNext = true
 
         if options <> invalid
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
-        end if
-        request.Cancellation(cancellation)
-
-        response = request.Await()
-
-        if not response.IsSuccess()
-            return response
-        end if
-
-        parsedResponse = ParseInnertubeVideoResponse(response.Json())
-
-        if parsedResponse <> invalid
-            if parsedResponse.Success
-                response.OverrideJson(parsedResponse.Metadata)
-            else
-                response.OverrideStatusCode(500)
-                response.OverrideErrorMessage(parsedResponse.Error)
+            if options.DoesExist("fetchNext")
+                fetchNext = options.fetchNext
             end if
         end if
 
-        return response
+        playerRequest = CreatePlayerRequest(videoId)
+        playerRequest.Cancellation(cancellation)
+        playerRequest.Send()
+
+        nextRequest = invalid
+        nextResponse = invalid
+        if fetchNext
+            nextRequest = CreateNextRequest(videoId)
+            nextRequest.Cancellation(cancellation)
+            nextRequest.Send()
+        end if
+
+        playerResponse = playerRequest.Await()
+        if not playerResponse.IsSuccess()
+            return playerResponse
+        end if
+
+        if fetchNext
+            nextResponse = nextRequest.Await()
+        end if
+
+        parsedResponse = ParseInnertubePlayerResponse(playerResponse.Json())
+
+        if fetchNext
+            parsedResponse = ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
+        end if
+
+        if parsedResponse <> invalid
+            if parsedResponse.Success
+                playerResponse.OverrideJson(parsedResponse.Metadata)
+            else
+                playerResponse.OverrideStatusCode(500)
+                playerResponse.OverrideErrorMessage(parsedResponse.Error)
+            end if
+        end if
+
+        return playerResponse
     end function
 
-    function MakePayload(videoId as string) as object
+    function CreatePlayerRequest(videoId as string) as object
         deviceInfo = CreateObject("roDeviceInfo")
-        return {
+
+        payload = {
             "playbackContext": {
                 "contentPlaybackContext": {
                     "vis": 0
@@ -104,9 +118,82 @@ namespace InnertubeService
                 }
             }
         }
+
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player", FormatJson(payload))
+        request.Headers({
+            "accept": "*/*"
+            "accept-language": "*"
+            "content-type": "application/json"
+            "user-agent": "com.google.ios.youtube/18.06.35 (iPhone; CPU iPhone OS 14_4 like Mac OS X; en_US)"
+            "x-youtube-client-name": "5"
+            "x-youtube-client-version": "18.06.35"
+        })
+
+        return request
     end function
 
-    function ParseInnertubeVideoResponse(payload as object) as object
+    function CreateNextRequest(videoId as string) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "videoId": videoId
+            "context": {
+                "client": {
+                    "hl": "en"
+                    "gl": "US"
+                    "remoteHost": ""
+                    "screenDensityFloat": 1
+                    "screenHeightPoints": 1440
+                    "screenPixelDensity": 1
+                    "screenWidthPoints": 2560
+                    "visitorData": ""
+                    "clientName": "WEB"
+                    "clientVersion": "2.20241010.09.00"
+                    "osName": "Windows"
+                    "osVersion": "10.0"
+                    "platform": "DESKTOP"
+                    "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+                    "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
+                    "timeZone": deviceInfo.GetTimeZone()
+                    "originalUrl": "https://www.youtube.com"
+                    "deviceMake": ""
+                    "deviceModel": ""
+                    "browserName": "Chrome"
+                    "browserVersion": "109.0.0.0"
+                    "utcOffsetMinutes": -240
+                    "memoryTotalKbytes": "8000000"
+                    "mainAppWebInfo": {
+                        "graftUrl": "https://www.youtube.com"
+                        "pwaInstallabilityStatus": "PWA_INSTALLABILITY_STATUS_UNKNOWN"
+                        "webDisplayMode": "WEB_DISPLAY_MODE_BROWSER"
+                        "isWebNativeShareAvailable": true
+                    }
+                }
+                "user": {
+                    "enableSafetyMode": false
+                    "lockedSafetyMode": false
+                }
+                "request": {
+                    "useSsl": true
+                    "internalExperimentFlags": []
+                }
+            }
+        }
+
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", FormatJson(payload))
+        request.Headers({
+            "accept": "*/*"
+            "accept-language": "*"
+            "content-type": "application/json"
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0"
+            "x-youtube-client-name": "1"
+            "x-youtube-client-version": "2.20241010.09.00"
+        })
+
+        return request
+    end function
+
+    function ParseInnertubePlayerResponse(payload as object) as object
         if not IsAssociativeArray(payload)
             return {
                 Success: false
@@ -167,6 +254,49 @@ namespace InnertubeService
             Success: true
             Metadata: videoInfo
         }
+    end function
+
+    function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object
+        if not parsedResponse.Success
+            LogWarn("Invalid parsed response", parsedResponse)
+            return invalid
+        end if
+
+        if not IsArray(parsedResponse.Metadata.recommendedVideos)
+            LogWarn("Invalid recommended videos", parsedResponse.Metadata.recommendedVideos)
+            return parsedResponse
+        end if
+
+        if not IsAssociativeArray(payload)
+            LogWarn("Invalid payload", payload)
+            return parsedResponse
+        end if
+
+        endScreenVideos = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen", "watchNextEndScreenRenderer", "results"])
+        if not IsArray(endScreenVideos)
+            LogWarn("Invalid end screen videos", endScreenVideos)
+            return parsedResponse
+        end if
+
+        for each video in endScreenVideos
+            videoId = ObjectUtils.Dig(video, ["endScreenVideoRenderer", "videoId"])
+            if videoId = invalid
+                LogWarn("Invalid video ID in end screen video", video)
+                continue for
+            end if
+
+            title = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "title", "simpleText"]))
+            author = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "shortBylineText", "runs", 0, "text"]))
+
+            parsedResponse.Metadata.recommendedVideos.Push({
+                "type": "video"
+                "videoId": videoId
+                "title": title
+                "author": author
+            })
+        end for
+
+        return parsedResponse
     end function
 
 end namespace
