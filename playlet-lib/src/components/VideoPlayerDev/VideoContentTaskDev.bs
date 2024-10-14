@@ -1,3 +1,4 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
@@ -8,6 +9,7 @@ function VideoContentTaskDev(input as object) as object
     backgroundPoster = input.backgroundPoster
     contentNode = input.content
     invidiousNode = input.invidious
+    preferencesNode = input.preferences
 
     titleLabel.text = contentNode.title
     secondaryTitleLabel.text = contentNode.secondaryTitle
@@ -23,7 +25,12 @@ function VideoContentTaskDev(input as object) as object
 
     backgroundPoster.uri = `${instance}/vi/${videoId}/maxresdefault.jpg`
 
-    response = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+    backend = preferencesNode["playback.backend"]
+    if backend = "playlet"
+        response = InnertubeService.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+    else
+        response = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+    end if
 
     if m.top.cancel
         return invalid
@@ -55,7 +62,7 @@ function VideoContentTaskDev(input as object) as object
     secondaryTitleLabel.text = secondaryTitle
     contentNode.live = metadata.liveNow
 
-    streamUrls = [`http://127.0.0.1:8888/api/dash?v=${metadata.videoId}`]
+    streamUrls = CreateStreamUrls(metadata)
     contentNode.url = streamUrls[0]
 
     contentNode.addFields({
@@ -68,4 +75,16 @@ function VideoContentTaskDev(input as object) as object
     return {
         success: true
     }
+end function
+
+function CreateStreamUrls(metadata as object) as object
+    streamUrls = []
+
+    if metadata.hlsUrl <> invalid
+        streamUrls.push(metadata.hlsUrl)
+    else
+        streamUrls.push(`http://127.0.0.1:8888/api/dash?v=${metadata.videoId}`)
+    end if
+
+    return streamUrls
 end function
