@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- Spanish translations (Thanks to Kamborio)
 
 ## [0.28.0] - 2024-10-13
 
