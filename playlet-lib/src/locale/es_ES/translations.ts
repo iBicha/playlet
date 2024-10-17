@@ -514,7 +514,7 @@
     </message>
     <message>
         <source>Link with TV code</source>
-        <translation>Enlacar con código de TV</translation>
+        <translation>Enlazar con código de TV</translation>
     </message>
     <message>
         <source>Roku connected to:</source>
@@ -1011,6 +1011,218 @@
     <message>
         <source>Tap the cast icon.</source>
         <translation>Presiona el ícono de transmisión.</translation>
+    </message>
+    <message>
+        <source>Failed to generate manual pairing code</source>
+        <translation>Error al general código de emparejamiento manual</translation>
+    </message>
+    <message>
+        <source>Playback</source>
+        <translation>Reproducción</translation>
+    </message>
+    <message>
+        <source>Playback preferences</source>
+        <translation>Ajustes de reproducción</translation>
+    </message>
+    <message>
+        <source>Invidious preferences</source>
+        <translation>Ajustes de Invidious</translation>
+    </message>
+    <message>
+        <source>Invidious instance to use. Example: https://example.com</source>
+        <translation>Utilizar instancia de Invidious. Ejemplo: https://example.com</translation>
+    </message>
+    <message>
+        <source>Proxy videos</source>
+        <translation>Videos de proxy</translation>
+    </message>
+    <message>
+        <source>Proxy videos through the Invidious server. This is useful if videos are geoblocked.</source>
+        <translation>Vídeos de proxy a través del servidor de Invidious. Esto es útil cuando los videos están bloqueados por región.</translation>
+    </message>
+    <message>
+        <source>SponsorBlock</source>
+        <translation>SponsorBlock</translation>
+    </message>
+    <message>
+        <source>Enable SponsorBlock</source>
+        <translation>Activar SponsorBlock</translation>
+    </message>
+    <message>
+        <source>Show notifications when a segment is skipped</source>
+        <translation>Mostrar notificaciones cuando se salte una sección</translation>
+    </message>
+    <message>
+        <source>Clear search history from Playlet. This affects the search suggestions. This does not affect the watch history on Invidious.</source>
+        <translation>Borrar el historial de búsqueda de Playlet. Esto afectará a las sugerencias. Esto no afectará al historial de reproducción de Invidious.</translation>
+    </message>
+    <message>
+        <source>Use dev video player</source>
+        <translation>Utilizar reproductor de video de desarrollo</translation>
+    </message>
+    <message>
+        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
+        <translation>Activar el reproductor de video de desarrollo. Este es un reproductor de video no completado para realizar pruebas.</translation>
+    </message>
+    <message>
+        <source>Error closing video</source>
+        <translation>Error al cerrar el vídeo</translation>
+    </message>
+    <message>
+        <source>Autoplay</source>
+        <translation>Reproducción automática</translation>
+    </message>
+    <message>
+        <source>When you finish a video, another plays automatically</source>
+        <translation>Al terminar de ver un video, otro se reproduce automáticamente</translation>
+    </message>
+    <message>
+        <source>SponsorBlock preferences</source>
+        <translation>Ajustes de SponsorBlock</translation>
+    </message>
+    <message>
+        <source>Enable/disable and reorder sections on the home screen</source>
+        <translation>Activar/Desactivar y reordenar secciones en la pantalla de inicio</translation>
+    </message>
+    <message>
+        <source>Queue notifications</source>
+        <translation>Cola de notificaciones</translation>
+    </message>
+    <message>
+        <source>Show a notification when a video is added to the queue</source>
+        <translation>Mostrar una notificación cuando se añada un video a la cola</translation>
+    </message>
+    <message>
+        <source>Music: Non-Music Section</source>
+        <translation>Música: Sección no musical</translation>
+    </message>
+    <message>
+        <source>Non-Music</source>
+        <translation>No musical</translation>
+    </message>
+    <message>
+        <source>To add bookmarks, select a video, playlist or channel, and add a bookmark.</source>
+        <translation>Para añadir marcadores, seleccionar un vídeo, lista de reproducción o canal, y añade un marcador.</translation>
+    </message>
+    <message>
+        <source>Play on %1</source>
+        <translation>Reproducir en %1</translation>
+    </message>
+    <message>
+        <source>Queue on %1</source>
+        <translation>Poner en cola en %1</translation>
+    </message>
+    <message>
+        <source>Any type</source>
+        <translation>Cualquier tipo</translation>
+    </message>
+    <message>
+        <source>Video load error</source>
+        <translation>Error de carga de vídeo</translation>
+    </message>
+    <message>
+        <source>Failed to load video information for %1</source>
+        <translation>Fallo al cargar la información del vídeo de %1</translation>
+    </message>
+    <message>
+        <source>Error playing video %1</source>
+        <translation>Error al reproducir el vídeo %1</translation>
+    </message>
+    <message>
+        <source>Request not sent.</source>
+        <translation>Solicitud no enviada.</translation>
+    </message>
+    <message>
+        <source>Request timed out.</source>
+        <translation>Tiempo de espera de solicitud agotado.</translation>
+    </message>
+    <message>
+        <source>Sponsor</source>
+        <translation>Patrocinador</translation>
+    </message>
+    <message>
+        <source>Skipped</source>
+        <translation>Omitido</translation>
+    </message>
+    <message>
+        <source>Intermission/Intro Animation</source>
+        <translation>Intermedio/Animación de introducción</translation>
+    </message>
+    <message>
+        <source>Intermission</source>
+        <translation>Intermedio</translation>
+    </message>
+    <message>
+        <source>Endcards/Credits</source>
+        <translation>Tarjeta final/Créditos</translation>
+    </message>
+    <message>
+        <source>Preview/Recap/Hook</source>
+        <translation>Vista previa/Resumen/Gancho</translation>
+    </message>
+    <message>
+        <source>Press and hold Options (*) to open the queue</source>
+        <translation>Mantén pulsado Opciones (*) para abrir la cola</translation>
+    </message>
+    <message>
+        <source>You have feedback? Let us know by %IssueStart%creating an issue on Github%IssueEnd% or by %EmailStart%sending an email%EmailEnd%.</source>
+        <translation>¿Tienes comentarios? Háznoslo saber %IssueStart%creating una incidencia en Github%IssueEnd% o %EmailStart%sending un email%EmailEnd%.</translation>
+    </message>
+    <message>
+        <source>Drop a YouTube link here</source>
+        <translation>Deja aquí un enlace de YouTube</translation>
+    </message>
+    <message>
+        <source>Open on %1</source>
+        <translation>Abrir en %1</translation>
+    </message>
+    <message>
+        <source>Error with login, please refresh the page.</source>
+        <translation>Error al iniciar sesión, por favor recarga la página.</translation>
+    </message>
+    <message>
+        <source>Open in Invidious</source>
+        <translation>Abrir en Invidious</translation>
+    </message>
+    <message>
+        <source>Queue Video</source>
+        <translation>Poner vídeo en cola</translation>
+    </message>
+    <message>
+        <source>Queue Playlist</source>
+        <translation>Poner lista de reproducción en cola</translation>
+    </message>
+    <message>
+        <source>Remove from %1 bookmarks</source>
+        <translation>Eliminar de marcadores %1</translation>
+    </message>
+    <message>
+        <source>Add to %1 bookmark</source>
+        <translation>Añadir a marcadores %1</translation>
+    </message>
+    <message>
+        <source>Any duration</source>
+        <translation>Cualquier duración</translation>
+    </message>
+    <message>
+        <source>Clear cache from cachefs: and tmp:</source>
+        <translation>Limpiar caché de cachefs: y tmp:</translation>
+    </message>
+    <message>
+        <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
+        <translation>Utilizar instancia de Invidious, Ejemplo: https://example.com. Encuentra más instancias en  %INVIDIOUS_PUBLIC_INSTANCES%</translation>
+    </message>
+    <message>
+        <source>Tap &apos;Link with TV code&apos; and enter the code below.</source>
+        <translation>Pulsar &apos;Enlazar con código de TV&apos; e introduce el siguiente código.</translation>
+    </message>
+    <message>
+        <source>TV code error</source>
+        <translation>Error en el código de TV</translation>
+    </message>
+    <message>
+        <source>Press Options (*) for full screen</source>
+        <translation>Pulsar Opciones (*) para pantalla completa</translation>
     </message>
 </context>
 </TS>
