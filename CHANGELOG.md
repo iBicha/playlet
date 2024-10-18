@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Spanish translations (Thanks to Kamborio)
+- Support for auto-generated captions in Playlet backend
 
 ## [0.28.0] - 2024-10-13
 

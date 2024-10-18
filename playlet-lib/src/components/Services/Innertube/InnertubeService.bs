@@ -246,7 +246,7 @@ namespace InnertubeService
             "hlsUrl": streamingData["hlsManifestUrl"]
             "adaptiveFormats": []
             "formatStreams": []
-            "captions": []
+            "captions": ParseCaptions(payload)
             "recommendedVideos": []
         }
 
@@ -254,6 +254,66 @@ namespace InnertubeService
             Success: true
             Metadata: videoInfo
         }
+    end function
+
+    function ParseCaptions(payload as object) as object
+        captions = payload["captions"]
+        if not IsAssociativeArray(captions)
+            return []
+        end if
+
+        playerCaptions = captions["playerCaptionsTracklistRenderer"]
+        if not IsAssociativeArray(playerCaptions)
+            return []
+        end if
+
+        tracks = playerCaptions["captionTracks"]
+        if not IsArray(tracks)
+            return []
+        end if
+
+        captions = []
+        for each track in tracks
+            if not IsAssociativeArray(track)
+                continue for
+            end if
+
+            baseUrl = track["baseUrl"]
+            if not IsString(baseUrl)
+                continue for
+            end if
+
+            queryComponents = UrlUtils.ParseQueryComponents(baseUrl)
+            queryComponents["fmt"] = "vtt"
+            baseUrl = UrlUtils.SetQueryParams(baseUrl, queryComponents)
+
+            languageCode = track["languageCode"]
+            if not IsString(languageCode)
+                continue for
+            end if
+
+            label = ""
+            name = track["name"]
+            if IsAssociativeArray(name)
+                runs = name["runs"]
+                if IsArray(runs)
+                    for each rn in runs
+                        text = rn["text"]
+                        if IsString(text)
+                            label += text
+                        end if
+                    end for
+                end if
+            end if
+
+            captions.Push({
+                "label": label
+                "language_code": languageCode
+                "url": baseUrl
+            })
+        end for
+
+        return captions
     end function
 
     function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object

@@ -8,7 +8,7 @@ namespace UrlUtils
 
     function BuildUrl(url as string, pathParams as object, queryParams as object) as string
         url = SetPathParams(url, pathParams)
-        url = SetQueryParams(url, queryParams)
+        url = AppendQueryParams(url, queryParams)
         return url
     end function
 
@@ -34,6 +34,14 @@ namespace UrlUtils
     end function
 
     function SetQueryParams(url as string, queryParams as object) as string
+        questionMarkIndex = url.InStr("?")
+        if questionMarkIndex <> -1
+            url = url.Left(questionMarkIndex)
+        end if
+        return AppendQueryParams(url, queryParams)
+    end function
+
+    function AppendQueryParams(url as string, queryParams as object) as string
         if queryParams = invalid or queryParams.Count() = 0
             return url
         end if
