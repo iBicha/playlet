@@ -1224,5 +1224,53 @@
         <source>Press Options (*) for full screen</source>
         <translation>Pulsar Opciones (*) para pantalla completa</translation>
     </message>
+    <message>
+        <source>Miscellaneous</source>
+        <translation>Informaciones diversas</translation>
+    </message>
+    <message>
+        <source>Misc. preferences</source>
+        <translation>Otras configuraciones</translation>
+    </message>
+    <message>
+        <source>Playlet Library version</source>
+        <translation>Versión de la biblioteca Playlet</translation>
+    </message>
+    <message>
+        <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
+        <translation>La versión de Playlet Lib que se utilizará. Estas corresponden a las versiones etiquetadas en Github. Las versiones que no tienen un archivo playlet-lib.zip están deshabilitadas.</translation>
+    </message>
+    <message>
+        <source>Interaction Reminder (Subscribe)</source>
+        <translation>Recordatorio de interacción (suscripción)</translation>
+    </message>
+    <message>
+        <source>Interaction Reminder</source>
+        <translation>Recordatorio de interacción</translation>
+    </message>
+    <message>
+        <source>Are you sure you want to change the Playlet Library version to %1?</source>
+        <translation>¿Estás seguro de que deseas cambiar la versión de la biblioteca Playlet a %1?</translation>
+    </message>
+    <message>
+        <source>Filler</source>
+        <translation>Relleno</translation>
+    </message>
+    <message>
+        <source>Playlet Library version changed. Playlet will now restart.</source>
+        <translation>Se modificó la versión de la biblioteca Playlet. Playlet ahora se reiniciará.</translation>
+    </message>
+    <message>
+        <source>Features</source>
+        <translation>Características</translation>
+    </message>
+    <message>
+        <source>Auto (DASH)</source>
+        <translation>Automático (DASH)</translation>
+    </message>
+    <message>
+        <source>Medium</source>
+        <translation>Medio</translation>
+    </message>
 </context>
 </TS>
