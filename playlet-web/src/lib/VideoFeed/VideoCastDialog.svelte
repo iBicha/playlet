@@ -3,7 +3,6 @@
   import { playletStateStore, tr } from "lib/Stores";
   import VideoStartAt from "./VideoStartAt.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
-  import { YoutubeJs } from "lib/Api/YoutubeJs";
 
   export let videoId: string | undefined = undefined;
   export let title: string | undefined = undefined;
@@ -42,22 +41,6 @@
 
   async function playOnTv() {
     await PlayletApi.playVideo(getVideoInfo());
-  }
-
-  async function playOnTvHotFix() {
-    // measure length of time it takes to get video info
-    try {
-      const start = performance.now();
-      const videoInfo = await YoutubeJs.getVideoInfo(videoId);
-      const end = performance.now();
-      console.log(`Time to get video info: ${end - start}ms`);
-
-      await YoutubeJs.postCacheData(videoInfo);
-      await playOnTv();
-    } catch (e) {
-      console.error(e);
-      alert(e.toString());
-    }
   }
 
   async function queueOnTv() {
@@ -130,12 +113,6 @@
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>
           {$tr("Play on %1").replace("%1", tvName)}
-        </button>
-        <button
-          class="btn join-item hover:btn-accent"
-          on:click={playOnTvHotFix}
-        >
-          {$tr("Play on %1").replace("%1", tvName)} (HOT FIX)
         </button>
         <button class="btn join-item hover:btn-accent" on:click={queueOnTv}>
           {$tr("Queue on %1").replace("%1", tvName)}

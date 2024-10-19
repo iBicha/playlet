@@ -36,34 +36,6 @@ namespace Http
             return true
         end function
 
-        @post("/api/ytjs-cache")
-        function CacheVideoInfo(context as object) as boolean
-            request = context.request
-            response = context.response
-
-            json = request.Json()
-            if json = invalid
-                response.Default(400, "Invalid request body")
-                return true
-            end if
-
-            instance = m.invidiousService.GetInstance()
-            videoId = json.videoId
-
-            url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
-
-            ' Place a fake cache so we can read it later
-            requestObj = HttpClient.Get(url)
-            requestObj.CacheSeconds(18000)
-            responseObj = new HttpClient.HttpResponse(requestObj, invalid)
-            responseObj.OverrideStatusCode(200)
-            responseObj.OverrideText(request.body)
-            HttpClientCache.Set(responseObj)
-
-            response.Default(204, "OK")
-            return true
-        end function
-
     end class
 
 end namespace

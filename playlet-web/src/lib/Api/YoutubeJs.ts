@@ -186,53 +186,6 @@ export class YoutubeJs {
             throw new Error(`Video not available: ${info.playability_status.reason}`);
         }
 
-        const formatStreams = info.streaming_data.formats.map(format => {
-            return {
-                url: format.decipher(YoutubeJs.innerTube.session.player),
-                itag: `${format.itag}`,
-            }
-        });
-
-        const adaptiveFormats = info.streaming_data.adaptive_formats.map(format => {
-            const formatInfo = FORMATS[format.itag];
-            const result: any = {
-                init: format.init_range ? `${format.init_range.start}-${format.init_range.end}` : "",
-                index: format.index_range ? `${format.index_range.start}-${format.index_range.end}` : "",
-                bitrate: `${format.bitrate}`,
-                url: format.decipher(YoutubeJs.innerTube.session.player),
-                itag: `${format.itag}`,
-                type: format.mime_type,
-                clen: `${format.approx_duration_ms}`,
-                container: formatInfo?.ext,
-                encoding: formatInfo?.acodec ?? formatInfo?.vcodec,
-            };
-            if (format.audio_quality) {
-                result.audioQuality = format.audio_quality;
-            }
-            if (format.audio_sample_rate) {
-                result.audioSampleRate = format.audio_sample_rate;
-            }
-            if (format.audio_channels) {
-                result.audioChannels = format.audio_channels;
-            }
-
-            if (format.quality_label) {
-                result.qualityLabel = format.quality_label;
-            }
-            if (format.fps) {
-                result.fps = format.fps;
-            }
-            if (format.height && format.width) {
-                result.size = `${format.width}x${format.height}`;
-                result.resolution = `${format.height}p`;
-            } else if (formatInfo?.height && formatInfo?.width) {
-                result.size = `${formatInfo.width}x${formatInfo.height}`;
-                result.resolution = `${formatInfo.height}p`;
-            }
-
-            return result;
-        });
-
         // Populate a video object that is similar to Invidious format.
         // Mostly populate only fields we care about, enough to make it work.
         return {
@@ -269,58 +222,10 @@ export class YoutubeJs {
             isUpcoming: info.basic_info.is_upcoming,
             dashUrl: "",
             hlsUrl: info.streaming_data.hls_manifest_url,
-            adaptiveFormats,
-            formatStreams,
+            adaptiveFormats: [],
+            formatStreams: [],
             captions: [],
             recommendedVideos: [],
         }
-    }
-
-    static async postCacheData(data) {
-        const maxRetries = 2;
-        const timeout = 5000;
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                await YoutubeJs.postJson(`${YoutubeJs.host()}/api/ytjs-cache`, data, timeout);
-                break;
-            } catch (error) {
-                if (attempt === maxRetries) {
-                    throw error;
-                }
-                console.warn(`Attempt ${attempt} failed. Retrying...`);
-            }
-        }
-    }
-
-    private static postJson(url, payload, timeout) {
-        return new Promise((resolve, reject) => {
-            const controller = new AbortController();
-            const timer = setTimeout(() => {
-                controller.abort();
-                reject(new Error('Request timed out'));
-            }, timeout);
-
-            fetch(url, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                method: "POST",
-                body: JSON.stringify(payload),
-                signal: controller.signal
-            })
-                .then(response => {
-                    clearTimeout(timer);
-                    resolve(response);
-                })
-                .catch(err => {
-                    clearTimeout(timer);
-                    if (err.name === 'AbortError') {
-                        reject(new Error('Request was aborted'));
-                    } else {
-                        reject(err);
-                    }
-                });
-        });
     }
 }

@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Link drag and drop functionality in web app
+
+### Removed
+
+- "Hot fix" from web app
 
 ## [0.29.0] - 2024-10-18
 
