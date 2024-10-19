@@ -90,7 +90,20 @@ export class YoutubeJs {
         console.log('[YTJS] info:', info);
 
         if (info.playability_status.status !== 'OK') {
-            throw new Error(`Video not available: ${info.playability_status.reason}`);
+            let errorMessage = "";
+            if (info.playability_status.reason) {
+                errorMessage = info.playability_status.reason;
+            }
+            if (info.playability_status.error_screen) {
+                if (info.playability_status.error_screen.hasKey('subreason')) {
+                    const subreason = info.playability_status.error_screen.subreason;
+                    if (subreason?.text && typeof subreason.text === 'string') {
+                        errorMessage += `\n` + subreason.text;
+                    }
+                }
+            }
+
+            throw new Error(errorMessage);
         }
 
         // Populate a video object that is similar to Invidious format.

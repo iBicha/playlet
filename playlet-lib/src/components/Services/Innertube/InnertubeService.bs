@@ -210,9 +210,37 @@ namespace InnertubeService
         end if
 
         if playabilityStatus["status"] <> "OK"
+            errorMessage = ""
+            if IsString(playabilityStatus["reason"])
+                errorMessage = playabilityStatus["reason"]
+            end if
+
+            subreason = ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"])
+            if IsAssociativeArray(subreason)
+                subreasonText = ""
+                runs = subreason["runs"]
+                if IsArray(runs)
+                    for each rn in runs
+                        text = rn["text"]
+                        if IsString(text)
+                            subreasonText += text
+                        end if
+                    end for
+                end if
+                subreason = subreasonText
+            end if
+
+            if IsString(subreason)
+                errorMessage += `\n` + subreason
+            end if
+
+            if errorMessage = ""
+                errorMessage = "Video not available"
+            end if
+
             return {
                 Success: false
-                Error: playabilityStatus["reason"]
+                Error: errorMessage
             }
         end if
 

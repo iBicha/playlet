@@ -115,6 +115,8 @@
         videoStartAtTimestamp = timestamp;
       }
       videoModal.show();
+    } catch (error) {
+      alert(error);
     } finally {
       isLoading = false;
     }
