@@ -1272,5 +1272,9 @@
         <source>Medium</source>
         <translation>Medio</translation>
     </message>
+    <message>
+        <source>Filler Tangent/Jokes</source>
+        <translation>Chistes de relleno</translation>
+    </message>
 </context>
 </TS>
