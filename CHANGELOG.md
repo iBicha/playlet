@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - "Hot fix" from web app
 
+### Changed
+
+- Reduced search cache to 5 minutes
+
 ## [0.29.0] - 2024-10-18
 
 ### Added
