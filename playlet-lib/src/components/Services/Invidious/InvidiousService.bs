@@ -356,6 +356,8 @@ namespace Invidious
 
             statusCode = response.StatusCode()
             if statusCode = 404
+                ' Similar to VideoInfoHandler, we can return a valid response
+                ' in case of a deleted playlist.
                 response.OverrideStatusCode(200)
                 return {
                     isLastPage: true
@@ -378,6 +380,21 @@ namespace Invidious
 
         function ChannelVideosHandler(context as object) as object
             response = context.response
+
+            statusCode = response.StatusCode()
+            if statusCode = 404
+                ' Similar to VideoInfoHandler, we can return a valid response
+                ' in case of a deleted channel.
+                response.OverrideStatusCode(200)
+                return {
+                    isLastPage: true
+                    items: [{
+                        "type": "video"
+                        "videoId": "-----------"
+                        "title": "[Channel videos not found]"
+                    }]
+                }
+            end if
 
             if response.StatusCode() = 200
                 json = response.Json()
@@ -406,7 +423,7 @@ namespace Invidious
             response = context.response
 
             statusCode = response.StatusCode()
-            if statusCode >= 500
+            if statusCode >= 500 or statusCode = 404
                 ' In some cases, such as a video became private, or a live stream ended,
                 ' Invidious returns a 500 error. We can in this case return a valid response
                 ' with just a video id, which will allow us to show a valid thumbnail if possible.
@@ -438,6 +455,8 @@ namespace Invidious
 
             statusCode = response.StatusCode()
             if statusCode = 404
+                ' Similar to VideoInfoHandler, we can return a valid response
+                ' in case of a deleted playlist.
                 response.OverrideStatusCode(200)
                 return {
                     items: [{
@@ -461,7 +480,21 @@ namespace Invidious
         function ChannelInfoHandler(context as object) as object
             response = context.response
 
-            if response.StatusCode() = 200
+            statusCode = response.StatusCode()
+            if statusCode = 404
+                ' Similar to VideoInfoHandler, we can return a valid response
+                ' in case of a deleted channel.
+                response.OverrideStatusCode(200)
+                return {
+                    items: [{
+                        "type": "channel"
+                        "authorId": context.feedSource.pathParams.ucid
+                        "author": "[Channel not found]"
+                    }]
+                }
+            end if
+
+            if statusCode = 200
                 json = response.Json()
                 json.type = "channel"
                 return {

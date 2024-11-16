@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Sort options for channel shorts
 
+### Fixed
+
+- Bug where deleted channels cannot be removed from bookmarks
+
 ## [0.29.2] - 2024-11-07
 
 ### Changed
