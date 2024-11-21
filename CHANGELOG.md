@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Sort options for channel shorts
+- Option to export device registry
 
 ### Fixed
 

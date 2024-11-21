@@ -141,6 +141,44 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async showExportRegistryCode() {
+        await fetch(`${PlayletApi.host()}/api/registry/export/code`);
+    }
+
+    static async exportRegistry(code: string) {
+        const response = await fetch(`${PlayletApi.host()}/api/registry/export?code=${code}`);
+        if (!response.ok) {
+            const error = `Error from /api/registry/export: ${response.statusText}`;
+            console.error(error);
+            throw new Error(error);
+        }
+
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'playlet-registry.json';
+
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename="(.+)"/);
+            if (match && match[1]) {
+                filename = match[1];
+            }
+        }
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        try {
+            a.href = url;
+            a.download = filename;
+            a.click();
+        } catch (error) {
+            throw error;
+        } finally {
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+    }
+
     static async setPlayletLibVersion(tag) {
         if (tag !== "") {
             const urls = [{

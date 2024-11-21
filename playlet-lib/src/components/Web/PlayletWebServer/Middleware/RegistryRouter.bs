@@ -1,25 +1,128 @@
-#if DEBUG
-    import "pkg:/source/utils/RegistryUtils.bs"
+' LOG_EXPORT_CODE will log export code.
+' Only use this for debugging purposes.
+#const LOG_EXPORT_CODE = false
 
-    namespace Http
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 
-        class RegistryRouter extends HttpRouter
+const REGISTRY_EXPORT_VERSION = 1
 
-            function new()
-                super()
-            end function
+namespace Http
 
+    ' TODO:P2 update openapi spec
+    class RegistryRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            m.task = server.task
+            m.lastRequestCodeTimeSeconds = 0
+            m.requestCode = invalid
+        end function
+
+        @get("/api/registry/export/code")
+        function ShowExportRegistryCode(context as object) as boolean
+            response = context.response
+
+            requestCodeTimeSeconds = TimeUtils.Now().AsSeconds()
+
+            m.requestCode = invalid
+            scene = m.task.getScene()
+            dialog = scene.dialog
+            if dialog <> invalid and dialog.hasField("isExportRegistryCodeDialog")
+                dialog.close = true
+            end if
+
+            if requestCodeTimeSeconds - m.lastRequestCodeTimeSeconds < 2
+                response.Default(429, "Too Many Requests")
+                return true
+            end if
+
+            requestCode = rnd(999999).ToStr()
+            if requestCode.Len() < 6
+                requestCode = string(6 - requestCode.Len(), "0") + requestCode
+            end if
+
+            m.requestCode = requestCode
+            m.lastRequestCodeTimeSeconds = requestCodeTimeSeconds
+            requestCode = requestCode.Left(3) + " " + requestCode.Right(3)
+
+            #if LOG_EXPORT_CODE
+                #if DEBUG
+                    LogInfo(`Export registry code: ${requestCode}`)
+                #end if
+            #end if
+
+            message = `The code to export the registry data is: ${requestCode}.
+            This code will expire in 2 minutes.
+            If you did not request to export the registry, please close this dialog.`
+            dialog = DialogUtils.ShowDialog(message, "Export registry")
+            dialog.addField("isExportRegistryCodeDialog", "boolean", false)
+
+            response.Default(204, "OK")
+            return true
+        end function
+
+        @get("/api/registry/export")
+        function ExportRegistry(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            requestCode = m.requestCode
+            m.requestCode = invalid
+            scene = m.task.getScene()
+            dialog = scene.dialog
+            if dialog = invalid or not dialog.hasField("isExportRegistryCodeDialog")
+                response.Default(400, "Invalid code")
+                return true
+            end if
+            dialog.close = true
+
+            requestTimeSeconds = TimeUtils.Now().AsSeconds()
+            if requestTimeSeconds - m.lastRequestCodeTimeSeconds > 120
+                response.Default(400, "Invalid code")
+                return true
+            end if
+
+            if requestCode = invalid
+                response.Default(400, "Invalid code")
+                return true
+            end if
+
+            code = request.query.code
+            if StringUtils.IsNullOrEmpty(code)
+                response.Default(400, "Invalid code")
+                return true
+            end if
+
+            code = code.Replace(" ", "")
+            if code <> requestCode
+                response.Default(400, "Invalid code")
+                return true
+            end if
+
+            registryValues = RegistryUtils.ReadAll()
+            registryValues["__version"] = REGISTRY_EXPORT_VERSION
+
+            response.Json(registryValues)
+            response.headers["Content-Disposition"] = "attachment; filename=playlet-registry.json"
+            return true
+        end function
+
+        #if DEBUG
             @get("/debug/registry")
-            function GetRegistry(context as object) as boolean
+            function GetRegistryDebug(context as object) as boolean
                 response = context.response
 
                 registryValues = RegistryUtils.ReadAll()
+                registryValues["__version"] = REGISTRY_EXPORT_VERSION
+
                 response.Json(registryValues)
                 return true
             end function
 
             @post("/debug/registry")
-            function SetRegistry(context as object) as boolean
+            function SetRegistryDebug(context as object) as boolean
                 request = context.request
                 response = context.response
 
@@ -29,21 +132,27 @@
                     return true
                 end if
 
+                if not payload.DoesExist("__version") or payload["__version"] <> REGISTRY_EXPORT_VERSION
+                    response.Default(400, "Invalid version")
+                    return true
+                end if
+                payload.Delete("__version")
+
                 RegistryUtils.WriteAll(payload)
                 response.Default(204, "OK")
                 return true
             end function
 
             @delete("/debug/registry")
-            function ClearRegistry(context as object) as boolean
+            function ClearRegistryDebug(context as object) as boolean
                 response = context.response
 
                 RegistryUtils.DeleteAll()
                 response.Default(204, "OK")
                 return true
             end function
+        #end if
 
-        end class
+    end class
 
-    end namespace
-#end if
+end namespace

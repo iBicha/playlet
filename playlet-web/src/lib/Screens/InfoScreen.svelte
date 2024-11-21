@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getHost } from "lib/Api/Host";
+  import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore, tr } from "lib/Stores";
 
   export let visibility: boolean;
@@ -145,6 +146,20 @@ ${JSON.stringify(profilesInfo, null, 2)}
     const body = encodeURIComponent(createFeedbackBody());
     return `mailto:brahim.hadriche@gmail.com?subject=${feedbackTitle}&body=${body}`;
   }
+
+  async function exportRegistry() {
+    try {
+      await PlayletApi.showExportRegistryCode();
+      const code = prompt("Enter the code you see on your Roku device");
+      if (!code) {
+        return;
+      }
+      await PlayletApi.exportRegistry(code);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to export registry. Please try again.");
+    }
+  }
 </script>
 
 <div class={visibility ? "" : "hidden"}>
@@ -198,6 +213,15 @@ ${JSON.stringify(profilesInfo, null, 2)}
             >
           </tr>
         {/each}
+
+        <tr>
+          <td>{"Registry"}</td>
+          <td
+            ><button class="btn btn-outline btn-sm" on:click={exportRegistry}
+              >Export registry</button
+            ></td
+          >
+        </tr>
       </tbody>
     </table>
   </div>
