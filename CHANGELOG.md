@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Bug where deleted channels cannot be removed from bookmarks
+- Issue with Invidious instance caption test
 
 ## [0.29.2] - 2024-11-07
 
