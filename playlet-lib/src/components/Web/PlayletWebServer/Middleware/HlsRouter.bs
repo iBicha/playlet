@@ -1,0 +1,195 @@
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Http
+
+    class HlsRouter extends HttpRouter
+        function new(server as object)
+            super()
+
+            m.videoQueue = server.task.videoQueue
+        end function
+
+        @get("/api/hls")
+        function GenerateHlsManifest(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            url = request.query.url
+
+            if StringUtils.IsNullOrEmpty(url)
+                response.Default(400, "Missing url")
+                return true
+            end if
+
+            hlsRequest = HttpClient.Get(url)
+            headers = request.headers
+            headers.Delete("Host")
+            hlsRequest.Headers(headers)
+
+            hlsResponse = hlsRequest.Await()
+
+            if not hlsResponse.IsSuccess()
+                LogError("Failed to fetch HLS manifest:", hlsResponse.ErrorMessage())
+            end if
+
+            hlsManifest = hlsResponse.Text()
+            hlsManifest = m.AppendStoryboardPlaylists(hlsManifest)
+
+            response.http_code = hlsResponse.StatusCode()
+            response.headers = hlsResponse.Headers()
+            response.SetBodyDataString(ValidString(hlsManifest))
+
+            return true
+        end function
+
+        @get("/api/hls/storyboards")
+        function GetStoryboardsHls(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            metadata = m.GetPlayerMetadata()
+            if metadata = invalid
+                response.Default(500, "Player metadata is invalid")
+                return true
+            end if
+
+            storyboards = metadata.storyboards
+            if not IsArray(storyboards)
+                response.Default(500, "Player metadata storyboards is invalid")
+                return true
+            end if
+
+            lengthSeconds = metadata.lengthSeconds
+            if not IsInt(lengthSeconds)
+                response.Default(500, "Player metadata lengthSeconds is invalid")
+                return true
+            end if
+
+            index = request.query.index
+            if StringUtils.IsNullOrEmpty(index)
+                response.Default(400, "Missing index")
+                return true
+            end if
+
+            index = index.ToInt()
+            if index < 0 or index >= storyboards.Count()
+                response.Default(400, "Invalid index")
+                return true
+            end if
+
+            storyboard = storyboards[index]
+            hlsManifest = m.GenerateStoryboardManifest(storyboard, lengthSeconds)
+
+            response.http_code = 200
+            response.SetBodyDataString(hlsManifest)
+            response.ContentType("application/vnd.apple.mpegurl")
+
+            return true
+        end function
+
+        function AppendStoryboardPlaylists(hlsManifest as dynamic) as string
+            if StringUtils.IsNullOrEmpty(hlsManifest) or not hlsManifest.StartsWith("#EXTM3U")
+                return hlsManifest
+            end if
+
+            metadata = m.GetPlayerMetadata()
+            if metadata = invalid
+                return hlsManifest
+            end if
+
+            ' TODO:P2: handle live videos
+            if ValidBool(metadata.liveNow)
+                return hlsManifest
+            end if
+
+            storyboards = metadata.storyboards
+            if not IsArray(storyboards)
+                return hlsManifest
+            end if
+
+            ' Perhaps this is due to the bandwidth calculation being off, but the
+            ' Video node ends up using the first storyboard, which is the lowest
+            ' quality. That's why we reverse the order here.
+            for i = storyboards.Count() - 1 to 0 step -1
+                storyboard = storyboards[i]
+                ' estimate bandwidth based on storyboard size
+                bandwidth = Cint((storyboard.width * storyboard.height * storyboard.storyboardWidth * storyboard.storyboardHeight * storyboard.storyboardCount / (Cdbl(storyboard.interval) / 1000.0)) * 0.01)
+                hlsManifest += `\n#EXT-X-IMAGE-STREAM-INF:BANDWIDTH=${bandwidth},RESOLUTION=${storyboard.width}x${storyboard.height},CODECS="jpeg",URI="/api/hls/storyboards?index=${i}"`
+            end for
+
+            hlsManifest += `\n`
+
+            return hlsManifest
+        end function
+
+        function GenerateStoryboardManifest(storyboard as object, lengthSeconds as float) as string
+            tileCount = storyboard.storyboardWidth * storyboard.storyboardHeight
+            intervalSeconds = Cdbl(storyboard.interval) / 1000.0
+            targetDuration = tileCount * intervalSeconds
+
+            hlsManifest = `#EXTM3U
+#EXT-X-TARGETDURATION:${targetDuration}
+#EXT-X-VERSION:7
+#EXT-X-MEDIA-SEQUENCE:1
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXT-X-IMAGES-ONLY
+
+`
+            for i = 0 to storyboard.storyboardCount - 1
+                currentTileCount = tileCount
+                currentStoryboardWidth = storyboard.storyboardWidth
+                currentStoryboardHeight = storyboard.storyboardHeight
+                if i = storyboard.storyboardCount - 1
+                    currentTileCount = storyboard.count mod tileCount
+                    if currentTileCount = 0
+                        currentTileCount = tileCount
+                    end if
+
+                    if currentTileCount < currentStoryboardWidth
+                        currentStoryboardWidth = currentTileCount
+                    end if
+
+                    currentStoryboardHeight = Cint(Cdbl(currentTileCount) / Cdbl(currentStoryboardWidth))
+                    if currentStoryboardHeight * currentStoryboardWidth < currentTileCount
+                        currentStoryboardHeight += 1
+                    end if
+                end if
+
+                extinf = currentTileCount * intervalSeconds
+
+                ' TODO:P2: although we took care of the last storyboard to get the
+                ' correct tile count and layout, and still looks wrong, similar to DASH.
+                hlsManifest += `#EXTINF:${extinf},
+#EXT-X-TILES:RESOLUTION=${storyboard.width}x${storyboard.height},LAYOUT=${currentStoryboardWidth}x${currentStoryboardHeight},DURATION=${intervalSeconds}
+${storyboard.templateUrl.replace("$M", `${i}`)}
+
+`
+            end for
+
+            hlsManifest += `#EXT-X-ENDLIST`
+
+            return hlsManifest
+        end function
+
+        function GetPlayerMetadata() as object
+            player = m.videoQueue.player
+
+            if player = invalid
+                return invalid
+            end if
+
+            content = player.content
+            if content = invalid
+                return invalid
+            end if
+
+            metadata = content.metadata
+            if not IsAssociativeArray(metadata)
+                return invalid
+            end if
+
+            return metadata
+        end function
+    end class
+
+end namespace

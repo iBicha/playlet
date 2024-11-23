@@ -60,16 +60,16 @@ function VideoContentTask(input as object) as object
     end if
 
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode, playletServerPort)
-    contentNode.url = streamUrls[0]
-
-    SetCaptions(metadata, service, contentNode)
-
     contentNode.addFields({
         metadata: metadata
         ' StreamUrls is taken
         playletStreamUrls: streamUrls
         playletStreamUrlIndex: 0
     })
+
+    contentNode.url = streamUrls[0]
+
+    SetCaptions(metadata, service, contentNode)
 
     if metadata.liveNow = true
         contentNode.Live = true
@@ -87,7 +87,7 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
     streamUrls = []
 
     if metadata.hlsUrl <> invalid
-        AddHlsUrls(streamUrls, metadata, proxyVideos)
+        AddHlsUrls(streamUrls, metadata, proxyVideos, playletServerPort)
     else
         preferredQuality = preferences["playback.preferred_quality"]
 
@@ -105,9 +105,16 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
     return streamUrls
 end function
 
-function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as string)
+function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer)
     hlsUrl = metadata.hlsUrl
+    if hlsUrl.StartsWith("/api/manifest")
+        hlsUrl = "https://manifest.googlevideo.com" + hlsUrl
+    end if
     hlsUrlLocal = AddLocalFlag(hlsUrl)
+
+    ' Redirect to Playet's local web server, where we will be
+    ' dynamically adding storyboards
+    hlsUrl = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrl.EncodeUriComponent()}`
 
     AddUrls(streamUrls, hlsUrl, hlsUrlLocal, proxyVideos)
 end function

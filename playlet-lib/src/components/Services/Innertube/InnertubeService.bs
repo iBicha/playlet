@@ -260,16 +260,17 @@ namespace InnertubeService
             }
         end if
 
+        lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         videoInfo = {
             "type": "video"
             "title": videoDetails["title"]
             "videoId": videoDetails["videoId"]
             "videoThumbnails": videoDetails["thumbnail"]["thumbnails"]
-            "storyboards": []
+            "storyboards": ParseStoryboards(payload, lengthSeconds)
             "viewCount": videoDetails["viewCount"].ToInt()
             "author": videoDetails["author"]
             "authorId": videoDetails["channelId"]
-            "lengthSeconds": videoDetails["lengthSeconds"].ToInt()
+            "lengthSeconds": lengthSeconds
             "liveNow": ValidBool(videoDetails["isLive"])
             "hlsUrl": streamingData["hlsManifestUrl"]
             "adaptiveFormats": []
@@ -282,6 +283,88 @@ namespace InnertubeService
             Success: true
             Metadata: videoInfo
         }
+    end function
+
+    function ParseStoryboards(payload as object, lengthSeconds as integer) as object
+        storyboard = ObjectUtils.Dig(payload, ["storyboards", "playerLiveStoryboardSpecRenderer", "spec"])
+        if IsString(storyboard)
+            storyboard = storyboard.Split("#")
+            if storyboard.Count() <> 5
+                return []
+            end if
+            return [{
+                "templateUrl": storyboard[0]
+                "width": storyboard[1].ToInt()
+                "height": storyboard[2].ToInt()
+                "count": -1
+                "interval": 5000
+                "storyboardHeight": storyboard[3].ToInt()
+                "storyboardWidth": storyboard[4].ToInt()
+            }]
+        end if
+
+        storyboards = ObjectUtils.Dig(payload, ["storyboards", "playerStoryboardSpecRenderer", "spec"])
+        if not IsString(storyboards)
+            return []
+        end if
+
+        storyboardsData = storyboards.Split("|")
+        if storyboardsData.Count() < 2
+            return []
+        end if
+
+        baseUrl = storyboardsData.Shift()
+        storyboards = []
+
+        index = 0
+        for each sb in storyboardsData
+            sbData = sb.Split("#")
+            if sbData.Count() <> 8
+                index += 1
+                continue for
+            end if
+
+            width = sbData[0].ToInt()
+            height = sbData[1].ToInt()
+            _count = sbData[2].ToInt()
+            columns = sbData[3].ToInt()
+            rows = sbData[4].ToInt()
+            interval = sbData[5].ToInt()
+            name = sbData[6]
+            sigh = sbData[7]
+
+            url = baseUrl
+            url = url.Replace("$L", `${index}`)
+            url = url.Replace("$N", name)
+
+            queryComponents = UrlUtils.ParseQueryComponents(url)
+            queryComponents["sigh"] = sigh.DecodeUriComponent()
+            url = UrlUtils.SetQueryParams(url, queryComponents)
+
+            thumbnailsPerImage = columns * rows
+            imagesCount = _count \ thumbnailsPerImage
+            if _count mod thumbnailsPerImage > 0
+                imagesCount += 1
+            end if
+
+            if interval = 0 and _count > 0
+                interval = Cint(Cdbl(lengthSeconds) * 1000.0 / Cdbl(_count))
+            end if
+
+            storyboards.Push({
+                "templateUrl": url
+                "width": width
+                "height": height
+                "count": _count
+                "interval": interval
+                "storyboardWidth": columns
+                "storyboardHeight": rows
+                "storyboardCount": imagesCount
+            })
+            index += 1
+        end for
+
+        return storyboards
     end function
 
     function ParseCaptions(payload as object) as object
