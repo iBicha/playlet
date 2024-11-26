@@ -1,3 +1,5 @@
+#const DEBUG_LOG_VIDEO_QUALITY = false
+
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
@@ -50,7 +52,48 @@ function Init()
 
     httpAgent = m.top.getHttpAgent()
     httpAgent.AddHeader("User-Agent", "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:126.0) Gecko/20100101 Firefox/126.0")
+
+    #if DEBUG_LOG_VIDEO_QUALITY
+        m.top.addFields({
+            "_resolution": ""
+            "_audioFormat": ""
+            "_videoFormat": ""
+        })
+
+        m.top.observeField("streamingSegment", FuncName(OnStreamingSegmentChangeDebug))
+
+        m.top.observeField("audioFormat", FuncName(OnFormatChangeDebug))
+        m.top.observeField("videoFormat", FuncName(OnFormatChangeDebug))
+        m.top.observeField("_resolution", FuncName(OnFormatChangeDebug))
+
+        m.top.observeField("_audioFormat", FuncName(OnQualityChangeDebug))
+        m.top.observeField("_videoFormat", FuncName(OnQualityChangeDebug))
+    #end if
 end function
+
+#if DEBUG_LOG_VIDEO_QUALITY
+    function OnStreamingSegmentChangeDebug()
+        segment = m.top.streamingSegment
+        width = segment.width
+        height = segment.height
+        if width > 0 and height > 0
+            m.top._resolution = `${width}x${height}`
+        end if
+    end function
+
+    function OnFormatChangeDebug()
+        audioFormat = m.top.audioFormat
+        videoFormat = m.top.videoFormat
+        resolution = m.top._resolution
+
+        m.top._audioFormat = audioFormat
+        m.top._videoFormat = `${videoFormat} ${resolution}`
+    end function
+
+    function OnQualityChangeDebug()
+        LogDebug("Video format:", m.top._videoFormat, "Audio format:", m.top._audioFormat)
+    end function
+#end if
 
 function OnNodeReady()
     minRect = m.top.minRect
