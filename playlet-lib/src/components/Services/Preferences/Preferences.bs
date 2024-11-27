@@ -109,10 +109,13 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
         RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
     end if
 
-    ' v1 -> v2 goes here (if needed)
-    ' if userPrefs.__version = 1
-    '   'do stuff
-    ' end if
+    if userPrefs.__version = 1
+        if ValidString(userPrefs["playback.preferred_quality"]) = "medium"
+            userPrefs["playback.preferred_quality"] = "480p"
+        end if
+        userPrefs.__version = 2
+        isDirty = true
+    end if
 
     ' TODO:P2 handle case where saved preferences version is higher than current version (e.g. user downgraded)
     return isDirty

@@ -137,16 +137,8 @@
         <translation>Nach dem Ende eines Videos wird automatisch ein neues Video wiedergegeben</translation>
     </message>
     <message>
-        <source>Auto (DASH)</source>
-        <translation>Automatisch (DASH)</translation>
-    </message>
-    <message>
-        <source>Medium</source>
-        <translation>Mittel</translation>
-    </message>
-    <message>
-        <source>720p</source>
-        <translation>720p</translation>
+        <source>Auto</source>
+        <translation>Automatisch</translation>
     </message>
     <message>
         <source>Proxy videos</source>

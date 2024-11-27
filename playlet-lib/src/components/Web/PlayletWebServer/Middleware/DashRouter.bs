@@ -22,6 +22,7 @@ namespace Http
 
             v = request.query.v
             local = request.query.local
+            quality = request.query.quality
 
             if StringUtils.IsNullOrEmpty(v)
                 response.Default(400, "Missing video id")
@@ -37,13 +38,35 @@ namespace Http
             metadata = metadataRequest.Json()
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
 
-            xmlContent = m.dashManifest.fromVideoMetadata(metadata, ValidString(local) = "true")
+            qualityFilter = m.CreateQualityFilter(quality)
+            xmlContent = m.dashManifest.fromVideoMetadata(metadata, qualityFilter, ValidString(local) = "true")
 
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
             response.ContentType("application/dash+xml")
 
             return true
+        end function
+
+        function CreateQualityFilter(quality as dynamic) as object
+            qualityFilter = {}
+            if not IsString(quality)
+                return qualityFilter
+            end if
+
+            includeList = quality.split(",")
+            for each quality in includeList
+                if quality = "auto"
+                    continue for
+                end if
+                pIndex = quality.InStr("p")
+                if pIndex <> -1
+                    quality = quality.Mid(0, pIndex)
+                end if
+                qualityFilter[quality] = true
+            end for
+
+            return qualityFilter
         end function
 
     end class

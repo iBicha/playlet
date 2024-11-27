@@ -83,81 +83,48 @@ end function
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, playletServerPort as integer) as object
     instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
+    preferredQuality = preferences["playback.preferred_quality"]
 
     streamUrls = []
 
     if metadata.hlsUrl <> invalid
-        AddHlsUrls(streamUrls, metadata, proxyVideos, playletServerPort)
+        metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
+        AddHlsUrls(streamUrls, metadata, preferredQuality, proxyVideos, playletServerPort)
     else
-        preferredQuality = preferences["playback.preferred_quality"]
-
-        if preferredQuality = "auto"
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
-        else
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
-        end if
+        AddDashUrls(streamUrls, metadata, preferredQuality, proxyVideos, playletServerPort)
     end if
 
-    AddInstanceToUrlIfNeeded(streamUrls, instance)
+    for i = 0 to streamUrls.Count() - 1
+        streamUrls[i] = AddInstanceToUrlIfNeeded(streamUrls[i], instance)
+    end for
 
     return streamUrls
 end function
 
-function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer)
+function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, proxyVideos as string, playletServerPort as integer)
     hlsUrl = metadata.hlsUrl
-    if hlsUrl.StartsWith("/api/manifest")
-        hlsUrl = "https://manifest.googlevideo.com" + hlsUrl
-    end if
     hlsUrlLocal = AddLocalFlag(hlsUrl)
 
     ' Redirect to Playet's local web server, where we will be
     ' dynamically adding storyboards
     hlsUrl = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrl.EncodeUriComponent()}`
+    if not StringUtils.IsNullOrEmpty(preferredQuality)
+        hlsUrl = hlsUrl + "&quality=" + preferredQuality
+    end if
 
     AddUrls(streamUrls, hlsUrl, hlsUrlLocal, proxyVideos)
 end function
 
-function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer) as void
+function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, proxyVideos as string, playletServerPort as integer) as void
     ' Redirect to Playet's local web server, where will will be
     ' dynamically generating the DASH manifest, instead of metadata.dashUrl
     dashUrl = `http://127.0.0.1:${playletServerPort}/api/dash?v=${metadata.videoId}`
+    if not StringUtils.IsNullOrEmpty(preferredQuality)
+        dashUrl = dashUrl + "&quality=" + preferredQuality
+    end if
 
     dashUrlLocal = AddLocalFlag(dashUrl)
     AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
-end function
-
-function AddStreamUrls(streamUrls as object, metadata as object, service as Invidious.InvidiousService, proxyVideos as string, preferredQuality as string) as void
-    if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
-        return
-    end if
-
-    itag = invalid
-    ' If we prefer medium quality, we check if we have a 360p or 480p streams
-    if preferredQuality = "medium"
-        ' These are roughly the itags for 360p and 480p
-        ' Most videos will hit 18, which is 360p
-        mediumItags = {
-            "18": true
-            "43": true
-            "44": true
-            "82": true
-            "83": true
-            "101": true
-        }
-        for each formatStream in metadata.formatStreams
-            if mediumItags[ValidString(formatStream.itag)] = true
-                itag = formatStream.itag
-                exit for
-            end if
-        end for
-    end if
-
-    url = service.GetVideoStreamUrl(metadata.videoId, itag)
-    localUrl = AddLocalFlag(url)
-
-    AddUrls(streamUrls, url, localUrl, proxyVideos)
 end function
 
 function AddLocalFlag(url as string) as string
@@ -182,13 +149,11 @@ function AddUrls(streamUrls as object, url as string, localUrl as string, proxyV
     end if
 end function
 
-function AddInstanceToUrlIfNeeded(streamUrls as object, instance as string)
-    for i = 0 to streamUrls.Count() - 1
-        url = streamUrls[i]
-        if url.StartsWith("/")
-            streamUrls[i] = instance + url
-        end if
-    end for
+function AddInstanceToUrlIfNeeded(url as object, instance as string) as string
+    if url.StartsWith("/")
+        return instance + url
+    end if
+    return url
 end function
 
 function SetCaptions(metadata as object, service as object, contentNode as object) as void

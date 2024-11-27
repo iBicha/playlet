@@ -32,7 +32,7 @@ class DashManifest
         }
     end function
 
-    function fromVideoMetadata(metadata as object, local as boolean) as string
+    function fromVideoMetadata(metadata as object, qualityFilter as object, local as boolean) as string
         adaptiveFormats = []
         adaptiveFormats.Append(metadata.adaptiveFormats)
 
@@ -43,7 +43,10 @@ class DashManifest
         end if
 
         audioStreams = m.getAudioStreams(adaptiveFormats)
-        videoStreams = m.getVideoStreams(adaptiveFormats)
+        videoStreams = m.getVideoStreams(adaptiveFormats, qualityFilter)
+        if videoStreams.Count() = 0
+            videoStreams = m.getVideoStreams(adaptiveFormats, {})
+        end if
 
         videoMimeTypes = m.getMimeTypes(videoStreams)
         audioSets = m.getMimeTypeLanguageCombos(audioStreams)
@@ -296,9 +299,13 @@ class DashManifest
         return audioStreams
     end function
 
-    function getVideoStreams(streams as object) as object
+    function getVideoStreams(streams as object, qualityFilter as object) as object
         videoStreams = []
         for i = 0 to streams.Count() - 1
+            if not m.isVideoFormatIncluded(streams[i], qualityFilter)
+                continue for
+            end if
+
             stream = streams[i]
             if stream.type.startsWith("video/")
                 if stream.bitrate = invalid
@@ -330,6 +337,46 @@ class DashManifest
 
         videoStreams.SortBy("bitrate", "r")
         return videoStreams
+    end function
+
+    function isVideoFormatIncluded(stream as object, qualityFilter as object) as boolean
+        if qualityFilter.Count() = 0
+            return true
+        end if
+
+        qualityLabel = stream.qualityLabel
+        if not StringUtils.IsNullOrEmpty(qualityLabel)
+            pIndex = qualityLabel.InStr("p")
+            if pIndex <> -1
+                qualityLabel = qualityLabel.Mid(0, pIndex)
+            end if
+            if qualityFilter[qualityLabel] = true
+                return true
+            end if
+        end if
+
+        resolution = stream.resolution
+        if not StringUtils.IsNullOrEmpty(resolution)
+            pIndex = resolution.InStr("p")
+            if pIndex <> -1
+                resolution = resolution.Mid(0, pIndex)
+            end if
+            if qualityFilter[resolution] = true
+                return true
+            end if
+        end if
+
+        size = stream.size
+        if not StringUtils.IsNullOrEmpty(size)
+            size = size.Split("x")
+            if size.Count() = 2
+                if qualityFilter[size[1]] = true
+                    return true
+                end if
+            end if
+        end if
+
+        return false
     end function
 
     function getMimeTypes(streams as object) as object
