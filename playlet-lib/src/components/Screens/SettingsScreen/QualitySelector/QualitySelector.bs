@@ -1,0 +1,156 @@
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.checkList = m.top.findNode("checkList")
+    m.closeButton = m.top.findNode("closeButton")
+    m.saveButton = m.top.findNode("saveButton")
+
+    SetNavigation(m.checkList, RemoteKeys.Down, m.saveButton)
+    SetNavigation(m.saveButton, RemoteKeys.Up, m.checkList)
+    SetNavigation(m.closeButton, RemoteKeys.Up, m.checkList)
+    SetNavigation(m.saveButton, RemoteKeys.Right, m.closeButton)
+    SetNavigation(m.closeButton, RemoteKeys.Left, m.saveButton)
+
+    m.saveButton.observeField("buttonSelected", FuncName(OnSaveButtonSelected))
+    m.closeButton.observeField("buttonSelected", FuncName(Close))
+
+    m.lastCheckedState = [false, false, false, false, false, false, false]
+    m.checkList.observeField("checkedState", FuncName(OnCheckedStateChange))
+
+    SetButtonPositions()
+end function
+
+function SetButtonPositions()
+    saveButtonWidth = m.saveButton.width
+    closeButtonWidth = m.closeButton.width
+    buttonsWith = closeButtonWidth + saveButtonWidth + 20
+    m.saveButton.translation = [780 / 2 - buttonsWith / 2, m.saveButton.translation[1]]
+    m.closeButton.translation = [780 / 2 + buttonsWith / 2 - closeButtonWidth, m.closeButton.translation[1]]
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.checkList, true)
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
+        ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
+        return false
+    end if
+
+    if key = RemoteKeys.Back and press
+        Close()
+        return true
+    end if
+
+    return true
+end function
+
+function OnValueChange() as void
+    content = m.checkList.content
+    value = m.top.value
+
+    if content = invalid or content.getChildCount() = 0
+        return
+    end if
+
+    values = value.Split(",")
+    valuesDict = {}
+    for each value in values
+        valuesDict[value] = true
+    end for
+
+    checkboxes = content.getChildren(-1, 0)
+    checkedState = []
+    for i = 0 to checkboxes.Count() - 1
+        checkedState.push(valuesDict.DoesExist(checkboxes[i].id))
+    end for
+    m.checkList.checkedState = checkedState
+end function
+
+function OnCheckedStateChange() as void
+    content = m.checkList.content
+    if content = invalid or content.getChildCount() = 0
+        return
+    end if
+
+    checkedState = m.checkList.checkedState
+    if checkedState = invalid or checkedState.Count() = 0
+        return
+    end if
+    lastCheckedState = m.lastCheckedState
+    m.lastCheckedState = checkedState
+
+    autoChanged = lastCheckedState[0] <> checkedState[0]
+    hasAuto = checkedState[0]
+
+    if autoChanged
+        if hasAuto
+            checkedState = [true, false, false, false, false, false, false]
+            m.lastCheckedState = checkedState
+            m.checkList.checkedState = checkedState
+            m.top.value = "auto"
+            return
+        else
+            checkedState = [false, true, true, true, true, true, true]
+            m.lastCheckedState = checkedState
+            m.checkList.checkedState = checkedState
+            m.top.value = "1080p,720p,480p,360p,240p,144p"
+            return
+        end if
+    end if
+
+    values = []
+    checkboxes = content.getChildren(-1, 0)
+
+    hasNonAuto = false
+    for i = 0 to checkboxes.Count() - 1
+        if not checkedState[i]
+            continue for
+        end if
+        values.push(checkboxes[i].id)
+        if i <> 0
+            hasNonAuto = true
+        end if
+    end for
+
+    if values.Count() = 0
+        checkedState = [true, false, false, false, false, false, false]
+        m.lastCheckedState = checkedState
+        m.checkList.checkedState = checkedState
+        m.top.value = "auto"
+        return
+    end if
+
+    if hasNonAuto and hasAuto
+        checkedState[0] = false
+        m.lastCheckedState = checkedState
+        m.checkList.checkedState = checkedState
+        values.shift()
+    end if
+
+    m.top.value = values.Join(",")
+end function
+
+function OnSaveButtonSelected()
+    OnCheckedStateChange()
+    m.top.save = true
+    Close()
+end function
+
+function Close()
+    m.appController@.PopScreen()
+end function
