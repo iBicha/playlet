@@ -37,6 +37,8 @@ namespace Http
 
             qualityFilter = m.CreateQualityFilter(quality)
             hlsManifest = m.FilterHlsManifest(hlsManifest, qualityFilter)
+            ' For some reason, player hangs on HDR videos...
+            hlsManifest = m.ReplaceVideoRange(hlsManifest)
 
             hlsManifest = m.AppendStoryboardPlaylists(hlsManifest)
 
@@ -170,6 +172,14 @@ namespace Http
                 return hlsManifest
             end if
             return newLines.join(`\n`)
+        end function
+
+        function ReplaceVideoRange(hlsManifest as dynamic) as dynamic
+            if StringUtils.IsNullOrEmpty(hlsManifest)
+                return hlsManifest
+            end if
+
+            return hlsManifest.Replace("VIDEO-RANGE=HLG", "VIDEO-RANGE=SDR").Replace("VIDEO-RANGE=PQ", "VIDEO-RANGE=SDR")
         end function
 
         function GenerateStoryboardManifest(storyboard as object, lengthSeconds as float) as string
