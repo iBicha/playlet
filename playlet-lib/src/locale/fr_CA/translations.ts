@@ -721,16 +721,8 @@
         <translation>Qualité vidéo préférée</translation>
     </message>
     <message>
-        <source>Auto (DASH)</source>
-        <translation>Auto (DASH)</translation>
-    </message>
-    <message>
-        <source>720p</source>
-        <translation>720p</translation>
-    </message>
-    <message>
-        <source>Medium</source>
-        <translation>Moyenne</translation>
+        <source>Auto</source>
+        <translation>Auto</translation>
     </message>
     <message>
         <source>Invidious preferences</source>

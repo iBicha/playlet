@@ -6,8 +6,9 @@
   import RadioControl from "lib/Screens/Settings/SettingControls/RadioControl.svelte";
   import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
   import NumberControl from "./SettingControls/NumberControl.svelte";
-  import { tr } from "lib/Stores";
   import ClearCacheControl from "./SettingControls/ClearCacheControl.svelte";
+  import EditQualityControl from "./SettingControls/EditQualityControl.svelte";
+  import { tr } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -34,6 +35,7 @@
     ClearCacheControl,
     EditHomeScreenControl,
     PlayletLibVersionControl,
+    EditQualityControl,
   };
 </script>
 

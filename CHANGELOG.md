@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- Support for better video quality selector
 
 ## [0.31.0] - 2024-11-24
 

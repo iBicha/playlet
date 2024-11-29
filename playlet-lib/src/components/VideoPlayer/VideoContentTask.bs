@@ -59,7 +59,7 @@ function VideoContentTask(input as object) as object
         }
     end if
 
-    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, playletServerPort)
+    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
     contentNode.addFields({
         metadata: metadata
         ' StreamUrls is taken
@@ -80,115 +80,125 @@ function VideoContentTask(input as object) as object
     }
 end function
 
-function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, playletServerPort as integer) as object
+function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
     instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
+    preferredQuality = preferences["playback.preferred_quality"]
 
     streamUrls = []
 
     if metadata.hlsUrl <> invalid
-        AddHlsUrls(streamUrls, metadata, proxyVideos, playletServerPort)
+        metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
+        AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
     else
-        preferredQuality = preferences["playback.preferred_quality"]
-
-        if preferredQuality = "auto"
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
-        else
-            AddStreamUrls(streamUrls, metadata, service, proxyVideos, preferredQuality)
-            AddDashUrls(streamUrls, metadata, proxyVideos, playletServerPort)
-        end if
+        AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
     end if
-
-    AddInstanceToUrlIfNeeded(streamUrls, instance)
 
     return streamUrls
 end function
 
-function AddHlsUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer)
+function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer)
     hlsUrl = metadata.hlsUrl
-    if hlsUrl.StartsWith("/api/manifest")
-        hlsUrl = "https://manifest.googlevideo.com" + hlsUrl
+    hlsUrlLocal = invalid
+    hlsUrlFiltered = invalid
+    hlsUrlFilteredLocal = invalid
+
+    supportsProxying = backend <> "playlet"
+    hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
+
+    if supportsProxying
+        hlsUrlLocal = UrlUtils.AppendQueryParams(hlsUrl, { local: "true" })
     end if
-    hlsUrlLocal = AddLocalFlag(hlsUrl)
 
     ' Redirect to Playet's local web server, where we will be
-    ' dynamically adding storyboards
+    ' dynamically adding storyboards to the HLS manifest, and filter quality
     hlsUrl = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrl.EncodeUriComponent()}`
+    hlsUrlLocal = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrlLocal.EncodeUriComponent()}`
 
-    AddUrls(streamUrls, hlsUrl, hlsUrlLocal, proxyVideos)
+    if hasQuality
+        hlsUrlFiltered = UrlUtils.AppendQueryParams(hlsUrl, { quality: preferredQuality })
+        if supportsProxying
+            hlsUrlFilteredLocal = UrlUtils.AppendQueryParams(hlsUrlLocal, { quality: preferredQuality })
+        end if
+    end if
+
+    AddUrls(streamUrls, hlsUrl, hlsUrlLocal, hlsUrlFiltered, hlsUrlFilteredLocal, proxyVideos)
+    if streamUrls.Count() = 0
+        streamUrls.push(hlsUrl)
+    end if
 end function
 
-function AddDashUrls(streamUrls as object, metadata as object, proxyVideos as string, playletServerPort as integer) as void
+function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
     ' Redirect to Playet's local web server, where will will be
-    ' dynamically generating the DASH manifest, instead of metadata.dashUrl
+    ' dynamically generating the DASH manifest, and filter quality
     dashUrl = `http://127.0.0.1:${playletServerPort}/api/dash?v=${metadata.videoId}`
+    dashUrlLocal = invalid
+    dashUrlFiltered = invalid
+    dashUrlFilteredLocal = invalid
 
-    dashUrlLocal = AddLocalFlag(dashUrl)
-    AddUrls(streamUrls, dashUrl, dashUrlLocal, proxyVideos)
-end function
+    supportsProxying = backend <> "playlet"
+    hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
 
-function AddStreamUrls(streamUrls as object, metadata as object, service as Invidious.InvidiousService, proxyVideos as string, preferredQuality as string) as void
-    if metadata.formatStreams = invalid or metadata.formatStreams.Count() = 0
-        return
+    if supportsProxying
+        dashUrlLocal = UrlUtils.AppendQueryParams(dashUrl, { local: "true" })
     end if
 
-    itag = invalid
-    ' If we prefer medium quality, we check if we have a 360p or 480p streams
-    if preferredQuality = "medium"
-        ' These are roughly the itags for 360p and 480p
-        ' Most videos will hit 18, which is 360p
-        mediumItags = {
-            "18": true
-            "43": true
-            "44": true
-            "82": true
-            "83": true
-            "101": true
-        }
-        for each formatStream in metadata.formatStreams
-            if mediumItags[ValidString(formatStream.itag)] = true
-                itag = formatStream.itag
-                exit for
-            end if
-        end for
+    if hasQuality
+        dashUrlFiltered = UrlUtils.AppendQueryParams(dashUrl, { quality: preferredQuality })
+        if supportsProxying
+            dashUrlFilteredLocal = UrlUtils.AppendQueryParams(dashUrlLocal, { quality: preferredQuality })
+        end if
     end if
 
-    url = service.GetVideoStreamUrl(metadata.videoId, itag)
-    localUrl = AddLocalFlag(url)
-
-    AddUrls(streamUrls, url, localUrl, proxyVideos)
-end function
-
-function AddLocalFlag(url as string) as string
-    if url.InStr("?") = -1
-        return url + "?local=true"
-    else
-        return url + "&local=true"
+    AddUrls(streamUrls, dashUrl, dashUrlLocal, dashUrlFiltered, dashUrlFilteredLocal, proxyVideos)
+    if streamUrls.Count() = 0
+        streamUrls.push(dashUrl)
     end if
 end function
 
-function AddUrls(streamUrls as object, url as string, localUrl as string, proxyVideos as string)
+function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFiltered as dynamic, urlFilteredLocal as dynamic, proxyVideos as string)
     if proxyVideos = "if_needed"
+        if urlFiltered <> invalid
+            streamUrls.push(urlFiltered)
+        end if
         streamUrls.push(url)
-        streamUrls.push(localUrl)
+        if urlFilteredLocal <> invalid
+            streamUrls.push(urlFilteredLocal)
+        end if
+        if urlLocal <> invalid
+            streamUrls.push(urlLocal)
+        end if
     else if proxyVideos = "never"
+        if urlFiltered <> invalid
+            streamUrls.push(urlFiltered)
+        end if
         streamUrls.push(url)
     else if proxyVideos = "always"
-        streamUrls.push(localUrl)
+        if urlFilteredLocal <> invalid
+            streamUrls.push(urlFilteredLocal)
+        end if
+        if urlLocal <> invalid
+            streamUrls.push(urlLocal)
+        end if
     else
+        if urlFiltered <> invalid
+            streamUrls.push(urlFiltered)
+        end if
         streamUrls.push(url)
-        streamUrls.push(localUrl)
+        if urlFilteredLocal <> invalid
+            streamUrls.push(urlFilteredLocal)
+        end if
+        if urlLocal <> invalid
+            streamUrls.push(urlLocal)
+        end if
     end if
 end function
 
-function AddInstanceToUrlIfNeeded(streamUrls as object, instance as string)
-    for i = 0 to streamUrls.Count() - 1
-        url = streamUrls[i]
-        if url.StartsWith("/")
-            streamUrls[i] = instance + url
-        end if
-    end for
+function AddInstanceToUrlIfNeeded(url as object, instance as string) as string
+    if url.StartsWith("/")
+        return instance + url
+    end if
+    return url
 end function
 
 function SetCaptions(metadata as object, service as object, contentNode as object) as void

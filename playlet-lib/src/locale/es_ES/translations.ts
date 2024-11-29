@@ -913,10 +913,6 @@
         <translation>Calidad de vídeo preferida</translation>
     </message>
     <message>
-        <source>720p</source>
-        <translation>720p</translation>
-    </message>
-    <message>
         <source>Instance</source>
         <translation>Instancia</translation>
     </message>
@@ -1265,12 +1261,8 @@
         <translation>Características</translation>
     </message>
     <message>
-        <source>Auto (DASH)</source>
-        <translation>Automático (DASH)</translation>
-    </message>
-    <message>
-        <source>Medium</source>
-        <translation>Medio</translation>
+        <source>Auto</source>
+        <translation>Automático</translation>
     </message>
     <message>
         <source>Filler Tangent/Jokes</source>

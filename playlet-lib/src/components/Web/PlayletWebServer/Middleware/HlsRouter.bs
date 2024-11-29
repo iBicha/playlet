@@ -15,6 +15,7 @@ namespace Http
             response = context.response
 
             url = request.query.url
+            quality = request.query.quality
 
             if StringUtils.IsNullOrEmpty(url)
                 response.Default(400, "Missing url")
@@ -33,6 +34,10 @@ namespace Http
             end if
 
             hlsManifest = hlsResponse.Text()
+
+            qualityFilter = m.CreateQualityFilter(quality)
+            hlsManifest = m.FilterHlsManifest(hlsManifest, qualityFilter)
+
             hlsManifest = m.AppendStoryboardPlaylists(hlsManifest)
 
             response.http_code = hlsResponse.StatusCode()
@@ -87,7 +92,7 @@ namespace Http
             return true
         end function
 
-        function AppendStoryboardPlaylists(hlsManifest as dynamic) as string
+        function AppendStoryboardPlaylists(hlsManifest as dynamic) as dynamic
             if StringUtils.IsNullOrEmpty(hlsManifest) or not hlsManifest.StartsWith("#EXTM3U")
                 return hlsManifest
             end if
@@ -120,6 +125,50 @@ namespace Http
             hlsManifest += `\n`
 
             return hlsManifest
+        end function
+
+        function FilterHlsManifest(hlsManifest as dynamic, qualityFilter as object) as dynamic
+            if StringUtils.IsNullOrEmpty(hlsManifest) or qualityFilter.Count() = 0
+                return hlsManifest
+            end if
+
+            lines = hlsManifest.split(`\n`)
+            newLines = []
+            includedQualitiesCount = 0
+
+            for i = 0 to lines.Count() - 1
+                line = lines[i]
+                if not line.StartsWith("#EXT-X-STREAM-INF:")
+                    newLines.push(line)
+                    continue for
+                end if
+
+                resolution = StringUtils.GetBetween(line, "RESOLUTION=", ",")
+                if StringUtils.IsNullOrEmpty(resolution)
+                    newLines.push(line)
+                    continue for
+                end if
+
+                resolutionParts = resolution.split("x")
+                if resolutionParts.Count() <> 2
+                    newLines.push(line)
+                    continue for
+                end if
+
+                if qualityFilter[resolutionParts[1]] = true
+                    newLines.push(line)
+                    includedQualitiesCount += 1
+                    continue for
+                end if
+
+                ' skip the next line
+                i += 1
+            end for
+
+            if includedQualitiesCount = 0
+                return hlsManifest
+            end if
+            return newLines.join(`\n`)
         end function
 
         function GenerateStoryboardManifest(storyboard as object, lengthSeconds as float) as string
@@ -189,6 +238,27 @@ ${storyboard.templateUrl.replace("$M", `${i}`)}
             end if
 
             return metadata
+        end function
+
+        function CreateQualityFilter(quality as dynamic) as object
+            qualityFilter = {}
+            if not IsString(quality)
+                return qualityFilter
+            end if
+
+            includeList = quality.split(",")
+            for each quality in includeList
+                if quality = "auto"
+                    continue for
+                end if
+                pIndex = quality.InStr("p")
+                if pIndex <> -1
+                    quality = quality.Mid(0, pIndex)
+                end if
+                qualityFilter[quality] = true
+            end for
+
+            return qualityFilter
         end function
     end class
 

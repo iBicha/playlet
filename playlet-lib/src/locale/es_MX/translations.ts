@@ -809,10 +809,6 @@
         <translation>Conexíon alámbrica</translation>
     </message>
     <message>
-        <source>720p</source>
-        <translation>720p</translation>
-    </message>
-    <message>
         <source>Channel</source>
         <translation>Canal</translation>
     </message>
@@ -953,10 +949,6 @@
         <translation>Reproducción</translation>
     </message>
     <message>
-        <source>Medium</source>
-        <translation>Media</translation>
-    </message>
-    <message>
         <source>Request cancelled.</source>
         <translation>Solicitud cancelada.</translation>
     </message>
@@ -1085,8 +1077,8 @@
         <translation>PRÓXIMAMENTE</translation>
     </message>
     <message>
-        <source>Auto (DASH)</source>
-        <translation>Automática (DASH)</translation>
+        <source>Auto</source>
+        <translation>Automática</translation>
     </message>
     <message>
         <source>SponsorBlock</source>
