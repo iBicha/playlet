@@ -112,8 +112,10 @@ function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality a
 
     ' Redirect to Playet's local web server, where we will be
     ' dynamically adding storyboards to the HLS manifest, and filter quality
-    hlsUrl = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrl.EncodeUriComponent()}`
-    hlsUrlLocal = `http://127.0.0.1:${playletServerPort}/api/hls?url=${hlsUrlLocal.EncodeUriComponent()}`
+    hlsUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrl })
+    if supportsProxying
+        hlsUrlLocal = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrlLocal })
+    end if
 
     if hasQuality
         hlsUrlFiltered = UrlUtils.AppendQueryParams(hlsUrl, { quality: preferredQuality })
@@ -123,15 +125,12 @@ function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality a
     end if
 
     AddUrls(streamUrls, hlsUrl, hlsUrlLocal, hlsUrlFiltered, hlsUrlFilteredLocal, proxyVideos)
-    if streamUrls.Count() = 0
-        streamUrls.push(hlsUrl)
-    end if
 end function
 
 function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
     ' Redirect to Playet's local web server, where will will be
     ' dynamically generating the DASH manifest, and filter quality
-    dashUrl = `http://127.0.0.1:${playletServerPort}/api/dash?v=${metadata.videoId}`
+    dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, { v: metadata.videoId })
     dashUrlLocal = invalid
     dashUrlFiltered = invalid
     dashUrlFilteredLocal = invalid
@@ -151,9 +150,6 @@ function AddDashUrls(streamUrls as object, metadata as object, preferredQuality 
     end if
 
     AddUrls(streamUrls, dashUrl, dashUrlLocal, dashUrlFiltered, dashUrlFilteredLocal, proxyVideos)
-    if streamUrls.Count() = 0
-        streamUrls.push(dashUrl)
-    end if
 end function
 
 function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFiltered as dynamic, urlFilteredLocal as dynamic, proxyVideos as string)
@@ -180,7 +176,9 @@ function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFi
         if urlLocal <> invalid
             streamUrls.push(urlLocal)
         end if
-    else
+    end if
+
+    if streamUrls.Count() = 0
         if urlFiltered <> invalid
             streamUrls.push(urlFiltered)
         end if
