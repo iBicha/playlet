@@ -7,13 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- Small optimization to json payload size in Innertube
-
 ### Fixed
 
 - Hls hanging on HDR videos
+- [Perf] Small optimization to json payload size in Innertube
 
 ### Changed
 
