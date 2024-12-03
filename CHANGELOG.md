@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hls hanging on HDR videos
 
+### Changed
+
+- Default Invidious instance
+
 ## [0.32.0] - 2024-11-29
 
 ### Added
