@@ -1,3 +1,4 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 
@@ -7,13 +8,17 @@ function SearchSuggestionsTask(input as object) as object
     invidiousNode = input.invidious
     preferencesNode = input.preferences
 
-    service = new Invidious.InvidiousService(invidiousNode)
-
     if m.top.cancel
         return invalid
     end if
 
-    searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : service.SearchSuggestions(q, m.top.cancellation)
+    backend = preferencesNode["playback.backend"]
+    if backend = "playlet"
+        searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : InnertubeService.GetSearchSuggestions(q, m.top.cancellation)
+    else
+        service = new Invidious.InvidiousService(invidiousNode)
+        searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : service.SearchSuggestions(q, m.top.cancellation)
+    end if
 
     if m.top.cancel
         return invalid
