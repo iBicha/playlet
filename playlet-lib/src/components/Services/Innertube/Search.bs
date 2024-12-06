@@ -1,0 +1,68 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+
+namespace Innertube
+
+    function Search(query as string, cancellation = invalid as object) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            query: query
+            context: Innertube.CreateContext(Innertube.ClientType.WEB, deviceInfo)
+        }
+
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/search?prettyPrint=false&alt=json", FormatJson(payload))
+        request.Headers({
+            "accept": "*/*"
+            "accept-language": "*"
+            "content-type": "application/json"
+            "user-agent": INNERTUBE_WEB_USER_AGENT
+            "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
+            "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
+        })
+
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        return response.Json()
+    end function
+
+    function SearchSuggestions(query as string, cancellation = invalid as object) as object
+        request = HttpClient.Get("https://suggestqueries.google.com/complete/search?hl=en&gl=US&ds=yt&client=youtube&xssi=t&oe=UTF&q=" + query.EncodeUriComponent())
+        request.Headers({
+            "user-agent": INNERTUBE_WEB_USER_AGENT
+        })
+        request.CacheSeconds(60 * 60 * 24)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        text = response.Text()
+        text = text.Replace(`)]}'`, "")
+
+        parsed = ParseJson(text)
+        if not IsArray(parsed) or parsed.Count() < 2
+            return invalid
+        end if
+        parsed = parsed[1]
+
+        suggestions = []
+        for each suggestion in parsed
+            sugg = suggestion[0]
+            if not IsString(sugg)
+                continue for
+            end if
+
+            suggestions.Push(sugg)
+        end for
+
+        return suggestions
+    end function
+
+end namespace

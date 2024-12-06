@@ -1,0 +1,67 @@
+namespace Innertube
+
+    function CreateNextRequest(videoId as string) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "videoId": videoId
+            "context": Innertube.CreateContext(Innertube.ClientType.Web, deviceInfo)
+        }
+
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", FormatJson(payload))
+        request.Headers({
+            "accept": "*/*"
+            "accept-language": "*"
+            "content-type": "application/json"
+            "user-agent": INNERTUBE_WEB_USER_AGENT
+            "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
+            "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
+        })
+
+        return request
+    end function
+
+    function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object
+        if not parsedResponse.Success
+            LogWarn("Invalid parsed response", parsedResponse)
+            return parsedResponse
+        end if
+
+        if not IsArray(parsedResponse.Metadata.recommendedVideos)
+            LogWarn("Invalid recommended videos", parsedResponse.Metadata.recommendedVideos)
+            return parsedResponse
+        end if
+
+        if not IsAssociativeArray(payload)
+            LogWarn("Invalid payload", payload)
+            return parsedResponse
+        end if
+
+        endScreenVideos = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen", "watchNextEndScreenRenderer", "results"])
+        if not IsArray(endScreenVideos)
+            LogWarn("Invalid end screen videos", endScreenVideos)
+            return parsedResponse
+        end if
+
+        for each video in endScreenVideos
+            videoId = ObjectUtils.Dig(video, ["endScreenVideoRenderer", "videoId"])
+            if videoId = invalid
+                LogWarn("Invalid video ID in end screen video", video)
+                continue for
+            end if
+
+            title = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "title", "simpleText"]))
+            author = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "shortBylineText", "runs", 0, "text"]))
+
+            parsedResponse.Metadata.recommendedVideos.Push({
+                "type": "video"
+                "videoId": videoId
+                "title": title
+                "author": author
+            })
+        end for
+
+        return parsedResponse
+    end function
+
+end namespace
