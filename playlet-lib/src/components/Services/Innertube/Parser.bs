@@ -1,0 +1,94 @@
+namespace Innertube
+
+    function ParseResponse(responseData as object) as object
+        if responseData = invalid
+            return []
+        end if
+
+        unwrapped = UnwrapContainer(responseData)
+        return ParseSearchResults(unwrapped)
+    end function
+
+    function UnwrapContainer(responseData as object) as object
+        if responseData.DoesExist("contents")
+            return responseData["contents"]
+        end if
+        if responseData.DoesExist("response")
+            return responseData["response"]
+        end if
+        data = ObjectUtils.Dig(responseData, ["onResponseReceivedActions", 0])
+        if data <> invalid
+            return data
+        end if
+        return responseData
+    end function
+
+    function ParseSearchResults(responseData as object) as object
+        data = ObjectUtils.Dig(responseData, ["twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "contents"])
+        if not IsArray(data)
+            return []
+        end if
+        items = []
+        for each section in data
+            sectionContents = ObjectUtils.Dig(section, ["itemSectionRenderer", "contents"])
+            if sectionContents = invalid
+                continue for
+            end if
+            for each item in sectionContents
+                parsedItem = ParseItem(item)
+                if parsedItem <> invalid
+                    items.Push(parsedItem)
+                end if
+            end for
+        end for
+        return items
+    end function
+
+    function ParseItem(item as object) as object
+        parsed = ParseVideoRenderer(item)
+        if parsed <> invalid
+            return parsed
+        end if
+
+        return invalid
+    end function
+
+    function ParseVideoRenderer(data as object) as object
+        video = invalid
+        if data.DoesExist("videoRenderer")
+            video = data["videoRenderer"]
+        else if data.DoesExist("gridVideoRenderer")
+            video = data["gridVideoRenderer"]
+        end if
+
+        if video = invalid
+            return invalid
+        end if
+
+        return {
+            "type": "video"
+            "videoId": video["videoId"]
+            "title": ParseText(video["title"])
+        }
+    end function
+
+    function ParseText(data as object) as string
+        if data = invalid
+            return ""
+        end if
+        if IsString(data)
+            return data
+        end if
+        if data.DoesExist("simpleText")
+            return data["simpleText"]
+        end if
+        if data.DoesExist("runs")
+            text = ""
+            for each _run in data["runs"]
+                text += _run["text"]
+            end for
+            return text
+        end if
+        return ""
+    end function
+end namespace
