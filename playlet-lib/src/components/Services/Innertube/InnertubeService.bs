@@ -18,6 +18,7 @@ namespace InnertubeService
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
         cancellation = invalid
         fetchNext = true
+        ctt = ""
 
         if options <> invalid
             if options.DoesExist("cancellation")
@@ -26,16 +27,19 @@ namespace InnertubeService
             if options.DoesExist("fetchNext")
                 fetchNext = options.fetchNext
             end if
+            if options.DoesExist("ctt")
+                ctt = options.ctt
+            end if
         end if
 
-        playerRequest = CreatePlayerRequest(videoId)
+        playerRequest = CreatePlayerRequest(videoId, ctt)
         playerRequest.Cancellation(cancellation)
         playerRequest.Send()
 
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = CreateNextRequest(videoId)
+            nextRequest = CreateNextRequest(videoId, ctt)
             nextRequest.Cancellation(cancellation)
             nextRequest.Send()
         end if
@@ -67,7 +71,7 @@ namespace InnertubeService
         return playerResponse
     end function
 
-    function CreatePlayerRequest(videoId as string) as object
+    function CreatePlayerRequest(videoId as string, ctt as string) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
@@ -124,6 +128,13 @@ namespace InnertubeService
             }
         }
 
+        if not StringUtils.IsNullOrEmpty(ctt)
+            payload["context"]["user"]["credentialTransferTokens"] = [{
+                "token": ctt
+                "scope": "VIDEO"
+            }]
+        end if
+
         request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", FormatJson(payload))
         request.Headers({
             "accept": "*/*"
@@ -137,7 +148,7 @@ namespace InnertubeService
         return request
     end function
 
-    function CreateNextRequest(videoId as string) as object
+    function CreateNextRequest(videoId as string, ctt as string) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
@@ -184,6 +195,13 @@ namespace InnertubeService
                 }
             }
         }
+
+        if not StringUtils.IsNullOrEmpty(ctt)
+            payload["context"]["user"]["credentialTransferTokens"] = [{
+                "token": ctt
+                "scope": "VIDEO"
+            }]
+        end if
 
         request = HttpClient.Post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", FormatJson(payload))
         request.Headers({
