@@ -9,11 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Small optimization to json payload size in Innertube
+- Search suggestions to Playlet backend
+
+## [0.32.1] - 2024-12-03
 
 ### Fixed
 
 - Hls hanging on HDR videos
+- [Perf] Small optimization to json payload size in Innertube
+
+### Changed
+
+- Default Invidious instance
 
 ## [0.32.0] - 2024-11-29
 

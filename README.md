@@ -42,8 +42,6 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 [Playlet on Roku channel store](https://channelstore.roku.com/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
 
-Note: sometimes a bug in Roku channel store redirects to a random app instead of Playlet. If this happens to you, you can install Playlet from your Roku TV directly, by searching "Playlet" in the store. 
-
 Can't install from the store? See [How to install Playlet as a sideloaded/dev app](https://github.com/iBicha/playlet/discussions/371)
 
 ## Features
