@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Search suggestions to Playlet backend
+- Support for age restrcited videos and private videos when cast from YouTube app (logged in)
 
 ## [0.32.1] - 2024-12-03
 
