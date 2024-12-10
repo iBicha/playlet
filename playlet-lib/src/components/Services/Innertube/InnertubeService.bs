@@ -12,6 +12,7 @@ namespace InnertubeService
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
         cancellation = invalid
         fetchNext = true
+        ctt = ""
 
         if options <> invalid
             if options.DoesExist("cancellation")
@@ -20,16 +21,19 @@ namespace InnertubeService
             if options.DoesExist("fetchNext")
                 fetchNext = options.fetchNext
             end if
+            if options.DoesExist("ctt")
+                ctt = options.ctt
+            end if
         end if
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, ctt)
         playerRequest.Cancellation(cancellation)
         playerRequest.Send()
 
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = Innertube.CreateNextRequest(videoId)
+            nextRequest = Innertube.CreateNextRequest(videoId, ctt)
             nextRequest.Cancellation(cancellation)
             nextRequest.Send()
         end if
