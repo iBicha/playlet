@@ -7,7 +7,7 @@ namespace Innertube
         IOS = "IOS"
     end enum
 
-    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object) as object
+    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object, ctt as string) as object
         client = invalid
         if clienType = ClientType.Web
             client = CreateContextClientWeb(deviceInfo)
@@ -17,7 +17,7 @@ namespace Innertube
             throw "Invalid client type"
         end if
 
-        return {
+        context = {
             "client": client
             "user": {
                 "enableSafetyMode": false
@@ -28,6 +28,15 @@ namespace Innertube
                 "internalExperimentFlags": []
             }
         }
+
+        if not StringUtils.IsNullOrEmpty(ctt)
+            context["user"]["credentialTransferTokens"] = [{
+                "token": ctt
+                "scope": "VIDEO"
+            }]
+        end if
+
+        return context
     end function
 
     function CreateContextClientWeb(deviceInfo as object) as object
