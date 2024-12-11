@@ -6,6 +6,7 @@ import "pkg:/components/Services/Innertube/Search.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/components/Services/Innertube/BrowseEndpoint.bs"
 
 namespace InnertubeService
 
@@ -79,4 +80,38 @@ namespace InnertubeService
             suggestions: suggestions
         }
     end function
+
+    function GetTrending(options = invalid as object) as object
+        cancellation = invalid
+        params = ""
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("type")
+                trendingType = options.type
+
+                if trendingType = "music"
+                    params = "4gINGgt5dG1hX2NoYXJ0cw%3D%3D"
+                else if trendingType = "gaming"
+                    params = "4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D"
+                else if trendingType = "movies"
+                    params = "4gIKGgh0cmFpbGVycw%3D%3D"
+                end if
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest("FEtrending", params)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParseResponse(json)
+    end function
+
 end namespace

@@ -5,8 +5,14 @@ namespace Innertube
             return []
         end if
 
-        unwrapped = UnwrapContainer(responseData)
-        return ParseSearchResults(unwrapped)
+        data = UnwrapContainer(responseData)
+        if data = invalid
+            return []
+        end if
+
+        directives = GetParsingDirectives()
+        results = ParseData(data, directives, [])
+        return results
     end function
 
     function UnwrapContainer(responseData as object) as object
@@ -23,52 +29,79 @@ namespace Innertube
         return responseData
     end function
 
-    function ParseSearchResults(responseData as object) as object
-        data = ObjectUtils.Dig(responseData, ["twoColumnSearchResultsRenderer", "primaryContents", "sectionListRenderer", "contents"])
-        if not IsArray(data)
-            return []
+    function GetParsingDirectives() as object
+        return {
+            "twoColumnSearchResultsRenderer": {
+                "dig": ["primaryContents"]
+            }
+            "twoColumnBrowseResultsRenderer": {
+                "dig": ["tabs"]
+            }
+            "tabRenderer": {
+                "dig": ["content"]
+            }
+            "sectionListRenderer": {
+                "dig": ["contents"]
+            }
+            "itemSectionRenderer": {
+                "dig": ["contents"]
+            }
+            "shelfRenderer": {
+                "dig": ["content"]
+            }
+            "expandedShelfContentsRenderer": {
+                "dig": ["items"]
+            }
+            "videoRenderer": {
+                "parse": ParseVideoItem
+            }
+            "gridVideoRenderer": {
+                "parse": ParseVideoItem
+            }
+            ' TODO: continuationItemRenderer
+        }
+    end function
+
+    function ParseData(data as object, directives as object, results as object) as object
+        if IsArray(data)
+            for each item in data
+                ParseData(item, directives, results)
+            end for
+            return results
         end if
-        items = []
-        for each section in data
-            sectionContents = ObjectUtils.Dig(section, ["itemSectionRenderer", "contents"])
-            if sectionContents = invalid
+
+        if not IsAssociativeArray(data)
+            return results
+        end if
+
+        for each key in data
+            directive = directives[key]
+            if directive = invalid
                 continue for
             end if
-            for each item in sectionContents
-                parsedItem = ParseItem(item)
-                if parsedItem <> invalid
-                    items.Push(parsedItem)
+
+            data = data[key]
+
+            if directive.DoesExist("dig")
+                data = ObjectUtils.Dig(data, directive["dig"])
+            else if directive.DoesExist("parse")
+                item = directive["parse"](data)
+                if item <> invalid
+                    results.Push(item)
                 end if
-            end for
+            end if
+
+            ParseData(data, directives, results)
         end for
-        return items
+
+        return results
     end function
 
-    function ParseItem(item as object) as object
-        parsed = ParseVideoRenderer(item)
-        if parsed <> invalid
-            return parsed
-        end if
-
-        return invalid
-    end function
-
-    function ParseVideoRenderer(data as object) as object
-        video = invalid
-        if data.DoesExist("videoRenderer")
-            video = data["videoRenderer"]
-        else if data.DoesExist("gridVideoRenderer")
-            video = data["gridVideoRenderer"]
-        end if
-
-        if video = invalid
-            return invalid
-        end if
-
+    function ParseVideoItem(data as object) as object
         return {
             "type": "video"
-            "videoId": video["videoId"]
-            "title": ParseText(video["title"])
+            "videoId": data["videoId"]
+            "title": ParseText(data["title"])
         }
     end function
 
