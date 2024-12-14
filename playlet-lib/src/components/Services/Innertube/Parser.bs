@@ -15,16 +15,69 @@ namespace Innertube
         return results
     end function
 
-    function ParseChannelResponse(responseData as object) as object
+    function ParseChannelPageResponse(responseData as object) as object
         if responseData = invalid
             return invalid
         end if
 
+        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
+        if IsAssociativeArray(alert) and alert.type = "ERROR"
+            return {
+                error: ParseText(alert.text)
+            }
+        end if
 
-        directives = GetParsingDirectives()
-        ' TODO
-        results = ParseData(responseData, directives, [])
-        return results
+        title = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "title"])
+
+        thumbnails = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "avatar", "thumbnails"])
+        if thumbnails = invalid
+            thumbnails = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "image", "decoratedAvatarViewModel", "avatar", "avatarViewModel", "image", "sources"])
+            if thumbnails = invalid
+                thumbnails = ObjectUtils.Dig(responseData, ["microformat", "microformatDataRenderer", "thumbnail", "thumbnails"])
+                if thumbnails = invalid
+                    thumbnails = []
+                end if
+            end if
+        end if
+
+        ucid = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "externalId"])
+        banners = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "banner", "imageBannerViewModel", "image", "sources"])
+        if banners = invalid
+            banners = []
+        end if
+
+        authorSubTitle = ""
+        contentMetadata = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "metadata", "contentMetadataViewModel"])
+        if contentMetadata <> invalid
+            metadataRows = contentMetadata["metadataRows"]
+            delimiter = ` ${ValidString(contentMetadata["delimiter"])} `
+            if metadataRows <> invalid
+                parts = []
+                for each row in metadataRows
+                    metadataParts = row["metadataParts"]
+                    if metadataParts = invalid
+                        continue for
+                    end if
+                    for each part in metadataParts
+                        text = ObjectUtils.Dig(part, ["text", "content"])
+                        if IsString(text)
+                            parts.Push(text)
+                        end if
+                    end for
+                end for
+                if parts.Count() > 0
+                    authorSubTitle = parts.Join(delimiter)
+                end if
+            end if
+        end if
+
+        return {
+            "author": title
+            "authorId": ucid
+            "authorThumbnails": thumbnails
+            "authorBanners": banners
+            "authorSubTitle": authorSubTitle
+        }
     end function
 
     function UnwrapContainer(responseData as object) as object
