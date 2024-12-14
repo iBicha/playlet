@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for age restrcited videos and private videos when cast from YouTube app (logged in)
   - Note: it works when the video is explicitely cast. If it was added to queue, or added as part of a playlist, this might not work.
 
+### Fixed
+
+- Improved on issue with long videos (10+ hours) showing as 2:30 only. They now show about 5 hours.
+
 ## [0.32.1] - 2024-12-03
 
 ### Fixed
