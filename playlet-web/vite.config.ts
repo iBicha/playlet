@@ -1,5 +1,6 @@
 import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import viteCompression from 'vite-plugin-compression';
 import tsconfigPaths from 'vite-tsconfig-paths'
 import ip from 'ip';
 import { existsSync, readFileSync } from 'fs'
@@ -15,6 +16,9 @@ const config: UserConfig = {
     svelte(),
     legacy({
       targets: ['defaults', 'not IE 11'],
+    }),
+    viteCompression({
+      deleteOriginFile: true
     })
   ],
   build: {
