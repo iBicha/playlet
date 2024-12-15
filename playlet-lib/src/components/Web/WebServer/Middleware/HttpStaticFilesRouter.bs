@@ -11,6 +11,7 @@ namespace Http
         private showHidden
         private fsCheck
         private staticFiles
+        private staticCompressed
 
         function new(route as string, root as string, etags as object, options = {} as object)
             super()
@@ -30,6 +31,8 @@ namespace Http
             m.fsCheck = ValidBool(options.fsCheck)
             ' staticFiles: if true, Etag tags will be cached to skip reading the file entirely.
             m.staticFiles = ValidBool(options.staticFiles)
+            ' staticCompressed: the files are .gz and already compressed.
+            m.staticCompressed = m.staticFiles and ValidBool(options.staticCompressed)
         end function
 
         @get("*")
@@ -46,6 +49,10 @@ namespace Http
 
             decoded_path = path_in_route.DecodeUri()
             full_path = StringUtils.PathJoin(m.root, decoded_path)
+
+            if m.staticCompressed
+                full_path += ".gz"
+            end if
 
             if m.staticFiles
                 ' Although we have an Etag middleware, having a check here allows us to
@@ -68,6 +75,10 @@ namespace Http
 
                     if m.staticFiles
                         m.etags.AddEtagFromBody(request, response, full_path)
+                    end if
+
+                    if m.staticCompressed
+                        response.headers["Content-Encoding"] = "gzip"
                     end if
                     return true
                 end if
@@ -109,6 +120,9 @@ namespace Http
                 LogInfo("uri:", request.uri, "target:", path, "content-type:", mimetype, "content-length", stat.size)
                 if m.staticFiles
                     m.etags.AddEtagFromBody(request, response, full_path)
+                end if
+                if m.staticCompressed
+                    response.headers["Content-Encoding"] = "gzip"
                 end if
                 return true
             else

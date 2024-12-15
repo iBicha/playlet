@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Compression (gzip) to static web app files. Reduces app size significantly
+
+## [0.33.0] - 2024-12-14
+
+### Added
+
 - Search suggestions to Playlet backend
 - Support for age restrcited videos and private videos when cast from YouTube app (logged in)
   - Note: it works when the video is explicitely cast. If it was added to queue, or added as part of a playlist, this might not work.
