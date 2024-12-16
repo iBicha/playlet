@@ -1,0 +1,172 @@
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Innertube
+
+    function GetClientIdentity(cancellation = invalid as dynamic) as object
+        request = HttpClient.Get("https://www.youtube.com/tv")
+        request.Headers({
+            "User-Agent": "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version"
+            "Referer": "https://www.youtube.com/tv"
+            "Accept-Language": "en-US"
+        })
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            throw `Failed to get client id: ${response.ErrorMessage()}`
+        end if
+
+        text = response.Text()
+
+        scriptRegex = /<script\s+id="base-js"\s+src="([^"]+)"[^>]*><\/script>/
+
+        match = scriptRegex.Match(text)
+        if match.Count() < 2
+            throw "Could not find base-js script"
+        end if
+
+        baseJsUrl = "https://www.youtube.com" + match[1]
+
+        request = HttpClient.Get(baseJsUrl)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            throw `Failed to get base js: ${response.ErrorMessage()}`
+        end if
+
+        text = response.Text()
+
+        clientIdRegex = /clientId:"(?<client_id>[^"]+)",[^"]*?:"(?<client_secret>[^"]+)"/
+
+        match = clientIdRegex.Match(text)
+        if match.Count() < 3
+            throw "Could not find client id"
+        end if
+
+        return {
+            "clientId": match[1]
+            "clientSecret": match[2]
+        }
+    end function
+
+    function GetDeviceAndUserCode(clientId as string, cancellation = invalid as dynamic) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "client_id": clientId
+            "scope": "http://gdata.youtube.com https://www.googleapis.com/auth/youtube-paid-content"
+            "device_id": deviceInfo.GetRandomUUID()
+            "device_model": "ytlr::"
+        }
+
+        request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/device/code", payload)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            throw `Failed to get device code: ${response.ErrorMessage()}`
+        end if
+
+        responseData = response.Json()
+        if responseData.DoesExist("error_code")
+            throw "Failed to get device code: " + ToString(responseData)
+        end if
+
+        return responseData
+    end function
+
+    function PollForAccessToken(clientIdentity as object, deviceAndUserCode as object, cancellation = invalid as dynamic) as object
+        payload = {
+            "client_id": clientIdentity.clientId
+            "client_secret": clientIdentity.clientSecret
+            "code": deviceAndUserCode.device_code
+            "grant_type": "http://oauth.net/grant_type/device/1.0"
+        }
+
+        intervalMs = deviceAndUserCode.interval * 1000
+
+        while true
+            request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/token", payload)
+            request.Cancellation(cancellation)
+            response = request.Await()
+
+            if not response.IsSuccess()
+                LogError(response.ErrorMessage())
+                sleep(intervalMs)
+                continue while
+            end if
+
+            responseData = response.Json()
+            if not responseData.DoesExist("error")
+                return responseData
+            end if
+
+            if responseData.error = "authorization_pending"
+                LogInfo("Waiting for user to authorize device", responseData)
+                sleep(intervalMs)
+                if CancellationUtils.IsCancelled(cancellation)
+                    return invalid
+                end if
+                continue while
+            else if responseData.error = "slow_down"
+                LogWarn("Polling too fast, slowing down", responseData)
+                sleep(intervalMs + 3000)
+                if CancellationUtils.IsCancelled(cancellation)
+                    return invalid
+                end if
+                continue while
+            else if responseData.error = "expired_token"
+                throw "Failed to get access token: " + ToString(responseData)
+            else if responseData.error = "access_denied"
+                throw "Failed to get access token: " + ToString(responseData)
+            else
+                throw "Failed to get access token: " + ToString(responseData)
+            end if
+
+            if CancellationUtils.IsCancelled(cancellation)
+                return invalid
+            end if
+        end while
+
+        return invalid
+    end function
+
+    ' TODO: validate
+    function RefreshAccessToken(clientIdentity as object, refreshToken as string, cancellation = invalid as dynamic) as object
+        payload = {
+            "client_id": clientIdentity.clientId
+            "client_secret": clientIdentity.clientSecret
+            "refresh_token": refreshToken
+            "grant_type": "refresh_token"
+        }
+
+        request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/token", payload)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            throw `Failed to refresh token: ${response.ErrorMessage()}`
+        end if
+
+        responseData = response.Json()
+        if responseData.DoesExist("error_code")
+            throw "Failed to refresh token: " + ToString(responseData)
+        end if
+
+        return responseData
+    end function
+
+    ' TODO: validate
+    function RevokeAccessToken(accessToken as string, cancellation = invalid as dynamic) as boolean
+        request = HttpClient.Post("https://www.youtube.com/o/oauth2/revoke", "")
+        request.QueryParam("token", accessToken)
+        request.Cancellation(cancellation)
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
+        end if
+        return response.IsSuccess()
+    end function
+
+end namespace

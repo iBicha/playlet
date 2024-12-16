@@ -2,9 +2,11 @@ import "pkg:/components/Services/Innertube/BrowseEndpoint.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/NextEndpoint.bs"
+import "pkg:/components/Services/Innertube/OAuth.bs"
 import "pkg:/components/Services/Innertube/PlayerEndpoint.bs"
 import "pkg:/components/Services/Innertube/Search.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
@@ -42,6 +44,10 @@ namespace InnertubeService
         playerResponse = playerRequest.Await()
         if not playerResponse.IsSuccess()
             return playerResponse
+        end if
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
         end if
 
         if fetchNext
@@ -134,4 +140,30 @@ namespace InnertubeService
         json = response.Json()
         return Innertube.ParseChannelPageResponse(json)
     end function
+
+    function AuthGetCode(cancellation = invalid as object) as object
+        result = Innertube.GetClientIdentity(cancellation)
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
+        end if
+
+        result2 = Innertube.GetDeviceAndUserCode(result.clientId, cancellation)
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
+        end if
+
+        result.Append(result2)
+        return result
+    end function
+
+    function AuthGetActivationUrl(code as object) as string
+        return `https://www.youtube.com/tv/activate?user_code=${code.user_code}`
+    end function
+
+    function AuthPollForAccessToken(code as object, cancellation = invalid as object) as object
+        return Innertube.PollForAccessToken(code, code, cancellation)
+    end function
+
 end namespace
