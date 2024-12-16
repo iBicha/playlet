@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Compression (gzip) to static web app files. Reduces app size significantly
 
+### Fixed
+
+- Error when opening a mix
+
 ## [0.33.0] - 2024-12-14
 
 ### Added
