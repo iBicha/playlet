@@ -13,6 +13,7 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 
 namespace HttpClient
 
@@ -470,11 +471,7 @@ namespace HttpClient
                 throw "Can't await request without a message port. use Send(andForget=false) in order to await request."
             end if
 
-            if m._cancellation <> invalid
-                if m._cancellation.node <> invalid and m._cancellation.field <> invalid
-                    m._cancellation.node.ObserveFieldScoped(m._cancellation.field, messagePort)
-                end if
-            end if
+            CancellationUtils.ObserveCancellationScoped(m._cancellation, messagePort)
 
             msg = wait(m._timeoutSeconds * 1000, messagePort)
 
@@ -484,13 +481,7 @@ namespace HttpClient
                 #end if
             #end if
 
-            if m._cancellation <> invalid
-                if m._cancellation.node <> invalid and m._cancellation.field <> invalid
-                    ' TODO:P2 use a separate node as a cancellation token
-                    ' This is to avoid removing observers other than our own
-                    m._cancellation.node.UnobserveFieldScoped(m._cancellation.field)
-                end if
-            end if
+            CancellationUtils.UnobserveCancellationScoped(m._cancellation)
 
             if msg = invalid
                 ' timeout
@@ -500,16 +491,10 @@ namespace HttpClient
                 eventType = type(msg)
                 if eventType = "roUrlEvent"
                     LogInfo("Finished ID:", m.urlTransfer.GetIdentity(), "after", m._timer.TotalMilliseconds(), "ms")
-                else if eventType = "roSGNodeEvent"
-                    node = msg.getRoSGNode()
-                    field = msg.getField()
-                    value = msg.getData()
-                    ' cancellation
-                    if node.isSameNode(m._cancellation.node) and field = m._cancellation.field and value = m._cancellation.value
-                        LogInfo("Cancelled", "ID:", m.urlTransfer.GetIdentity())
-                        m._cancelled = true
-                        m.urlTransfer.AsyncCancel()
-                    end if
+                else if CancellationUtils.IsCancellationEvent(m._cancellation, msg)
+                    LogInfo("Cancelled", "ID:", m.urlTransfer.GetIdentity())
+                    m._cancelled = true
+                    m.urlTransfer.AsyncCancel()
                 end if
             end if
 
