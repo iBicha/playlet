@@ -100,6 +100,19 @@
       );
     }
   }
+
+  function showRemoteNotWorkingDialog() {
+    // show dialog with instructions
+    let content = `If the remote control is not working, please check your device settings. Go to:
+- Settings
+- System
+- Advanced System Settings
+- Control by mobile apps
+- Network access
+And set it to "Enabled".`;
+
+    alert(content);
+  }
 </script>
 
 <div bind:this={screen} tabindex="-1" class={visibility ? "" : "hidden"}>
@@ -144,5 +157,9 @@
       <RemoteButton key={BUTTONS.volumeDown} icon={VolumeDownIcon} small />
       <RemoteButton key={BUTTONS.volumeUp} icon={VolumeUpIcon} small />
     </div>
+    <button
+      on:click={showRemoteNotWorkingDialog}
+      class="btn btn-xs btn-accent m-4">Remote not working?</button
+    >
   </div>
 </div>
