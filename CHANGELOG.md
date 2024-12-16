@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Compression (gzip) to static web app files. Reduces app size significantly
+- UI to clarify how to enable `Control by mobile apps` in the web app
+
+### Fixed
+
+- Error when opening a mix
 
 ## [0.33.0] - 2024-12-14
 
