@@ -108,7 +108,41 @@ namespace InnertubeService
             end if
         end if
 
-        request = Innertube.CreateBrowseRequest("FEtrending", params)
+        request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, params)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParseResponse(json)
+    end function
+
+    function GetHome(options = invalid as object) as object
+        cancellation = invalid
+        params = ""
+        access_token = invalid
+        clientType = Innertube.ClientType.Web
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("params")
+                params = options.params
+            end if
+            if options.DoesExist("access_token")
+                access_token = options.access_token
+                clientType = Innertube.ClientType.Tv
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest("FEwhat_to_watch", clientType, params)
+        if access_token <> invalid
+            request.Header("Authorization", "Bearer " + access_token)
+        end if
         request.Cancellation(cancellation)
 
         response = request.Await()
@@ -129,7 +163,7 @@ namespace InnertubeService
             end if
         end if
 
-        request = Innertube.CreateBrowseRequest(channelId, "")
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, "")
         request.Cancellation(cancellation)
 
         response = request.Await()
