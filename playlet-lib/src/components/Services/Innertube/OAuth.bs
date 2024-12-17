@@ -92,9 +92,11 @@ namespace Innertube
             response = request.Await()
 
             if not response.IsSuccess()
-                LogError(response.ErrorMessage())
-                sleep(intervalMs)
-                continue while
+                errorMessage = response.ErrorMessage()
+                LogError(errorMessage)
+                return {
+                    "error": errorMessage
+                }
             end if
 
             responseData = response.Json()
@@ -122,10 +124,6 @@ namespace Innertube
                 throw "Failed to get access token: " + ToString(responseData)
             else
                 throw "Failed to get access token: " + ToString(responseData)
-            end if
-
-            if CancellationUtils.IsCancelled(cancellation)
-                return invalid
             end if
         end while
 
