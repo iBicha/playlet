@@ -121,25 +121,35 @@ namespace InnertubeService
     end function
 
     function GetHome(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEwhat_to_watch", options)
+    end function
+
+    function GetSubscriptions(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEsubscriptions", options)
+    end function
+
+    function GetWatchHistory(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEhistory", options)
+    end function
+
+    function GetPlaylists(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEplaylist_aggregation", options)
+    end function
+
+    function GetBrowseAuthenticatedPage(browserId as string, options = invalid as object) as object
         cancellation = invalid
-        params = ""
         access_token = invalid
-        clientType = Innertube.ClientType.Web
 
         if options <> invalid
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
-            if options.DoesExist("params")
-                params = options.params
-            end if
             if options.DoesExist("access_token")
                 access_token = options.access_token
-                clientType = Innertube.ClientType.Tv
             end if
         end if
 
-        request = Innertube.CreateBrowseRequest("FEwhat_to_watch", clientType, params)
+        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, "")
         if access_token <> invalid
             request.Header("Authorization", "Bearer " + access_token)
         end if
