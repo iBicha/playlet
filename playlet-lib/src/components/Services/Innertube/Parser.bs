@@ -1,3 +1,5 @@
+import "pkg:/components/Services/Innertube/NodesParser.bs"
+
 namespace Innertube
 
     function ParseResponse(responseData as object) as object
@@ -7,12 +9,25 @@ namespace Innertube
 
         data = UnwrapContainer(responseData)
         if data = invalid
-            return []
+            return invalid
         end if
 
-        directives = GetParsingDirectives()
-        results = ParseData(data, directives, [])
-        return results
+        context = {
+            directives: GetParsingDirectives()
+
+            feeds: []
+            currentFeed: {
+                title: ""
+                items: []
+            }
+        }
+
+        ParseNode(data, context)
+        if context.currentFeed <> invalid
+            context.feeds.Push(context.currentFeed)
+            context.currentFeed = invalid
+        end if
+        return context.feeds
     end function
 
     function ParseChannelPageResponse(responseData as object) as object
@@ -94,109 +109,4 @@ namespace Innertube
         return responseData
     end function
 
-    function GetParsingDirectives() as object
-        return {
-            "twoColumnSearchResultsRenderer": {
-                "dig": ["primaryContents"]
-            }
-            "twoColumnBrowseResultsRenderer": {
-                "dig": ["tabs"]
-            }
-            "tabRenderer": {
-                "dig": ["content"]
-            }
-            "sectionListRenderer": {
-                "dig": ["contents"]
-            }
-            "itemSectionRenderer": {
-                "dig": ["contents"]
-            }
-            "shelfRenderer": {
-                "dig": ["content"]
-            }
-            "expandedShelfContentsRenderer": {
-                "dig": ["items"]
-            }
-            "videoRenderer": {
-                "parse": ParseVideoItem
-            }
-            "gridVideoRenderer": {
-                "parse": ParseVideoItem
-            }
-            "tvBrowseRenderer": {
-                "dig": ["content"]
-            }
-            "tvSurfaceContentRenderer": {
-                "dig": ["content"]
-            }
-            "horizontalListRenderer": {
-                ' has continuations
-                "dig": ["items"]
-            }
-            ' TODO: continuationItemRenderer
-        }
-    end function
-
-    function ParseData(data as object, directives as object, results as object) as object
-        if IsArray(data)
-            for each item in data
-                ParseData(item, directives, results)
-            end for
-            return results
-        end if
-
-        if not IsAssociativeArray(data)
-            return results
-        end if
-
-        for each key in data
-            directive = directives[key]
-            if directive = invalid
-                continue for
-            end if
-
-            data = data[key]
-
-            if directive.DoesExist("dig")
-                data = ObjectUtils.Dig(data, directive["dig"])
-            else if directive.DoesExist("parse")
-                item = directive["parse"](data)
-                if item <> invalid
-                    results.Push(item)
-                end if
-            end if
-
-            ParseData(data, directives, results)
-        end for
-
-        return results
-    end function
-
-    function ParseVideoItem(data as object) as object
-        return {
-            "type": "video"
-            "videoId": data["videoId"]
-            "title": ParseText(data["title"])
-        }
-    end function
-
-    function ParseText(data as object) as string
-        if data = invalid
-            return ""
-        end if
-        if IsString(data)
-            return data
-        end if
-        if data.DoesExist("simpleText")
-            return data["simpleText"]
-        end if
-        if data.DoesExist("runs")
-            text = ""
-            for each _run in data["runs"]
-                text += _run["text"]
-            end for
-            return text
-        end if
-        return ""
-    end function
 end namespace

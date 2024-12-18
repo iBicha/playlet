@@ -1,0 +1,168 @@
+import "pkg:/source/utils/ObjectUtils.bs"
+
+namespace Innertube
+
+    function ParseNode(nodeData as object, context as object) as void
+        if IsArray(nodeData)
+            for each item in nodeData
+                ParseNode(item, context)
+            end for
+            return
+        end if
+
+        if not IsAssociativeArray(nodeData)
+            return
+        end if
+
+        directives = context["directives"]
+        for each key in nodeData
+            directive = directives[key]
+            if directive = invalid
+                continue for
+            end if
+
+            subdata = directive(nodeData[key], context)
+            ParseNode(subdata, context)
+        end for
+    end function
+
+    function GetParsingDirectives() as object
+        return {
+            "twoColumnSearchResultsRenderer": ParseTwoColumnSearchResultsRenderer
+            "twoColumnBrowseResultsRenderer": ParseTwoColumnBrowseResultsRenderer
+            "tabRenderer": ParseTabRenderer
+            "sectionListRenderer": ParseSectionListRenderer
+            "itemSectionRenderer": ParseItemSectionRenderer
+            "shelfRenderer": ParseShelfRenderer
+            "horizontalListRenderer": ParseHorizontalListRenderer
+            "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
+            "videoRenderer": ParseVideoRenderer
+            "gridVideoRenderer": ParseGridVideoRenderer
+            "tvBrowseRenderer": ParseNotImplemented
+            "tvSurfaceContentRenderer": ParseNotImplemented
+            "continuationItemRenderer": ParseNotImplemented
+        }
+    end function
+
+    function ParseTwoColumnSearchResultsRenderer(nodeData as object, context as object) as object
+        return nodeData["primaryContents"]
+    end function
+
+    function ParseTwoColumnBrowseResultsRenderer(nodeData as object, context as object) as object
+        return nodeData["tabs"]
+    end function
+
+    function ParseTabRenderer(nodeData as object, context as object) as object
+        selected = nodeData["selected"]
+        if not ValidBool(selected)
+            return invalid
+        end if
+
+        StartNewFeed(ParseText(nodeData["title"]), context)
+        return nodeData["content"]
+    end function
+
+    function ParseSectionListRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseItemSectionRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseShelfRenderer(nodeData as object, context as object) as object
+        ' TODO: handle shelfRenderer.title
+        return nodeData["content"]
+    end function
+
+    function ParseHorizontalListRenderer(nodeData as object, context as object) as object
+        ' TODO: handle continuations
+        return nodeData["items"]
+    end function
+
+    function ParseExpandedShelfContentsRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
+    function ParseVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseGridVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseText(data as object) as string
+        if data = invalid
+            return ""
+        end if
+        if IsString(data)
+            return data
+        end if
+        if data.DoesExist("simpleText")
+            return data["simpleText"]
+        end if
+        if data.DoesExist("runs")
+            text = ""
+            for each _run in data["runs"]
+                text += _run["text"]
+            end for
+            return text
+        end if
+        return ""
+    end function
+
+    function StartNewFeed(title as string, context as object) as void
+        if context.currentFeed <> invalid
+            if context.currentFeed.items.Count() = 0 and context.currentFeed.title = ""
+                context.currentFeed.title = title
+                return
+            end if
+            context.feeds.Push(context.currentFeed)
+        end if
+        context.currentFeed = {
+            "title": title
+            "items": []
+        }
+    end function
+
+    function PushFeedItem(item as object, context as object) as void
+        if context.currentFeed = invalid
+            context.currentFeed = {
+                "title": ""
+                "items": []
+            }
+        end if
+        context.currentFeed.items.Push(item)
+    end function
+
+    function ParseNotImplemented(data as object, context as object) as object
+        return invalid
+    end function
+end namespace
