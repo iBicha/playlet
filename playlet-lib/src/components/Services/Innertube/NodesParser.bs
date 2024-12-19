@@ -44,8 +44,12 @@ namespace Innertube
             "channelRenderer": ParseChannelRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
-            "tvBrowseRenderer": ParseNotImplemented
-            "tvSurfaceContentRenderer": ParseNotImplemented
+            "tvBrowseRenderer": ParseTvBrowseRenderer
+            "tvSurfaceContentRenderer": ParseTvSurfaceContentRenderer
+            "tvSecondaryNavRenderer": ParseTvSecondaryNavRenderer
+            "tvSecondaryNavSectionRenderer": ParseTvSecondaryNavSectionRenderer
+            "tileRenderer": ParseTileRenderer
+            "gridRenderer": ParseGridRenderer
             "continuationItemRenderer": ParseNotImplemented
         }
     end function
@@ -78,6 +82,7 @@ namespace Innertube
 
     function ParseShelfRenderer(nodeData as object, context as object) as object
         ' TODO: handle shelfRenderer.title
+        ' TODO: handle shelfRenderer.headerRenderer.shelfHeaderRenderer.avatarLockup.avatarLockupRenderer.title
         return nodeData["content"]
     end function
 
@@ -156,6 +161,7 @@ namespace Innertube
     function ParseLockupViewModel(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
         if contentType <> "LOCKUP_CONTENT_TYPE_PLAYLIST"
+            LogWarn("Unknown content type:", nodeData)
             return invalid
         end if
 
@@ -197,6 +203,67 @@ namespace Innertube
 
         PushFeedItem(video, context)
         return invalid
+    end function
+
+    function ParseTvBrowseRenderer(nodeData as object, context as object) as object
+        return nodeData["content"]
+    end function
+
+    function ParseTvSurfaceContentRenderer(nodeData as object, context as object) as object
+        ' TODO: handle tvSurfaceContentRenderer.continuation
+        return nodeData["content"]
+    end function
+
+    function ParseTvSecondaryNavRenderer(nodeData as object, context as object) as object
+        return nodeData["sections"]
+    end function
+
+    function ParseTvSecondaryNavSectionRenderer(nodeData as object, context as object) as object
+        return nodeData["tabs"]
+    end function
+
+    function ParseTileRenderer(nodeData as object, context as object) as object
+        contentType = ValidString(nodeData["contentType"])
+        if contentType = "TILE_CONTENT_TYPE_VIDEO"
+            videoId = nodeData["contentId"]
+            if not IsString(videoId)
+                LogWarn("Invalid video ID", nodeData)
+                return invalid
+            end if
+
+            video = {
+                "type": "video"
+                "videoId": videoId
+                "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+                "videoThumbnails": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            }
+
+            PushFeedItem(video, context)
+        else if contentType = "TILE_CONTENT_TYPE_PLAYLIST"
+            playlistId = nodeData["contentId"]
+            if not IsString(playlistId)
+                LogWarn("Invalid playlist ID", nodeData)
+                return invalid
+            end if
+
+            playlist = {
+                "type": "playlist"
+                "playlistId": playlistId
+                "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+                "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            }
+
+            PushFeedItem(playlist, context)
+        else
+            LogWarn("Unknown content type:", nodeData)
+        end if
+
+        return invalid
+    end function
+
+    function ParseGridRenderer(nodeData as object, context as object) as object
+        ' TODO: handle gridRenderer.continuations
+        return nodeData["items"]
     end function
 
     function ParseText(data as object) as string
