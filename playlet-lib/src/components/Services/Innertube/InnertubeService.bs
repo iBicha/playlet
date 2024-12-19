@@ -192,7 +192,7 @@ namespace InnertubeService
             return invalid
         end if
 
-        result2 = Innertube.GetDeviceAndUserCode(result.clientId, cancellation)
+        result2 = Innertube.GetDeviceAndUserCode(result.client_id, cancellation)
 
         if CancellationUtils.IsCancelled(cancellation)
             return invalid
@@ -208,6 +208,37 @@ namespace InnertubeService
 
     function AuthPollForAccessToken(code as object, cancellation = invalid as object) as object
         return Innertube.PollForAccessToken(code, code, cancellation)
+    end function
+
+    function AuthRefreshAccessTokenIfNeeded(accessToken as object, cancellation = invalid as object) as boolean
+        if not IsAssociativeArray(accessToken)
+            return false
+        end if
+
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        expiresTimestamp = accessToken["expires_timestamp"]
+
+        if expiresTimestamp = invalid or expiresTimestamp < nowSeconds
+            refreshed = Innertube.RefreshAccessToken(accessToken, cancellation)
+
+            if IsAssociativeArray(refreshed) and refreshed.DoesExist("access_token")
+                accessToken.Append(refreshed)
+                if accessToken.DoesExist("expires_in")
+                    accessToken["expires_timestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expires_in"]
+                end if
+                return true
+            end if
+        end if
+
+        return false
+    end function
+
+    function AuthRevokeAccessToken(accessToken as object, cancellation = invalid as object) as boolean
+        if not IsAssociativeArray(accessToken)
+            return false
+        end if
+
+        return Innertube.RevokeAccessToken(accessToken["access_token"], cancellation)
     end function
 
 end namespace

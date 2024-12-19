@@ -1,4 +1,5 @@
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/TimeUtils.bs"
 
 namespace Innertube
 
@@ -45,8 +46,8 @@ namespace Innertube
         end if
 
         return {
-            "clientId": match[1]
-            "clientSecret": match[2]
+            "client_id": match[1]
+            "client_secret": match[2]
         }
     end function
 
@@ -73,13 +74,17 @@ namespace Innertube
             throw "Failed to get device code: " + ToString(responseData)
         end if
 
+        if responseData.DoesExist("expires_in")
+            responseData["expires_timestamp"] = TimeUtils.Now().AsSeconds() + responseData["expires_in"]
+        end if
+
         return responseData
     end function
 
     function PollForAccessToken(clientIdentity as object, deviceAndUserCode as object, cancellation = invalid as dynamic) as object
         payload = {
-            "client_id": clientIdentity.clientId
-            "client_secret": clientIdentity.clientSecret
+            "client_id": clientIdentity.client_id
+            "client_secret": clientIdentity.client_secret
             "code": deviceAndUserCode.device_code
             "grant_type": "http://oauth.net/grant_type/device/1.0"
         }
@@ -101,6 +106,11 @@ namespace Innertube
 
             responseData = response.Json()
             if not responseData.DoesExist("error")
+                if responseData.DoesExist("expires_in")
+                    responseData["expires_timestamp"] = TimeUtils.Now().AsSeconds() + responseData["expires_in"]
+                end if
+                responseData["client_id"] = clientIdentity.client_id
+                responseData["client_secret"] = clientIdentity.client_secret
                 return responseData
             end if
 
@@ -130,12 +140,11 @@ namespace Innertube
         return invalid
     end function
 
-    ' TODO: validate
-    function RefreshAccessToken(clientIdentity as object, refreshToken as string, cancellation = invalid as dynamic) as object
+    function RefreshAccessToken(accessToken as object, cancellation = invalid as dynamic) as object
         payload = {
-            "client_id": clientIdentity.clientId
-            "client_secret": clientIdentity.clientSecret
-            "refresh_token": refreshToken
+            "client_id": accessToken.client_id
+            "client_secret": accessToken.client_secret
+            "refresh_token": accessToken.refresh_token
             "grant_type": "refresh_token"
         }
 
@@ -155,16 +164,16 @@ namespace Innertube
         return responseData
     end function
 
-    ' TODO: validate
     function RevokeAccessToken(accessToken as string, cancellation = invalid as dynamic) as boolean
         request = HttpClient.Post("https://www.youtube.com/o/oauth2/revoke", "")
         request.QueryParam("token", accessToken)
         request.Cancellation(cancellation)
         response = request.Await()
-        if not response.IsSuccess()
+        success = response.IsSuccess()
+        if success
             LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
         end if
-        return response.IsSuccess()
+        return success
     end function
 
 end namespace
