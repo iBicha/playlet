@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Nothing worth mentioning yet.
+
+## [0.33.2] - 2024-12-17
+
+### Changed
+
+- Default Invidious instance
+
+## [0.33.1] - 2024-12-17
+
 ### Added
 
 - Compression (gzip) to static web app files. Reduces app size significantly
