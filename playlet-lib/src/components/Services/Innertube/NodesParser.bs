@@ -18,6 +18,7 @@ namespace Innertube
         for each key in nodeData
             directive = directives[key]
             if directive = invalid
+                LogWarn("Unknown node", key)
                 continue for
             end if
 
@@ -34,10 +35,15 @@ namespace Innertube
             "sectionListRenderer": ParseSectionListRenderer
             "itemSectionRenderer": ParseItemSectionRenderer
             "shelfRenderer": ParseShelfRenderer
+            "reelShelfRenderer": ParseReelShelfRenderer
+            "verticalListRenderer": ParseVerticalListRenderer
             "horizontalListRenderer": ParseHorizontalListRenderer
             "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
             "videoRenderer": ParseVideoRenderer
             "gridVideoRenderer": ParseGridVideoRenderer
+            "channelRenderer": ParseChannelRenderer
+            "lockupViewModel": ParseLockupViewModel
+            "shortsLockupViewModel": ParseShortsLockupViewModel
             "tvBrowseRenderer": ParseNotImplemented
             "tvSurfaceContentRenderer": ParseNotImplemented
             "continuationItemRenderer": ParseNotImplemented
@@ -75,6 +81,15 @@ namespace Innertube
         return nodeData["content"]
     end function
 
+    function ParseReelShelfRenderer(nodeData as object, context as object) as object
+        ' TODO: handle reelShelfRenderer.title
+        return nodeData["items"]
+    end function
+
+    function ParseVerticalListRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
     function ParseHorizontalListRenderer(nodeData as object, context as object) as object
         ' TODO: handle continuations
         return nodeData["items"]
@@ -95,6 +110,7 @@ namespace Innertube
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
         }
 
         PushFeedItem(video, context)
@@ -112,6 +128,71 @@ namespace Innertube
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseChannelRenderer(nodeData as object, context as object) as object
+        channelId = nodeData["channelId"]
+        if not IsString(channelId)
+            LogWarn("Invalid channel ID", nodeData)
+            return invalid
+        end if
+
+        channel = {
+            "type": "channel"
+            "channelId": channelId
+            "title": ParseText(nodeData["title"])
+            "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(channel, context)
+        return invalid
+    end function
+
+    function ParseLockupViewModel(nodeData as object, context as object) as object
+        contentType = ValidString(nodeData["contentType"])
+        if contentType <> "LOCKUP_CONTENT_TYPE_PLAYLIST"
+            return invalid
+        end if
+
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": title
+            "playlistThumbnail": thumbnail
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseShortsLockupViewModel(nodeData as object, context as object) as object
+        videoId = ObjectUtils.Dig(nodeData, ["onTap", "innertubeCommand", "reelWatchEndpoint", "videoId"])
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ObjectUtils.Dig(nodeData, ["overlayMetadata", "primaryText", "content"])
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "sources"])
         }
 
         PushFeedItem(video, context)
