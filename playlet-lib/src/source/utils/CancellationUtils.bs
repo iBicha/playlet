@@ -1,0 +1,47 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace CancellationUtils
+
+    function IsCancelled(cancellation as dynamic) as boolean
+        if cancellation = invalid or cancellation.node = invalid or cancellation.field = invalid
+            return false
+        end if
+
+        return cancellation.node[cancellation.field] = cancellation.value
+    end function
+
+    function ObserveCancellationScoped(cancellation as dynamic, messagePort as dynamic) as void
+        if cancellation = invalid or cancellation.node = invalid or cancellation.field = invalid
+            return
+        end if
+
+        cancellation.node.ObserveFieldScoped(cancellation.field, messagePort)
+    end function
+
+    function UnobserveCancellationScoped(cancellation as dynamic) as void
+        if cancellation = invalid or cancellation.node = invalid or cancellation.field = invalid
+            return
+        end if
+
+        cancellation.node.UnobserveFieldScoped(cancellation.field)
+    end function
+
+    function IsCancellationEvent(cancellation as dynamic, message as dynamic) as boolean
+        messageType = type(message)
+        if messageType <> "roSGNodeEvent"
+            return false
+        end if
+
+        if cancellation = invalid or cancellation.node = invalid or cancellation.field = invalid
+            return false
+        end if
+
+        node = message.getRoSGNode()
+        if node = invalid or not node.isSameNode(cancellation.node)
+            return false
+        end if
+
+        return cancellation.field = message.getField() and cancellation.value = message.getData()
+    end function
+
+end namespace
