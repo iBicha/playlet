@@ -164,7 +164,7 @@ namespace InnertubeService
         return Innertube.ParseResponse(json)
     end function
 
-    function GetChannelInfo(channelId as string, options = invalid as object) as object
+    function GetChannel(channelId as string, options = invalid as object) as object
         cancellation = invalid
 
         if options <> invalid
@@ -183,6 +183,31 @@ namespace InnertubeService
 
         json = response.Json()
         return Innertube.ParseChannelPageResponse(json)
+    end function
+
+    function GetPlaylist(playlistId as string, options = invalid as object) as object
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        if not playlistId.StartsWith("VL")
+            playlistId = "VL" + playlistId
+        end if
+
+        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "")
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParsePlaylistPageResponse(json)
     end function
 
     function AuthGetCode(cancellation = invalid as object) as object

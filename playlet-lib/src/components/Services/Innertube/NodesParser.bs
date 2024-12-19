@@ -39,8 +39,10 @@ namespace Innertube
             "verticalListRenderer": ParseVerticalListRenderer
             "horizontalListRenderer": ParseHorizontalListRenderer
             "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
+            "playlistVideoListRenderer": ParsePlaylistVideoListRenderer
             "videoRenderer": ParseVideoRenderer
             "gridVideoRenderer": ParseGridVideoRenderer
+            "playlistVideoRenderer": ParsePlaylistVideoRenderer
             "channelRenderer": ParseChannelRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
@@ -104,6 +106,10 @@ namespace Innertube
         return nodeData["items"]
     end function
 
+    function ParsePlaylistVideoListRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
     function ParseVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
@@ -134,6 +140,25 @@ namespace Innertube
             "videoId": videoId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParsePlaylistVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "index": ParseText(nodeData["index"]).ToInt()
         }
 
         PushFeedItem(video, context)
