@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Added a workaround for an issue where json parsing fails due to unicode characters
 
 ## [0.33.2] - 2024-12-17
 
