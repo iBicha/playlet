@@ -39,11 +39,14 @@ namespace Innertube
             "verticalListRenderer": ParseVerticalListRenderer
             "horizontalListRenderer": ParseHorizontalListRenderer
             "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
+            "channelFeaturedContentRenderer": ParseChannelFeaturedContentRenderer
             "playlistVideoListRenderer": ParsePlaylistVideoListRenderer
             "videoRenderer": ParseVideoRenderer
             "gridVideoRenderer": ParseGridVideoRenderer
+            "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
             "playlistVideoRenderer": ParsePlaylistVideoRenderer
             "channelRenderer": ParseChannelRenderer
+            "gridChannelRenderer": ParseGridChannelRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
             "tvBrowseRenderer": ParseTvBrowseRenderer
@@ -55,6 +58,15 @@ namespace Innertube
             "richGridRenderer": ParseRichGridRenderer
             "richItemRenderer": ParseRichItemRenderer
             "continuationItemRenderer": ParseNotImplemented
+            ' Posts not yet supported
+            "postRenderer": ParseNotImplemented
+            ' a "View all posts" button
+            "buttonCardViewModel": ParseNotImplemented
+            ' to show chapters of a particular video in the search results
+            "horizontalCardListRenderer": ParseNotImplemented
+            ' expandableTabRenderer contains the search tab with a channel. Ignored.
+            "expandableTabRenderer": ParseNotImplemented
+
         }
     end function
 
@@ -108,6 +120,10 @@ namespace Innertube
         return nodeData["items"]
     end function
 
+    function ParseChannelFeaturedContentRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
     function ParsePlaylistVideoListRenderer(nodeData as object, context as object) as object
         return nodeData["contents"]
     end function
@@ -142,6 +158,26 @@ namespace Innertube
             "videoId": videoId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseChannelVideoPlayerRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": [{
+                "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+            }]
         }
 
         PushFeedItem(video, context)
@@ -185,13 +221,60 @@ namespace Innertube
         return invalid
     end function
 
-    function ParseLockupViewModel(nodeData as object, context as object) as object
-        contentType = ValidString(nodeData["contentType"])
-        if contentType <> "LOCKUP_CONTENT_TYPE_PLAYLIST"
-            LogWarn("Unknown content type:", nodeData)
+    function ParseGridChannelRenderer(nodeData as object, context as object) as object
+        channelId = nodeData["channelId"]
+        if not IsString(channelId)
+            LogWarn("Invalid channel ID", nodeData)
             return invalid
         end if
 
+        channel = {
+            "type": "channel"
+            "authorId": channelId
+            "author": ParseText(nodeData["title"])
+            "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(channel, context)
+        return invalid
+    end function
+
+    function ParseLockupViewModel(nodeData as object, context as object) as object
+        contentType = ValidString(nodeData["contentType"])
+        if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
+            return LockupViewModelTypePlaylist(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
+            return LockupViewModelTypePodcast(nodeData, context)
+        end if
+
+        LogWarn("Unknown content type:", nodeData)
+        return invalid
+    end function
+
+    function LockupViewModelTypePlaylist(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": title
+            "playlistThumbnail": thumbnail
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function LockupViewModelTypePodcast(nodeData as object, context as object) as object
         playlistId = nodeData["contentId"]
         if not IsString(playlistId)
             LogWarn("Invalid playlist ID", nodeData)
@@ -252,39 +335,48 @@ namespace Innertube
     function ParseTileRenderer(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
         if contentType = "TILE_CONTENT_TYPE_VIDEO"
-            videoId = nodeData["contentId"]
-            if not IsString(videoId)
-                LogWarn("Invalid video ID", nodeData)
-                return invalid
-            end if
-
-            video = {
-                "type": "video"
-                "videoId": videoId
-                "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
-                "videoThumbnails": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
-            }
-
-            PushFeedItem(video, context)
+            return TileRendererTypeVideo(nodeData, context)
         else if contentType = "TILE_CONTENT_TYPE_PLAYLIST"
-            playlistId = nodeData["contentId"]
-            if not IsString(playlistId)
-                LogWarn("Invalid playlist ID", nodeData)
-                return invalid
-            end if
-
-            playlist = {
-                "type": "playlist"
-                "playlistId": playlistId
-                "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
-                "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
-            }
-
-            PushFeedItem(playlist, context)
-        else
-            LogWarn("Unknown content type:", nodeData)
+            return TileRendererTypePlaylist(nodeData, context)
         end if
 
+        LogWarn("Unknown content type:", nodeData)
+        return invalid
+    end function
+
+    function TileRendererTypeVideo(nodeData as object, context as object) as object
+        videoId = nodeData["contentId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function TileRendererTypePlaylist(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(playlist, context)
         return invalid
     end function
 
