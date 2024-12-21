@@ -135,11 +135,20 @@ namespace Innertube
             return invalid
         end if
 
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
-            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
@@ -153,11 +162,20 @@ namespace Innertube
             return invalid
         end if
 
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
-            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
@@ -175,9 +193,7 @@ namespace Innertube
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
-            "videoThumbnails": [{
-                "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-            }]
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
         }
 
         PushFeedItem(video, context)
@@ -191,11 +207,20 @@ namespace Innertube
             return invalid
         end if
 
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
-            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "videoThumbnails": videoThumbnails
             "index": ParseText(nodeData["index"]).ToInt()
         }
 
@@ -304,11 +329,21 @@ namespace Innertube
             return invalid
         end if
 
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "sources"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ObjectUtils.Dig(nodeData, ["overlayMetadata", "primaryText", "content"])
-            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "sources"])
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
@@ -351,11 +386,20 @@ namespace Innertube
             return invalid
         end if
 
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
-            "videoThumbnails": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
@@ -439,5 +483,34 @@ namespace Innertube
 
     function ParseNotImplemented(data as object, context as object) as object
         return invalid
+    end function
+
+    function GenerateVideoThumbnails(videoId as string) as object
+        return [
+            {
+                "quality": "maxres"
+                "url": `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+                "width": 1280
+                "height": 720
+            }
+            {
+                "quality": "sddefault"
+                "url": `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`
+                "width": 640
+                "height": 480
+            }
+            {
+                "quality": "high"
+                "url": `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+                "width": 480
+                "height": 360
+            }
+            {
+                "quality": "medium"
+                "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+                "width": 320
+                "height": 180
+            }
+        ]
     end function
 end namespace
