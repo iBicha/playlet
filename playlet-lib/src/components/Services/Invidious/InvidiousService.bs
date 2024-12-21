@@ -12,7 +12,7 @@ import "pkg:/source/utils/TimeUtils.bs"
 namespace Invidious
     const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
 
-    const DEFAULT_INSTANCE = "https://inv.nadeko.net"
+    const DEFAULT_INSTANCE = "http://127.0.0.1:8888/playlet-invidious-backend"
 
     const TOKEN_CALLBACK = "/invidious/token_callback"
 
@@ -71,7 +71,13 @@ namespace Invidious
                 return instance
             end if
 
-            return DEFAULT_INSTANCE
+            instance = DEFAULT_INSTANCE
+            if instance.StartsWith("http://127.0.0.1:8888")
+                address = m.invidiousNode.webServer@.GetServerAddress()
+                instance = instance.Replace("http://127.0.0.1:8888", address)
+            end if
+
+            return instance
         end function
 
         function MarkVideoWatched(videoId as dynamic) as void
