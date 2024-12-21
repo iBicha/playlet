@@ -135,9 +135,25 @@ namespace Innertube
             return invalid
         end if
 
-        longByLineText = nodeData["longBylineText"]
-        author = ParseText(longByLineText)
-        authorId = ObjectUtils.Dig(longByLineText, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["ownerText", "shortBylineText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
+        viewCountText = ParseText(nodeData["shortViewCountText"])
+        if viewCountText = ""
+            viewCountText = ParseText(nodeData["viewCountText"])
+        end if
+
+        publishedText = ParseText(nodeData["publishedTimeText"])
+        lengthText = ParseText(nodeData["lengthText"])
 
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
@@ -152,10 +168,18 @@ namespace Innertube
             "type": "video"
             "videoId": videoId
             "title": ParseText(nodeData["title"])
-            "author": author
-            "authorId": authorId
             "videoThumbnails": videoThumbnails
+            "viewCountText": viewCountText
+            "publishedText": publishedText
+            "lengthText": lengthText
         }
+
+        if author <> ""
+            video["author"] = author
+        end if
+        if authorId <> invalid
+            video["authorId"] = authorId
+        end if
 
         PushFeedItem(video, context)
         return invalid
@@ -168,6 +192,13 @@ namespace Innertube
             return invalid
         end if
 
+        viewCountText = ParseText(nodeData["shortViewCountText"])
+        if viewCountText = ""
+            viewCountText = ParseText(nodeData["viewCountText"])
+        end if
+
+        publishedText = ParseText(nodeData["publishedTimeText"])
+
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
         else
@@ -182,6 +213,8 @@ namespace Innertube
             "videoId": videoId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": videoThumbnails
+            "publishedText": publishedText
+            "viewCountText": viewCountText
         }
 
         PushFeedItem(video, context)
@@ -213,6 +246,9 @@ namespace Innertube
             return invalid
         end if
 
+        lengthText = ParseText(nodeData["lengthText"])
+        lengthSeconds = ValidString(nodeData["lengthSeconds"]).ToInt()
+
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
         else
@@ -228,6 +264,8 @@ namespace Innertube
             "title": ParseText(nodeData["title"])
             "videoThumbnails": videoThumbnails
             "index": ParseText(nodeData["index"]).ToInt()
+            "lengthText": lengthText
+            "lengthSeconds": lengthSeconds
         }
 
         PushFeedItem(video, context)
@@ -343,7 +381,6 @@ namespace Innertube
                 videoThumbnails = GenerateVideoThumbnails(videoId)
             end if
         end if
-
 
         video = {
             "type": "video"

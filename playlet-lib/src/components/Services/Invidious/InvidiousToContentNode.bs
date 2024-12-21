@@ -40,7 +40,7 @@ namespace InvidiousContent
         SetIfExists(node, "_author", item, "author")
         SetIfExists(node, "authorId", item, "authorId")
         SetIfExists(node, "lengthSeconds", item, "lengthSeconds")
-        node.lengthText = TimeUtils.GetFormattedTime(item.lengthSeconds)
+        node.lengthText = VideoGetLengthText(item)
         node.liveNow = VideoIsLive(item)
         VideoSetPremiereTimestampText(node, item)
         node.publishedText = VideoGetPublishedText(item)
@@ -232,6 +232,11 @@ namespace InvidiousContent
     end function
 
     function VideoGetViewCountText(videoItem as object) as string
+        viewCountText = videoItem.viewCountText
+        if not StringUtils.IsNullOrEmpty(viewCountText)
+            return viewCountText
+        end if
+
         viewCount = videoItem.viewCount
         if viewCount = invalid
             return ""
@@ -354,6 +359,13 @@ namespace InvidiousContent
         else
             return Tr(Locale.RowCell.OneMinuteAgo)
         end if
+    end function
+
+    function VideoGetLengthText(videoItem as object) as string
+        if not StringUtils.IsNullOrEmpty(videoItem.lengthText)
+            return videoItem.lengthText
+        end if
+        return TimeUtils.GetFormattedTime(videoItem.lengthSeconds)
     end function
 
     function PlaylistGetUpdatedText(playlistItem as object) as string
