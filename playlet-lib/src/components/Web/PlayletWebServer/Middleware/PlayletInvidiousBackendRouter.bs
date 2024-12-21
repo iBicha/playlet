@@ -1,0 +1,186 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+
+namespace Http
+
+    class PlayletInvidiousBackendRouter extends HttpRouter
+
+        function new()
+            super()
+        end function
+
+        @get("/playlet-invidious-backend/authorize_token")
+        function AuthorizeToken(context as object) as boolean
+            response = context.response
+
+            error = "Playlet built-in Invidious backend is not a real Invidious instance, and does not support accounts."
+            response.Default(400, error)
+            return true
+        end function
+
+        @get("/playlet-invidious-backend/api/v1/stats")
+        function GetStats(context as object) as boolean
+            response = context.response
+
+            error = "Playlet built-in Invidious backend is not a real Invidious instance, and does not support stats."
+            response.Default(400, error)
+            return true
+        end function
+
+        @get("/playlet-invidious-backend/api/v1/trending")
+        function GetTrending(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            feeds = InnertubeService.GetTrending({ type: request.query.type })
+            if not IsArray(feeds) or feeds.Count() = 0
+                response.Default(500, "Failed to get trending feed")
+                return true
+            end if
+
+            response.Json(ValidArray(feeds[0].items))
+            return true
+        end function
+
+        @get("/playlet-invidious-backend/api/v1/popular")
+        function GetPopular(context as object) as boolean
+            return m.GetTrending(context)
+        end function
+
+        @get("/playlet-invidious-backend/api/v1/search/suggestions")
+        function GetSearchSuggestions(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            query = request.query.q
+
+            suggestions = InnertubeService.SearchSuggestions(query)
+            suggestions.query = query
+            response.Json(suggestions)
+            return true
+        end function
+
+        @get("/playlet-invidious-backend/api/v1/search")
+        function GetSearch(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            query = request.query.q
+
+            feeds = InnertubeService.Search(query)
+            if not IsArray(feeds) or feeds.Count() = 0
+                response.Default(500, "Failed to search")
+                return true
+            end if
+
+            response.Json(ValidArray(feeds[0].items))
+            return true
+        end function
+
+        @get("*")
+        function GetAll(context as object) as boolean
+            request = context.request
+            route = request.route
+
+            if route.StartsWith("/playlet-invidious-backend/api/v1/videos/")
+                return m.GetVideo(context)
+            else if route.StartsWith("/playlet-invidious-backend/api/v1/playlists/")
+                return m.GetPlaylist(context)
+            else if route.StartsWith("/playlet-invidious-backend/api/v1/channels/")
+                return m.GetChannel(context)
+            end if
+
+            return false
+        end function
+
+        function GetVideo(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            videoId = route.Mid("/playlet-invidious-backend/api/v1/videos/".Len())
+
+            playerResponse = InnertubeService.GetVideoMetadata(videoId)
+            if not playerResponse.IsSuccess()
+                response.Default(playerResponse.StatusCode(), playerResponse.ErrorMessage())
+                return true
+            end if
+
+            response.Json(playerResponse.Json())
+            return true
+        end function
+
+        function GetPlaylist(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
+
+            playlist = InnertubeService.GetPlaylist(playlistId)
+            if playlist = invalid
+                response.Default(500, "Failed to get playlist")
+                return true
+            end if
+
+            ' TODO: Implement continuation
+            index = request.query.index
+            if not StringUtils.IsNullOrEmpty(index)
+                index = index.ToInt()
+                if index > 0
+                    LogWarn("Playlist continuation is not implemented yet")
+                    playlist.videos = []
+                end if
+            end if
+
+            response.Json(playlist)
+            return true
+        end function
+
+        function GetChannel(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            channelAndTab = route.Mid("/playlet-invidious-backend/api/v1/channels/".Len())
+            channelAndTab = channelAndTab.Split("/")
+
+            if channelAndTab.Count() = 1
+                channelId = channelAndTab[0]
+                channel = InnertubeService.GetChannel(channelId)
+                if channel = invalid
+                    response.Default(500, "Failed to get channel")
+                    return true
+                end if
+
+                response.Json(channel)
+                return true
+            else if channelAndTab.Count() = 2
+                channelId = channelAndTab[0]
+                _tab = channelAndTab[1]
+
+                params = ValidString(request.query.params)
+
+                channel = InnertubeService.GetChannel(channelId, { "params": params })
+                if channel = invalid
+                    response.Default(500, "Failed to get channel")
+                    return true
+                end if
+
+                if _tab = "playlists" or _tab = "podcasts" or _tab = "releases"
+                    response.Json({
+                        "playlists": channel.items
+                    })
+                else
+                    response.Json({
+                        "videos": channel.items
+                    })
+                end if
+
+                return true
+            end if
+
+            return false
+        end function
+    end class
+
+end namespace

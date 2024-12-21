@@ -1,0 +1,160 @@
+import "pkg:/components/Services/Innertube/Constants.bs"
+
+namespace Innertube
+
+    enum ClientType
+        Web = "WEB"
+        IOS = "IOS"
+        Tv = "TV"
+    end enum
+
+    function CreateHeaders(clienType as Innertube.ClientType) as object
+        if clienType = ClientType.Web
+            return {
+                "user-agent": INNERTUBE_WEB_USER_AGENT
+                "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
+                "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
+            }
+        else if clienType = ClientType.IOS
+            return {
+                "user-agent": INNERTUBE_IOS_USER_AGENT
+                "x-youtube-client-name": INNERTUBE_IOS_CLIENT_NAME
+                "x-youtube-client-version": INNERTUBE_IOS_CLIENT_VERSION
+            }
+        else if clienType = ClientType.Tv
+            return {
+                "user-agent": INNERTUBE_TV_USER_AGENT
+                "x-youtube-client-name": INNERTUBE_TV_CLIENT_NAME
+                "x-youtube-client-version": INNERTUBE_TV_CLIENT_VERSION
+            }
+        else
+            throw "Invalid client type"
+        end if
+    end function
+
+    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object, ctt as string) as object
+        client = invalid
+        if clienType = ClientType.Web
+            client = CreateContextClientWeb(deviceInfo)
+        else if clienType = ClientType.IOS
+            client = CreateContextClientIOS(deviceInfo)
+        else if clienType = ClientType.Tv
+            client = CreateContextClientTv(deviceInfo)
+        else
+            throw "Invalid client type"
+        end if
+
+        context = {
+            "client": client
+            "user": {
+                "enableSafetyMode": false
+                "lockedSafetyMode": false
+            }
+            "request": {
+                "useSsl": true
+                "internalExperimentFlags": []
+            }
+        }
+
+        if not StringUtils.IsNullOrEmpty(ctt)
+            context["user"]["credentialTransferTokens"] = [{
+                "token": ctt
+                "scope": "VIDEO"
+            }]
+        end if
+
+        return context
+    end function
+
+    function CreateContextClientWeb(deviceInfo as object) as object
+        return {
+            "hl": "en"
+            "gl": "US"
+            "remoteHost": ""
+            "screenDensityFloat": 1
+            "screenHeightPoints": 1440
+            "screenPixelDensity": 1
+            "screenWidthPoints": 2560
+            "visitorData": ""
+            "clientName": "WEB"
+            "clientVersion": INNERTUBE_WEB_CLIENT_VERSION
+            "osName": "Windows"
+            "osVersion": "10.0"
+            "platform": "DESKTOP"
+            "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+            "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
+            "timeZone": deviceInfo.GetTimeZone()
+            "originalUrl": "https://www.youtube.com"
+            "deviceMake": ""
+            "deviceModel": ""
+            "browserName": INNERTUBE_WEB_BROWSER_NAME
+            "browserVersion": INNERTUBE_WEB_BROWSER_VERSION
+            "utcOffsetMinutes": -240
+            "memoryTotalKbytes": "8000000"
+            "mainAppWebInfo": {
+                "graftUrl": "https://www.youtube.com"
+                "pwaInstallabilityStatus": "PWA_INSTALLABILITY_STATUS_UNKNOWN"
+                "webDisplayMode": "WEB_DISPLAY_MODE_BROWSER"
+                "isWebNativeShareAvailable": true
+            }
+        }
+    end function
+
+    function CreateContextClientIOS(deviceInfo as object) as object
+        return {
+            "hl": "en"
+            "gl": "US"
+            "remoteHost": ""
+            "screenDensityFloat": 1
+            "screenHeightPoints": 1440
+            "screenPixelDensity": 1
+            "screenWidthPoints": 2560
+            "visitorData": ""
+            "clientName": "iOS"
+            "clientVersion": INNERTUBE_IOS_CLIENT_VERSION
+            "osName": "iOS"
+            "osVersion": INNERTUBE_IOS_OS_VERSION
+            "platform": "MOBILE"
+            "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+            "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
+            "timeZone": deviceInfo.GetTimeZone()
+            "originalUrl": "https://www.youtube.com"
+            "deviceMake": "Apple"
+            "deviceModel": "iPhone10,6"
+            "utcOffsetMinutes": -240
+            "memoryTotalKbytes": "8000000"
+        }
+    end function
+
+    function CreateContextClientTv(deviceInfo as object) as object
+        return {
+            "hl": "en"
+            "gl": "US"
+            "remoteHost": ""
+            "deviceMake": INNERTUBE_TV_DEVICE_MAKE
+            "deviceModel": INNERTUBE_TV_DEVICE_MODEL
+            "userAgent": INNERTUBE_TV_USER_AGENT
+            "clientName": "TVHTML5"
+            "clientVersion": INNERTUBE_TV_CLIENT_VERSION
+            "osName": INNERTUBE_TV_OS_NAME
+            "osVersion": INNERTUBE_TV_OS_VERSION
+            "originalUrl": "https://www.youtube.com/tv"
+            "theme": "CLASSIC"
+            "platform": "TV"
+            "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+            "webpSupport": false
+            "tvAppInfo": {
+                "appQuality": "TV_APP_QUALITY_LIMITED_MEMORY"
+                "useStartPlaybackPreviewCommand": false
+                "supportsNativeScrolling": false
+            }
+            "browserName": INNERTUBE_TV_BROWSER_NAME
+            "browserVersion": INNERTUBE_TV_BROWSER_VERSION
+            "acceptHeader": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+            "screenHeightPoints": 1440
+            "screenWidthPoints": 2560
+            "screenPixelDensity": 2
+            "utcOffsetMinutes": -300
+        }
+    end function
+end namespace

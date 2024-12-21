@@ -24,6 +24,14 @@ know the IP address of a user, the identifiers of watched video, and search
 keywords. In case the user has privacy concerns, they can host their own
 Invidious instance and use it from Playlet.
 
+## Innertube
+
+When the Playlet built-in backend is in use, instead of an Invidious instance,
+Playlet makes requests directly to Innertube instead of Invidious.
+
+Similar to Invidious requests, only the bare minimum and necessary information
+is sent, which is used to enable the viewing of content.
+
 ## SponsorBlock
 
 Playlet may request information from a [SponsorBlock](https://github.com/ajayyy/SponsorBlock)

@@ -1,0 +1,195 @@
+import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace Innertube
+
+    function ParseResponse(responseData as object) as object
+        if responseData = invalid
+            return []
+        end if
+
+        data = UnwrapContainer(responseData)
+        if data = invalid
+            return []
+        end if
+
+        context = {
+            directives: Innertube.GetParsingDirectives()
+
+            feeds: []
+            currentFeed: {
+                title: ""
+                items: []
+            }
+            generateVideoThumbnails: true
+        }
+
+        Innertube.ParseNode(data, context)
+
+        if context.currentFeed <> invalid and (context.currentFeed.items.Count() > 0 or context.currentFeed.title <> "")
+            context.feeds.Push(context.currentFeed)
+            context.currentFeed = invalid
+        end if
+        return context.feeds
+    end function
+
+    function ParseChannelPageResponse(responseData as object) as object
+        if responseData = invalid
+            return invalid
+        end if
+
+        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
+        if IsAssociativeArray(alert) and alert.type = "ERROR"
+            return {
+                error: ParseText(alert.text)
+            }
+        end if
+
+        title = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "title"])
+
+        thumbnails = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "avatar", "thumbnails"])
+        if thumbnails = invalid
+            thumbnails = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "image", "decoratedAvatarViewModel", "avatar", "avatarViewModel", "image", "sources"])
+            if thumbnails = invalid
+                thumbnails = ObjectUtils.Dig(responseData, ["microformat", "microformatDataRenderer", "thumbnail", "thumbnails"])
+                if thumbnails = invalid
+                    thumbnails = []
+                end if
+            end if
+        end if
+
+        ucid = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "externalId"])
+        banners = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "banner", "imageBannerViewModel", "image", "sources"])
+        if banners = invalid
+            banners = []
+        end if
+
+        authorSubTitle = ""
+        contentMetadata = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "metadata", "contentMetadataViewModel"])
+        if contentMetadata <> invalid
+            metadataRows = contentMetadata["metadataRows"]
+            delimiter = ` ${ValidString(contentMetadata["delimiter"])} `
+            if metadataRows <> invalid
+                parts = []
+                for each row in metadataRows
+                    metadataParts = row["metadataParts"]
+                    if metadataParts = invalid
+                        continue for
+                    end if
+                    for each part in metadataParts
+                        text = ObjectUtils.Dig(part, ["text", "content"])
+                        if IsString(text)
+                            parts.Push(text)
+                        end if
+                    end for
+                end for
+                if parts.Count() > 0
+                    authorSubTitle = parts.Join(delimiter)
+                end if
+            end if
+        end if
+
+        tabsNames = []
+        tabsParams = {}
+
+        tabs = ObjectUtils.Dig(responseData, ["contents", "twoColumnBrowseResultsRenderer", "tabs"])
+        if tabs <> invalid
+            for each t in tabs
+                tabRenderer = t["tabRenderer"]
+                if tabRenderer = invalid
+                    continue for
+                end if
+
+                tabName = ObjectUtils.Dig(tabRenderer, ["endpoint", "commandMetadata", "webCommandMetadata", "url"])
+                if tabName = invalid
+                    continue for
+                end if
+                tabName = tabName.Split("?")[0]
+                tabName = tabName.Split("/")
+                tabName = tabName[tabName.Count() - 1]
+                if StringUtils.IsNullOrEmpty(tabName)
+                    continue for
+                end if
+
+                tabParams = ObjectUtils.Dig(tabRenderer, ["endpoint", "browseEndpoint", "params"])
+                if tabParams = invalid
+                    continue for
+                end if
+
+                tabsNames.Push(tabName)
+                tabsParams[tabName] = tabParams
+            end for
+        end if
+
+        items = []
+        feeds = ParseResponse(responseData)
+        if feeds.Count() > 0
+            items = ValidArray(feeds[0].items)
+        end if
+
+        return {
+            "author": title
+            "authorId": ucid
+            "authorThumbnails": thumbnails
+            "authorBanners": banners
+            "authorSubTitle": authorSubTitle
+            "tabs": tabsNames
+            "tabsParams": tabsParams
+            "items": items
+        }
+    end function
+
+    function ParsePlaylistPageResponse(responseData as object) as object
+        if responseData = invalid
+            return invalid
+        end if
+
+        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
+        if IsAssociativeArray(alert) and alert.type = "ERROR"
+            return {
+                error: ParseText(alert.text)
+            }
+        end if
+
+        playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
+
+        primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
+        ' secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
+
+        title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
+        description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
+        videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
+        thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
+
+        playlist = {
+            "title": title
+            "description": description
+            "videoCount": videoCount
+            "thumbnail": thumbnail
+            "videos": []
+        }
+
+        feeds = ParseResponse(responseData)
+        if feeds.Count() > 0
+            playlist["videos"] = ValidArray(feeds[0].items)
+        end if
+
+        return playlist
+    end function
+
+    function UnwrapContainer(responseData as object) as object
+        if responseData.DoesExist("contents")
+            return responseData["contents"]
+        end if
+        if responseData.DoesExist("response")
+            return responseData["response"]
+        end if
+        data = ObjectUtils.Dig(responseData, ["onResponseReceivedActions", 0])
+        if data <> invalid
+            return data
+        end if
+        return responseData
+    end function
+
+end namespace

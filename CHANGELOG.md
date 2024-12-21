@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Built-in Playlet backend, which supports channels, playlists, and search
+  - This backend is not finished, and provides the bare minimum to watch videos.
+  - More features to come.
+
 ### Fixed
 
 - Added a workaround for an issue where json parsing fails due to unicode characters

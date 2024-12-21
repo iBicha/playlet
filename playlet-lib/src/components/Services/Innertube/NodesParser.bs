@@ -1,0 +1,516 @@
+import "pkg:/source/utils/ObjectUtils.bs"
+
+namespace Innertube
+
+    function ParseNode(nodeData as object, context as object) as void
+        if IsArray(nodeData)
+            for each item in nodeData
+                ParseNode(item, context)
+            end for
+            return
+        end if
+
+        if not IsAssociativeArray(nodeData)
+            return
+        end if
+
+        directives = context["directives"]
+        for each key in nodeData
+            directive = directives[key]
+            if directive = invalid
+                LogWarn("Unknown node", key)
+                continue for
+            end if
+
+            subdata = directive(nodeData[key], context)
+            ParseNode(subdata, context)
+        end for
+    end function
+
+    function GetParsingDirectives() as object
+        return {
+            "twoColumnSearchResultsRenderer": ParseTwoColumnSearchResultsRenderer
+            "twoColumnBrowseResultsRenderer": ParseTwoColumnBrowseResultsRenderer
+            "tabRenderer": ParseTabRenderer
+            "sectionListRenderer": ParseSectionListRenderer
+            "itemSectionRenderer": ParseItemSectionRenderer
+            "shelfRenderer": ParseShelfRenderer
+            "reelShelfRenderer": ParseReelShelfRenderer
+            "verticalListRenderer": ParseVerticalListRenderer
+            "horizontalListRenderer": ParseHorizontalListRenderer
+            "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
+            "channelFeaturedContentRenderer": ParseChannelFeaturedContentRenderer
+            "playlistVideoListRenderer": ParsePlaylistVideoListRenderer
+            "videoRenderer": ParseVideoRenderer
+            "gridVideoRenderer": ParseGridVideoRenderer
+            "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
+            "playlistVideoRenderer": ParsePlaylistVideoRenderer
+            "channelRenderer": ParseChannelRenderer
+            "gridChannelRenderer": ParseGridChannelRenderer
+            "lockupViewModel": ParseLockupViewModel
+            "shortsLockupViewModel": ParseShortsLockupViewModel
+            "tvBrowseRenderer": ParseTvBrowseRenderer
+            "tvSurfaceContentRenderer": ParseTvSurfaceContentRenderer
+            "tvSecondaryNavRenderer": ParseTvSecondaryNavRenderer
+            "tvSecondaryNavSectionRenderer": ParseTvSecondaryNavSectionRenderer
+            "tileRenderer": ParseTileRenderer
+            "gridRenderer": ParseGridRenderer
+            "richGridRenderer": ParseRichGridRenderer
+            "richItemRenderer": ParseRichItemRenderer
+            "continuationItemRenderer": ParseNotImplemented
+            ' Posts not yet supported
+            "postRenderer": ParseNotImplemented
+            ' a "View all posts" button
+            "buttonCardViewModel": ParseNotImplemented
+            ' to show chapters of a particular video in the search results
+            "horizontalCardListRenderer": ParseNotImplemented
+            ' expandableTabRenderer contains the search tab with a channel. Ignored.
+            "expandableTabRenderer": ParseNotImplemented
+
+        }
+    end function
+
+    function ParseTwoColumnSearchResultsRenderer(nodeData as object, context as object) as object
+        return nodeData["primaryContents"]
+    end function
+
+    function ParseTwoColumnBrowseResultsRenderer(nodeData as object, context as object) as object
+        return nodeData["tabs"]
+    end function
+
+    function ParseTabRenderer(nodeData as object, context as object) as object
+        selected = nodeData["selected"]
+        if not ValidBool(selected)
+            return invalid
+        end if
+
+        StartNewFeed(ParseText(nodeData["title"]), context)
+        return nodeData["content"]
+    end function
+
+    function ParseSectionListRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseItemSectionRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseShelfRenderer(nodeData as object, context as object) as object
+        ' TODO: handle shelfRenderer.title
+        ' TODO: handle shelfRenderer.headerRenderer.shelfHeaderRenderer.avatarLockup.avatarLockupRenderer.title
+        return nodeData["content"]
+    end function
+
+    function ParseReelShelfRenderer(nodeData as object, context as object) as object
+        ' TODO: handle reelShelfRenderer.title
+        return nodeData["items"]
+    end function
+
+    function ParseVerticalListRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
+    function ParseHorizontalListRenderer(nodeData as object, context as object) as object
+        ' TODO: handle continuations
+        return nodeData["items"]
+    end function
+
+    function ParseExpandedShelfContentsRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
+    function ParseChannelFeaturedContentRenderer(nodeData as object, context as object) as object
+        return nodeData["items"]
+    end function
+
+    function ParsePlaylistVideoListRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": videoThumbnails
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseGridVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": videoThumbnails
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseChannelVideoPlayerRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParsePlaylistVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": videoThumbnails
+            "index": ParseText(nodeData["index"]).ToInt()
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseChannelRenderer(nodeData as object, context as object) as object
+        channelId = nodeData["channelId"]
+        if not IsString(channelId)
+            LogWarn("Invalid channel ID", nodeData)
+            return invalid
+        end if
+
+        channel = {
+            "type": "channel"
+            "authorId": channelId
+            "author": ParseText(nodeData["title"])
+            "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(channel, context)
+        return invalid
+    end function
+
+    function ParseGridChannelRenderer(nodeData as object, context as object) as object
+        channelId = nodeData["channelId"]
+        if not IsString(channelId)
+            LogWarn("Invalid channel ID", nodeData)
+            return invalid
+        end if
+
+        channel = {
+            "type": "channel"
+            "authorId": channelId
+            "author": ParseText(nodeData["title"])
+            "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(channel, context)
+        return invalid
+    end function
+
+    function ParseLockupViewModel(nodeData as object, context as object) as object
+        contentType = ValidString(nodeData["contentType"])
+        if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
+            return LockupViewModelTypePlaylist(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
+            return LockupViewModelTypePodcast(nodeData, context)
+        end if
+
+        LogWarn("Unknown content type:", nodeData)
+        return invalid
+    end function
+
+    function LockupViewModelTypePlaylist(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": title
+            "playlistThumbnail": thumbnail
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function LockupViewModelTypePodcast(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": title
+            "playlistThumbnail": thumbnail
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseShortsLockupViewModel(nodeData as object, context as object) as object
+        videoId = ObjectUtils.Dig(nodeData, ["onTap", "innertubeCommand", "reelWatchEndpoint", "videoId"])
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "sources"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ObjectUtils.Dig(nodeData, ["overlayMetadata", "primaryText", "content"])
+            "videoThumbnails": videoThumbnails
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseTvBrowseRenderer(nodeData as object, context as object) as object
+        return nodeData["content"]
+    end function
+
+    function ParseTvSurfaceContentRenderer(nodeData as object, context as object) as object
+        ' TODO: handle tvSurfaceContentRenderer.continuation
+        return nodeData["content"]
+    end function
+
+    function ParseTvSecondaryNavRenderer(nodeData as object, context as object) as object
+        return nodeData["sections"]
+    end function
+
+    function ParseTvSecondaryNavSectionRenderer(nodeData as object, context as object) as object
+        return nodeData["tabs"]
+    end function
+
+    function ParseTileRenderer(nodeData as object, context as object) as object
+        contentType = ValidString(nodeData["contentType"])
+        if contentType = "TILE_CONTENT_TYPE_VIDEO"
+            return TileRendererTypeVideo(nodeData, context)
+        else if contentType = "TILE_CONTENT_TYPE_PLAYLIST"
+            return TileRendererTypePlaylist(nodeData, context)
+        end if
+
+        LogWarn("Unknown content type:", nodeData)
+        return invalid
+    end function
+
+    function TileRendererTypeVideo(nodeData as object, context as object) as object
+        videoId = nodeData["contentId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "videoThumbnails": videoThumbnails
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function TileRendererTypePlaylist(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseGridRenderer(nodeData as object, context as object) as object
+        ' TODO: handle gridRenderer.continuations
+        return nodeData["items"]
+    end function
+
+    function ParseRichGridRenderer(nodeData as object, context as object) as object
+        return nodeData["contents"]
+    end function
+
+    function ParseRichItemRenderer(nodeData as object, context as object) as object
+        return nodeData["content"]
+    end function
+
+    function ParseText(data as object) as string
+        if data = invalid
+            return ""
+        end if
+        if IsString(data)
+            return data
+        end if
+        if data.DoesExist("simpleText")
+            return data["simpleText"]
+        end if
+        if data.DoesExist("runs")
+            text = ""
+            for each _run in data["runs"]
+                text += _run["text"]
+            end for
+            return text
+        end if
+        return ""
+    end function
+
+    function StartNewFeed(title as string, context as object) as void
+        if context.currentFeed <> invalid
+            if context.currentFeed.items.Count() = 0 and context.currentFeed.title = ""
+                context.currentFeed.title = title
+                return
+            end if
+            context.feeds.Push(context.currentFeed)
+        end if
+        context.currentFeed = {
+            "title": title
+            "items": []
+        }
+    end function
+
+    function PushFeedItem(item as object, context as object) as void
+        if context.currentFeed = invalid
+            context.currentFeed = {
+                "title": ""
+                "items": []
+            }
+        end if
+        context.currentFeed.items.Push(item)
+    end function
+
+    function ParseNotImplemented(data as object, context as object) as object
+        return invalid
+    end function
+
+    function GenerateVideoThumbnails(videoId as string) as object
+        return [
+            {
+                "quality": "maxres"
+                "url": `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+                "width": 1280
+                "height": 720
+            }
+            {
+                "quality": "sddefault"
+                "url": `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`
+                "width": 640
+                "height": 480
+            }
+            {
+                "quality": "high"
+                "url": `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+                "width": 480
+                "height": 360
+            }
+            {
+                "quality": "medium"
+                "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+                "width": 320
+                "height": 180
+            }
+        ]
+    end function
+end namespace

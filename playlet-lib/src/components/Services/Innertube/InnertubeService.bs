@@ -1,17 +1,14 @@
+import "pkg:/components/Services/Innertube/BrowseEndpoint.bs"
+import "pkg:/components/Services/Innertube/Constants.bs"
+import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/NextEndpoint.bs"
+import "pkg:/components/Services/Innertube/OAuth.bs"
+import "pkg:/components/Services/Innertube/PlayerEndpoint.bs"
+import "pkg:/components/Services/Innertube/Search.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
-
-const INNERTUBE_IOS_CLIENT_NAME = "5"
-const INNERTUBE_IOS_CLIENT_VERSION = "19.09.3"
-const INNERTUBE_IOS_OS_VERSION = "15.6"
-const INNERTUBE_IOS_USER_AGENT = "com.google.ios.youtube/19.09.3 (iPhone14,3; U; CPU iOS 15_6 like Mac OS X)"
-
-const INNERTUBE_WEB_CLIENT_NAME = "1"
-const INNERTUBE_WEB_CLIENT_VERSION = "2.20241126.01.00"
-const INNERTUBE_WEB_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0"
-const INNERTUBE_WEB_BROWSER_NAME = "Chrome"
-const INNERTUBE_WEB_BROWSER_VERSION = "131.0.0.0"
 
 namespace InnertubeService
 
@@ -32,14 +29,14 @@ namespace InnertubeService
             end if
         end if
 
-        playerRequest = CreatePlayerRequest(videoId, ctt)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, ctt)
         playerRequest.Cancellation(cancellation)
         playerRequest.Send()
 
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = CreateNextRequest(videoId, ctt)
+            nextRequest = Innertube.CreateNextRequest(videoId, ctt)
             nextRequest.Cancellation(cancellation)
             nextRequest.Send()
         end if
@@ -49,14 +46,18 @@ namespace InnertubeService
             return playerResponse
         end if
 
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
+        end if
+
         if fetchNext
             nextResponse = nextRequest.Await()
         end if
 
-        parsedResponse = ParseInnertubePlayerResponse(playerResponse.Json())
+        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json())
 
         if fetchNext
-            parsedResponse = ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
+            parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
         end if
 
         if parsedResponse <> invalid
@@ -71,456 +72,202 @@ namespace InnertubeService
         return playerResponse
     end function
 
-    function CreatePlayerRequest(videoId as string, ctt as string) as object
-        deviceInfo = CreateObject("roDeviceInfo")
-
-        payload = {
-            "playbackContext": {
-                "contentPlaybackContext": {
-                    "vis": 0
-                    "splay": false
-                    "referer": "https://www.youtube.com/watch?v=" + videoId
-                    "currentUrl": "/watch?v=" + videoId
-                    "autonavState": "STATE_ON"
-                    "autoCaptionsDefaultOn": false
-                    "html5Preference": "HTML5_PREF_WANTS"
-                    "lactMilliseconds": "-1"
-                }
-            }
-            "attestationRequest": {
-                "omitBotguardData": true
-            }
-            "racyCheckOk": true
-            "contentCheckOk": true
-            "videoId": videoId
-            "context": {
-                "client": {
-                    "hl": "en"
-                    "gl": "US"
-                    "remoteHost": ""
-                    "screenDensityFloat": 1
-                    "screenHeightPoints": 1440
-                    "screenPixelDensity": 1
-                    "screenWidthPoints": 2560
-                    "visitorData": ""
-                    "clientName": "iOS"
-                    "clientVersion": INNERTUBE_IOS_CLIENT_VERSION
-                    "osName": "iOS"
-                    "osVersion": INNERTUBE_IOS_OS_VERSION
-                    "platform": "MOBILE"
-                    "clientFormFactor": "UNKNOWN_FORM_FACTOR"
-                    "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
-                    "timeZone": deviceInfo.GetTimeZone()
-                    "originalUrl": "https://www.youtube.com"
-                    "deviceMake": "Apple"
-                    "deviceModel": "iPhone10,6"
-                    "utcOffsetMinutes": -240
-                    "memoryTotalKbytes": "8000000"
-                }
-                "user": {
-                    "enableSafetyMode": false
-                    "lockedSafetyMode": false
-                }
-                "request": {
-                    "useSsl": true
-                    "internalExperimentFlags": []
-                }
-            }
-        }
-
-        if not StringUtils.IsNullOrEmpty(ctt)
-            payload["context"]["user"]["credentialTransferTokens"] = [{
-                "token": ctt
-                "scope": "VIDEO"
-            }]
+    function SearchSuggestions(q as string, cancellation = invalid as object) as object
+        suggestions = Innertube.SearchSuggestions(q, cancellation)
+        if suggestions = invalid
+            suggestions = []
         end if
-
-        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", FormatJson(payload))
-        request.Headers({
-            "accept": "*/*"
-            "accept-language": "*"
-            "content-type": "application/json"
-            "user-agent": INNERTUBE_IOS_USER_AGENT
-            "x-youtube-client-name": INNERTUBE_IOS_CLIENT_NAME
-            "x-youtube-client-version": INNERTUBE_IOS_CLIENT_VERSION
-        })
-
-        return request
-    end function
-
-    function CreateNextRequest(videoId as string, ctt as string) as object
-        deviceInfo = CreateObject("roDeviceInfo")
-
-        payload = {
-            "videoId": videoId
-            "context": {
-                "client": {
-                    "hl": "en"
-                    "gl": "US"
-                    "remoteHost": ""
-                    "screenDensityFloat": 1
-                    "screenHeightPoints": 1440
-                    "screenPixelDensity": 1
-                    "screenWidthPoints": 2560
-                    "visitorData": ""
-                    "clientName": "WEB"
-                    "clientVersion": INNERTUBE_WEB_CLIENT_VERSION
-                    "osName": "Windows"
-                    "osVersion": "10.0"
-                    "platform": "DESKTOP"
-                    "clientFormFactor": "UNKNOWN_FORM_FACTOR"
-                    "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
-                    "timeZone": deviceInfo.GetTimeZone()
-                    "originalUrl": "https://www.youtube.com"
-                    "deviceMake": ""
-                    "deviceModel": ""
-                    "browserName": INNERTUBE_WEB_BROWSER_NAME
-                    "browserVersion": INNERTUBE_WEB_BROWSER_VERSION
-                    "utcOffsetMinutes": -240
-                    "memoryTotalKbytes": "8000000"
-                    "mainAppWebInfo": {
-                        "graftUrl": "https://www.youtube.com"
-                        "pwaInstallabilityStatus": "PWA_INSTALLABILITY_STATUS_UNKNOWN"
-                        "webDisplayMode": "WEB_DISPLAY_MODE_BROWSER"
-                        "isWebNativeShareAvailable": true
-                    }
-                }
-                "user": {
-                    "enableSafetyMode": false
-                    "lockedSafetyMode": false
-                }
-                "request": {
-                    "useSsl": true
-                    "internalExperimentFlags": []
-                }
-            }
-        }
-
-        if not StringUtils.IsNullOrEmpty(ctt)
-            payload["context"]["user"]["credentialTransferTokens"] = [{
-                "token": ctt
-                "scope": "VIDEO"
-            }]
-        end if
-
-        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", FormatJson(payload))
-        request.Headers({
-            "accept": "*/*"
-            "accept-language": "*"
-            "content-type": "application/json"
-            "user-agent": INNERTUBE_WEB_USER_AGENT
-            "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
-            "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
-        })
-
-        return request
-    end function
-
-    function ParseInnertubePlayerResponse(payload as object) as object
-        if not IsAssociativeArray(payload)
-            return {
-                Success: false
-                Error: "Invalid payload"
-            }
-        end if
-
-        playabilityStatus = payload["playabilityStatus"]
-        if not IsAssociativeArray(playabilityStatus)
-            return {
-                Success: false
-                Error: "Invalid playability status"
-            }
-        end if
-
-        if playabilityStatus["status"] <> "OK"
-            errorMessage = ""
-            if IsString(playabilityStatus["reason"])
-                errorMessage = playabilityStatus["reason"]
-            end if
-
-            subreason = ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"])
-            if IsAssociativeArray(subreason)
-                subreasonText = ""
-                runs = subreason["runs"]
-                if IsArray(runs)
-                    for each rn in runs
-                        text = rn["text"]
-                        if IsString(text)
-                            subreasonText += text
-                        end if
-                    end for
-                end if
-                subreason = subreasonText
-            end if
-
-            if IsString(subreason)
-                errorMessage += `\n` + subreason
-            end if
-
-            if errorMessage = ""
-                errorMessage = "Video not available"
-            end if
-
-            return {
-                Success: false
-                Error: errorMessage
-            }
-        end if
-
-        videoDetails = payload["videoDetails"]
-        if not IsAssociativeArray(videoDetails)
-            return {
-                Success: false
-                Error: "Invalid video details"
-            }
-        end if
-
-        streamingData = payload["streamingData"]
-        if not IsAssociativeArray(streamingData)
-            return {
-                Success: false
-                Error: "Invalid streaming data"
-            }
-        end if
-
-        lengthSeconds = videoDetails["lengthSeconds"].ToInt()
-        videoInfo = {
-            "type": "video"
-            "title": videoDetails["title"]
-            "videoId": videoDetails["videoId"]
-            "videoThumbnails": videoDetails["thumbnail"]["thumbnails"]
-            "storyboards": ParseStoryboards(payload, lengthSeconds)
-            "viewCount": videoDetails["viewCount"].ToInt()
-            "author": videoDetails["author"]
-            "authorId": videoDetails["channelId"]
-            "lengthSeconds": lengthSeconds
-            "liveNow": ValidBool(videoDetails["isLive"])
-            "hlsUrl": streamingData["hlsManifestUrl"]
-            "adaptiveFormats": []
-            "formatStreams": []
-            "captions": ParseCaptions(payload)
-            "recommendedVideos": []
-        }
-
-        return {
-            Success: true
-            Metadata: videoInfo
-        }
-    end function
-
-    function ParseStoryboards(payload as object, lengthSeconds as integer) as object
-        storyboard = ObjectUtils.Dig(payload, ["storyboards", "playerLiveStoryboardSpecRenderer", "spec"])
-        if IsString(storyboard)
-            storyboard = storyboard.Split("#")
-            if storyboard.Count() <> 5
-                return []
-            end if
-            return [{
-                "templateUrl": storyboard[0]
-                "width": storyboard[1].ToInt()
-                "height": storyboard[2].ToInt()
-                "count": -1
-                "interval": 5000
-                "storyboardHeight": storyboard[3].ToInt()
-                "storyboardWidth": storyboard[4].ToInt()
-            }]
-        end if
-
-        storyboards = ObjectUtils.Dig(payload, ["storyboards", "playerStoryboardSpecRenderer", "spec"])
-        if not IsString(storyboards)
-            return []
-        end if
-
-        storyboardsData = storyboards.Split("|")
-        if storyboardsData.Count() < 2
-            return []
-        end if
-
-        baseUrl = storyboardsData.Shift()
-        storyboards = []
-
-        index = 0
-        for each sb in storyboardsData
-            sbData = sb.Split("#")
-            if sbData.Count() <> 8
-                index += 1
-                continue for
-            end if
-
-            width = sbData[0].ToInt()
-            height = sbData[1].ToInt()
-            _count = sbData[2].ToInt()
-            columns = sbData[3].ToInt()
-            rows = sbData[4].ToInt()
-            interval = sbData[5].ToInt()
-            name = sbData[6]
-            sigh = sbData[7]
-
-            url = baseUrl
-            url = url.Replace("$L", `${index}`)
-            url = url.Replace("$N", name)
-
-            queryComponents = UrlUtils.ParseQueryComponents(url)
-            queryComponents["sigh"] = sigh.DecodeUriComponent()
-            url = UrlUtils.SetQueryParams(url, queryComponents)
-
-            thumbnailsPerImage = columns * rows
-            imagesCount = _count \ thumbnailsPerImage
-            if _count mod thumbnailsPerImage > 0
-                imagesCount += 1
-            end if
-
-            if interval = 0 and _count > 0
-                interval = Cint(Cdbl(lengthSeconds) * 1000.0 / Cdbl(_count))
-            end if
-
-            storyboards.Push({
-                "templateUrl": url
-                "width": width
-                "height": height
-                "count": _count
-                "interval": interval
-                "storyboardWidth": columns
-                "storyboardHeight": rows
-                "storyboardCount": imagesCount
-            })
-            index += 1
-        end for
-
-        return storyboards
-    end function
-
-    function ParseCaptions(payload as object) as object
-        tracks = ObjectUtils.Dig(payload, ["captions", "playerCaptionsTracklistRenderer", "captionTracks"])
-        if not IsArray(tracks)
-            return []
-        end if
-
-        captions = []
-        for each track in tracks
-            if not IsAssociativeArray(track)
-                continue for
-            end if
-
-            baseUrl = track["baseUrl"]
-            if not IsString(baseUrl)
-                continue for
-            end if
-
-            queryComponents = UrlUtils.ParseQueryComponents(baseUrl)
-            queryComponents["fmt"] = "vtt"
-            baseUrl = UrlUtils.SetQueryParams(baseUrl, queryComponents)
-
-            languageCode = track["languageCode"]
-            if not IsString(languageCode)
-                continue for
-            end if
-
-            label = ""
-            name = track["name"]
-            if IsAssociativeArray(name)
-                runs = name["runs"]
-                if IsArray(runs)
-                    for each rn in runs
-                        text = rn["text"]
-                        if IsString(text)
-                            label += text
-                        end if
-                    end for
-                end if
-            end if
-
-            captions.Push({
-                "label": label
-                "language_code": languageCode
-                "url": baseUrl
-            })
-        end for
-
-        return captions
-    end function
-
-    function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object
-        if not parsedResponse.Success
-            LogWarn("Invalid parsed response", parsedResponse)
-            return parsedResponse
-        end if
-
-        if not IsArray(parsedResponse.Metadata.recommendedVideos)
-            LogWarn("Invalid recommended videos", parsedResponse.Metadata.recommendedVideos)
-            return parsedResponse
-        end if
-
-        if not IsAssociativeArray(payload)
-            LogWarn("Invalid payload", payload)
-            return parsedResponse
-        end if
-
-        endScreenVideos = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen", "watchNextEndScreenRenderer", "results"])
-        if not IsArray(endScreenVideos)
-            LogWarn("Invalid end screen videos", endScreenVideos)
-            return parsedResponse
-        end if
-
-        for each video in endScreenVideos
-            videoId = ObjectUtils.Dig(video, ["endScreenVideoRenderer", "videoId"])
-            if videoId = invalid
-                LogWarn("Invalid video ID in end screen video", video)
-                continue for
-            end if
-
-            title = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "title", "simpleText"]))
-            author = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "shortBylineText", "runs", 0, "text"]))
-
-            parsedResponse.Metadata.recommendedVideos.Push({
-                "type": "video"
-                "videoId": videoId
-                "title": title
-                "author": author
-            })
-        end for
-
-        return parsedResponse
-    end function
-
-    function GetSearchSuggestions(q as string, cancellation = invalid as object) as object
-        request = HttpClient.Get("https://suggestqueries.google.com/complete/search?hl=en&gl=US&ds=yt&client=youtube&xssi=t&oe=UTF&q=" + q.EncodeUriComponent())
-        request.Headers({
-            "user-agent": INNERTUBE_WEB_USER_AGENT
-        })
-        request.CacheSeconds(60 * 60 * 24)
-        request.Cancellation(cancellation)
-
-        response = request.Await()
-        if not response.IsSuccess()
-            return {
-                suggestions: []
-            }
-        end if
-
-        text = response.Text()
-        text = text.Replace(`)]}'`, "")
-
-        parsed = ParseJson(text)
-        if not IsArray(parsed) or parsed.Count() < 2
-            return {
-                suggestions: []
-            }
-        end if
-        parsed = parsed[1]
-
-        suggestions = []
-        for each suggestion in parsed
-            s = suggestion[0]
-            if not IsString(s)
-                continue for
-            end if
-
-            suggestions.Push(s)
-        end for
 
         return {
             suggestions: suggestions
         }
     end function
+
+    function Search(query as string, cancellation = invalid as object) as object
+        return Innertube.Search(query, cancellation)
+    end function
+
+    function GetTrending(options = invalid as object) as object
+        cancellation = invalid
+        params = ""
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("type")
+                trendingType = LCase(ValidString(options.type))
+
+                if trendingType = "music"
+                    params = "4gINGgt5dG1hX2NoYXJ0cw%3D%3D"
+                else if trendingType = "gaming"
+                    params = "4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D"
+                else if trendingType = "movies"
+                    params = "4gIKGgh0cmFpbGVycw%3D%3D"
+                end if
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, params)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParseResponse(json)
+    end function
+
+    function GetHome(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEwhat_to_watch", options)
+    end function
+
+    function GetSubscriptions(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEsubscriptions", options)
+    end function
+
+    function GetWatchHistory(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEhistory", options)
+    end function
+
+    function GetPlaylists(options = invalid as object) as object
+        return GetBrowseAuthenticatedPage("FEplaylist_aggregation", options)
+    end function
+
+    function GetBrowseAuthenticatedPage(browserId as string, options = invalid as object) as object
+        cancellation = invalid
+        access_token = invalid
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("access_token")
+                access_token = options.access_token
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, "")
+        if access_token <> invalid
+            request.Header("Authorization", "Bearer " + access_token)
+        end if
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParseResponse(json)
+    end function
+
+    function GetChannel(channelId as string, options = invalid as object) as object
+        cancellation = invalid
+        params = ""
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("params")
+                params = options.params
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, params)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParseChannelPageResponse(json)
+    end function
+
+    function GetPlaylist(playlistId as string, options = invalid as object) as object
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        if not playlistId.StartsWith("VL")
+            playlistId = "VL" + playlistId
+        end if
+
+        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "")
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return Innertube.ParsePlaylistPageResponse(json)
+    end function
+
+    function AuthGetCode(cancellation = invalid as object) as object
+        result = Innertube.GetClientIdentity(cancellation)
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
+        end if
+
+        result2 = Innertube.GetDeviceAndUserCode(result.client_id, cancellation)
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return invalid
+        end if
+
+        result.Append(result2)
+        return result
+    end function
+
+    function AuthGetActivationUrl(code as object) as string
+        return `https://www.youtube.com/tv/activate?user_code=${code.user_code}`
+    end function
+
+    function AuthPollForAccessToken(code as object, cancellation = invalid as object) as object
+        return Innertube.PollForAccessToken(code, code, cancellation)
+    end function
+
+    function AuthRefreshAccessTokenIfNeeded(accessToken as object, cancellation = invalid as object) as boolean
+        if not IsAssociativeArray(accessToken)
+            return false
+        end if
+
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        expiresTimestamp = accessToken["expires_timestamp"]
+
+        if expiresTimestamp = invalid or expiresTimestamp < nowSeconds
+            refreshed = Innertube.RefreshAccessToken(accessToken, cancellation)
+
+            if IsAssociativeArray(refreshed) and refreshed.DoesExist("access_token")
+                accessToken.Append(refreshed)
+                if accessToken.DoesExist("expires_in")
+                    accessToken["expires_timestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expires_in"]
+                end if
+                return true
+            end if
+        end if
+
+        return false
+    end function
+
+    function AuthRevokeAccessToken(accessToken as object, cancellation = invalid as object) as boolean
+        if not IsAssociativeArray(accessToken)
+            return false
+        end if
+
+        return Innertube.RevokeAccessToken(accessToken["access_token"], cancellation)
+    end function
+
 end namespace
