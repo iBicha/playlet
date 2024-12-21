@@ -164,6 +164,19 @@ namespace Innertube
             end if
         end if
 
+        liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
+        if not liveNow
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    if ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE"
+                        liveNow = true
+                        exit for
+                    end if
+                end for
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
@@ -172,6 +185,7 @@ namespace Innertube
             "viewCountText": viewCountText
             "publishedText": publishedText
             "lengthText": lengthText
+            "liveNow": liveNow
         }
 
         if author <> ""
