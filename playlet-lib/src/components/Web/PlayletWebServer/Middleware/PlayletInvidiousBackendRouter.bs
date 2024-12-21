@@ -145,16 +145,24 @@ namespace Http
                 response.Json(channel)
                 return true
             else if channelAndTab.Count() = 2
-                ' channelId = channelAndTab[0]
+                channelId = channelAndTab[0]
                 _tab = channelAndTab[1]
+
+                params = ValidString(request.query.params)
+
+                channel = InnertubeService.GetChannel(channelId, { "params": params })
+                if channel = invalid
+                    response.Default(500, "Failed to get channel")
+                    return true
+                end if
 
                 if _tab = "playlists" or _tab = "podcasts" or _tab = "releases"
                     response.Json({
-                        playlists: []
+                        "playlists": channel.items
                     })
                 else
                     response.Json({
-                        videos: []
+                        "videos": channel.items
                     })
                 end if
 

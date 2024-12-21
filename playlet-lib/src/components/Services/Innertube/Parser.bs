@@ -1,4 +1,6 @@
 import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 namespace Innertube
 
@@ -13,7 +15,7 @@ namespace Innertube
         end if
 
         context = {
-            directives: GetParsingDirectives()
+            directives: Innertube.GetParsingDirectives()
 
             feeds: []
             currentFeed: {
@@ -22,7 +24,7 @@ namespace Innertube
             }
         }
 
-        ParseNode(data, context)
+        Innertube.ParseNode(data, context)
 
         if context.currentFeed <> invalid and (context.currentFeed.items.Count() > 0 or context.currentFeed.title <> "")
             context.feeds.Push(context.currentFeed)
@@ -87,12 +89,53 @@ namespace Innertube
             end if
         end if
 
+        tabsNames = []
+        tabsParams = {}
+
+        tabs = ObjectUtils.Dig(responseData, ["contents", "twoColumnBrowseResultsRenderer", "tabs"])
+        if tabs <> invalid
+            for each t in tabs
+                tabRenderer = t["tabRenderer"]
+                if tabRenderer = invalid
+                    continue for
+                end if
+
+                tabName = ObjectUtils.Dig(tabRenderer, ["endpoint", "commandMetadata", "webCommandMetadata", "url"])
+                if tabName = invalid
+                    continue for
+                end if
+                tabName = tabName.Split("?")[0]
+                tabName = tabName.Split("/")
+                tabName = tabName[tabName.Count() - 1]
+                if StringUtils.IsNullOrEmpty(tabName)
+                    continue for
+                end if
+
+                tabParams = ObjectUtils.Dig(tabRenderer, ["endpoint", "browseEndpoint", "params"])
+                if tabParams = invalid
+                    continue for
+                end if
+
+                tabsNames.Push(tabName)
+                tabsParams[tabName] = tabParams
+            end for
+        end if
+
+        items = []
+        feeds = ParseResponse(responseData)
+        if feeds.Count() > 0
+            items = ValidArray(feeds[0].items)
+        end if
+
         return {
             "author": title
             "authorId": ucid
             "authorThumbnails": thumbnails
             "authorBanners": banners
             "authorSubTitle": authorSubTitle
+            "tabs": tabsNames
+            "tabsParams": tabsParams
+            "items": items
         }
     end function
 
