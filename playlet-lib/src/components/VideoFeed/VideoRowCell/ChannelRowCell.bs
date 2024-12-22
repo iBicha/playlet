@@ -1,3 +1,5 @@
+import "pkg:/source/utils/StringUtils.bs"
+
 function OnContentSet() as void
     content = m.top.itemContent
 
@@ -7,7 +9,21 @@ function OnContentSet() as void
 
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
     m.top._author = content._author
-    m.top.subCountText = content.subCountText
+    subCountText = content.authorSubTitle
+    if StringUtils.IsNullOrEmpty(subCountText)
+        if content.subCount > 0
+            subCountText = content.subCountText
+            if StringUtils.IsNullOrEmpty(subCountText)
+                subCountText = content.videoCountText
+            end if
+        else
+            subCountText = content.videoCountText
+            if StringUtils.IsNullOrEmpty(subCountText)
+                subCountText = content.subCountText
+            end if
+        end if
+    end if
+    m.top.subCountText = subCountText
     m.top.channelHandle = content.channelHandle
     m.top.thumbnail = content.thumbnail
 end function

@@ -47,6 +47,7 @@ namespace Innertube
             "playlistVideoRenderer": ParsePlaylistVideoRenderer
             "channelRenderer": ParseChannelRenderer
             "gridChannelRenderer": ParseGridChannelRenderer
+            "playlistRenderer": ParsePlaylistRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
             "tvBrowseRenderer": ParseTvBrowseRenderer
@@ -135,6 +136,32 @@ namespace Innertube
             return invalid
         end if
 
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["ownerText", "shortBylineText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+        if StringUtils.IsNullOrEmpty(author) and StringUtils.IsNullOrEmpty(authorId)
+            if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+                author = context.currentAuthor
+                authorId = context.currentAuthorId
+            end if
+        end if
+
+        viewCountText = ParseText(nodeData["shortViewCountText"])
+        if viewCountText = ""
+            viewCountText = ParseText(nodeData["viewCountText"])
+        end if
+
+        publishedText = ParseText(nodeData["publishedTimeText"])
+        lengthText = ParseText(nodeData["lengthText"])
+
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
         else
@@ -144,12 +171,50 @@ namespace Innertube
             end if
         end if
 
+        liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
+        if not liveNow
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    if ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE"
+                        liveNow = true
+                        exit for
+                    end if
+                end for
+            end if
+        end if
+
+        isUpcoming = false
+        premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
+        if IsString(premiereTimestamp)
+            premiereTimestamp = premiereTimestamp.ToInt()
+            isUpcoming = true
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
+            "author": author
+            "authorId": authorId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": videoThumbnails
+            "viewCountText": viewCountText
+            "publishedText": publishedText
+            "lengthText": lengthText
+            "liveNow": liveNow
         }
+
+        if author <> ""
+            video["author"] = author
+        end if
+        if authorId <> invalid
+            video["authorId"] = authorId
+        end if
+
+        if isUpcoming
+            video["isUpcoming"] = true
+            video["premiereTimestamp"] = premiereTimestamp
+        end if
 
         PushFeedItem(video, context)
         return invalid
@@ -162,6 +227,44 @@ namespace Innertube
             return invalid
         end if
 
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["ownerText", "shortBylineText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+        if StringUtils.IsNullOrEmpty(author) and StringUtils.IsNullOrEmpty(authorId)
+            if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+                author = context.currentAuthor
+                authorId = context.currentAuthorId
+            end if
+        end if
+
+        viewCountText = ParseText(nodeData["shortViewCountText"])
+        if viewCountText = ""
+            viewCountText = ParseText(nodeData["viewCountText"])
+        end if
+
+        publishedText = ParseText(nodeData["publishedTimeText"])
+
+        lengthText = ParseText(nodeData["lengthText"])
+        if lengthText = ""
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    lengthText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
+                    if lengthText <> ""
+                        exit for
+                    end if
+                end for
+            end if
+        end if
+
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
         else
@@ -171,12 +274,29 @@ namespace Innertube
             end if
         end if
 
+        isUpcoming = false
+        premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
+        if IsString(premiereTimestamp)
+            premiereTimestamp = premiereTimestamp.ToInt()
+            isUpcoming = true
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
+            "author": author
+            "authorId": authorId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": videoThumbnails
+            "publishedText": publishedText
+            "viewCountText": viewCountText
+            "lengthText": lengthText
         }
+
+        if isUpcoming
+            video["isUpcoming"] = true
+            video["premiereTimestamp"] = premiereTimestamp
+        end if
 
         PushFeedItem(video, context)
         return invalid
@@ -189,11 +309,22 @@ namespace Innertube
             return invalid
         end if
 
+        author = invalid
+        authorId = invalid
+        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
+            "author": author
+            "authorId": authorId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": GenerateVideoThumbnails(videoId)
+            "viewCountText": ParseText(nodeData["viewCountText"])
+            "publishedText": ParseText(nodeData["publishedTimeText"])
         }
 
         PushFeedItem(video, context)
@@ -207,6 +338,21 @@ namespace Innertube
             return invalid
         end if
 
+        lengthText = ParseText(nodeData["lengthText"])
+        lengthSeconds = ValidString(nodeData["lengthSeconds"]).ToInt()
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
         else
@@ -219,9 +365,13 @@ namespace Innertube
         video = {
             "type": "video"
             "videoId": videoId
+            "author": author
+            "authorId": authorId
             "title": ParseText(nodeData["title"])
             "videoThumbnails": videoThumbnails
             "index": ParseText(nodeData["index"]).ToInt()
+            "lengthText": lengthText
+            "lengthSeconds": lengthSeconds
         }
 
         PushFeedItem(video, context)
@@ -240,6 +390,8 @@ namespace Innertube
             "authorId": channelId
             "author": ParseText(nodeData["title"])
             "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "subCountText": ParseText(nodeData["subscriberCountText"])
+            "videoCountText": ParseText(nodeData["videoCountText"])
         }
 
         PushFeedItem(channel, context)
@@ -258,9 +410,61 @@ namespace Innertube
             "authorId": channelId
             "author": ParseText(nodeData["title"])
             "authorThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            "subCountText": ParseText(nodeData["subscriberCountText"])
+            "videoCountText": ParseText(nodeData["videoCountText"])
         }
 
         PushFeedItem(channel, context)
+        return invalid
+    end function
+
+    function ParsePlaylistRenderer(nodeData as object, context as object) as object
+        playlistId = nodeData["playlistId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
+        videoCountText = ""
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                videoCountText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayBottomPanelRenderer", "text"]))
+                if videoCountText <> ""
+                    exit for
+                end if
+            end for
+        end if
+        if videoCountText = ""
+            videoCountText = ParseText(nodeData["videoCountText"])
+        end if
+
+        videoCount = ParseText(nodeData["videoCount"]).ToInt()
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(nodeData["title"])
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["thumbnails", 0, "thumbnails", 0, "url"])
+            "author": author
+            "authorId": authorId
+            "videoCount": videoCount
+            "videoCountText": videoCountText
+        }
+
+        PushFeedItem(playlist, context)
         return invalid
     end function
 
@@ -270,9 +474,11 @@ namespace Innertube
             return LockupViewModelTypePlaylist(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
             return LockupViewModelTypePodcast(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_ALBUM"
+            return LockupViewModelTypeAlbum(nodeData, context)
         end if
 
-        LogWarn("Unknown content type:", nodeData)
+        LogWarn("Unknown content type:", contentType, `\n`, nodeData)
         return invalid
     end function
 
@@ -286,13 +492,31 @@ namespace Innertube
         metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
 
         title = ObjectUtils.Dig(metadata, ["title", "content"])
-        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
+        thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
+        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+
+        author = invalid
+        authorId = invalid
+
+        maybeAuthorNode = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel", "metadata", "contentMetadataViewModel", "metadataRows", 0, "metadataParts", 0, "text"])
+        maybeAuthorId = ObjectUtils.Dig(maybeAuthorNode, ["commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+        if IsString(maybeAuthorId) and maybeAuthorId.StartsWith("UC")
+            authorId = maybeAuthorId
+            author = ValidString(maybeAuthorNode["content"])
+        else if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
 
         playlist = {
             "type": "playlist"
             "playlistId": playlistId
             "title": title
+            "author": author
+            "authorId": authorId
             "playlistThumbnail": thumbnail
+            "videoCountText": videoCountText
         }
 
         PushFeedItem(playlist, context)
@@ -309,13 +533,60 @@ namespace Innertube
         metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
 
         title = ObjectUtils.Dig(metadata, ["title", "content"])
-        thumbnail = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel", "image", "sources", 0, "url"])
+        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
+        thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
+        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+
+        author = invalid
+        authorId = invalid
+        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
 
         playlist = {
             "type": "playlist"
             "playlistId": playlistId
             "title": title
+            "author": author
+            "authorId": authorId
             "playlistThumbnail": thumbnail
+            "videoCountText": videoCountText
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function LockupViewModelTypeAlbum(nodeData as object, context as object) as object
+        playlistId = nodeData["contentId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
+        thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
+        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+
+        author = invalid
+        authorId = invalid
+        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": title
+            "author": author
+            "authorId": authorId
+            "playlistThumbnail": thumbnail
+            "videoCountText": videoCountText
         }
 
         PushFeedItem(playlist, context)
@@ -338,11 +609,20 @@ namespace Innertube
             end if
         end if
 
+        author = invalid
+        authorId = invalid
+        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
 
         video = {
             "type": "video"
             "videoId": videoId
+            "author": author
+            "authorId": authorId
             "title": ObjectUtils.Dig(nodeData, ["overlayMetadata", "primaryText", "content"])
+            "viewCountText": ObjectUtils.Dig(nodeData, ["overlayMetadata", "secondaryText", "content"])
             "videoThumbnails": videoThumbnails
         }
 
@@ -375,7 +655,7 @@ namespace Innertube
             return TileRendererTypePlaylist(nodeData, context)
         end if
 
-        LogWarn("Unknown content type:", nodeData)
+        LogWarn("Unknown content type:", contentType, `\n`, nodeData)
         return invalid
     end function
 

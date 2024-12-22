@@ -40,7 +40,7 @@ namespace InvidiousContent
         SetIfExists(node, "_author", item, "author")
         SetIfExists(node, "authorId", item, "authorId")
         SetIfExists(node, "lengthSeconds", item, "lengthSeconds")
-        node.lengthText = TimeUtils.GetFormattedTime(item.lengthSeconds)
+        node.lengthText = VideoGetLengthText(item)
         node.liveNow = VideoIsLive(item)
         VideoSetPremiereTimestampText(node, item)
         node.publishedText = VideoGetPublishedText(item)
@@ -75,6 +75,7 @@ namespace InvidiousContent
         node.viewCountText = PlaylistGetViewCountText(item)
         SetIfExists(node, "updated", item, "updated")
         node.updatedText = PlaylistGetUpdatedText(item)
+        SetIfExists(node, "statsText", item, "statsText")
 
         if item.videos <> invalid
             childCount = node.getChildCount()
@@ -116,6 +117,7 @@ namespace InvidiousContent
         SetIfExists(node, "channelHandle", item, "channelHandle")
         SetIfExists(node, "description", item, "description")
         SetIfExists(node, "subCount", item, "subCount")
+        SetIfExists(node, "authorSubTitle", item, "authorSubTitle")
         node.subCountText = GetChannelSubCountText(item)
         SetIfExists(node, "videoCount", item, "videoCount")
         node.videoCountText = GetVideoCountText(item)
@@ -232,6 +234,11 @@ namespace InvidiousContent
     end function
 
     function VideoGetViewCountText(videoItem as object) as string
+        viewCountText = videoItem.viewCountText
+        if not StringUtils.IsNullOrEmpty(viewCountText)
+            return viewCountText
+        end if
+
         viewCount = videoItem.viewCount
         if viewCount = invalid
             return ""
@@ -285,6 +292,9 @@ namespace InvidiousContent
     end function
 
     function GetVideoCountText(item as object) as string
+        if not StringUtils.IsNullOrEmpty(item.videoCountText)
+            return item.videoCountText
+        end if
         videoCount = ValidInt(item.videoCount)
         return LocaleUtils.GetPluralString(videoCount, Locale.RowCell.ZeroVideos, Locale.RowCell.OneVideo, Locale.RowCell.NVideos)
     end function
@@ -354,6 +364,13 @@ namespace InvidiousContent
         else
             return Tr(Locale.RowCell.OneMinuteAgo)
         end if
+    end function
+
+    function VideoGetLengthText(videoItem as object) as string
+        if not StringUtils.IsNullOrEmpty(videoItem.lengthText)
+            return videoItem.lengthText
+        end if
+        return TimeUtils.GetFormattedTime(videoItem.lengthSeconds)
     end function
 
     function PlaylistGetUpdatedText(playlistItem as object) as string

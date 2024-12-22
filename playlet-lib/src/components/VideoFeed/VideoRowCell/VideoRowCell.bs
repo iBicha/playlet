@@ -23,19 +23,22 @@ function OnContentSet() as void
 
     if content.isUpcoming = true
         m.top.viewCountDate = content.premiereTimestampText
-    else if not StringUtils.IsNullOrEmpty(content.publishedText)
-        label = content.publishedText
-        if not StringUtils.IsNullOrEmpty(content.viewCountText)
-            label = `${label} • ${content.viewCountText}`
-        end if
-        m.top.viewCountDate = label
     else
-        m.top.viewCountDate = ""
+        publishedText = content.publishedText
+        viewCountText = content.viewCountText
+
+        label = publishedText
+        if publishedText.Len() > 0 and viewCountText.Len() > 0
+            label += " • "
+        end if
+        label += viewCountText
+
+        m.top.viewCountDate = label
     end if
 
     m.top.thumbnailUri = content.thumbnail
 
-    if ValidInt(content.lengthSeconds) <> 0
+    if not StringUtils.IsNullOrEmpty(content.lengthText)
         SetDurationLabel(content.lengthText, "#161616FF", 0.8, m.smallestSystemFont)
         m.top.durationRectVisible = true
     else

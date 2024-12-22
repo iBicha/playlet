@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Built-in Playlet backend, which supports channels, playlists, and search
-  - This backend is not finished, and provides the bare minimum to watch videos.
-  - More features to come.
+  - This backend is experimental, and has a few missing features.
+  - To use it, set the Invidious instance to an empty string.
 
 ### Fixed
 

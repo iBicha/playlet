@@ -4,7 +4,7 @@ import "pkg:/source/utils/StringUtils.bs"
 
 namespace Innertube
 
-    function ParseResponse(responseData as object) as object
+    function ParseResponse(responseData as object, context = invalid as object) as object
         if responseData = invalid
             return []
         end if
@@ -14,7 +14,11 @@ namespace Innertube
             return []
         end if
 
-        context = {
+        if context = invalid
+            context = {}
+        end if
+
+        context.Append({
             directives: Innertube.GetParsingDirectives()
 
             feeds: []
@@ -23,7 +27,7 @@ namespace Innertube
                 items: []
             }
             generateVideoThumbnails: true
-        }
+        })
 
         Innertube.ParseNode(data, context)
 
@@ -46,7 +50,8 @@ namespace Innertube
             }
         end if
 
-        title = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "title"])
+        author = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "title"])
+        authorId = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "externalId"])
 
         thumbnails = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "avatar", "thumbnails"])
         if thumbnails = invalid
@@ -59,7 +64,6 @@ namespace Innertube
             end if
         end if
 
-        ucid = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "externalId"])
         banners = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "content", "pageHeaderViewModel", "banner", "imageBannerViewModel", "image", "sources"])
         if banners = invalid
             banners = []
@@ -123,14 +127,14 @@ namespace Innertube
         end if
 
         items = []
-        feeds = ParseResponse(responseData)
+        feeds = ParseResponse(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
         end if
 
         return {
-            "author": title
-            "authorId": ucid
+            "author": author
+            "authorId": authorId
             "authorThumbnails": thumbnails
             "authorBanners": banners
             "authorSubTitle": authorSubTitle
@@ -155,19 +159,40 @@ namespace Innertube
         playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
 
         primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
-        ' secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
+        secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
 
+        playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
         title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
         description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
         videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
         thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
 
+        author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
+        authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
+
+        statsText = ""
+        stats = ObjectUtils.Dig(primaryInfo, ["stats"])
+        if IsArray(stats)
+            statsTexts = []
+            for each stat in stats
+                statText = ParseText(stat)
+                if statText <> ""
+                    statsTexts.Push(statText)
+                end if
+            end for
+            statsText = statsTexts.Join(" • ")
+        end if
+
         playlist = {
+            "playlistId": playlistId
             "title": title
+            "author": author
+            "authorId": authorId
             "description": description
             "videoCount": videoCount
             "thumbnail": thumbnail
             "videos": []
+            "statsText": statsText
         }
 
         feeds = ParseResponse(responseData)
