@@ -2,6 +2,7 @@
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
+'import "pkg:/source/utils/Locale.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
@@ -19,6 +20,7 @@ function MainSceneContainerChanged()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
     CopyLoadingMessagesToCache()
+    ShowAnnouncement()
 end function
 
 function StartWebServer()
@@ -28,5 +30,27 @@ function StartWebServer()
     m.webServer.callfunc("StartServer", invalid)
     m.dialServer = m.top.findNode("DialServer")
     m.dialServer.callfunc("StartServer", invalid)
+end function
+
+function ShowAnnouncement()
+    title = "Announcement - Playlet backend"
+    message = [
+        "An experimental backend has been implemented for Playlet."
+        "This allows you to access YouTube content without the need for an Invidious instance."
+        "To use it, go to the settings set the Invidious Instance field to empty."
+        "Please note that it's missing some features and may not work as expected."
+        "Thank you for using Playlet!"
+    ]
+    buttons = [
+        Tr("OK")
+    ]
+    dialog = CreateObject("roSGNode", "SimpleDialog")
+    dialog.title = title
+    dialog.message = message
+    dialog.buttons = buttons
+    deviceInfo = CreateObject("roDeviceInfo")
+    displaySize = deviceInfo.GetDisplaySize()
+    dialog.width = displaySize.w - 180
+    m.top.getScene().dialog = dialog
 end function
 '//# sourceMappingURL=./MainScene.brs.map
