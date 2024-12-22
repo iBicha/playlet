@@ -166,12 +166,26 @@ namespace Innertube
         videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
         thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
 
+        statsText = ""
+        stats = ObjectUtils.Dig(primaryInfo, ["stats"])
+        if IsArray(stats)
+            statsTexts = []
+            for each stat in stats
+                statText = ParseText(stat)
+                if statText <> ""
+                    statsTexts.Push(statText)
+                end if
+            end for
+            statsText = statsTexts.Join(" • ")
+        end if
+
         playlist = {
             "title": title
             "description": description
             "videoCount": videoCount
             "thumbnail": thumbnail
             "videos": []
+            "statsText": statsText
         }
 
         feeds = ParseResponse(responseData)
