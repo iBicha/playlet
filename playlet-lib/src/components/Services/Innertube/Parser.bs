@@ -159,12 +159,16 @@ namespace Innertube
         playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
 
         primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
-        ' secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
+        secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
 
+        playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
         title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
         description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
         videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
         thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
+
+        author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
+        authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
 
         statsText = ""
         stats = ObjectUtils.Dig(primaryInfo, ["stats"])
@@ -180,7 +184,10 @@ namespace Innertube
         end if
 
         playlist = {
+            "playlistId": playlistId
             "title": title
+            "author": author
+            "authorId": authorId
             "description": description
             "videoCount": videoCount
             "thumbnail": thumbnail

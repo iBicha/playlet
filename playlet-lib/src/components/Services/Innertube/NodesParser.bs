@@ -184,6 +184,13 @@ namespace Innertube
             end if
         end if
 
+        isUpcoming = false
+        premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
+        if IsString(premiereTimestamp)
+            premiereTimestamp = premiereTimestamp.ToInt()
+            isUpcoming = true
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
@@ -202,6 +209,11 @@ namespace Innertube
         end if
         if authorId <> invalid
             video["authorId"] = authorId
+        end if
+
+        if isUpcoming
+            video["isUpcoming"] = true
+            video["premiereTimestamp"] = premiereTimestamp
         end if
 
         PushFeedItem(video, context)
@@ -262,6 +274,13 @@ namespace Innertube
             end if
         end if
 
+        isUpcoming = false
+        premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
+        if IsString(premiereTimestamp)
+            premiereTimestamp = premiereTimestamp.ToInt()
+            isUpcoming = true
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
@@ -273,6 +292,11 @@ namespace Innertube
             "viewCountText": viewCountText
             "lengthText": lengthText
         }
+
+        if isUpcoming
+            video["isUpcoming"] = true
+            video["premiereTimestamp"] = premiereTimestamp
+        end if
 
         PushFeedItem(video, context)
         return invalid
@@ -474,7 +498,13 @@ namespace Innertube
 
         author = invalid
         authorId = invalid
-        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+
+        maybeAuthorNode = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel", "metadata", "contentMetadataViewModel", "metadataRows", 0, "metadataParts", 0, "text"])
+        maybeAuthorId = ObjectUtils.Dig(maybeAuthorNode, ["commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+        if IsString(maybeAuthorId) and maybeAuthorId.StartsWith("UC")
+            authorId = maybeAuthorId
+            author = ValidString(maybeAuthorNode["content"])
+        else if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
             author = context.currentAuthor
             authorId = context.currentAuthorId
         end if
