@@ -35,9 +35,9 @@ end function
 function ShowAnnouncement()
     title = "Announcement - Playlet backend"
     message = [
-        "An experimental backend has been implemented for Playlet."
+        "An experimental built-in backend has been added to Playlet."
         "This allows you to access YouTube content without the need for an Invidious instance."
-        "To use it, go to the settings set the Invidious Instance field to empty."
+        "To use it, go to the Settings > Invidious > Instance and set the field to empty (Edit, and delete the url)."
         "Please note that it's missing some features and may not work as expected."
         "Thank you for using Playlet!"
     ]
