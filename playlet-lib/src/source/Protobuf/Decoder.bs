@@ -7,22 +7,19 @@ namespace Protobuf
             m.reader = reader
         end function
 
+        ' TODO:P2 decoder is not finished, does not work properly
         function DecodeMessage(buffer as object) as dynamic
             m.reader.SetBuffer(buffer)
 
             message = {}
             while true
                 field = m.reader.ReadByte()
-                ? "field:", field
                 if field = invalid
                     exit while
                 end if
 
                 tag = field >> 3
                 wire_type = field and &h7
-
-                ? "tag:", tag
-                ? "wire_type:", wire_type
 
                 value = invalid
                 if wire_type = 0
@@ -34,8 +31,6 @@ namespace Protobuf
                 else if wire_type = 5
                     value = m.reader.ReadInt32()
                 end if
-
-                ? "value:", value
 
                 if value = invalid
                     return invalid

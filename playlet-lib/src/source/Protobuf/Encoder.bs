@@ -39,7 +39,12 @@ namespace Protobuf
 
         function EncodeMessage(tag as integer, value as dynamic) as void
             m.writer.WriteByte((tag << 3) or 2)
-            m.writer.WriteString(value)
+            buffer = CreateObject("roByteArray")
+            buffer.FromBase64String(value.DecodeUriComponent())
+            m.writer.WriteVarInt(buffer.Count())
+            for i = 0 to buffer.Count() - 1
+                m.writer.WriteByte(buffer[i])
+            end for
         end function
 
     end class
