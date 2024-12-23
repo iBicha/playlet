@@ -43,6 +43,11 @@
     ) {
       version += "-canary";
     }
+
+    if (version) {
+      version = `v${version}`;
+    }
+
     return version;
   }
 </script>
