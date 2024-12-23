@@ -1,0 +1,96 @@
+namespace Protobuf
+
+    class BinaryReader
+        private buffer
+        private position
+
+        function SetBuffer(buffer as dynamic) as void
+            if buffer = invalid
+                return
+            end if
+
+            if GetInterface(buffer, "ifString") <> invalid
+                b = CreateObject("roByteArray")
+                b.FromBase64String(buffer.DecodeUriComponent())
+                buffer = b
+            end if
+
+            m.buffer = buffer
+            m.position = 0
+        end function
+
+        function ReadVarInt() as dynamic
+            value = 0
+            _shift = 0
+            while true
+                byte = m.ReadByte()
+                if byte = invalid
+                    return invalid
+                end if
+
+                if _shift < 32
+                    value = value or ((byte and &h7F) << _shift)
+                else
+                    value = value + ((byte and &h7F) * (2 ^ _shift))
+                end if
+                _shift += 7
+
+                if (byte and &h80) = 0
+                    return value
+                end if
+            end while
+
+            return invalid
+        end function
+
+        function ReadByte() as dynamic
+            if m.position >= m.buffer.Count()
+                return invalid
+            end if
+            byte = m.buffer[m.position]
+            m.position += 1
+            return byte
+        end function
+
+        function ReadInt32() as dynamic
+            if m.position + 4 > m.buffer.Count()
+                return invalid
+            end if
+            value = m.buffer[m.position] or (m.buffer[m.position + 1] << 8) or (m.buffer[m.position + 2] << 16) or (m.buffer[m.position + 3] << 24)
+            m.position += 4
+            return value
+        end function
+
+        function ReadInt64() as dynamic
+            if m.position + 8 > m.buffer.Count()
+                return invalid
+            end if
+            value = m.buffer[m.position] or (m.buffer[m.position + 1] << 8) or (m.buffer[m.position + 2] << 16) or (m.buffer[m.position + 3] << 24) or (m.buffer[m.position + 4] << 32) or (m.buffer[m.position + 5] << 40) or (m.buffer[m.position + 6] << 48) or (m.buffer[m.position + 7] << 56)
+            m.position += 8
+            return value
+        end function
+
+        function ReadBytes() as dynamic
+            length = m.ReadVarInt()
+            if length = invalid
+                return invalid
+            end if
+            endPosition = m.position + length
+            if endPosition > m.buffer.Count()
+                return invalid
+            end if
+            value = m.buffer.Slice(m.position, endPosition)
+            m.position += length
+            return value
+        end function
+
+        function ReadString() as dynamic
+            bytes = m.ReadBytes()
+            if bytes = invalid
+                return invalid
+            end if
+            return bytes.ToAsciiString()
+        end function
+    end class
+
+end namespace

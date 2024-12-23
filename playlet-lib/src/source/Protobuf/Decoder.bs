@@ -1,0 +1,59 @@
+namespace Protobuf
+
+    class Decoder
+        private reader
+
+        function new(reader as object)
+            m.reader = reader
+        end function
+
+        function DecodeMessage(buffer as object) as dynamic
+            m.reader.SetBuffer(buffer)
+
+            message = {}
+            while true
+                field = m.reader.ReadByte()
+                ? "field:", field
+                if field = invalid
+                    exit while
+                end if
+
+                tag = field >> 3
+                wire_type = field and &h7
+
+                ? "tag:", tag
+                ? "wire_type:", wire_type
+
+                value = invalid
+                if wire_type = 0
+                    value = m.reader.ReadVarInt()
+                else if wire_type = 1
+                    value = m.reader.ReadInt64()
+                else if wire_type = 2
+                    value = m.reader.ReadString()
+                else if wire_type = 5
+                    value = m.reader.ReadInt32()
+                end if
+
+                ? "value:", value
+
+                if value = invalid
+                    return invalid
+                end if
+
+                tagStr = `${tag}`
+                if message[tagStr] = invalid
+                    message[tagStr] = value
+                else if GetInterface(message[tagStr], "ifArray") <> invalid
+                    message[tagStr].Push(value)
+                else
+                    message[tagStr] = [message[tagStr], value]
+                end if
+            end while
+
+            return message
+        end function
+
+    end class
+
+end namespace

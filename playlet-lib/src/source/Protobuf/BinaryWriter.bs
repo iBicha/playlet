@@ -1,0 +1,58 @@
+namespace Protobuf
+
+    class BinaryWriter
+        private buffer
+        private position
+
+        function SetBuffer(buffer as dynamic) as void
+            if buffer = invalid
+                return
+            end if
+
+            if GetInterface(buffer, "ifString") <> invalid
+                b = CreateObject("roByteArray")
+                b.FromBase64String(buffer.DecodeUriComponent())
+                buffer = b
+            end if
+
+            m.buffer = buffer
+            m.position = 0
+        end function
+
+        function WriteByte(byte as dynamic) as void
+            m.buffer[m.position] = byte
+            m.position += 1
+        end function
+
+        function WriteInt32(value as dynamic) as void
+            m.buffer[m.position] = value and &hFF
+            m.buffer[m.position + 1] = (value >> 8) and &hFF
+            m.buffer[m.position + 2] = (value >> 16) and &hFF
+            m.buffer[m.position + 3] = (value >> 24) and &hFF
+            m.position += 4
+        end function
+
+        function WriteVarInt(value as dynamic) as void
+            while true
+                byte = value and &h7F
+                value >>= 7
+                if value = 0
+                    m.WriteByte(byte)
+                    return
+                end if
+                m.WriteByte(byte or &h80)
+            end while
+        end function
+
+        function WriteString(value as dynamic) as void
+            strBuffer = CreateObject("roByteArray")
+            strBuffer.FromAsciiString(value)
+            m.WriteVarInt(strBuffer.Count())
+            for i = 0 to strBuffer.Count() - 1
+                m.buffer[m.position + i] = strBuffer[i]
+            end for
+            m.position += strBuffer.Count()
+        end function
+    end class
+
+end namespace
