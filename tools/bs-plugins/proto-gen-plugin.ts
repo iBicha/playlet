@@ -55,7 +55,6 @@ export class ProtoGenPlugin implements CompilerPlugin {
 
   generateProto(protoContent: any, protoHash: string, outputFile: string): string {
     const protoSchema = protobufSchema.parse(protoContent);
-    // writeFileSync(outputFile + ".json", JSON.stringify(protoSchema, null, 2));
 
     const fullNameSpace = `Protobuf.Generated.${protoSchema.package}`;
 
@@ -110,6 +109,9 @@ end enum`;
 
 
   generateCreateFunctions(protoSchema: any, fullNameSpace: string): string {
+    // not needed for now
+    return "";
+
     function generateCreateFunction(message: any): string {
       const innerTypes = message.messages.map((msg: any) => msg.name);
       const fieldsInitialization = message.fields.map((field: any) => {
@@ -189,6 +191,8 @@ end function`;
   }
 
   generateDecodeFunctions(protoSchema: any, fullNameSpace: string) {
+    // unfinished, and not needed for now
+    return "";
     let decodeFunctions = protoSchema.messages.map((message: any) => {
       return `function decode${message.name}(data as dynamic) as dynamic
 obj = ${fullNameSpace}.create${message.name}()
