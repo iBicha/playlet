@@ -1,0 +1,52 @@
+namespace Protobuf
+
+    class Encoder
+        private writer
+
+        function new(writer as object) as void
+            m.writer = writer
+        end function
+
+        function EncodeString(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 2)
+            m.writer.WriteString(value)
+        end function
+
+        function EncodeInt32(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 0)
+            m.writer.WriteVarInt(value)
+        end function
+
+        function EncodeInt64(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 0)
+            m.writer.WriteInt64(value)
+        end function
+
+        function EncodeFloat(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 5)
+            m.writer.WriteFloat(value)
+        end function
+
+        function EncodeDouble(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 1)
+            m.writer.WriteDouble(value)
+        end function
+
+        function EncodeBool(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 0)
+            m.writer.WriteBool(value)
+        end function
+
+        function EncodeMessage(tag as integer, value as dynamic) as void
+            m.writer.WriteByte((tag << 3) or 2)
+            buffer = CreateObject("roByteArray")
+            buffer.FromBase64String(value.DecodeUriComponent())
+            m.writer.WriteVarInt(buffer.Count())
+            for i = 0 to buffer.Count() - 1
+                m.writer.WriteByte(buffer[i])
+            end for
+        end function
+
+    end class
+
+end namespace

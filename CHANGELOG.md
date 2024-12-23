@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Region and locale support for Playlet backend
+- Search filters support for Playlet backend
 
 ### Fixed
 

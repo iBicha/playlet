@@ -66,7 +66,29 @@ namespace Http
 
             query = request.query.q
 
-            feeds = InnertubeService.Search(query)
+            searchFilters = {}
+            sort = request.query.sort
+            if not StringUtils.IsNullOrEmpty(sort)
+                searchFilters.sort = sort
+            end if
+            date = request.query.date
+            if not StringUtils.IsNullOrEmpty(date)
+                searchFilters.date = date
+            end if
+            _type = request.query.type
+            if not StringUtils.IsNullOrEmpty(_type)
+                searchFilters.type = _type
+            end if
+            duration = request.query.duration
+            if not StringUtils.IsNullOrEmpty(duration)
+                searchFilters.duration = duration
+            end if
+            features = request.query.features
+            if not StringUtils.IsNullOrEmpty(features)
+                searchFilters.features = features.Split(",")
+            end if
+
+            feeds = InnertubeService.Search(query, searchFilters)
             if not IsArray(feeds) or feeds.Count() = 0
                 response.Default(500, "Failed to search")
                 return true

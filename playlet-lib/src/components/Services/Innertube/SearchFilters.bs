@@ -1,0 +1,93 @@
+import "pkg:/components/Services/Innertube/protos/params.proto.gen.bs"
+
+namespace Innertube
+    function GetEncodedSearchFilters(searchFilters as object) as string
+        searchFiltersObj = {
+            filters: {}
+        }
+
+        if searchFilters.DoesExist("sort")
+            sort = searchFilters["sort"]
+            if sort = "relevance"
+                searchFiltersObj["sort_by"] = Protobuf.Generated.misc.SortBy.RELEVANCE
+            else if sort = "rating"
+                searchFiltersObj["sort_by"] = Protobuf.Generated.misc.SortBy.RATING
+            else if sort = "views"
+                searchFiltersObj["sort_by"] = Protobuf.Generated.misc.SortBy.VIEW_COUNT
+            else if sort = "date"
+                searchFiltersObj["sort_by"] = Protobuf.Generated.misc.SortBy.UPLOAD_DATE
+            end if
+        end if
+
+        if searchFilters.DoesExist("date")
+            date = searchFilters["date"]
+            if date = "hour"
+                searchFiltersObj["filters"]["upload_date"] = Protobuf.Generated.misc.UploadDate.HOUR
+            else if date = "today"
+                searchFiltersObj["filters"]["upload_date"] = Protobuf.Generated.misc.UploadDate.TODAY
+            else if date = "week"
+                searchFiltersObj["filters"]["upload_date"] = Protobuf.Generated.misc.UploadDate.WEEK
+            else if date = "month"
+                searchFiltersObj["filters"]["upload_date"] = Protobuf.Generated.misc.UploadDate.MONTH
+            else if date = "year"
+                searchFiltersObj["filters"]["upload_date"] = Protobuf.Generated.misc.UploadDate.YEAR
+            end if
+        end if
+
+        if searchFilters.DoesExist("type")
+            _type = searchFilters["type"]
+            if _type = "video"
+                searchFiltersObj["filters"]["type"] = Protobuf.Generated.misc.SearchType.VIDEO
+            else if _type = "channel"
+                searchFiltersObj["filters"]["type"] = Protobuf.Generated.misc.SearchType.CHANNEL
+            else if _type = "playlist"
+                searchFiltersObj["filters"]["type"] = Protobuf.Generated.misc.SearchType.PLAYLIST
+            else if _type = "movie"
+                searchFiltersObj["filters"]["type"] = Protobuf.Generated.misc.SearchType.MOVIE
+            end if
+        end if
+
+        if searchFilters.DoesExist("duration")
+            duration = searchFilters["duration"]
+            if duration = "short"
+                searchFiltersObj["filters"]["duration"] = Protobuf.Generated.misc.Duration.SHORT
+            else if duration = "long"
+                searchFiltersObj["filters"]["duration"] = Protobuf.Generated.misc.Duration.LONG
+            else if duration = "medium"
+                searchFiltersObj["filters"]["duration"] = Protobuf.Generated.misc.Duration.MEDIUM
+            end if
+        end if
+
+        if searchFilters.DoesExist("features")
+            features = searchFilters["features"]
+            for each feature in features
+                if feature = "hd"
+                    searchFiltersObj["filters"]["features_hd"] = true
+                else if feature = "subtitles"
+                    searchFiltersObj["filters"]["features_subtitles"] = true
+                else if feature = "creative_commons"
+                    searchFiltersObj["filters"]["features_creative_commons"] = true
+                else if feature = "3d"
+                    searchFiltersObj["filters"]["features_3d"] = true
+                else if feature = "live"
+                    searchFiltersObj["filters"]["features_live"] = true
+                else if feature = "purchased"
+                    searchFiltersObj["filters"]["features_purchased"] = true
+                else if feature = "4k"
+                    searchFiltersObj["filters"]["features_4k"] = true
+                else if feature = "360"
+                    searchFiltersObj["filters"]["features_360"] = true
+                else if feature = "location"
+                    searchFiltersObj["filters"]["features_location"] = true
+                else if feature = "hdr"
+                    searchFiltersObj["filters"]["features_hdr"] = true
+                else if feature = "vr180"
+                    searchFiltersObj["filters"]["features_vr180"] = true
+                end if
+            end for
+        end if
+
+        return Protobuf.Generated.misc.encodeSearchFilter(searchFiltersObj)
+    end function
+end namespace
+
