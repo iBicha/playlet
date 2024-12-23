@@ -1,5 +1,6 @@
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 @asynctask
@@ -8,7 +9,7 @@ function LoungeGenerateManualPairingCodeTask(input as object) as object
 
     if StringUtils.IsNullOrEmpty(input.loungeToken)
         messagePort = CreateObject("roMessagePort")
-        loungeService.observeFieldScopedEx("loungeToken", messagePort)
+        MessagePortUtils.ObserveFieldScopedExSafe(loungeService, "loungeToken", messagePort)
         loungeService.join = true
         message = wait(30000, messagePort)
         loungeService.unobserveFieldScoped("loungeToken")
