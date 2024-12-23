@@ -9,6 +9,7 @@
   export let videoThumbnails: any[] | undefined = undefined;
   export let author: string | undefined = undefined;
   export let lengthSeconds: number = undefined;
+  export let lengthText: string | undefined = undefined;
   export let liveNow: boolean = undefined;
   export let viewCount: number | undefined = undefined;
   export let isUpcoming: boolean = undefined;
@@ -64,6 +65,7 @@
       videoThumbnails: getVideoThumbnails(),
       author,
       lengthSeconds,
+      lengthText,
       liveNow,
       viewCount,
       timestamp,
@@ -96,6 +98,7 @@
           bind:videoThumbnails
           bind:liveNow
           bind:lengthSeconds
+          bind:lengthText
           bind:viewCount
           bind:isUpcoming
           bind:premiereTimestamp
@@ -109,6 +112,7 @@
         bind:checked={videoStartAtChecked}
         bind:timestamp={videoStartAtTimestamp}
         {lengthSeconds}
+        {lengthText}
       />
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>

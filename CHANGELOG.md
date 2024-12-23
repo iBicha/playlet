@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Regression caused watch history thumbnails to break
+- Web app views when using new backend
 
 ## [0.34.0] - 2024-12-22
 

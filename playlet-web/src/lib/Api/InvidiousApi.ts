@@ -1,5 +1,7 @@
 import { PlayletApi } from "lib/Api/PlayletApi";
 
+const DISABLE_CACHE = true;
+
 export class InvidiousApi {
     public instance: string;
     public endpoints: any;
@@ -290,6 +292,9 @@ export class InvidiousApi {
 
     // TODO:P2 use more appropriate cache storage
     private getCache(url: string, cacheSeconds: number) {
+        if (DISABLE_CACHE) {
+            return null;
+        }
         const cacheKey = this.getCacheKey(url);
         const cache = localStorage.getItem(cacheKey);
         if (!cache) {

@@ -258,6 +258,7 @@
   videoThumbnails={videoMetadata?.videoThumbnails}
   author={videoMetadata?.author}
   lengthSeconds={videoMetadata?.lengthSeconds}
+  lengthText={videoMetadata?.lengthText}
   liveNow={videoMetadata?.liveNow}
   isUpcoming={videoMetadata?.isUpcoming}
   premiereTimestamp={videoMetadata?.premiereTimestamp}

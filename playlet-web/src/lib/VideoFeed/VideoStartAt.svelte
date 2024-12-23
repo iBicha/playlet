@@ -3,6 +3,7 @@
 
   export let checked = false;
   export let lengthSeconds = undefined;
+  export let lengthText = undefined;
   export let timestamp = 0;
 
   let textInputElemet;
@@ -12,6 +13,12 @@
   $: {
     if (document.activeElement !== textInputElemet) {
       timestampText = getFormattedTime(timestamp);
+    }
+  }
+
+  $: {
+    if (lengthSeconds === undefined && lengthText) {
+      lengthSeconds = getTimeStamp(lengthText);
     }
   }
 

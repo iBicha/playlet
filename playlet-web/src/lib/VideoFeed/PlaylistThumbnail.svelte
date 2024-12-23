@@ -3,6 +3,7 @@
 
   export let title: string | undefined = undefined;
   export let videoCount: number | undefined = undefined;
+  export let videoCountText: string | undefined = undefined;
   export let playlistThumbnail: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
 
@@ -37,6 +38,9 @@
   }
 
   function getVideoCountText() {
+    if (videoCountText) {
+      return videoCountText;
+    }
     if (isNaN(videoCount) || videoCount < 0) {
       return "";
     }

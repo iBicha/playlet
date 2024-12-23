@@ -112,7 +112,12 @@ export class YoutubeJs {
             type: "video",
             title: info.basic_info.title,
             videoId: info.basic_info.id,
-            videoThumbnails: [],
+            videoThumbnails: [{
+                quality: "medium",
+                url: `https://i.ytimg.com/vi/${info.basic_info.id}/mqdefault.jpg`,
+                width: 320,
+                height: 180
+            }],
             storyboards: [],
             description: "",
             published: 0,

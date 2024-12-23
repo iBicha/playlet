@@ -16,6 +16,7 @@
   export let isUpcoming: boolean = undefined;
   export let premiereTimestamp: number | undefined = undefined;
   export let lengthSeconds: number = undefined;
+  export let lengthText: string | undefined = undefined;
   export let liveNow: boolean = undefined;
 
   // svelte-ignore unused-export-let
@@ -190,6 +191,7 @@
       bind:isUpcoming
       bind:premiereTimestamp
       bind:lengthSeconds
+      bind:lengthText
       bind:viewCount
       bind:invidiousInstance
     />
@@ -214,6 +216,7 @@
   bind:title
   bind:author
   bind:lengthSeconds
+  bind:lengthText
   bind:videoThumbnails
   bind:liveNow
   bind:isUpcoming

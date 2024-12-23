@@ -6,6 +6,7 @@
   export let videoThumbnails: any[] | undefined = undefined;
   export let liveNow: boolean = undefined;
   export let lengthSeconds: number = undefined;
+  export let lengthText: string | undefined = undefined;
   export let viewCount: number | undefined = undefined;
   export let isUpcoming: boolean | undefined = undefined;
   export let premiereTimestamp: number | undefined = undefined;
@@ -29,7 +30,11 @@
     }
   }
 
-  function getFormattedTime(length) {
+  function getFormattedTime(text, length) {
+    if (text) {
+      return text;
+    }
+
     const hours = Math.floor(length / 3600);
     const minutes = Math.floor((length / 60) % 60);
     const seconds = length % 60;
@@ -80,11 +85,11 @@
     >
       {$tr("LIVE")}
     </div>
-  {:else if lengthSeconds}
+  {:else if lengthSeconds || lengthText}
     <div
       class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm pt-1 pb-1 pr-2 pl-2"
     >
-      {getFormattedTime(lengthSeconds)}
+      {getFormattedTime(lengthText, lengthSeconds)}
     </div>
   {/if}
 </figure>

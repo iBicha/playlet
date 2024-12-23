@@ -6,6 +6,7 @@
   export let title: string | undefined = undefined;
   export let playlistId: string | undefined = undefined;
   export let videoCount: number | undefined = undefined;
+  export let videoCountText: string | undefined = undefined;
   export let playlistThumbnail: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
 
@@ -50,6 +51,7 @@
       title,
       playlistThumbnail: getPlaylistThumbnail(),
       videoCount,
+      videoCountText,
       videos,
     };
   }
@@ -89,6 +91,7 @@
           bind:title
           bind:playlistThumbnail
           bind:videoCount
+          bind:videoCountText
           bind:videos
           bind:invidiousInstance
         />

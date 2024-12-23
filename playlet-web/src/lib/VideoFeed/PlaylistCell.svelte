@@ -9,6 +9,7 @@
   export let playlistId: string | undefined = undefined;
   export let playlistThumbnail: string | undefined = undefined;
   export let videoCount: number | undefined = undefined;
+  export let videoCountText: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
   export let updated: number | undefined = undefined;
 
@@ -84,6 +85,7 @@
       bind:title
       bind:playlistThumbnail
       bind:videoCount
+      bind:videoCountText
       bind:videos
       bind:invidiousInstance
     />
@@ -100,5 +102,6 @@
   bind:playlistId
   bind:playlistThumbnail
   bind:videoCount
+  bind:videoCountText
   bind:videos
 />
