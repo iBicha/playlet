@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Region and locale support for Playlet backend
+
+### Fixed
+
+- Start up crash on older OS version (11.5)
+
+## [0.34.1] - 2024-12-23
+
 ### Fixed
 
 - Regression caused watch history thumbnails to break
