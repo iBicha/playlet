@@ -114,6 +114,13 @@ function CreateChannelFeeds(authorId as string, author as string, tabs as object
             feeds.Push(m.tabs[tabName](authorId, author, params))
         end if
     end for
+
+    ' If we're dealing with an auto-generated channel, we might not have any tabs at all.
+    ' In this case, it's better to show "home" instead of nothing at all.
+    if feeds.Count() = 0 and tabs.Count() > 0 and tabsParams <> invalid and tabsParams["featured"] <> invalid
+        feeds.Push(CreateChannelFeed("Home", "channel_featured", authorId, author, tabsParams["featured"]))
+    end if
+
     return feeds
 end function
 

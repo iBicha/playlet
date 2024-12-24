@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for auto-generated channels in Playlet backend
+
 ### Removed
 
 - [YouTube.js](https://github.com/LuanRT/YouTube.js) from web app. It is no longer needed, so this reduces app size.
