@@ -65,6 +65,7 @@ namespace Http
             response = context.response
 
             query = request.query.q
+            continuation = request.query.continuation
 
             searchFilters = {}
             sort = request.query.sort
@@ -88,13 +89,21 @@ namespace Http
                 searchFilters.features = features.Split(",")
             end if
 
-            feeds = InnertubeService.Search(query, searchFilters)
+            options = {}
+            if searchFilters.Count() > 0
+                options.searchFilters = searchFilters
+            end if
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
+            feeds = InnertubeService.Search(query, options)
             if not IsArray(feeds) or feeds.Count() = 0
                 response.Default(500, "Failed to search")
                 return true
             end if
 
-            response.Json(ValidArray(feeds[0].items))
+            response.Json(feeds[0])
             return true
         end function
 

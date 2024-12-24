@@ -215,19 +215,21 @@ namespace Invidious
             end if
 
             feedSourceState.paginationType = endpoint.paginationType
-            if feedSourceState.paginationType = PaginationType.Pages
-                if not IsInt(feedSourceState.page)
-                    feedSourceState.page = 0
-                end if
-                feedSourceState.page += 1
-                feedSourceState.queryParams.page = feedSourceState.page
-            else if feedSourceState.paginationType = PaginationType.Continuation
-                continuation = feedSourceState.continuation
+
+            continuation = feedSourceState.continuation
+            if feedSourceState.paginationType = PaginationType.Continuation or not StringUtils.IsNullOrEmpty(continuation)
                 if not StringUtils.IsNullOrEmpty(continuation)
                     feedSourceState.queryParams.continuation = continuation
                 else
                     feedSourceState.queryParams.Delete("continuation")
                 end if
+                feedSourceState.queryParams.Delete("page")
+            else if feedSourceState.paginationType = PaginationType.Pages
+                if not IsInt(feedSourceState.page)
+                    feedSourceState.page = 0
+                end if
+                feedSourceState.page += 1
+                feedSourceState.queryParams.page = feedSourceState.page
             end if
 
             feedSource.state = feedSourceState
@@ -345,9 +347,12 @@ namespace Invidious
 
             if response.StatusCode() = 200
                 json = response.Json()
-                return {
-                    items: json
-                }
+                if IsArray(json)
+                    json = {
+                        items: json
+                    }
+                end if
+                return json
             end if
             return invalid
         end function

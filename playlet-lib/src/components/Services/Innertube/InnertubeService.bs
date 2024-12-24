@@ -84,8 +84,24 @@ namespace InnertubeService
         }
     end function
 
-    function Search(query as string, searchFilters as object, cancellation = invalid as object) as object
-        return Innertube.Search(query, searchFilters, cancellation)
+    function Search(query as string, options = invalid as object) as object
+        searchFilters = invalid
+        continuation = ""
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("searchFilters")
+                searchFilters = options.searchFilters
+            end if
+            if options.DoesExist("continuation")
+                continuation = options.continuation
+            end if
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        return Innertube.Search(query, searchFilters, continuation, cancellation)
     end function
 
     function GetTrending(options = invalid as object) as object

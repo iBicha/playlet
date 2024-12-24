@@ -28,7 +28,8 @@ export class InvidiousApi {
         return await this.cachedFetch(url, 60 * 60 * 24);
     }
 
-    public async search(query: string, filters: any, page: number = 1) {
+    // need to change this
+    public async search(query: string, filters: any, page: number, continuation: string | undefined) {
         // TODO:P2 use a FeedSource similar to brightscript version
         let url = `${this.instance}/api/v1/search?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
         for (let filter in filters) {
@@ -44,9 +45,18 @@ export class InvidiousApi {
                 url += `&${filter}=${filters[filter].join(',')}`;
             }
         }
-        url += `&page=${page}`;
+
+        if (continuation) {
+            url += `&continuation=${encodeURIComponent(continuation)}`;
+        } else {
+            url += `&page=${page}`;
+        }
         const response = await fetch(url);
-        return await response.json();
+        let json = await response.json();
+        if (Array.isArray(json)) {
+            json = { items: json };
+        }
+        return json;
     }
 
     public async getVideoMetadata(videoId: string) {
@@ -89,19 +99,20 @@ export class InvidiousApi {
 
         feedSourceState.paginationType = endpoint.paginationType
 
-        if (feedSourceState.paginationType === "Pages") {
-            if (!Number.isInteger(feedSourceState.page)) {
-                feedSourceState.page = 0;
-            }
-            feedSourceState.page += 1;
-            feedSourceState.queryParams.page = feedSourceState.page;
-        } else if (feedSourceState.paginationType === "Continuation") {
-            const continuation = feedSourceState.continuation;
+        const continuation = feedSourceState.continuation;
+        if (feedSourceState.paginationType === "Continuation" || continuation) {
             if (continuation) {
                 feedSourceState.queryParams.continuation = continuation;
             } else {
                 delete feedSourceState.queryParams.continuation;
             }
+            delete feedSourceState.queryParams.page;
+        } else if (feedSourceState.paginationType === "Pages") {
+            if (!Number.isInteger(feedSourceState.page)) {
+                feedSourceState.page = 0;
+            }
+            feedSourceState.page += 1;
+            feedSourceState.queryParams.page = feedSourceState.page;
         }
     }
 
@@ -188,7 +199,11 @@ export class InvidiousApi {
     }
 
     private async DefaultHandler(feedSource, responseJson) {
-        return { items: responseJson };
+        // if is array
+        if (Array.isArray(responseJson)) {
+            responseJson = { items: responseJson };
+        }
+        return responseJson;
     }
 
     private async PlaylistHandler(feedSource, responseJson) {

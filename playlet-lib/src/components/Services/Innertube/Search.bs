@@ -3,11 +3,10 @@ import "pkg:/components/Services/Innertube/Parser.bs"
 
 namespace Innertube
 
-    function Search(query as string, searchFilters as object, cancellation = invalid as object) as object
+    function Search(query as string, searchFilters as object, continuation = "" as string, cancellation = invalid as object) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
-            query: query
             context: Innertube.CreateContext(Innertube.ClientType.WEB, deviceInfo, "")
         }
 
@@ -16,6 +15,12 @@ namespace Innertube
             if params <> ""
                 payload["params"] = Innertube.GetEncodedSearchFilters(searchFilters)
             end if
+        end if
+
+        if continuation <> ""
+            payload["continuation"] = continuation
+        else
+            payload["query"] = query
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/search?prettyPrint=false&alt=json", payload)
