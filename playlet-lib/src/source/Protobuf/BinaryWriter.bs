@@ -48,10 +48,12 @@ namespace Protobuf
             strBuffer = CreateObject("roByteArray")
             strBuffer.FromAsciiString(value)
             m.WriteVarInt(strBuffer.Count())
-            for i = 0 to strBuffer.Count() - 1
-                m.buffer[m.position + i] = strBuffer[i]
-            end for
-            m.position += strBuffer.Count()
+            m.WriteByteArrayRaw(strBuffer, 0, strBuffer.Count())
+        end function
+
+        function WriteProtoByteArray(value as dynamic) as void
+            m.WriteVarInt(value.Count())
+            m.WriteByteArrayRaw(value, 0, value.Count())
         end function
 
         function WriteBool(value as dynamic) as void
@@ -60,6 +62,14 @@ namespace Protobuf
             else
                 m.WriteByte(0)
             end if
+        end function
+
+        function WriteByteArrayRaw(buffer as dynamic, index as dynamic, size as dynamic) as void
+            position = m.position
+            for i = 0 to size - 1
+                m.buffer[position + i] = buffer[index + i]
+            end for
+            m.position += size
         end function
     end class
 

@@ -154,7 +154,7 @@ end function`;
         }
 
         if (innerTypes.includes(field.type)) {
-          fieldEncode += `encoder.EncodeMessage(${field.tag}, ${fullNameSpace}.encode${field.type}(value))\n`;
+          fieldEncode += `encoder.EncodeMessage(${field.tag}, ${fullNameSpace}.encode${field.type}(value, true))\n`;
         }
         else if (enums.includes(field.type)) {
           fieldEncode += `encoder.EncodeInt32(${field.tag}, value)\n`;
@@ -169,13 +169,17 @@ end function`;
         return fieldEncode + 'end if';
       }).join('\n');
 
-      return `function encode${message.name}(message as dynamic) as string
+      return `function encode${message.name}(message as dynamic, asByteArray = false as boolean) as dynamic
 buffer = CreateObject("roByteArray")
 writer = new Protobuf.BinaryWriter()
 writer.SetBuffer(buffer)
 encoder = new Protobuf.Encoder(writer)
 ${encodeFields}
-return buffer.ToBase64String().EncodeUriComponent()
+if asByteArray
+  return buffer
+else
+  return buffer.ToBase64String().EncodeUriComponent()
+end if
 end function`;
     }
 

@@ -43,7 +43,7 @@ namespace Protobuf
 
 
 
-            function encodeFilters(message as dynamic) as string
+            function encodeFilters(message as dynamic, asByteArray = false as boolean) as dynamic
                 buffer = CreateObject("roByteArray")
                 writer = new Protobuf.BinaryWriter()
                 writer.SetBuffer(buffer)
@@ -104,10 +104,14 @@ namespace Protobuf
                     value = message["features_vr180"]
                     encoder.EncodeBool(26, value)
                 end if
-                return buffer.ToBase64String().EncodeUriComponent()
+                if asByteArray
+                    return buffer
+                else
+                    return buffer.ToBase64String().EncodeUriComponent()
+                end if
             end function
 
-            function encodeSearchFilter(message as dynamic) as string
+            function encodeSearchFilter(message as dynamic, asByteArray = false as boolean) as dynamic
                 buffer = CreateObject("roByteArray")
                 writer = new Protobuf.BinaryWriter()
                 writer.SetBuffer(buffer)
@@ -118,9 +122,13 @@ namespace Protobuf
                 end if
                 if message.DoesExist("filters")
                     value = message["filters"]
-                    encoder.EncodeMessage(2, Protobuf.Generated.misc.encodeFilters(value))
+                    encoder.EncodeMessage(2, Protobuf.Generated.misc.encodeFilters(value, true))
                 end if
-                return buffer.ToBase64String().EncodeUriComponent()
+                if asByteArray
+                    return buffer
+                else
+                    return buffer.ToBase64String().EncodeUriComponent()
+                end if
             end function
 
 
