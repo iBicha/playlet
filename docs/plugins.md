@@ -13,6 +13,7 @@
 - [Type Gen](#type-gen)
 - [Web Server](#web-server)
 - [Locale validation](#locale-validation)
+- [Protobuf Generator](#protobuf-generator)
 
 Playlet implements a few [Brighterscript Plugins](https://github.com/rokucommunity/brighterscript/blob/master/docs/plugins.md). The plugins inject themselves in the compilation process, allowing the modification of bs scripts, xml components, and even assets or the app manifest. Let's start with a simple one:
 
@@ -623,3 +624,19 @@ The plugin checks for the following:
 - `en_US` must have matching source and translation values, so it can act as a fallback translation.
 - All `source` translations from all languages must be present in the `@locale` enums. This is to prevent renaming the values in the code without updating translation files.
 - Translation `source` keys can't be used except for certain fields such as `"text"` and `"title"`. This is to prevent the accidental localization of non-display fields, such as node ids.
+
+## Protobuf Generator
+
+**[Source](/tools/bs-plugins/proto-gen-plugin.ts)**
+
+### Why
+
+To generate BrighterScript encoding/decoding functions for Protobuf types.
+These are needed for some functionality (e.g. Search filters in Innertube backend)
+
+### How
+
+The plugin scans for `.proto` files, and parse them into plain objects using [protocol-buffers-schema](https://www.npmjs.com/package/protocol-buffers-schema)
+Then the right functions that get generated to serialize/deserialize types.
+Please note this generator is VERY bare bone: only features necessary for Playlet were implemented.
+The generation can be improved as needed.
