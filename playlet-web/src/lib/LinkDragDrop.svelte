@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { playletStateStore, tr } from "lib/Stores";
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import { YoutubeJs } from "./Api/YoutubeJs";
+  import { PlayletApi } from "./Api/PlayletApi";
   import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
   import ChannelCastDialog from "./VideoFeed/ChannelCastDialog.svelte";
   import PlaylistCastDialog from "./VideoFeed/PlaylistCastDialog.svelte";
@@ -109,7 +109,7 @@
   async function searchForVideoById(videoId, timestamp) {
     try {
       isLoading = true;
-      videoMetadata = await YoutubeJs.getVideoInfo(videoId);
+      videoMetadata = await PlayletApi.getVideoInfo(videoId);
       videoStartAtChecked = timestamp !== undefined;
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;

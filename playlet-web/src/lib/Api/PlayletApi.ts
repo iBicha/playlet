@@ -3,6 +3,11 @@ import { getHost } from "lib/Api/Host";
 export class PlayletApi {
     static host = () => `http://${getHost()}`
 
+    static async getVideoInfo(videoId) {
+        const response = await fetch(`${PlayletApi.host()}/playlet-invidious-backend/api/v1/videos/${videoId}`);
+        return await response.json();
+    }
+
     static async getState() {
         const response = await fetch(`${PlayletApi.host()}/api/state`);
         return await response.json();

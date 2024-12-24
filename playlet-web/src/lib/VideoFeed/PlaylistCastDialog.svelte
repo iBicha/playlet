@@ -77,7 +77,7 @@
       }
     }
     if (url === "") {
-      url = `${invidiousInstance}/vi/-----------/mqdefault.jpg`;
+      url = `https://i.ytimg.com/vi/-----------/mqdefault.jpg`;
     }
     return url;
   }
