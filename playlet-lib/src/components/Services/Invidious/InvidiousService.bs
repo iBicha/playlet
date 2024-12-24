@@ -164,14 +164,16 @@ namespace Invidious
 
         function GetPlaylist(playlistId as string, index = 0 as integer, cancellation = invalid as object) as object
             authToken = m.invidiousNode.authToken
-            if authToken = invalid
-                instance = m.GetInstance()
-                url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
-                request = HttpClient.Get(url)
-            else
+            ' There's no need to use auth, unless the playlist is from Invidious
+            ' (starts with "IV") because it can be a private playlist from logged user.
+            if playlistId.StartsWith("IV") and authToken <> invalid
                 url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}/${playlistId}`
                 request = HttpClient.Get(url)
                 request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            else
+                instance = m.GetInstance()
+                url = `${instance}${Invidious.PLAYLISTS_ENDPOINT}/${playlistId}`
+                request = HttpClient.Get(url)
             end if
 
             request.QueryParam("index", index)
