@@ -209,6 +209,7 @@ export class InvidiousApi {
     private async PlaylistHandler(feedSource, responseJson) {
         return {
             items: responseJson.videos,
+            continuation: responseJson.continuation
         };
     }
 
