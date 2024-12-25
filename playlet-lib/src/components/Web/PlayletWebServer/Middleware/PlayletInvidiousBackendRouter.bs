@@ -107,6 +107,72 @@ namespace Http
             return true
         end function
 
+        @get("/playlet-invidious-backend/api/v1/resolveurl")
+        function ResolveUrl(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            url = request.query.url
+            if StringUtils.IsNullOrEmpty(url)
+                response.Default(400, "Missing 'url' query parameter")
+                return true
+            end if
+
+            json = InnertubeService.ResolveUrl(url, response)
+            if json = invalid
+                response.Default(500, "Failed to resolve URL")
+                return true
+            end if
+
+            endpoint = json["endpoint"]
+            pageType = ValidString(ObjectUtils.Dig(endpoint, ["commandMetadata", "webCommandMetadata", "webPageType"]))
+            if pageType = "WEB_PAGE_TYPE_UNKNOWN" or pageType = ""
+                response.Default(400, "Unknown url")
+                return true
+            end if
+
+            subEndpoint = endpoint["watchEndpoint"]
+            if subEndpoint = invalid
+                subEndpoint = endpoint["browseEndpoint"]
+                if subEndpoint = invalid
+                    subEndpoint = endpoint
+                end if
+            end if
+
+            params = ObjectUtils.Dig(subEndpoint, ["params"])
+
+            result = {
+                "pageType": pageType
+            }
+
+            browseId = ObjectUtils.Dig(subEndpoint, ["browseId"])
+            if not StringUtils.IsNullOrEmpty(browseId)
+                result["ucid"] = browseId
+            end if
+
+            videoId = ObjectUtils.Dig(subEndpoint, ["videoId"])
+            if not StringUtils.IsNullOrEmpty(videoId)
+                result["videoId"] = videoId
+            end if
+
+            playlistId = ObjectUtils.Dig(subEndpoint, ["playlistId"])
+            if not StringUtils.IsNullOrEmpty(playlistId)
+                result["playlistId"] = playlistId
+            end if
+
+            startTimeSeconds = ObjectUtils.Dig(subEndpoint, ["startTimeSeconds"])
+            if ValidInt(startTimeSeconds) > 0
+                result["startTimeSeconds"] = startTimeSeconds
+            end if
+
+            if IsString(params)
+                result["params"] = params
+            end if
+
+            response.Json(result)
+            return true
+        end function
+
         @get("*")
         function GetAll(context as object) as boolean
             request = context.request

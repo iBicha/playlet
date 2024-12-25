@@ -10,6 +10,7 @@ import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/components/Services/Innertube/ResolveUrl.bs"
 
 namespace InnertubeService
 
@@ -237,6 +238,27 @@ namespace InnertubeService
 
         json = response.Json()
         return Innertube.ParsePlaylistPageResponse(json)
+    end function
+
+    function ResolveUrl(url as string, options = invalid as object) as object
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        request = Innertube.CreateResolveUrlRequest(url)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        json = response.Json()
+        return json
     end function
 
     function AuthGetCode(cancellation = invalid as object) as object
