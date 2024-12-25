@@ -48,6 +48,7 @@ namespace Innertube
             "channelRenderer": ParseChannelRenderer
             "gridChannelRenderer": ParseGridChannelRenderer
             "playlistRenderer": ParsePlaylistRenderer
+            "gridPlaylistRenderer": ParseGridPlaylistRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
             "tvBrowseRenderer": ParseTvBrowseRenderer
@@ -68,7 +69,7 @@ namespace Innertube
             "horizontalCardListRenderer": ParseNotImplemented
             ' expandableTabRenderer contains the search tab with a channel. Ignored.
             "expandableTabRenderer": ParseNotImplemented
-
+            "clickTrackingParams": ParseNotImplemented
         }
     end function
 
@@ -459,6 +460,69 @@ namespace Innertube
             "playlistId": playlistId
             "title": ParseText(nodeData["title"])
             "playlistThumbnail": ObjectUtils.Dig(nodeData, ["thumbnails", 0, "thumbnails", 0, "url"])
+            "author": author
+            "authorId": authorId
+            "videoCount": videoCount
+            "videoCountText": videoCountText
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseGridPlaylistRenderer(nodeData as object, context as object) as object
+        playlistId = nodeData["playlistId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+        if StringUtils.IsNullOrEmpty(author) and StringUtils.IsNullOrEmpty(authorId)
+            if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+                author = context.currentAuthor
+                authorId = context.currentAuthorId
+            end if
+        end if
+
+        videoCountText = ""
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                videoCountText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayBottomPanelRenderer", "text"]))
+                if videoCountText <> ""
+                    exit for
+                end if
+            end for
+        end if
+        if videoCountText = ""
+            videoCountText = ParseText(nodeData["videoCountText"])
+        end if
+        if videoCountText = ""
+            videoCountText = ParseText(nodeData["videoCountShortText"])
+        end if
+
+        videoCount = ParseText(nodeData["videoCount"])
+        if videoCount = ""
+            videoCount = ParseText(nodeData["videoCountShortText"])
+        end if
+        videoCount = videoCount.ToInt()
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(nodeData["title"])
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails", 0, "url"])
             "author": author
             "authorId": authorId
             "videoCount": videoCount
