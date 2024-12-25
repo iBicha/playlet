@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for auto-generated channels in Playlet backend
+- Support for continuation/pagination in Playlet backend: search, channels and playlists load more content as you scroll
 
 ### Fixed
 
