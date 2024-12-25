@@ -175,9 +175,16 @@ namespace Http
             channelAndTab = route.Mid("/playlet-invidious-backend/api/v1/channels/".Len())
             channelAndTab = channelAndTab.Split("/")
 
+            options = {}
+            continuation = request.query.continuation
+
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
             if channelAndTab.Count() = 1
                 channelId = channelAndTab[0]
-                channel = InnertubeService.GetChannel(channelId)
+                channel = InnertubeService.GetChannel(channelId, options)
                 if channel = invalid
                     response.Default(500, "Failed to get channel")
                     return true
@@ -189,22 +196,33 @@ namespace Http
                 channelId = channelAndTab[0]
                 _tab = channelAndTab[1]
 
-                params = ValidString(request.query.params)
+                params = request.query.params
+                if not StringUtils.IsNullOrEmpty(params)
+                    options.params = params
+                end if
 
-                channel = InnertubeService.GetChannel(channelId, { "params": params })
+                channel = InnertubeService.GetChannel(channelId, options)
                 if channel = invalid
                     response.Default(500, "Failed to get channel")
                     return true
                 end if
 
                 if _tab = "playlists" or _tab = "podcasts" or _tab = "releases"
-                    response.Json({
+                    result = {
                         "playlists": channel.items
-                    })
+                    }
+                    if channel.DoesExist("continuation")
+                        result.continuation = channel.continuation
+                    end if
+                    response.Json(result)
                 else
-                    response.Json({
+                    result = {
                         "videos": channel.items
-                    })
+                    }
+                    if channel.DoesExist("continuation")
+                        result.continuation = channel.continuation
+                    end if
+                    response.Json(result)
                 end if
 
                 return true

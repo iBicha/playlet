@@ -127,12 +127,16 @@ namespace Innertube
         end if
 
         items = []
+        continuation = invalid
         feeds = ParseResponse(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
+            if feeds[0].DoesExist("continuation")
+                continuation = feeds[0].continuation
+            end if
         end if
 
-        return {
+        channel = {
             "author": author
             "authorId": authorId
             "authorThumbnails": thumbnails
@@ -142,6 +146,12 @@ namespace Innertube
             "tabsParams": tabsParams
             "items": items
         }
+
+        if continuation <> invalid
+            channel["continuation"] = continuation
+        end if
+
+        return channel
     end function
 
     function ParsePlaylistPageResponse(responseData as object) as object

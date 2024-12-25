@@ -1,15 +1,19 @@
 namespace Innertube
 
-    function CreateBrowseRequest(browseId as string, clienType as Innertube.ClientType, params as string) as object
+    function CreateBrowseRequest(browseId as string, clienType as Innertube.ClientType, params = "" as string, continuation = "" as string) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
-            "browseId": browseId
             "context": Innertube.CreateContext(clienType, deviceInfo, "")
         }
 
-        if not StringUtils.IsNullOrEmpty(params)
-            payload["params"] = params
+        if not StringUtils.IsNullOrEmpty(continuation)
+            payload["continuation"] = continuation
+        else
+            payload["browseId"] = browseId
+            if not StringUtils.IsNullOrEmpty(params)
+                payload["params"] = params
+            end if
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/browse?prettyPrint=false&alt=json", payload)
