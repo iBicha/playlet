@@ -151,6 +151,7 @@
       }
 
       invidiousApi.markFeedSourcePagination(feedSource);
+      let hadContinuation = !!feedSource.state.continuation;
 
       try {
         const result = await invidiousApi.makeRequest(feedSource);
@@ -163,14 +164,14 @@
           continue;
         }
 
-        const hasContinuation = !!result.continuation;
-        if (hasContinuation) {
-          feedSource.state.continuation = result.continuation;
-        }
+        let hasContinuation = !!result.continuation;
+        feedSource.state.continuation = result.continuation || "";
 
         if (result.items.length > 0) {
           const paginationType = feedSource.state.paginationType;
-          if (paginationType === "Continuation" && hasContinuation) {
+          if (hadContinuation && !hasContinuation) {
+            feedSource.state.loadState = FeedLoadState.Loaded;
+          } else if (paginationType === "Continuation" && hasContinuation) {
             feedSource.state.loadState = FeedLoadState.LoadedPage;
           } else if (paginationType === "Pages") {
             feedSource.state.loadState = FeedLoadState.LoadedPage;

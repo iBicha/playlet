@@ -48,6 +48,7 @@ namespace Innertube
             "channelRenderer": ParseChannelRenderer
             "gridChannelRenderer": ParseGridChannelRenderer
             "playlistRenderer": ParsePlaylistRenderer
+            "gridPlaylistRenderer": ParseGridPlaylistRenderer
             "lockupViewModel": ParseLockupViewModel
             "shortsLockupViewModel": ParseShortsLockupViewModel
             "tvBrowseRenderer": ParseTvBrowseRenderer
@@ -58,7 +59,8 @@ namespace Innertube
             "gridRenderer": ParseGridRenderer
             "richGridRenderer": ParseRichGridRenderer
             "richItemRenderer": ParseRichItemRenderer
-            "continuationItemRenderer": ParseNotImplemented
+            "continuationItemRenderer": ParseContinuationItemRenderer
+            "appendContinuationItemsAction": ParseAppendContinuationItemsAction
             ' Posts not yet supported
             "postRenderer": ParseNotImplemented
             ' a "View all posts" button
@@ -67,7 +69,7 @@ namespace Innertube
             "horizontalCardListRenderer": ParseNotImplemented
             ' expandableTabRenderer contains the search tab with a channel. Ignored.
             "expandableTabRenderer": ParseNotImplemented
-
+            "clickTrackingParams": ParseNotImplemented
         }
     end function
 
@@ -468,6 +470,69 @@ namespace Innertube
         return invalid
     end function
 
+    function ParseGridPlaylistRenderer(nodeData as object, context as object) as object
+        playlistId = nodeData["playlistId"]
+        if not IsString(playlistId)
+            LogWarn("Invalid playlist ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+        if StringUtils.IsNullOrEmpty(author) and StringUtils.IsNullOrEmpty(authorId)
+            if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+                author = context.currentAuthor
+                authorId = context.currentAuthorId
+            end if
+        end if
+
+        videoCountText = ""
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                videoCountText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayBottomPanelRenderer", "text"]))
+                if videoCountText <> ""
+                    exit for
+                end if
+            end for
+        end if
+        if videoCountText = ""
+            videoCountText = ParseText(nodeData["videoCountText"])
+        end if
+        if videoCountText = ""
+            videoCountText = ParseText(nodeData["videoCountShortText"])
+        end if
+
+        videoCount = ParseText(nodeData["videoCount"])
+        if videoCount = ""
+            videoCount = ParseText(nodeData["videoCountShortText"])
+        end if
+        videoCount = videoCount.ToInt()
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(nodeData["title"])
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails", 0, "url"])
+            "author": author
+            "authorId": authorId
+            "videoCount": videoCount
+            "videoCountText": videoCountText
+        }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
     function ParseLockupViewModel(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
         if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
@@ -715,6 +780,22 @@ namespace Innertube
 
     function ParseRichItemRenderer(nodeData as object, _context as object) as object
         return nodeData["content"]
+    end function
+
+    function ParseContinuationItemRenderer(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuationEndpoint", "continuationCommand", "token"])
+        if IsString(continuation)
+            ' In Playlists there are 2 continuation items, and one of them is useless...
+            ' TODO:P1 figure this out
+            if StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
+                context.currentFeed.continuation = continuation
+            end if
+        end if
+        return invalid
+    end function
+
+    function ParseAppendContinuationItemsAction(nodeData as object, context as object) as object
+        return nodeData["continuationItems"]
     end function
 
     function ParseText(data as object) as string

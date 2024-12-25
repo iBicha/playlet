@@ -9,8 +9,8 @@ namespace Innertube
             return []
         end if
 
-        data = UnwrapContainer(responseData)
-        if data = invalid
+        containers = GetContainers(responseData)
+        if containers.Count() = 0
             return []
         end if
 
@@ -29,7 +29,7 @@ namespace Innertube
             generateVideoThumbnails: true
         })
 
-        Innertube.ParseNode(data, context)
+        Innertube.ParseNode(containers, context)
 
         if context.currentFeed <> invalid and (context.currentFeed.items.Count() > 0 or context.currentFeed.title <> "")
             context.feeds.Push(context.currentFeed)
@@ -127,12 +127,16 @@ namespace Innertube
         end if
 
         items = []
+        continuation = invalid
         feeds = ParseResponse(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
+            if feeds[0].DoesExist("continuation")
+                continuation = feeds[0].continuation
+            end if
         end if
 
-        return {
+        channel = {
             "author": author
             "authorId": authorId
             "authorThumbnails": thumbnails
@@ -142,6 +146,12 @@ namespace Innertube
             "tabsParams": tabsParams
             "items": items
         }
+
+        if continuation <> invalid
+            channel["continuation"] = continuation
+        end if
+
+        return channel
     end function
 
     function ParsePlaylistPageResponse(responseData as object) as object
@@ -198,23 +208,21 @@ namespace Innertube
         feeds = ParseResponse(responseData)
         if feeds.Count() > 0
             playlist["videos"] = ValidArray(feeds[0].items)
+            if feeds[0].DoesExist("continuation")
+                playlist["continuation"] = feeds[0].continuation
+            end if
         end if
 
         return playlist
     end function
 
-    function UnwrapContainer(responseData as object) as object
-        if responseData.DoesExist("contents")
-            return responseData["contents"]
-        end if
-        if responseData.DoesExist("response")
-            return responseData["response"]
-        end if
-        data = ObjectUtils.Dig(responseData, ["onResponseReceivedActions", 0])
-        if data <> invalid
-            return data
-        end if
-        return responseData
+    function GetContainers(responseData as object) as object
+        return [
+            responseData["contents"]
+            responseData["response"]
+            responseData["onResponseReceivedActions"]
+            responseData["onResponseReceivedCommands"]
+        ]
     end function
 
 end namespace

@@ -65,6 +65,7 @@ namespace Http
             response = context.response
 
             query = request.query.q
+            continuation = request.query.continuation
 
             searchFilters = {}
             sort = request.query.sort
@@ -88,13 +89,21 @@ namespace Http
                 searchFilters.features = features.Split(",")
             end if
 
-            feeds = InnertubeService.Search(query, searchFilters)
+            options = {}
+            if searchFilters.Count() > 0
+                options.searchFilters = searchFilters
+            end if
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
+            feeds = InnertubeService.Search(query, options)
             if not IsArray(feeds) or feeds.Count() = 0
                 response.Default(500, "Failed to search")
                 return true
             end if
 
-            response.Json(ValidArray(feeds[0].items))
+            response.Json(feeds[0])
             return true
         end function
 
@@ -138,18 +147,23 @@ namespace Http
 
             playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
 
-            playlist = InnertubeService.GetPlaylist(playlistId)
+            options = {}
+            continuation = request.query.continuation
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
+            playlist = InnertubeService.GetPlaylist(playlistId, options)
             if playlist = invalid
                 response.Default(500, "Failed to get playlist")
                 return true
             end if
 
-            ' TODO: Implement continuation
             index = request.query.index
             if not StringUtils.IsNullOrEmpty(index)
                 index = index.ToInt()
-                if index > 0
-                    LogWarn("Playlist continuation is not implemented yet")
+                if index > 1
+                    LogError("Playlet backend does not use playlist pagination (use continuation instead)")
                     playlist.videos = []
                 end if
             end if
@@ -166,9 +180,16 @@ namespace Http
             channelAndTab = route.Mid("/playlet-invidious-backend/api/v1/channels/".Len())
             channelAndTab = channelAndTab.Split("/")
 
+            options = {}
+            continuation = request.query.continuation
+
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
             if channelAndTab.Count() = 1
                 channelId = channelAndTab[0]
-                channel = InnertubeService.GetChannel(channelId)
+                channel = InnertubeService.GetChannel(channelId, options)
                 if channel = invalid
                     response.Default(500, "Failed to get channel")
                     return true
@@ -180,22 +201,33 @@ namespace Http
                 channelId = channelAndTab[0]
                 _tab = channelAndTab[1]
 
-                params = ValidString(request.query.params)
+                params = request.query.params
+                if not StringUtils.IsNullOrEmpty(params)
+                    options.params = params
+                end if
 
-                channel = InnertubeService.GetChannel(channelId, { "params": params })
+                channel = InnertubeService.GetChannel(channelId, options)
                 if channel = invalid
                     response.Default(500, "Failed to get channel")
                     return true
                 end if
 
                 if _tab = "playlists" or _tab = "podcasts" or _tab = "releases"
-                    response.Json({
+                    result = {
                         "playlists": channel.items
-                    })
+                    }
+                    if channel.DoesExist("continuation")
+                        result.continuation = channel.continuation
+                    end if
+                    response.Json(result)
                 else
-                    response.Json({
+                    result = {
                         "videos": channel.items
-                    })
+                    }
+                    if channel.DoesExist("continuation")
+                        result.continuation = channel.continuation
+                    end if
+                    response.Json(result)
                 end if
 
                 return true

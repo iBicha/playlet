@@ -84,8 +84,24 @@ namespace InnertubeService
         }
     end function
 
-    function Search(query as string, searchFilters as object, cancellation = invalid as object) as object
-        return Innertube.Search(query, searchFilters, cancellation)
+    function Search(query as string, options = invalid as object) as object
+        searchFilters = invalid
+        continuation = ""
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("searchFilters")
+                searchFilters = options.searchFilters
+            end if
+            if options.DoesExist("continuation")
+                continuation = options.continuation
+            end if
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        return Innertube.Search(query, searchFilters, continuation, cancellation)
     end function
 
     function GetTrending(options = invalid as object) as object
@@ -150,7 +166,7 @@ namespace InnertubeService
             end if
         end if
 
-        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, "")
+        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv)
         if access_token <> invalid
             request.Header("Authorization", "Bearer " + access_token)
         end if
@@ -166,19 +182,23 @@ namespace InnertubeService
     end function
 
     function GetChannel(channelId as string, options = invalid as object) as object
-        cancellation = invalid
+        continuation = ""
         params = ""
+        cancellation = invalid
 
         if options <> invalid
-            if options.DoesExist("cancellation")
-                cancellation = options.cancellation
+            if options.DoesExist("continuation")
+                continuation = options.continuation
             end if
             if options.DoesExist("params")
                 params = options.params
             end if
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
         end if
 
-        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, params)
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, params, continuation)
         request.Cancellation(cancellation)
 
         response = request.Await()
@@ -191,9 +211,13 @@ namespace InnertubeService
     end function
 
     function GetPlaylist(playlistId as string, options = invalid as object) as object
+        continuation = ""
         cancellation = invalid
 
         if options <> invalid
+            if options.DoesExist("continuation")
+                continuation = options.continuation
+            end if
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
@@ -203,7 +227,7 @@ namespace InnertubeService
             playlistId = "VL" + playlistId
         end if
 
-        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "")
+        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "", continuation)
         request.Cancellation(cancellation)
 
         response = request.Await()

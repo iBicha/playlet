@@ -3,18 +3,22 @@ import "pkg:/components/Services/Innertube/Parser.bs"
 
 namespace Innertube
 
-    function Search(query as string, searchFilters as object, cancellation = invalid as object) as object
+    function Search(query as string, searchFilters as object, continuation = "" as string, cancellation = invalid as object) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
-            query: query
             context: Innertube.CreateContext(Innertube.ClientType.WEB, deviceInfo, "")
         }
 
-        if searchFilters <> invalid and searchFilters.Count() > 0
-            params = Innertube.GetEncodedSearchFilters(searchFilters)
-            if params <> ""
-                payload["params"] = Innertube.GetEncodedSearchFilters(searchFilters)
+        if continuation <> ""
+            payload["continuation"] = continuation
+        else
+            payload["query"] = query
+            if searchFilters <> invalid and searchFilters.Count() > 0
+                params = Innertube.GetEncodedSearchFilters(searchFilters)
+                if params <> ""
+                    payload["params"] = Innertube.GetEncodedSearchFilters(searchFilters)
+                end if
             end if
         end if
 

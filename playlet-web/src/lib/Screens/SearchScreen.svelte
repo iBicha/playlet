@@ -21,6 +21,7 @@
   let searchBoxText = "";
   let suggestions: { suggestions: any[] } = { suggestions: [] };
   let page = 1;
+  let searchContinuation = "";
   let videos = [];
   let searchHistory = [];
   let isLoading = false;
@@ -85,11 +86,12 @@
   async function suggestionClicked(query) {
     searchBoxText = query;
     page = 1;
+    searchContinuation = "";
     videos = [];
-    await searchVideos();
+    await searchVideos("");
   }
 
-  async function searchVideos() {
+  async function searchVideos(continuation: string | undefined) {
     suggestions = { suggestions: [] };
     if (searchBoxText.length === 0) {
       return;
@@ -97,12 +99,14 @@
 
     try {
       isLoading = true;
-      const newVideos = await invidiousApi.search(
+      const response = await invidiousApi.search(
         searchBoxText,
         searchFilters,
-        page
+        page,
+        continuation
       );
-      videos = [...videos, ...newVideos];
+      videos = [...videos, ...response.items];
+      searchContinuation = response.continuation || "";
     } finally {
       isLoading = false;
     }
@@ -122,7 +126,7 @@
         e.preventDefault();
         page = 1;
         videos = [];
-        await searchVideos();
+        await searchVideos("");
       }}
     >
       <div class="join w-full border border-neutral rounded-full">
@@ -148,7 +152,7 @@
           on:click={async () => {
             page = 1;
             videos = [];
-            await searchVideos();
+            await searchVideos("");
           }}
         >
           <div class="h-6">
@@ -206,7 +210,7 @@
           class="btn w-1/2"
           on:click={async () => {
             page++;
-            await searchVideos();
+            await searchVideos(searchContinuation);
           }}
         >
           {$tr("Load more")}

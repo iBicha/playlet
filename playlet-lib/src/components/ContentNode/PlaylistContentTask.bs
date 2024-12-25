@@ -18,7 +18,10 @@ function PlaylistContentTask(input as object) as object
 
     while true
         index = contentNode.getChildCount()
-        response = service.GetPlaylist(contentNode.playlistId, index, m.top.cancellation)
+        continuation = contentNode.continuation
+        hadContinuation = not StringUtils.IsNullOrEmpty(continuation)
+
+        response = service.GetPlaylist(contentNode.playlistId, index, continuation, m.top.cancellation)
 
         if m.top.cancel
             contentNode.loadState = FeedLoadState.None
@@ -59,7 +62,8 @@ function PlaylistContentTask(input as object) as object
 
         videoCount = ValidInt(metadata.videoCount)
 
-        if metadata.videos.Count() = 0 or childCount >= videoCount
+        hasContinuation = not StringUtils.IsNullOrEmpty(metadata.continuation)
+        if (hadContinuation and not hasContinuation) or (metadata.videos.Count() = 0 or childCount >= videoCount)
             contentNode.loadState = FeedLoadState.Loaded
             return {
                 success: true
