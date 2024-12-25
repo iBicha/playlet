@@ -55,6 +55,7 @@ function VideoRowListRowContentTask(input as object) as object
             end if
 
             feedSource = service.MarkFeedPagination(feedContentNode)
+            hadContinuation = not StringUtils.IsNullOrEmpty(feedSource.state.continuation)
 
             response = service.MakeRequest(feedSource, feedSource.state.queryParams, m.top.cancellation)
 
@@ -109,13 +110,11 @@ function VideoRowListRowContentTask(input as object) as object
             feedContentNode.appendChildren(itemNodes)
 
             hasContinuation = not StringUtils.IsNullOrEmpty(response.result.continuation)
-            if hasContinuation
-                feedSource.state.continuation = response.result.continuation
-            end if
+            feedSource.state.continuation = ValidString(response.result.continuation)
 
             if response.result.items.Count() > 0
                 pageType = feedSource.state.paginationType
-                if response.result.isLastPage = true
+                if response.result.isLastPage = true or (hadContinuation and not hasContinuation)
                     feedSource.state.loadState = FeedLoadState.Loaded
                 else if hasContinuation
                     feedSource.state.loadState = FeedLoadState.LoadedPage

@@ -221,11 +221,14 @@ namespace Invidious
             feedSourceState.paginationType = endpoint.paginationType
 
             continuation = feedSourceState.continuation
-            if feedSourceState.paginationType = PaginationType.Continuation or not StringUtils.IsNullOrEmpty(continuation)
-                if not StringUtils.IsNullOrEmpty(continuation)
+            hasContinuation = not StringUtils.IsNullOrEmpty(continuation)
+            if not hasContinuation
+                feedSourceState.queryParams.Delete("continuation")
+            end if
+
+            if feedSourceState.paginationType = PaginationType.Continuation or hasContinuation
+                if hasContinuation
                     feedSourceState.queryParams.continuation = continuation
-                else
-                    feedSourceState.queryParams.Delete("continuation")
                 end if
                 feedSourceState.queryParams.Delete("page")
             else if feedSourceState.paginationType = PaginationType.Pages
