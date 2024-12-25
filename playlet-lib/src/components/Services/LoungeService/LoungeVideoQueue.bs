@@ -33,10 +33,7 @@ namespace LoungeVideoQueue
             if queueNodesDict.DoesExist(vId)
                 newQueueNodes.Push(queueNodesDict[vId])
             else
-                payload = {
-                    "type": "video"
-                    "videoId": vId
-                }
+                payload = CreateVideoPayload(vId)
 
                 if instance = invalid
                     instance = invService.GetInstance()
@@ -97,10 +94,7 @@ namespace LoungeVideoQueue
                     preferences = videoQueueNode.preferences
                     queueNotifications = preferences["misc.queue_notifications"]
                     if queueNotifications
-                        payload = {
-                            "type": "video"
-                            "videoId": eventVideoId
-                        }
+                        payload = CreateVideoPayload(eventVideoId)
 
                         if instance = invalid
                             instance = invService.GetInstance()
@@ -117,4 +111,36 @@ namespace LoungeVideoQueue
         end if
     end function
 
+    function CreateVideoPayload(videoId as string) as object
+        return {
+            "type": "video"
+            "videoId": videoId
+            "videoThumbnails": [
+                {
+                    "quality": "maxres"
+                    "url": `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+                    "width": 1280
+                    "height": 720
+                }
+                {
+                    "quality": "sddefault"
+                    "url": `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`
+                    "width": 640
+                    "height": 480
+                }
+                {
+                    "quality": "high"
+                    "url": `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+                    "width": 480
+                    "height": 360
+                }
+                {
+                    "quality": "medium"
+                    "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+                    "width": 320
+                    "height": 180
+                }
+            ]
+        }
+    end function
 end namespace

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Channels sub count in web app
 - Channel drag and drop in web app
+- Video thumbnail when adding to queue from lounge
 
 ### Removed
 
