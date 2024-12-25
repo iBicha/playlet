@@ -211,9 +211,13 @@ namespace InnertubeService
     end function
 
     function GetPlaylist(playlistId as string, options = invalid as object) as object
+        continuation = ""
         cancellation = invalid
 
         if options <> invalid
+            if options.DoesExist("continuation")
+                continuation = options.continuation
+            end if
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
@@ -223,7 +227,7 @@ namespace InnertubeService
             playlistId = "VL" + playlistId
         end if
 
-        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web)
+        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "", continuation)
         request.Cancellation(cancellation)
 
         response = request.Await()

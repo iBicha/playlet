@@ -162,7 +162,7 @@ namespace Invidious
             return request.Await()
         end function
 
-        function GetPlaylist(playlistId as string, index = 0 as integer, cancellation = invalid as object) as object
+        function GetPlaylist(playlistId as string, index = 0 as integer, continuation = "" as string, cancellation = invalid as object) as object
             authToken = m.invidiousNode.authToken
             ' There's no need to use auth, unless the playlist is from Invidious
             ' (starts with "IV") because it can be a private playlist from logged user.
@@ -176,7 +176,11 @@ namespace Invidious
                 request = HttpClient.Get(url)
             end if
 
-            request.QueryParam("index", index)
+            if continuation <> ""
+                request.QueryParam("continuation", continuation)
+            else
+                request.QueryParam("index", index)
+            end if
             request.Cancellation(cancellation)
 
             return request.Await()
@@ -377,9 +381,13 @@ namespace Invidious
 
             if statusCode = 200
                 json = response.Json()
-                return {
+                result = {
                     items: json.videos
                 }
+                if json.continuation <> invalid
+                    result.continuation = json.continuation
+                end if
+                return result
             end if
             return invalid
         end function

@@ -9,8 +9,8 @@ namespace Innertube
             return []
         end if
 
-        data = UnwrapContainer(responseData)
-        if data = invalid
+        containers = GetContainers(responseData)
+        if containers.Count() = 0
             return []
         end if
 
@@ -29,7 +29,7 @@ namespace Innertube
             generateVideoThumbnails: true
         })
 
-        Innertube.ParseNode(data, context)
+        Innertube.ParseNode(containers, context)
 
         if context.currentFeed <> invalid and (context.currentFeed.items.Count() > 0 or context.currentFeed.title <> "")
             context.feeds.Push(context.currentFeed)
@@ -208,26 +208,21 @@ namespace Innertube
         feeds = ParseResponse(responseData)
         if feeds.Count() > 0
             playlist["videos"] = ValidArray(feeds[0].items)
+            if feeds[0].DoesExist("continuation")
+                playlist["continuation"] = feeds[0].continuation
+            end if
         end if
 
         return playlist
     end function
 
-    function UnwrapContainer(responseData as object) as object
-        if responseData.DoesExist("contents")
-            return responseData["contents"]
-        end if
-        if responseData.DoesExist("response")
-            return responseData["response"]
-        end if
-        if responseData.DoesExist("onResponseReceivedActions")
-            return responseData["onResponseReceivedActions"]
-        end if
-        if responseData.DoesExist("onResponseReceivedCommands")
-            return responseData["onResponseReceivedCommands"]
-        end if
-
-        return responseData
+    function GetContainers(responseData as object) as object
+        return [
+            responseData["contents"]
+            responseData["response"]
+            responseData["onResponseReceivedActions"]
+            responseData["onResponseReceivedCommands"]
+        ]
     end function
 
 end namespace

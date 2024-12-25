@@ -147,18 +147,23 @@ namespace Http
 
             playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
 
-            playlist = InnertubeService.GetPlaylist(playlistId)
+            options = {}
+            continuation = request.query.continuation
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
+            playlist = InnertubeService.GetPlaylist(playlistId, options)
             if playlist = invalid
                 response.Default(500, "Failed to get playlist")
                 return true
             end if
 
-            ' TODO: Implement continuation
             index = request.query.index
             if not StringUtils.IsNullOrEmpty(index)
                 index = index.ToInt()
-                if index > 0
-                    LogWarn("Playlist continuation is not implemented yet")
+                if index > 1
+                    LogError("Playlet backend does not use playlist pagination (use continuation instead)")
                     playlist.videos = []
                 end if
             end if
