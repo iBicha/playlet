@@ -45,6 +45,7 @@ namespace Innertube
             "gridVideoRenderer": ParseGridVideoRenderer
             "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
             "playlistVideoRenderer": ParsePlaylistVideoRenderer
+            "playlistPanelVideoRenderer": ParsePlaylistPanelVideoRenderer
             "channelRenderer": ParseChannelRenderer
             "gridChannelRenderer": ParseGridChannelRenderer
             "playlistRenderer": ParsePlaylistRenderer
@@ -69,6 +70,9 @@ namespace Innertube
             "horizontalCardListRenderer": ParseNotImplemented
             ' expandableTabRenderer contains the search tab with a channel. Ignored.
             "expandableTabRenderer": ParseNotImplemented
+            ' Usually contains a "X unavailable video(s) are hidden" message. Ignored.
+            "messageRenderer": ParseNotImplemented
+            ' Obviously ignored.
             "clickTrackingParams": ParseNotImplemented
         }
     end function
@@ -374,6 +378,64 @@ namespace Innertube
             "index": ParseText(nodeData["index"]).ToInt()
             "lengthText": lengthText
             "lengthSeconds": lengthSeconds
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParsePlaylistPanelVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
+        if not liveNow
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    if ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE"
+                        liveNow = true
+                        exit for
+                    end if
+                end for
+            end if
+        end if
+
+        lengthText = ParseText(nodeData["lengthText"])
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "author": author
+            "authorId": authorId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": videoThumbnails
+            "lengthText": lengthText
+            "liveNow": liveNow
         }
 
         PushFeedItem(video, context)
