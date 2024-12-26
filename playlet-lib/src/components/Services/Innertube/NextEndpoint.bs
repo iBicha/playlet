@@ -1,12 +1,26 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/protos/params.proto.gen.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
 namespace Innertube
 
-    function CreateNextRequest(videoId as string, ctt as string) as object
+    function CreateNextRequest(videoId as string, params as string, ctt as string) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
-            "videoId": videoId
             "context": Innertube.CreateContext(Innertube.ClientType.Web, deviceInfo, ctt)
         }
+
+        if videoId <> ""
+            payload["videoId"] = videoId
+        end if
+
+        if params <> ""
+            payload["params"] = params
+        end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", payload)
         request.Headers({
@@ -18,6 +32,16 @@ namespace Innertube
         })
 
         return request
+    end function
+
+    function GetEncodedNextParams(videoIds as object) as string
+        if not IsArray(videoIds) or videoIds.Count() = 0
+            return ""
+        end if
+
+        return Protobuf.Generated.misc.encodeNextParams({
+            "video_id": videoIds
+        })
     end function
 
     function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object

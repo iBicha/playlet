@@ -38,7 +38,7 @@ namespace InnertubeService
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = Innertube.CreateNextRequest(videoId, ctt)
+            nextRequest = Innertube.CreateNextRequest(videoId, "", ctt)
             nextRequest.Cancellation(cancellation)
             nextRequest.Send()
         end if
@@ -72,6 +72,60 @@ namespace InnertubeService
         end if
 
         return playerResponse
+    end function
+
+    function GetVideoInfoBatched(videoIds as object, options = invalid as object) as object
+        if not IsArray(videoIds) or videoIds.Count() = 0
+            return []
+        end if
+
+        cancellation = invalid
+        retry = true
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+            if options.DoesExist("retry")
+                retry = options.retry
+            end if
+        end if
+
+        params = Innertube.GetEncodedNextParams(videoIds)
+        request = Innertube.CreateNextRequest("", params, "")
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return []
+        end if
+
+        responseData = ObjectUtils.Dig(response.Json(), ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
+        if responseData = invalid
+            ' Sometimes the response doesn't contain a playlist.
+            ' The theory here is that Innertube creates a playlist for the videoIds, and sometimes
+            ' it chooses to respond without the playlist (perhaps to avoid slow responses).
+            ' A retry after a short sleep usually fixes this.
+            if retry
+                LogWarn("Response data missing playlist. Retrying in a bit...")
+                newOptions = {}
+                if options <> invalid
+                    newOptions.Append(options)
+                end if
+                newOptions["retry"] = false
+                sleep(200 + Rnd(500))
+                return GetVideoInfoBatched(videoIds, newOptions)
+            else
+                LogWarn("Response data missing playlist. Not retrying.")
+            end if
+        end if
+
+        feeds = Innertube.ParseResponse(responseData)
+        if feeds.Count() > 0
+            return ValidArray(feeds[0].items)
+        end if
+
+        return []
     end function
 
     function SearchSuggestions(q as string, cancellation = invalid as object) as object

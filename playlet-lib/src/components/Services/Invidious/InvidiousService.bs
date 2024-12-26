@@ -1,4 +1,5 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
@@ -562,22 +563,39 @@ namespace Invidious
             end if
 
             json = response.Json()
-            if json = invalid
+            if not IsArray(json)
                 return invalid
             end if
 
             videos = []
-            for each item in json
-                videos.push({
-                    "type": "video"
-                    "videoId": item
-                    "videoThumbnails": [{
-                        "quality": "medium"
-                        "url": `https://i.ytimg.com/vi/${item}/mqdefault.jpg`
-                        "width": 320
-                        "height": 180
-                    }]
-                })
+            if json.Count() = 0
+                return {
+                    items: videos
+                }
+            end if
+
+            videoMetadata = InnertubeService.GetVideoInfoBatched(json)
+            videoDictionary = {}
+            for each video in videoMetadata
+                videoDictionary[video.videoId] = video
+            end for
+
+            for each videoId in json
+                video = videoDictionary[videoId]
+                if video = invalid
+                    video = {
+                        "type": "video"
+                        "videoId": videoId
+                        "videoThumbnails": [{
+                            "quality": "medium"
+                            "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+                            "width": 320
+                            "height": 180
+                        }]
+                    }
+                end if
+
+                videos.push(video)
             end for
 
             return {
