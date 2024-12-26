@@ -110,6 +110,9 @@
     try {
       isLoading = true;
       videoMetadata = await PlayletApi.getVideoInfo(videoId);
+      if (videoMetadata?.error) {
+        throw videoMetadata.error;
+      }
       videoStartAtChecked = timestamp !== undefined;
       if (videoStartAtChecked) {
         videoStartAtTimestamp = timestamp;
