@@ -412,17 +412,14 @@ namespace Innertube
             end if
         end if
 
+        isUpcoming = false
         liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
-        if not liveNow
-            thumbnailOverlays = nodeData["thumbnailOverlays"]
-            if IsArray(thumbnailOverlays)
-                for each overlay in thumbnailOverlays
-                    if ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE"
-                        liveNow = true
-                        exit for
-                    end if
-                end for
-            end if
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                liveNow = liveNow or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE")
+                isUpcoming = isUpcoming or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "UPCOMING")
+            end for
         end if
 
         lengthText = ParseText(nodeData["lengthText"])
@@ -436,6 +433,7 @@ namespace Innertube
             "videoThumbnails": videoThumbnails
             "lengthText": lengthText
             "liveNow": liveNow
+            "isUpcoming": isUpcoming
         }
 
         PushFeedItem(video, context)
