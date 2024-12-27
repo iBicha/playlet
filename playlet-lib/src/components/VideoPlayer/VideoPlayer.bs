@@ -179,7 +179,11 @@ function OnVideoContentTaskResults(output as object) as void
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
         dialog = DialogUtils.ShowTimedDialogButtons(message, title, buttons, 0, 10, true)
-        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+        if dialog <> invalid
+            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+        else
+            OnVideoContentTaskErrorDialogResponse(invalid)
+        end if
 
         Lounge.SendOnStateChange()
         return
@@ -246,9 +250,12 @@ function OnPreviousPlayerState(event as object) as void
 end function
 
 function OnVideoContentTaskErrorDialogResponse(event as object)
-    dialog = event.getRoSGNode()
-    dialog.unobserveFieldScoped("wasClosed")
-    shouldPlayNext = dialog.actualButtonSelected = 0
+    shouldPlayNext = false
+    if event <> invalid
+        dialog = event.getRoSGNode()
+        dialog.unobserveFieldScoped("wasClosed")
+        shouldPlayNext = dialog.actualButtonSelected = 0
+    end if
 
     if not shouldPlayNext or not VideoQueueUtils.PlayNext(m.videoQueue, m.invidious, m.preferences)
         if m.top.isSameNode(m.videoQueue.player)
@@ -294,7 +301,11 @@ function OnClose()
     catch error
         errorMessage = ErrorUtils.Format(error)
         LogError("Error stopping video:", errorMessage)
-        DialogUtils.ShowDialog(errorMessage, Tr(Locale.VideoPlayer.ErrorClosingVideo), true)
+        DialogUtils.ShowDialogEx({
+            message: errorMessage
+            title: Tr(Locale.VideoPlayer.ErrorClosingVideo)
+            large: true
+        })
     end try
 
     m.top.content = invalid
@@ -383,7 +394,11 @@ function OnVideoPlayerStateChange() as void
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
         dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, buttons, 0, 10, true)
-        dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+        if dialog <> invalid
+            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+        else
+            OnVideoContentTaskErrorDialogResponse(invalid)
+        end if
         m.ignoreNextFinishedState = true
     end if
 end function

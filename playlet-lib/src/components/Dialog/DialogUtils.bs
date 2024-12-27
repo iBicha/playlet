@@ -1,31 +1,67 @@
 import "pkg:/source/utils/Locale.bs"
 
 namespace DialogUtils
-    function ShowDialog(message as dynamic, title as string, large = false as boolean) as object
-        return ShowDialogButtons(message, title, [Tr(Locale.Buttons.OK)], large)
-    end function
 
-    function ShowDialogButtons(message as dynamic, title as string, buttons as object, large = false as boolean) as object
-        dialog = CreateObject("roSGNode", "SimpleDialog")
-        if GetInterface(message, "ifArray") = invalid
-            message = message.Tokenize(`\n`).ToArray()
+    function ShowDialogEx(options as object) as object
+        currentDialog = m.top.getScene().dialog
+        alwaysOnTop = false
+        if options.DoesExist("alwaysOnTop")
+            alwaysOnTop = options.alwaysOnTop
         end if
-        dialog.message = message
-        dialog.title = title
-        dialog.buttons = buttons
-        if large
+
+        if currentDialog <> invalid and ValidBool(currentDialog.alwaysOnTop)
+            if not alwaysOnTop
+                return invalid
+            end if
+        end if
+
+        dialog = CreateObject("roSGNode", "SimpleDialog")
+        dialog.alwaysOnTop = alwaysOnTop
+
+        if options.DoesExist("message")
+            message = options.message
+            if GetInterface(message, "ifArray") = invalid
+                message = message.Tokenize(`\n`).ToArray()
+            end if
+            dialog.message = message
+        end if
+
+        if options.DoesExist("title")
+            dialog.title = options.title
+        end if
+
+        if options.DoesExist("buttons")
+            dialog.buttons = options.buttons
+        else
+            dialog.buttons = [Tr(Locale.Buttons.OK)]
+        end if
+
+        if options.DoesExist("large") and options.large
             if m._deviceDisplayWidth = invalid
                 deviceInfo = CreateObject("roDeviceInfo")
                 displaySize = deviceInfo.GetDisplaySize()
                 m._deviceDisplayWidth = displaySize.w
             end if
             dialog.width = m._deviceDisplayWidth - 100
+        else if options.DoesExist("marginWidth")
+            if m._deviceDisplayWidth = invalid
+                deviceInfo = CreateObject("roDeviceInfo")
+                displaySize = deviceInfo.GetDisplaySize()
+                m._deviceDisplayWidth = displaySize.w
+            end if
+            dialog.width = m._deviceDisplayWidth - options.marginWidth
         end if
+
         m.top.getScene().dialog = dialog
         return dialog
     end function
 
     function ShowTimedDialogButtons(message as dynamic, title as string, buttons as object, defaultButton as integer, timeoutSeconds as integer, large = false as boolean) as object
+        currentDialog = m.top.getScene().dialog
+        if currentDialog <> invalid and ValidBool(currentDialog.alwaysOnTop)
+            return invalid
+        end if
+
         dialog = CreateObject("roSGNode", "TimedDialog")
         if GetInterface(message, "ifArray") = invalid
             message = message.Tokenize(`\n`).ToArray()
@@ -53,4 +89,5 @@ namespace DialogUtils
 
         return dialog
     end function
+
 end namespace
