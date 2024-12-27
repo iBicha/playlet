@@ -1,3 +1,4 @@
+'import "pkg:/components/Dialog/DialogUtils.bs"
 'import "pkg:/components/EcpArgs.bs"
 'import "pkg:/components/parts/AutoBind/AutoBind.part.bs"
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
@@ -33,24 +34,17 @@ function StartWebServer()
 end function
 
 function ShowAnnouncement()
-    title = "Announcement - Playlet backend"
-    message = [
-        "An experimental built-in backend has been added to Playlet."
-        "This allows you to access YouTube content without the need for an Invidious instance."
-        "To use it, go to the Settings > Invidious > Instance and set the field to empty (Edit, and delete the url)."
-        "Please note that it's missing some features and may not work as expected."
-        "Thank you for using Playlet!"
-    ]
-    buttons = [
-        Tr("OK")
-    ]
-    dialog = CreateObject("roSGNode", "SimpleDialog")
-    dialog.title = title
-    dialog.message = message
-    dialog.buttons = buttons
-    deviceInfo = CreateObject("roDeviceInfo")
-    displaySize = deviceInfo.GetDisplaySize()
-    dialog.width = displaySize.w - 180
-    m.top.getScene().dialog = dialog
+    DialogUtils_ShowDialogEx({
+        title: "Announcement - Playlet backend"
+        message: [
+            "An experimental built-in backend has been added to Playlet."
+            "This allows you to access YouTube content without the need for an Invidious instance."
+            "To use it, go to the Settings > Invidious > Instance and set the field to empty (Edit, and delete the url)."
+            "Please note that it's missing some features and may not work as expected."
+            "Thank you for using Playlet!"
+        ]
+        alwaysOnTop: true
+        marginWidth: 180
+    })
 end function
 '//# sourceMappingURL=./MainScene.brs.map
