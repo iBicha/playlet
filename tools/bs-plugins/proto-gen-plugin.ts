@@ -14,6 +14,8 @@ const protobufSchema = require('protocol-buffers-schema')
 export class ProtoGenPlugin implements CompilerPlugin {
   public name = 'ProtoGenPlugin';
 
+  private currentFileHash: string | undefined;
+
   afterProgramCreate(program: Program) {
     // @ts-ignore
     program.options.forceGenerateProtos = true;
@@ -38,7 +40,7 @@ export class ProtoGenPlugin implements CompilerPlugin {
     program.logger.info(`Generating proto from ${protoFile}`);
 
     const protoContent = readFileSync(protoFile, 'binary');
-    const protoHash = md5(protoContent).toString();
+    const protoHash = md5(protoContent + this.getCurrentFileHash()).toString();
 
     if (!forceGenerateProtos && existsSync(outputFile)) {
       const firstLine = readFileSync(outputFile, 'utf8').split('\n')[1];
@@ -247,6 +249,16 @@ end function`;
     });
 
     return new Formatter(options);
+  }
+
+  getCurrentFileHash() {
+    // hash current file (this plugin) - if it changes, it invalidates all generated files
+    if (this.currentFileHash) {
+      return this.currentFileHash;
+    }
+    const pluginContent = readFileSync(__filename, 'binary');
+    this.currentFileHash = md5(pluginContent).toString();
+    return this.currentFileHash;
   }
 }
 
