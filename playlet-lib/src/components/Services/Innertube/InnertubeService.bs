@@ -38,7 +38,7 @@ namespace InnertubeService
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = Innertube.CreateNextRequest(videoId, "", ctt)
+            nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, ctt)
             nextRequest.Cancellation(cancellation)
             nextRequest.Send()
         end if
@@ -92,7 +92,7 @@ namespace InnertubeService
         end if
 
         params = Innertube.GetEncodedNextParams(videoIds)
-        request = Innertube.CreateNextRequest("", params, "")
+        request = Innertube.CreateNextRequest({ "params": params }, "")
         request.Cancellation(cancellation)
 
         response = request.Await()
@@ -330,6 +330,33 @@ namespace InnertubeService
         end if
 
         return result
+    end function
+
+    function GetMix(mixId as string, options = invalid as object) as object
+        videoId = ""
+        cancellation = invalid
+
+        if options <> invalid
+            if options.DoesExist("videoId")
+                videoId = options.videoId
+            end if
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        request = Innertube.CreateNextRequest({ "videoId": videoId, "playlistId": mixId }, "")
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        json = response.Json()
+        return Innertube.ParseMixPageResponseData(json)
     end function
 
     function ResolveUrl(url as string, options = invalid as object) as object
