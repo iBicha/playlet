@@ -31,6 +31,7 @@ namespace Innertube
         return {
             "twoColumnSearchResultsRenderer": ParseTwoColumnSearchResultsRenderer
             "twoColumnBrowseResultsRenderer": ParseTwoColumnBrowseResultsRenderer
+            "watchNextEndScreenRenderer": ParseWatchNextEndScreenRenderer
             "tabRenderer": ParseTabRenderer
             "sectionListRenderer": ParseSectionListRenderer
             "itemSectionRenderer": ParseItemSectionRenderer
@@ -46,6 +47,7 @@ namespace Innertube
             "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
             "playlistVideoRenderer": ParsePlaylistVideoRenderer
             "playlistPanelVideoRenderer": ParsePlaylistPanelVideoRenderer
+            "endScreenVideoRenderer": ParseEndScreenVideoRenderer
             "channelRenderer": ParseChannelRenderer
             "gridChannelRenderer": ParseGridChannelRenderer
             "playlistRenderer": ParsePlaylistRenderer
@@ -83,6 +85,10 @@ namespace Innertube
 
     function ParseTwoColumnBrowseResultsRenderer(nodeData as object, _context as object) as object
         return nodeData["tabs"]
+    end function
+
+    function ParseWatchNextEndScreenRenderer(nodeData as object, _context as object) as object
+        return nodeData["results"]
     end function
 
     function ParseTabRenderer(nodeData as object, context as object) as object
@@ -434,6 +440,38 @@ namespace Innertube
             "lengthText": lengthText
             "liveNow": liveNow
             "isUpcoming": isUpcoming
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseEndScreenVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["shortBylineText", "ownerText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "author": author
+            "authorId": authorId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
         }
 
         PushFeedItem(video, context)

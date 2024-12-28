@@ -26,13 +26,12 @@ namespace Innertube
         }
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
-        request.Headers({
+        headers = {
             "accept": "*/*"
             "accept-language": "*"
-            "user-agent": INNERTUBE_IOS_USER_AGENT
-            "x-youtube-client-name": INNERTUBE_IOS_CLIENT_NAME
-            "x-youtube-client-version": INNERTUBE_IOS_CLIENT_VERSION
-        })
+        }
+        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.IOS))
+        request.Headers(headers)
 
         return request
     end function
@@ -40,16 +39,14 @@ namespace Innertube
     function ParseInnertubePlayerResponse(payload as object) as object
         if not IsAssociativeArray(payload)
             return {
-                Success: false
-                Error: "Invalid payload"
+                error: "Invalid payload"
             }
         end if
 
         playabilityStatus = payload["playabilityStatus"]
         if not IsAssociativeArray(playabilityStatus)
             return {
-                Success: false
-                Error: "Invalid playability status"
+                error: "Invalid playability status"
             }
         end if
 
@@ -59,22 +56,9 @@ namespace Innertube
                 errorMessage = playabilityStatus["reason"]
             end if
 
-            subreason = ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"])
-            if IsAssociativeArray(subreason)
-                subreasonText = ""
-                runs = subreason["runs"]
-                if IsArray(runs)
-                    for each rn in runs
-                        text = rn["text"]
-                        if IsString(text)
-                            subreasonText += text
-                        end if
-                    end for
-                end if
-                subreason = subreasonText
-            end if
+            subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
 
-            if IsString(subreason)
+            if subreason <> ""
                 errorMessage += `\n` + subreason
             end if
 
@@ -83,24 +67,21 @@ namespace Innertube
             end if
 
             return {
-                Success: false
-                Error: errorMessage
+                error: errorMessage
             }
         end if
 
         videoDetails = payload["videoDetails"]
         if not IsAssociativeArray(videoDetails)
             return {
-                Success: false
-                Error: "Invalid video details"
+                error: "Invalid video details"
             }
         end if
 
         streamingData = payload["streamingData"]
         if not IsAssociativeArray(streamingData)
             return {
-                Success: false
-                Error: "Invalid streaming data"
+                error: "Invalid streaming data"
             }
         end if
 
@@ -123,10 +104,7 @@ namespace Innertube
             "recommendedVideos": []
         }
 
-        return {
-            Success: true
-            Metadata: videoInfo
-        }
+        return videoInfo
     end function
 
     function ParseStoryboards(payload as object, lengthSeconds as integer) as object

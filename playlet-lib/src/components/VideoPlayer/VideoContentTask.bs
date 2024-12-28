@@ -21,45 +21,36 @@ function VideoContentTask(input as object) as object
 
     backend = preferencesNode["playback.backend"]
     if backend = "playlet"
-        response = InnertubeService.GetVideoMetadata(contentNode.videoId, {
+        metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
             cancellation: m.top.cancellation
             ctt: loungeServiceNode.ctt
         })
     else
-        response = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+        metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
     end if
 
     if m.top.cancel
         return invalid
     end if
 
-    metadata = response.Json()
-
-    if not response.IsSuccess() or metadata = invalid
-        errorMessage = response.ErrorMessage()
-        knownIssue = `{"error":"This helps protect our community. Learn more"}`
-
-        if errorMessage.InStr(knownIssue) <> -1
-            errorMessage = `NOTE: Please see the following link for more information about the error\nhttps://github.com/iBicha/playlet/issues/400\n` + errorMessage
-        end if
-
-        return {
-            success: false
-            error: errorMessage
-        }
-    end if
-
     contentNode.title = metadata.title
     contentNode.secondaryTitle = metadata.author
     contentNode.live = metadata.liveNow
 
-    if IsString(metadata.error)
+    if metadata.error <> invalid
+        errorMessage = metadata.error
+        knownIssue = `{"error":"This helps protect our community. Learn more"}`
+
+        if metadata.error.InStr(knownIssue) <> -1
+            errorMessage = `NOTE: Please see the following link for more information about the error\nhttps://github.com/iBicha/playlet/issues/400\n` + errorMessage
+        end if
+
         ' Adding metadata allows us to play next recommended video after displaying the error
         contentNode.addFields({ metadata: metadata })
 
         return {
             success: false
-            error: metadata.error
+            error: errorMessage
         }
     end if
 

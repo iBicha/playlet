@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Crash in player when video ID is invalid
+- [Perf] better caching in Playlet backend
 
 ## [0.35.2] - 2024-12-27
 

@@ -111,6 +111,12 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
+
+            if not response.IsSuccess()
+                return {
+                    error: response.ErrorMessage()
+                }
+            end if
             return response.Json()
         end function
 
@@ -160,7 +166,14 @@ namespace Invidious
                 end function)
             end if
 
-            return request.Await()
+            response = request.Await()
+            if not response.IsSuccess()
+                return {
+                    error: response.ErrorMessage()
+                }
+            end if
+
+            return response.Json()
         end function
 
         function GetPlaylist(playlistId as string, index = 0 as integer, continuation = "" as string, cancellation = invalid as object) as object
@@ -574,11 +587,16 @@ namespace Invidious
                 }
             end if
 
-            videoMetadata = InnertubeService.GetVideoInfoBatched(json)
             videoDictionary = {}
-            for each video in videoMetadata
-                videoDictionary[video.videoId] = video
-            end for
+
+            videosMetadata = InnertubeService.GetVideoInfoBatched(json)
+            if not StringUtils.IsNullOrEmpty(videosMetadata.error)
+                LogError("Failed to load video metadata", videosMetadata.error)
+            else
+                for each video in videosMetadata.videos
+                    videoDictionary[video.videoId] = video
+                end for
+            end if
 
             for each videoId in json
                 video = videoDictionary[videoId]

@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/Parser.bs"
 import "pkg:/components/Services/Innertube/protos/params.proto.gen.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -23,13 +24,12 @@ namespace Innertube
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", payload)
-        request.Headers({
+        headers = {
             "accept": "*/*"
             "accept-language": "*"
-            "user-agent": INNERTUBE_WEB_USER_AGENT
-            "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
-            "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
-        })
+        }
+        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Web))
+        request.Headers(headers)
 
         return request
     end function
@@ -45,13 +45,13 @@ namespace Innertube
     end function
 
     function ParseInnertubeNextResponse(payload as object, parsedResponse as object) as object
-        if not parsedResponse.Success
+        if parsedResponse.error <> invalid
             LogWarn("Invalid parsed response", parsedResponse)
             return parsedResponse
         end if
 
-        if not IsArray(parsedResponse.Metadata.recommendedVideos)
-            LogWarn("Invalid recommended videos", parsedResponse.Metadata.recommendedVideos)
+        if not IsArray(parsedResponse.recommendedVideos)
+            LogWarn("Invalid recommended videos", parsedResponse.recommendedVideos)
             return parsedResponse
         end if
 
@@ -60,29 +60,12 @@ namespace Innertube
             return parsedResponse
         end if
 
-        endScreenVideos = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen", "watchNextEndScreenRenderer", "results"])
-        if not IsArray(endScreenVideos)
-            LogWarn("Invalid end screen videos", endScreenVideos)
-            return parsedResponse
+        endscreen = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen"])
+
+        feeds = Innertube.ParseResponseDataForFeeds(endscreen, { noContainers: true })
+        if feeds.Count() > 0
+            parsedResponse.recommendedVideos.Append(ValidArray(feeds[0].items))
         end if
-
-        for each video in endScreenVideos
-            videoId = ObjectUtils.Dig(video, ["endScreenVideoRenderer", "videoId"])
-            if videoId = invalid
-                LogWarn("Invalid video ID in end screen video", video)
-                continue for
-            end if
-
-            title = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "title", "simpleText"]))
-            author = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "shortBylineText", "runs", 0, "text"]))
-
-            parsedResponse.Metadata.recommendedVideos.Push({
-                "type": "video"
-                "videoId": videoId
-                "title": title
-                "author": author
-            })
-        end for
 
         return parsedResponse
     end function

@@ -27,21 +27,19 @@ function VideoContentTaskDev(input as object) as object
 
     backend = preferencesNode["playback.backend"]
     if backend = "playlet"
-        response = InnertubeService.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+        metadata = InnertubeService.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
     else
-        response = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+        metadata = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
     end if
 
     if m.top.cancel
         return invalid
     end if
 
-    metadata = response.Json()
-
-    if not response.IsSuccess() or metadata = invalid
+    if metadata.error <> invalid
         return {
             success: false
-            error: response.ErrorMessage()
+            error: metadata.error
         }
     end if
 

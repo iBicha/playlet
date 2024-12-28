@@ -35,13 +35,26 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            return invalid
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
-        json = response.Json()
-        return ParseResponse(json)
+        feeds = ParseResponseDataForFeeds(response.Json())
+
+        result = {
+            feeds: feeds
+        }
+
+        cacheControl = ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
+    ' Not part of search endpoint, but this function is fine here.
     function SearchSuggestions(query as string, cancellation = invalid as object) as object
         request = HttpClient.Get("https://suggestqueries.google.com/complete/search?hl=en&gl=US&ds=yt&client=youtube&xssi=t&oe=UTF&q=" + query.EncodeUriComponent())
         request.Headers({
@@ -51,7 +64,9 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            return invalid
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
         text = response.Text()
@@ -59,7 +74,9 @@ namespace Innertube
 
         parsed = ParseJson(text)
         if not IsArray(parsed) or parsed.Count() < 2
-            return invalid
+            return {
+                error: "Failed to parse search suggestions"
+            }
         end if
         parsed = parsed[1]
 
@@ -73,7 +90,16 @@ namespace Innertube
             suggestions.Push(sugg)
         end for
 
-        return suggestions
+        result = {
+            suggestions: suggestions
+        }
+
+        cacheControl = ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
 end namespace
