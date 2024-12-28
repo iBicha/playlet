@@ -45,11 +45,15 @@ namespace InnertubeService
 
         playerResponse = playerRequest.Await()
         if not playerResponse.IsSuccess()
-            return playerResponse
+            return {
+                error: playerResponse.ErrorMessage()
+            }
         end if
 
         if CancellationUtils.IsCancelled(cancellation)
-            return invalid
+            return {
+                error: "Cancelled"
+            }
         end if
 
         if fetchNext
@@ -57,18 +61,12 @@ namespace InnertubeService
         end if
 
         parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json())
+        if parsedResponse.error <> invalid
+            return parsedResponse
+        end if
 
         if fetchNext
             parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
-        end if
-
-        if parsedResponse <> invalid
-            if parsedResponse.Success
-                playerResponse.OverrideJson(parsedResponse.Metadata)
-            else
-                playerResponse.OverrideStatusCode(500)
-                playerResponse.OverrideErrorMessage(parsedResponse.Error)
-            end if
         end if
 
         return playerResponse
@@ -76,7 +74,9 @@ namespace InnertubeService
 
     function GetVideoInfoBatched(videoIds as object, options = invalid as object) as object
         if not IsArray(videoIds) or videoIds.Count() = 0
-            return []
+            return {
+                videos: []
+            }
         end if
 
         cancellation = invalid
@@ -97,10 +97,21 @@ namespace InnertubeService
 
         response = request.Await()
         if not response.IsSuccess()
-            return []
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
-        responseData = ObjectUtils.Dig(response.Json(), ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
+        responseData = response.Json()
+
+        error = Innertube.ParseResponseDataForError(responseData)
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        responseData = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
         if responseData = invalid
             ' Sometimes the response doesn't contain a playlist.
             ' The theory here is that Innertube creates a playlist for the videoIds, and sometimes
@@ -120,23 +131,20 @@ namespace InnertubeService
             end if
         end if
 
-        feeds = Innertube.ParseResponse(responseData)
+        feeds = Innertube.ParseResponseDataForFeeds(responseData)
         if feeds.Count() > 0
-            return ValidArray(feeds[0].items)
-        end if
-
-        return []
-    end function
-
-    function SearchSuggestions(q as string, cancellation = invalid as object) as object
-        suggestions = Innertube.SearchSuggestions(q, cancellation)
-        if suggestions = invalid
-            suggestions = []
+            return {
+                videos: ValidArray(feeds[0].items)
+            }
         end if
 
         return {
-            suggestions: suggestions
+            videos: []
         }
+    end function
+
+    function SearchSuggestions(q as string, cancellation = invalid as object) as object
+        return Innertube.SearchSuggestions(q, cancellation)
     end function
 
     function Search(query as string, options = invalid as object) as object
@@ -189,7 +197,18 @@ namespace InnertubeService
         end if
 
         json = response.Json()
-        return Innertube.ParseResponse(json)
+        feeds = Innertube.ParseResponseDataForFeeds(json)
+
+        result = {
+            feeds: feeds
+        }
+
+        cacheControl = Innertube.ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
     function GetHome(options = invalid as object) as object
@@ -233,7 +252,7 @@ namespace InnertubeService
         end if
 
         json = response.Json()
-        return Innertube.ParseResponse(json)
+        return Innertube.ParseResponseDataForFeeds(json)
     end function
 
     function GetChannel(channelId as string, options = invalid as object) as object
@@ -258,11 +277,20 @@ namespace InnertubeService
 
         response = request.Await()
         if not response.IsSuccess()
-            return invalid
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
         json = response.Json()
-        return Innertube.ParseChannelPageResponse(json)
+        result = Innertube.ParseChannelPageResponseData(json)
+
+        cacheControl = Innertube.ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
     function GetPlaylist(playlistId as string, options = invalid as object) as object
@@ -287,11 +315,20 @@ namespace InnertubeService
 
         response = request.Await()
         if not response.IsSuccess()
-            return invalid
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
         json = response.Json()
-        return Innertube.ParsePlaylistPageResponse(json)
+        result = Innertube.ParsePlaylistPageResponseData(json)
+
+        cacheControl = Innertube.ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
     function ResolveUrl(url as string, options = invalid as object) as object
@@ -308,7 +345,9 @@ namespace InnertubeService
 
         response = request.Await()
         if not response.IsSuccess()
-            return invalid
+            return {
+                error: response.ErrorMessage()
+            }
         end if
 
         json = response.Json()

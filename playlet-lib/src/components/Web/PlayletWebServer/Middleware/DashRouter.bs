@@ -29,13 +29,12 @@ namespace Http
                 return true
             end if
 
-            metadataRequest = m.invidiousService.GetVideoMetadata(v)
-            if not metadataRequest.IsSuccess()
-                response.Default(metadataRequest.StatusCode(), metadataRequest.ErrorMessage())
+            metadata = m.invidiousService.GetVideoMetadata(v)
+            if metadata.error <> invalid
+                response.Default(500, metadata.error)
                 return true
             end if
 
-            metadata = metadataRequest.Json()
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
 
             qualityFilter = m.CreateQualityFilter(quality)

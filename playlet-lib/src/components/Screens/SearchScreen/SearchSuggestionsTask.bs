@@ -12,12 +12,18 @@ function SearchSuggestionsTask(input as object) as object
         return invalid
     end if
 
-    backend = preferencesNode["playback.backend"]
-    if backend = "playlet"
-        searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : InnertubeService.SearchSuggestions(q, m.top.cancellation)
+    if StringUtils.IsNullOrEmpty(q)
+        searchSuggestsions = {
+            suggestions: []
+        }
     else
-        service = new Invidious.InvidiousService(invidiousNode)
-        searchSuggestsions = StringUtils.IsNullOrEmpty(q) ? invalid : service.SearchSuggestions(q, m.top.cancellation)
+        backend = preferencesNode["playback.backend"]
+        if backend = "playlet"
+            searchSuggestsions = InnertubeService.SearchSuggestions(q, m.top.cancellation)
+        else
+            service = new Invidious.InvidiousService(invidiousNode)
+            searchSuggestsions = service.SearchSuggestions(q, m.top.cancellation)
+        end if
     end if
 
     if m.top.cancel
@@ -27,7 +33,11 @@ function SearchSuggestionsTask(input as object) as object
     history = SearchHistoryUtils.GetSaved(preferencesNode, q)
 
     if searchSuggestsions <> invalid
-        history = MergeSearchSuggestions(history, searchSuggestsions.suggestions)
+        if searchSuggestsions.error <> invalid
+            LogError(searchSuggestsions.error)
+        else
+            history = MergeSearchSuggestions(history, searchSuggestsions.suggestions)
+        end if
     end if
 
     return {

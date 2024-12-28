@@ -4,7 +4,7 @@ import "pkg:/source/utils/StringUtils.bs"
 
 namespace Innertube
 
-    function ParseResponse(responseData as object, context = invalid as object) as object
+    function ParseResponseDataForFeeds(responseData as object, context = invalid as object) as object
         if responseData = invalid
             return []
         end if
@@ -38,15 +38,17 @@ namespace Innertube
         return context.feeds
     end function
 
-    function ParseChannelPageResponse(responseData as object) as object
+    function ParseChannelPageResponseData(responseData as object) as object
         if responseData = invalid
-            return invalid
+            return {
+                error: "Invalid response data"
+            }
         end if
 
-        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
-        if IsAssociativeArray(alert) and alert.type = "ERROR"
+        error = ParseResponseDataForError(responseData)
+        if error <> ""
             return {
-                error: ParseText(alert.text)
+                error: error
             }
         end if
 
@@ -128,7 +130,7 @@ namespace Innertube
 
         items = []
         continuation = invalid
-        feeds = ParseResponse(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
+        feeds = ParseResponseDataForFeeds(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
             if feeds[0].DoesExist("continuation")
@@ -154,15 +156,17 @@ namespace Innertube
         return channel
     end function
 
-    function ParsePlaylistPageResponse(responseData as object) as object
+    function ParsePlaylistPageResponseData(responseData as object) as object
         if responseData = invalid
-            return invalid
+            return {
+                error: "Invalid response data"
+            }
         end if
 
-        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
-        if IsAssociativeArray(alert) and alert.type = "ERROR"
+        error = ParseResponseDataForError(responseData)
+        if error <> ""
             return {
-                error: ParseText(alert.text)
+                error: error
             }
         end if
 
@@ -205,7 +209,7 @@ namespace Innertube
             "statsText": statsText
         }
 
-        feeds = ParseResponse(responseData)
+        feeds = ParseResponseDataForFeeds(responseData)
         if feeds.Count() > 0
             playlist["videos"] = ValidArray(feeds[0].items)
             if feeds[0].DoesExist("continuation")
@@ -214,6 +218,38 @@ namespace Innertube
         end if
 
         return playlist
+    end function
+
+    function ParseResponseDataForError(responseData as object) as string
+        if responseData = invalid
+            return ""
+        end if
+
+        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
+        if IsAssociativeArray(alert) and alert.type = "ERROR"
+            return ParseText(alert.text)
+        end if
+
+        return ""
+    end function
+
+    function ParseResponseForCacheControl(response as object) as dynamic
+        if not response.IsSuccess()
+            return invalid
+        end if
+
+        headers = ValidAssociativeArray(response.Headers())
+        if headers.DoesExist("cache-control")
+            return headers["cache-control"]
+        end if
+
+        json = response.Json()
+        maxAgeSeconds = ObjectUtils.Dig(json, ["responseContext", "maxAgeSeconds"])
+        if IsInt(maxAgeSeconds)
+            return `max-age=${maxAgeSeconds}`
+        end if
+
+        return invalid
     end function
 
     function GetContainers(responseData as object) as object

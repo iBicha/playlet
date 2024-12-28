@@ -60,23 +60,17 @@ function LoadVideoDetail(videoNode as object, service as object, instance as str
     videoId = videoNode.videoId
 
     if backend = "playlet"
-        response = InnertubeService.GetVideoMetadata(videoId, requestOptions)
+        metadata = InnertubeService.GetVideoMetadata(videoId, requestOptions)
     else
-        response = service.GetVideoMetadata(videoId, requestOptions)
+        metadata = service.GetVideoMetadata(videoId, requestOptions)
     end if
 
-    metadata = response.Json()
-
-    if not response.IsSuccess() or metadata = invalid
-        LogError("Failed to load video metadata", response.ErrorMessage())
-        if response.StatusCode() = 500
-            ' The video is likely not available.
-            ' We set the title to make sure we don't try to load it again
-            videoNode.title = "Video not available"
-        end if
+    if metadata.error <> invalid
+        LogError("Failed to load video metadata", metadata.error)
+        videoNode.title = "Video not available"
         return false
     end if
 
     InvidiousContent.ToVideoContentNode(videoNode, metadata, instance)
-    return response.IsCached()
+    return false
 end function

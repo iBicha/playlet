@@ -35,8 +35,14 @@ namespace Http
             request = context.request
             response = context.response
 
-            feeds = InnertubeService.GetTrending({ type: request.query.type })
-            if not IsArray(feeds) or feeds.Count() = 0
+            result = InnertubeService.GetTrending({ type: request.query.type })
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = 500
+                return true
+            end if
+
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
                 response.Json({
                     "error": "Failed to get trending feed"
                 })
@@ -44,7 +50,11 @@ namespace Http
                 return true
             end if
 
-            response.Json(ValidArray(feeds[0].items))
+            response.Json(ValidArray(result.feeds[0].items))
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
+            end if
+
             return true
         end function
 
@@ -60,9 +70,20 @@ namespace Http
 
             query = request.query.q
 
-            suggestions = InnertubeService.SearchSuggestions(query)
-            suggestions.query = query
-            response.Json(suggestions)
+            result = InnertubeService.SearchSuggestions(query)
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = 500
+                return true
+            end if
+
+            result.query = query
+
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
+            end if
+
+            response.Json(result)
             return true
         end function
 
@@ -104,8 +125,14 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            feeds = InnertubeService.Search(query, options)
-            if not IsArray(feeds) or feeds.Count() = 0
+            result = InnertubeService.Search(query, options)
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = 500
+                return true
+            end if
+
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
                 response.Json({
                     "error": "Failed to search"
                 })
@@ -113,7 +140,11 @@ namespace Http
                 return true
             end if
 
-            response.Json(feeds[0])
+            response.Json(result.feeds[0])
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
+            end if
+
             return true
         end function
 
@@ -215,16 +246,13 @@ namespace Http
 
             videoId = route.Mid("/playlet-invidious-backend/api/v1/videos/".Len())
 
-            playerResponse = InnertubeService.GetVideoMetadata(videoId)
-            if not playerResponse.IsSuccess()
-                response.Json({
-                    "error": playerResponse.ErrorMessage()
-                })
-                response.http_code = playerResponse.StatusCode()
-                return true
+            metadata = InnertubeService.GetVideoMetadata(videoId)
+            response.Json(metadata)
+
+            if metadata.error <> invalid
+                response.http_code = 500
             end if
 
-            response.Json(playerResponse.Json())
             return true
         end function
 
@@ -242,10 +270,8 @@ namespace Http
             end if
 
             playlist = InnertubeService.GetPlaylist(playlistId, options)
-            if playlist = invalid
-                response.Json({
-                    "error": "Failed to get playlist"
-                })
+            if playlist.error <> invalid
+                response.Json(playlist)
                 response.http_code = 500
                 return true
             end if
@@ -281,15 +307,17 @@ namespace Http
             if channelAndTab.Count() = 1
                 channelId = channelAndTab[0]
                 channel = InnertubeService.GetChannel(channelId, options)
-                if channel = invalid
-                    response.Json({
-                        "error": "Failed to get channel"
-                    })
+                if channel.error <> invalid
+                    response.Json(channel)
                     response.http_code = 500
                     return true
                 end if
 
                 response.Json(channel)
+                if channel.DoesExist("cache-control")
+                    response.headers["cache-control"] = channel["cache-control"]
+                end if
+
                 return true
             else if channelAndTab.Count() = 2
                 channelId = channelAndTab[0]
@@ -301,10 +329,8 @@ namespace Http
                 end if
 
                 channel = InnertubeService.GetChannel(channelId, options)
-                if channel = invalid
-                    response.Json({
-                        "error": "Failed to get channel"
-                    })
+                if channel.error <> invalid
+                    response.Json(channel)
                     response.http_code = 500
                     return true
                 end if
@@ -317,6 +343,9 @@ namespace Http
                         result.continuation = channel.continuation
                     end if
                     response.Json(result)
+                    if channel.DoesExist("cache-control")
+                        response.headers["cache-control"] = channel["cache-control"]
+                    end if
                 else
                     result = {
                         "videos": channel.items
@@ -325,6 +354,9 @@ namespace Http
                         result.continuation = channel.continuation
                     end if
                     response.Json(result)
+                    if channel.DoesExist("cache-control")
+                        response.headers["cache-control"] = channel["cache-control"]
+                    end if
                 end if
 
                 return true

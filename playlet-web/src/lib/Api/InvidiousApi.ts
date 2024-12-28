@@ -25,7 +25,8 @@ export class InvidiousApi {
 
     public async searchSuggestions(query: string) {
         const url = `${this.instance}/api/v1/search/suggestions?q=${encodeURIComponent(query)}&region=${this.userCountryCode}`;
-        return await this.cachedFetch(url, 60 * 60 * 24);
+        const response = await fetch(url);
+        return await response.json();
     }
 
     // need to change this
