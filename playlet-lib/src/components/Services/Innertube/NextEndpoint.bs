@@ -50,8 +50,8 @@ namespace Innertube
             return parsedResponse
         end if
 
-        if not IsArray(parsedResponse.metadata.recommendedVideos)
-            LogWarn("Invalid recommended videos", parsedResponse.metadata.recommendedVideos)
+        if not IsArray(parsedResponse.recommendedVideos)
+            LogWarn("Invalid recommended videos", parsedResponse.recommendedVideos)
             return parsedResponse
         end if
 
@@ -60,29 +60,12 @@ namespace Innertube
             return parsedResponse
         end if
 
-        endScreenVideos = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen", "watchNextEndScreenRenderer", "results"])
-        if not IsArray(endScreenVideos)
-            LogWarn("Invalid end screen videos", endScreenVideos)
-            return parsedResponse
+        endscreen = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen"])
+
+        feeds = Innertube.ParseResponseDataForFeeds(endscreen, { noContainers: true })
+        if feeds.Count() > 0
+            parsedResponse.recommendedVideos.Append(ValidArray(feeds[0].items))
         end if
-
-        for each video in endScreenVideos
-            videoId = ObjectUtils.Dig(video, ["endScreenVideoRenderer", "videoId"])
-            if videoId = invalid
-                LogWarn("Invalid video ID in end screen video", video)
-                continue for
-            end if
-
-            title = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "title", "simpleText"]))
-            author = ValidString(ObjectUtils.Dig(video, ["endScreenVideoRenderer", "shortBylineText", "runs", 0, "text"]))
-
-            parsedResponse.Metadata.recommendedVideos.Push({
-                "type": "video"
-                "videoId": videoId
-                "title": title
-                "author": author
-            })
-        end for
 
         return parsedResponse
     end function

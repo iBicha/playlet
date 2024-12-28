@@ -69,7 +69,7 @@ namespace InnertubeService
             parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
         end if
 
-        return playerResponse
+        return parsedResponse
     end function
 
     function GetVideoInfoBatched(videoIds as object, options = invalid as object) as object
@@ -116,7 +116,8 @@ namespace InnertubeService
             ' Sometimes the response doesn't contain a playlist.
             ' The theory here is that Innertube creates a playlist for the videoIds, and sometimes
             ' it chooses to respond without the playlist (perhaps to avoid slow responses).
-            ' A retry after a short sleep usually fixes this.
+            ' A retry after a short sleep usually fixes this (but not always).
+            ' TODO:P1: Figure out why this happens and if there's a better way to handle it.
             if retry
                 LogWarn("Response data missing playlist. Retrying in a bit...")
                 newOptions = {}
