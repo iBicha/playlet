@@ -17,11 +17,19 @@ function PlaylistContentTask(input as object) as object
     instance = service.GetInstance()
 
     while true
+        playlistId = contentNode.playlistId
         index = contentNode.getChildCount()
         continuation = contentNode.continuation
         hadContinuation = not StringUtils.IsNullOrEmpty(continuation)
 
-        response = service.GetPlaylist(contentNode.playlistId, index, continuation, m.top.cancellation)
+        if playlistId.StartsWith("RD") and not hadContinuation
+            videoId = contentNode.videoId
+            if not StringUtils.IsNullOrEmpty(videoId)
+                continuation = videoId
+            end if
+        end if
+
+        response = service.GetPlaylist(playlistId, index, continuation, m.top.cancellation)
 
         if m.top.cancel
             contentNode.loadState = FeedLoadState.None

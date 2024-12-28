@@ -262,14 +262,28 @@ namespace Http
             route = request.route
 
             playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
+            continuation = request.query.continuation
 
             options = {}
-            continuation = request.query.continuation
-            if not StringUtils.IsNullOrEmpty(continuation)
-                options.continuation = continuation
+            if playlistId.StartsWith("RD")
+                if not StringUtils.IsNullOrEmpty(continuation)
+                    options.videoId = continuation
+                else
+                    videoId = request.query.videoId
+                    if not StringUtils.IsNullOrEmpty(videoId)
+                        options.videoId = videoId
+                    end if
+                end if
+
+                playlist = InnertubeService.GetMix(playlistId, options)
+            else
+                if not StringUtils.IsNullOrEmpty(continuation)
+                    options.continuation = continuation
+                end if
+
+                playlist = InnertubeService.GetPlaylist(playlistId, options)
             end if
 
-            playlist = InnertubeService.GetPlaylist(playlistId, options)
             if playlist.error <> invalid
                 response.Json(playlist)
                 response.http_code = 500

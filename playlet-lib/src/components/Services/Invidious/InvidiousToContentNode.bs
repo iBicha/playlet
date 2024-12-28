@@ -68,9 +68,10 @@ namespace InvidiousContent
         SetIfExists(node, "description", item, "description")
         SetIfExists(node, "id", item, "playlistId")
         SetIfExists(node, "playlistId", item, "playlistId")
+        SetIfExists(node, "videoId", item, "videoId")
         SetIfExists(node, "title", item, "title")
         SetIfExists(node, "videoCount", item, "videoCount")
-        node.videoCountText = GetVideoCountText(item)
+        SetVideoCountText(item, node)
         SetIfExists(node, "viewCount", item, "viewCount")
         node.viewCountText = PlaylistGetViewCountText(item)
         SetIfExists(node, "updated", item, "updated")
@@ -122,7 +123,7 @@ namespace InvidiousContent
         SetIfExists(node, "authorSubTitle", item, "authorSubTitle")
         node.subCountText = GetChannelSubCountText(item)
         SetIfExists(node, "videoCount", item, "videoCount")
-        node.videoCountText = GetVideoCountText(item)
+        SetVideoCountText(item, node)
         node.thumbnail = GetChannelThumbnail(item.authorThumbnails)
         node.banner = GetChannelBanner(item.authorBanners)
         ' Important: tabsParams should be set first, because settings that tabs triggers the ChannelView to load feeds
@@ -293,12 +294,17 @@ namespace InvidiousContent
         return authorBanners[0].url
     end function
 
-    function GetVideoCountText(item as object) as string
-        if not StringUtils.IsNullOrEmpty(item.videoCountText)
-            return item.videoCountText
+    function SetVideoCountText(item as object, node as object) as void
+        videoCountText = item.videoCountText
+        if not StringUtils.IsNullOrEmpty(videoCountText)
+            node.videoCountText = videoCountText
+            return
         end if
         videoCount = ValidInt(item.videoCount)
-        return LocaleUtils.GetPluralString(videoCount, Locale.RowCell.ZeroVideos, Locale.RowCell.OneVideo, Locale.RowCell.NVideos)
+        if videoCount = -1
+            return
+        end if
+        node.videoCountText = LocaleUtils.GetPluralString(videoCount, Locale.RowCell.ZeroVideos, Locale.RowCell.OneVideo, Locale.RowCell.NVideos)
     end function
 
     function GetChannelSubCountText(channel as object) as string

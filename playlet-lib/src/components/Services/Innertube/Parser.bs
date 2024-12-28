@@ -224,6 +224,59 @@ namespace Innertube
         return playlist
     end function
 
+    function ParseMixPageResponseData(responseData as object) as object
+        if responseData = invalid
+            return {
+                error: "Invalid response data"
+            }
+        end if
+
+        error = Innertube.ParseResponseDataForError(responseData)
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        playlist = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
+        if playlist = invalid
+            return {
+                error: "Invalid playlist data"
+            }
+        end if
+
+        playlistId = playlist["playlistId"]
+
+        title = ParseText(playlist["title"])
+        if title = ""
+            title = ParseText(playlist["titleText"])
+        end if
+
+        author = ParseText(playlist["ownerName"])
+        if author = ""
+            author = ParseText(playlist["shortBylineText"])
+            if author = ""
+                author = ParseText(playlist["longBylineText"])
+            end if
+        end if
+
+        result = {
+            "playlistId": playlistId
+            "title": title
+            "author": author
+            "videos": []
+            "videoCount": -1
+            "videoCountText": ""
+        }
+
+        feeds = ParseResponseDataForFeeds(playlist)
+        if feeds.Count() > 0
+            result["videos"] = ValidArray(feeds[0].items)
+        end if
+
+        return result
+    end function
+
     function ParseResponseDataForError(responseData as object) as string
         if responseData = invalid
             return ""
