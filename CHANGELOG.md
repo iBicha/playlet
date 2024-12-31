@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- German translation (Thanks to Lacey Anaya)
+
+### Fixed
+
+- Video duration in queue view
 
 ## [0.35.3] - 2024-12-29
 

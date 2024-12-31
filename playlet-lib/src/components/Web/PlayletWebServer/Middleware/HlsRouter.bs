@@ -71,12 +71,6 @@ namespace Http
                 return true
             end if
 
-            lengthSeconds = metadata.lengthSeconds
-            if not IsInt(lengthSeconds)
-                response.Default(500, "Player metadata lengthSeconds is invalid")
-                return true
-            end if
-
             index = request.query.index
             if StringUtils.IsNullOrEmpty(index)
                 response.Default(400, "Missing index")
@@ -90,7 +84,7 @@ namespace Http
             end if
 
             storyboard = storyboards[index]
-            hlsManifest = m.GenerateStoryboardManifest(storyboard, lengthSeconds)
+            hlsManifest = m.GenerateStoryboardManifest(storyboard)
 
             response.http_code = 200
             response.SetBodyDataString(hlsManifest)
@@ -187,7 +181,7 @@ namespace Http
             return hlsManifest.Replace("VIDEO-RANGE=HLG", "VIDEO-RANGE=SDR").Replace("VIDEO-RANGE=PQ", "VIDEO-RANGE=SDR")
         end function
 
-        function GenerateStoryboardManifest(storyboard as object, lengthSeconds as float) as string
+        function GenerateStoryboardManifest(storyboard as object) as string
             tileCount = storyboard.storyboardWidth * storyboard.storyboardHeight
             intervalSeconds = Cdbl(storyboard.interval) / 1000.0
             targetDuration = tileCount * intervalSeconds
