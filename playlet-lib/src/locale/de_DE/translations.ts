@@ -1264,5 +1264,9 @@
         <source>3D</source>
         <translation>3D</translation>
     </message>
+    <message>
+        <source>Buffering</source>
+        <translation type="unfinished">Puffert</translation>
+    </message>
 </context>
 </TS>
