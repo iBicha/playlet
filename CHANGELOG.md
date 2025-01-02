@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Video duration in queue view
+- Crash in player when video ID is invalid (again)
 
 ## [0.35.3] - 2024-12-29
 
