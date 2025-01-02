@@ -231,20 +231,24 @@ namespace InnertubeService
 
     function GetBrowseAuthenticatedPage(browserId as string, options = invalid as object) as object
         cancellation = invalid
-        access_token = invalid
+        accessToken = invalid
+        continuation = ""
 
         if options <> invalid
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
-            if options.DoesExist("access_token")
-                access_token = options.access_token
+            if options.DoesExist("accessToken")
+                accessToken = options.accessToken
+            end if
+            if options.DoesExist("continuation")
+                continuation = options.continuation
             end if
         end if
 
-        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv)
-        if access_token <> invalid
-            request.Header("Authorization", "Bearer " + access_token)
+        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, "", continuation)
+        if accessToken <> invalid
+            request.Header("Authorization", "Bearer " + accessToken)
         end if
         request.Cancellation(cancellation)
 
@@ -394,7 +398,7 @@ namespace InnertubeService
             return invalid
         end if
 
-        result2 = Innertube.GetDeviceAndUserCode(result.client_id, cancellation)
+        result2 = Innertube.GetDeviceAndUserCode(result.clientId, cancellation)
 
         if CancellationUtils.IsCancelled(cancellation)
             return invalid
@@ -405,7 +409,7 @@ namespace InnertubeService
     end function
 
     function AuthGetActivationUrl(code as object) as string
-        return `https://www.youtube.com/tv/activate?user_code=${code.user_code}`
+        return `https://www.youtube.com/tv/activate?user_code=${code.userCode}`
     end function
 
     function AuthPollForAccessToken(code as object, cancellation = invalid as object) as object
@@ -423,10 +427,10 @@ namespace InnertubeService
         if expiresTimestamp = invalid or expiresTimestamp < nowSeconds
             refreshed = Innertube.RefreshAccessToken(accessToken, cancellation)
 
-            if IsAssociativeArray(refreshed) and refreshed.DoesExist("access_token")
+            if IsAssociativeArray(refreshed) and refreshed.DoesExist("accessToken")
                 accessToken.Append(refreshed)
-                if accessToken.DoesExist("expires_in")
-                    accessToken["expires_timestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expires_in"]
+                if accessToken.DoesExist("expiresIn")
+                    accessToken["expiresTimestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expiresIn"]
                 end if
                 return true
             end if
@@ -440,7 +444,7 @@ namespace InnertubeService
             return false
         end if
 
-        return Innertube.RevokeAccessToken(accessToken["access_token"], cancellation)
+        return Innertube.RevokeAccessToken(accessToken["accessToken"], cancellation)
     end function
 
 end namespace
