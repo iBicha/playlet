@@ -67,9 +67,6 @@ function LoggerLoop()
     deviceInfo.EnableLowGeneralMemoryEvent(true)
     m.lastDeviceInfoMemoryLevel = ""
 
-    ' TestFeeds()
-    ' TestAuth()
-
     while true
         msg = wait(0, port)
         msgType = type(msg)
@@ -171,108 +168,4 @@ function FormatTime(dateTime as object) as string
     end if
 
     return "[" + hours + ":" + minutes + ":" + seconds + "." + milliseconds + "]"
-end function
-
-function TestFeeds()
-    timer = CreateObject("roTimeSpan")
-
-    ? "Search suggestions"
-    timer.Mark()
-    suggestions = InnertubeService.SearchSuggestions("pewdiepie")
-    ? "Search suggestions took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(suggestions)
-
-    ? "Search"
-    timer.Mark()
-    searchFeed = InnertubeService.Search("choufli hal 2008")
-    ? "Search took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(searchFeed)
-
-    ? "Trending"
-    timer.Mark()
-    trending = InnertubeService.GetTrending()
-    ? "Trending took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(trending)
-
-    ? "Music"
-    timer.Mark()
-    music = InnertubeService.GetTrending({ "type": "music" })
-    ? "Music took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(music)
-
-    ? "Gaming"
-    timer.Mark()
-    gaming = InnertubeService.GetTrending({ "type": "gaming" })
-    ? "Gaming took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(gaming)
-
-    ? "Movies"
-    timer.Mark()
-    movies = InnertubeService.GetTrending({ "type": "movies" })
-    ? "Movies took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(movies)
-
-    ? "Channel"
-    timer.Mark()
-    channel = InnertubeService.GetChannel("UCvJJ_dzjViJCoLf5uKUTwoA")
-    ? "Channel took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(channel)
-
-    ? "Playlist"
-    timer.Mark()
-    playlist = InnertubeService.GetPlaylist("PLplXQ2cg9B_qrCVd1J_iId5SvP8Kf_BfS")
-    ? "Playlist took " + timer.TotalMilliseconds().ToStr() + "ms"
-    ? FormatJson(playlist)
-end function
-
-function TestAuth()
-    ? "Auth"
-    auth = RegistryUtils.Read("auth", "TEST")
-    if auth = invalid
-        code = InnertubeService.AuthGetCode()
-        ? code
-        url = InnertubeService.AuthGetActivationUrl(code)
-        ? url
-        auth = InnertubeService.AuthPollForAccessToken(code)
-        ? auth
-        RegistryUtils.Write("auth", FormatJson(auth), "TEST")
-    else
-        auth = ParseJson(auth)
-
-        if InnertubeService.AuthRefreshAccessTokenIfNeeded(auth)
-            RegistryUtils.Write("auth", FormatJson(auth), "TEST")
-            ? "Refreshed access token"
-        end if
-    end if
-
-    ' if InnertubeService.AuthRevokeAccessToken(auth)
-    '     RegistryUtils.Delete("auth", "TEST")
-    '     ? "Revoked access token"
-    ' end if
-
-    timer = CreateObject("roTimeSpan")
-
-    ? "Home"
-    timer.Mark()
-    home = InnertubeService.GetHome({ "accessToken": auth.accessToken })
-    ? "Home took " + timer.TotalMilliseconds().ToStr() + "ms"
-    WriteAsciiFile("tmp:/home.json", FormatJson(home))
-
-    ? "Subscriptions"
-    timer.Mark()
-    subscriptions = InnertubeService.GetSubscriptions({ "accessToken": auth.accessToken })
-    ? "Subscriptions took " + timer.TotalMilliseconds().ToStr() + "ms"
-    WriteAsciiFile("tmp:/subscriptions.json", FormatJson(subscriptions))
-
-    ? "Watch history"
-    timer.Mark()
-    history = InnertubeService.GetWatchHistory({ "accessToken": auth.accessToken })
-    ? "Watch history took " + timer.TotalMilliseconds().ToStr() + "ms"
-    WriteAsciiFile("tmp:/history.json", FormatJson(history))
-
-    ? "Playlists"
-    timer.Mark()
-    playlists = InnertubeService.GetPlaylists({ "accessToken": auth.accessToken })
-    ? "Playlists took " + timer.TotalMilliseconds().ToStr() + "ms"
-    WriteAsciiFile("tmp:/playlists.json", FormatJson(playlists))
 end function
