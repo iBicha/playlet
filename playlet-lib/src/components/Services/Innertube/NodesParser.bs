@@ -67,6 +67,8 @@ namespace Innertube
             "richItemRenderer": ParseRichItemRenderer
             "continuationItemRenderer": ParseContinuationItemRenderer
             "appendContinuationItemsAction": ParseAppendContinuationItemsAction
+            "gridContinuation": ParseGridContinuation
+            "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
             ' Posts not yet supported
             "postRenderer": ParseNotImplemented
@@ -850,11 +852,32 @@ namespace Innertube
             end if
         end if
 
+        lengthText = ""
+        isUpcoming = false
+        liveNow = false
+        thumbnailOverlays = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnailOverlays"])
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                maybeLengthText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
+                if maybeLengthText <> ""
+                    lengthText = maybeLengthText
+                end if
+                liveNow = liveNow or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE")
+                isUpcoming = isUpcoming or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "UPCOMING")
+            end for
+            if liveNow or isUpcoming
+                lengthText = ""
+            end if
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
             "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
             "videoThumbnails": videoThumbnails
+            "lengthText": lengthText
+            "liveNow": liveNow
+            "isUpcoming": isUpcoming
         }
 
         PushFeedItem(video, context)
@@ -868,11 +891,23 @@ namespace Innertube
             return invalid
         end if
 
+        videoCountText = ""
+        thumbnailOverlays = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnailOverlays"])
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                videoCountText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
+                if videoCountText <> ""
+                    exit for
+                end if
+            end for
+        end if
+
         playlist = {
             "type": "playlist"
             "playlistId": playlistId
             "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
-            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails", 0, "url"])
+            "videoCountText": videoCountText
         }
 
         PushFeedItem(playlist, context)
@@ -909,6 +944,19 @@ namespace Innertube
 
     function ParseAppendContinuationItemsAction(nodeData as object, _context as object) as object
         return nodeData["continuationItems"]
+    end function
+
+    function ParseGridContinuation(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuations", 0, "nextContinuationData", "continuation"])
+        if IsString(continuation)
+            context.currentFeed.continuation = continuation
+        end if
+        return nodeData["items"]
+    end function
+
+    function ParseTvSurfaceContentContinuation(nodeData as object, context as object) as object
+        ' title = ParseText(ObjectUtils.Dig(nodeData, ["header", "tvSurfaceHeaderRenderer", "title"]))
+        return nodeData["content"]
     end function
 
     function ParseText(data as object) as string

@@ -58,14 +58,11 @@ function GenerateQrCode() as void
     m.top.uri = ""
 
     if StringUtils.IsNullOrEmpty(text)
-        m.busySpinner.control = "stop"
-        m.busySpinner.visible = false
+        m.top.isBusy = false
         return
     end if
 
-    m.busySpinnerPoster.rotation = 0
-    m.busySpinner.visible = true
-    m.busySpinner.control = "start"
+    m.top.isBusy = true
 
     m.qrCodeGenTask = AsyncTask.Start(Tasks.GenerateQrCodeTask, {
         poster: m.top
@@ -80,6 +77,18 @@ function OnGenerateQrCodeTaskResult(output as object) as void
         return
     end if
 
-    m.busySpinner.control = "stop"
-    m.busySpinner.visible = false
+    m.top.isBusy = false
+end function
+
+function OnIsBusy()
+    isBusy = m.top.isBusy
+
+    if isBusy
+        m.busySpinnerPoster.rotation = 0
+        m.busySpinner.control = "start"
+        m.busySpinner.visible = true
+    else
+        m.busySpinner.control = "stop"
+        m.busySpinner.visible = false
+    end if
 end function

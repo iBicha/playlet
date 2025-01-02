@@ -46,8 +46,8 @@ namespace Innertube
         end if
 
         return {
-            "client_id": match[1]
-            "client_secret": match[2]
+            "clientId": match[1]
+            "clientSecret": match[2]
         }
     end function
 
@@ -69,13 +69,14 @@ namespace Innertube
             throw `Failed to get device code: ${response.ErrorMessage()}`
         end if
 
-        responseData = response.Json()
-        if responseData.DoesExist("error_code")
+        responseData = ToCamelCase(response.Json())
+
+        if responseData.DoesExist("errorCode")
             throw "Failed to get device code: " + ToString(responseData)
         end if
 
-        if responseData.DoesExist("expires_in")
-            responseData["expires_timestamp"] = TimeUtils.Now().AsSeconds() + responseData["expires_in"]
+        if responseData.DoesExist("expiresIn")
+            responseData["expiresTimestamp"] = TimeUtils.Now().AsSeconds() + responseData["expiresIn"]
         end if
 
         return responseData
@@ -83,9 +84,9 @@ namespace Innertube
 
     function PollForAccessToken(clientIdentity as object, deviceAndUserCode as object, cancellation = invalid as dynamic) as object
         payload = {
-            "client_id": clientIdentity.client_id
-            "client_secret": clientIdentity.client_secret
-            "code": deviceAndUserCode.device_code
+            "client_id": clientIdentity.clientId
+            "client_secret": clientIdentity.clientSecret
+            "code": deviceAndUserCode.deviceCode
             "grant_type": "http://oauth.net/grant_type/device/1.0"
         }
 
@@ -104,13 +105,13 @@ namespace Innertube
                 }
             end if
 
-            responseData = response.Json()
+            responseData = ToCamelCase(response.Json())
             if not responseData.DoesExist("error")
-                if responseData.DoesExist("expires_in")
-                    responseData["expires_timestamp"] = TimeUtils.Now().AsSeconds() + responseData["expires_in"]
+                if responseData.DoesExist("expiresIn")
+                    responseData["expiresTimestamp"] = TimeUtils.Now().AsSeconds() + responseData["expiresIn"]
                 end if
-                responseData["client_id"] = clientIdentity.client_id
-                responseData["client_secret"] = clientIdentity.client_secret
+                responseData["clientId"] = clientIdentity["clientId"]
+                responseData["clientSecret"] = clientIdentity["clientSecret"]
                 return responseData
             end if
 
@@ -142,9 +143,9 @@ namespace Innertube
 
     function RefreshAccessToken(accessToken as object, cancellation = invalid as dynamic) as object
         payload = {
-            "client_id": accessToken.client_id
-            "client_secret": accessToken.client_secret
-            "refresh_token": accessToken.refresh_token
+            "client_id": accessToken.clientId
+            "client_secret": accessToken.clientSecret
+            "refresh_token": accessToken.refreshToken
             "grant_type": "refresh_token"
         }
 
@@ -156,8 +157,8 @@ namespace Innertube
             throw `Failed to refresh token: ${response.ErrorMessage()}`
         end if
 
-        responseData = response.Json()
-        if responseData.DoesExist("error_code")
+        responseData = ToCamelCase(response.Json())
+        if responseData.DoesExist("errorCode")
             throw "Failed to refresh token: " + ToString(responseData)
         end if
 
@@ -174,6 +175,24 @@ namespace Innertube
             LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
         end if
         return success
+    end function
+
+    function ToCamelCase(obj as object) as object
+        if not IsAssociativeArray(obj)
+            return obj
+        end if
+
+        newObj = {}
+        for each key in obj
+            newKey = key
+            underScoreIndex = newKey.InStr("_")
+            while underScoreIndex <> -1 and underScoreIndex < newKey.Len() - 2
+                newKey = newKey.Left(underScoreIndex) + UCase(newKey.Mid(underScoreIndex + 1, 1)) + newKey.Mid(underScoreIndex + 2)
+                underScoreIndex = newKey.InStr("_")
+            end while
+            newObj[newKey] = obj[key]
+        end for
+        return newObj
     end function
 
 end namespace

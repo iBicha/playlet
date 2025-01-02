@@ -560,9 +560,15 @@ namespace Invidious
                 videos.Append(json.videos)
             end if
 
-            return {
+            result = {
                 items: videos
             }
+
+            if json.continuation <> invalid
+                result.continuation = json.continuation
+            end if
+
+            return result
         end function
 
         function WatchHistoryHandler(context as object) as object
@@ -576,49 +582,49 @@ namespace Invidious
             end if
 
             json = response.Json()
-            if not IsArray(json)
-                return invalid
-            end if
+            if IsArray(json)
+                videos = []
+                if json.Count() = 0
+                    return {
+                        items: videos
+                    }
+                end if
 
-            videos = []
-            if json.Count() = 0
-                return {
+                videoDictionary = {}
+
+                videosMetadata = InnertubeService.GetVideoInfoBatched(json)
+                if not StringUtils.IsNullOrEmpty(videosMetadata.error)
+                    LogError("Failed to load video metadata", videosMetadata.error)
+                else
+                    for each video in videosMetadata.videos
+                        videoDictionary[video.videoId] = video
+                    end for
+                end if
+
+                for each videoId in json
+                    video = videoDictionary[videoId]
+                    if video = invalid
+                        video = {
+                            "type": "video"
+                            "videoId": videoId
+                            "videoThumbnails": [{
+                                "quality": "medium"
+                                "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+                                "width": 320
+                                "height": 180
+                            }]
+                        }
+                    end if
+
+                    videos.push(video)
+                end for
+
+                json = {
                     items: videos
                 }
             end if
 
-            videoDictionary = {}
-
-            videosMetadata = InnertubeService.GetVideoInfoBatched(json)
-            if not StringUtils.IsNullOrEmpty(videosMetadata.error)
-                LogError("Failed to load video metadata", videosMetadata.error)
-            else
-                for each video in videosMetadata.videos
-                    videoDictionary[video.videoId] = video
-                end for
-            end if
-
-            for each videoId in json
-                video = videoDictionary[videoId]
-                if video = invalid
-                    video = {
-                        "type": "video"
-                        "videoId": videoId
-                        "videoThumbnails": [{
-                            "quality": "medium"
-                            "url": `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
-                            "width": 320
-                            "height": 180
-                        }]
-                    }
-                end if
-
-                videos.push(video)
-            end for
-
-            return {
-                items: videos
-            }
+            return json
         end function
 
         function DeleteExpiredToken(response as object, authToken as object) as void
