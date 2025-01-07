@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Ability to hide annoucement messages
+- Ability to hide announcement messages
 
 ## [0.35.4] - 2025-01-07
 
