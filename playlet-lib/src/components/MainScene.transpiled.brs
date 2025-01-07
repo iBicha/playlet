@@ -34,7 +34,8 @@ function StartWebServer()
 end function
 
 function ShowAnnouncement()
-    DialogUtils_ShowDialogEx({
+    DialogUtils_ShowDialogOnce({
+        messageId: "1736288537"
         title: "Announcement - Playlet backend"
         message: [
             "An experimental built-in backend has been added to Playlet."

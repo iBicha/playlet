@@ -37,6 +37,10 @@
         <translation>OK</translation>
     </message>
     <message>
+        <source>Do not show again</source>
+        <translation>Do not show again</translation>
+    </message>
+    <message>
         <source>Activate</source>
         <translation>Activate</translation>
     </message>
