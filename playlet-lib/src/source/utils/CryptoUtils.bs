@@ -19,4 +19,50 @@ namespace CryptoUtils
         digest.Setup(method)
         return digest.Process(buffer)
     end function
+
+    function ChannelEncrypt(input as string) as string
+        return Encrypt(input, "channel")
+    end function
+
+    function ChannelDecrypt(input as string) as string
+        return Decrypt(input, "channel")
+    end function
+
+    function Encrypt(input as string, encType as string) as string
+        if input = ""
+            return ""
+        end if
+
+        deviceCrypto = CreateObject("roDeviceCrypto")
+
+        buffer = CreateObject("roByteArray")
+        buffer.FromAsciiString(input)
+
+        encrypted = deviceCrypto.Encrypt(buffer, encType)
+        if encrypted = invalid
+            return ""
+        end if
+        return encrypted.ToHexString()
+    end function
+
+    function Decrypt(input as string, encType as string) as string
+        if input = ""
+            return ""
+        end if
+
+        deviceCrypto = CreateObject("roDeviceCrypto")
+
+        buffer = CreateObject("roByteArray")
+        buffer.FromHexString(input)
+
+        if buffer.Count() = 0
+            return ""
+        end if
+
+        decrypted = deviceCrypto.Decrypt(buffer, encType)
+        if decrypted = invalid
+            return ""
+        end if
+        return decrypted.ToAsciiString()
+    end function
 end namespace
