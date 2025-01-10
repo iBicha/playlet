@@ -115,7 +115,20 @@ namespace Innertube
         return nodeData["contents"]
     end function
 
-    function ParseShelfRenderer(nodeData as object, _context as object) as object
+    function ParseShelfRenderer(nodeData as object, context as object) as object
+        if context.skipCreatorOnTheRise = true
+            badges = nodeData["badges"]
+            if IsArray(badges)
+                for each badge in badges
+                    if ValidString(ObjectUtils.Dig(badge, ["metadataBadgeRenderer", "style"])) = "BADGE_STYLE_TYPE_FEATURED"
+                        label = ParseText(ObjectUtils.Dig(badge, ["metadataBadgeRenderer", "label"]))
+                        LogInfo(`Skipping 'Create on the Rise' shelf (${label})`)
+                        return invalid
+                    end if
+                end for
+            end if
+        end if
+
         ' TODO: handle shelfRenderer.title
         ' TODO: handle shelfRenderer.headerRenderer.shelfHeaderRenderer.avatarLockup.avatarLockupRenderer.title
         return nodeData["content"]

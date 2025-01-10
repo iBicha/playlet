@@ -72,8 +72,8 @@ export class WebServerPlugin implements CompilerPlugin {
                     return;
                 }
 
-                const routeInfo = this.getRouteInfo(functionStatement);
-                if (!routeInfo) {
+                const routeInfos = this.getRouteInfos(functionStatement);
+                if (!routeInfos || routeInfos.length === 0) {
                     return;
                 }
 
@@ -83,9 +83,12 @@ export class WebServerPlugin implements CompilerPlugin {
                 }
                 const classConstructor = this.getClassConstructor(classStmt) as MethodStatement;
 
-                const method = routeInfo.method === 'ALL' ? '*' : routeInfo.method;
-                const stmt = new RawCodeStatement(`m.routes.push({ method: "${method}", path: "${routeInfo.route}", router: m, func: "${func.functionStatement?.name.text}" })`)
-                event.editor.arrayPush(classConstructor.func.body.statements, stmt);
+                for (let index = 0; index < routeInfos.length; index++) {
+                    const routeInfo = routeInfos[index];
+                    const method = routeInfo.method === 'ALL' ? '*' : routeInfo.method;
+                    const stmt = new RawCodeStatement(`m.routes.push({ method: "${method}", path: "${routeInfo.route}", router: m, func: "${func.functionStatement?.name.text}" })`)
+                    event.editor.arrayPush(classConstructor.func.body.statements, stmt);
+                }
             },
         }), {
             walkMode: WalkMode.visitExpressionsRecursive
@@ -102,12 +105,13 @@ export class WebServerPlugin implements CompilerPlugin {
         return parentClass === httpRouterBaseClass;
     }
 
-    getRouteInfo(functionStatement: FunctionStatement | undefined) {
+    getRouteInfos(functionStatement: FunctionStatement | undefined) {
         const annotations = functionStatement?.annotations
         if (!annotations || annotations.length === 0) {
             return undefined
         }
 
+        const routeInfos = [];
         for (let index = 0; index < annotations.length; index++) {
             const annotation = annotations[index];
             if (annotationNames.includes(annotation.name)) {
@@ -120,12 +124,14 @@ export class WebServerPlugin implements CompilerPlugin {
                     throw new Error(`Expected string argument for annotation ${annotation.name}`)
                 }
 
-                return {
+                routeInfos.push({
                     method: annotation.name.toUpperCase(),
                     route: args[0]
-                }
+                });
             }
         }
+
+        return routeInfos;
     }
 
     getClass(func: FunctionExpression) {
