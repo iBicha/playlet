@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { translate } from "lib/Stores";
+  import { tr } from "lib/Stores";
 
   export let videoId: string | undefined = undefined;
   export let title: string | undefined = undefined;
@@ -77,13 +77,13 @@
     <div
       class="absolute bottom-2 right-0 bg-black/70 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
     >
-      {$translate("UPCOMING")}
+      {$tr("UPCOMING")}
     </div>
   {:else if isVideoLive()}
     <div
       class="absolute bottom-2 right-0 bg-red-500 text-white text-sm rounded-sm font-bold pt-1 pb-1 pr-2 pl-2"
     >
-      {$translate("LIVE")}
+      {$tr("LIVE")}
     </div>
   {:else if lengthSeconds || lengthText}
     <div

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { translate } from "lib/Stores";
+  import { tr } from "lib/Stores";
 
   export let checked = false;
   export let lengthSeconds = undefined;
@@ -67,7 +67,7 @@
   <div class="flex flex-row items-center">
     <label class="label justify-start cursor-pointer">
       <input type="checkbox" bind:checked class="checkbox" />
-      <span class="label-text m-2">{$translate("Start at")}</span>
+      <span class="label-text m-2">{$tr("Start at")}</span>
     </label>
     <input
       bind:this={textInputElemet}

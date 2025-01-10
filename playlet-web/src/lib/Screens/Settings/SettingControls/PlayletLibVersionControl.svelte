@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore, translate } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import { ExternalControlProtocol } from "lib/Api/ExternalControlProtocol";
   import { get } from "svelte/store";
 
@@ -81,7 +81,7 @@
       version = "latest";
     }
 
-    const trFn = get(translate);
+    const trFn = get(tr);
 
     if (
       confirm(
@@ -100,9 +100,9 @@
 </script>
 
 <div class="m-5">
-  <div class="text-lg">{$translate("Playlet Library version")}</div>
+  <div class="text-lg">{$tr("Playlet Library version")}</div>
   <div class="text-xs text-gray-500">
-    {$translate(
+    {$tr(
       "The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled."
     )}
   </div>
@@ -112,14 +112,13 @@
       bind:value={selectedRelease}
       class="select select-bordered join-item w-full mr-1"
     >
-      <option selected value="">{$translate("Latest (default)")}</option>
+      <option selected value="">{$tr("Latest (default)")}</option>
       {#each releases as release}
         <option disabled={!release.enabled} value={release.name}
           >{release.name}</option
         >
       {/each}
     </select>
-    <button class="join-item btn" on:click={apply}>{$translate("Apply")}</button
-    >
+    <button class="join-item btn" on:click={apply}>{$tr("Apply")}</button>
   </div>
 </div>

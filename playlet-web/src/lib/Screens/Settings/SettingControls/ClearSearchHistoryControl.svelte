@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { searchHistoryStore, translate } from "lib/Stores";
+  import { searchHistoryStore, tr } from "lib/Stores";
   import { get } from "svelte/store";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
@@ -15,14 +15,14 @@
     await PlayletApi.clearSearchHistory();
     searchHistoryStore.set([]);
 
-    alert(get(translate)("Search history cleared."));
+    alert(get(tr)("Search history cleared."));
   }
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{$translate(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html $translate(description)}</div>
+  <div class={textSizes[level]}>{$tr(displayText)}</div>
+  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
   <button class="btn m-1" on:click={clearSeachHistory}
-    >{$translate("Clear search history")}</button
+    >{$tr("Clear search history")}</button
   >
 </div>

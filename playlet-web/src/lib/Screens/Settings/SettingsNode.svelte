@@ -8,7 +8,7 @@
   import NumberControl from "./SettingControls/NumberControl.svelte";
   import ClearCacheControl from "./SettingControls/ClearCacheControl.svelte";
   import EditQualityControl from "./SettingControls/EditQualityControl.svelte";
-  import { translate } from "lib/Stores";
+  import { tr } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -58,8 +58,8 @@
     />
   {:else}
     <div class="m-5">
-      <div class={textSizes[level]}>{$translate(displayText)}</div>
-      <div class="text-xs text-gray-500">{$translate(description)}</div>
+      <div class={textSizes[level]}>{$tr(displayText)}</div>
+      <div class="text-xs text-gray-500">{$tr(description)}</div>
     </div>
   {/if}
 

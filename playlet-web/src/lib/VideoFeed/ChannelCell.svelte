@@ -41,12 +41,7 @@
   }
 </script>
 
-<button
-  class="w-60 p-2"
-  on:click={() => {
-    modal.show();
-  }}
->
+<button class="w-60 p-2" on:click={modal.show()}>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <ChannelThumbnail bind:author bind:authorThumbnails />
     <div class="card-body">

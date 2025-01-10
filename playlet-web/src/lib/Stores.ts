@@ -23,4 +23,4 @@ export const bookmarksStore = writable([] as any);
 
 export const searchHistoryStore = writable([] as any);
 
-export const translate = writable((s: string) => s as any);
+export const tr = writable((s: string) => s as any);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { playletStateStore, translate } from "lib/Stores";
+  import { playletStateStore, tr } from "lib/Stores";
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { PlayletApi } from "./Api/PlayletApi";
   import VideoCastDialog from "./VideoFeed/VideoCastDialog.svelte";
@@ -248,11 +248,9 @@
     : 'hidden'} fixed w-full h-full bg-base-100/80 z-50 flex justify-center items-center"
 >
   {#if isDragging}
-    <div class="text-2xl font-bold">
-      {$translate("Drop a YouTube link here")}
-    </div>
+    <div class="text-2xl font-bold">{$tr("Drop a YouTube link here")}</div>
   {:else if isLoading}
-    <span class="loading loading-spinner loading-md"></span>
+    <span class="loading loading-spinner loading-md" />
   {/if}
 </div>
 
