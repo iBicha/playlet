@@ -13,7 +13,11 @@ const config = getEnvVars(['ROKU_DEV_TARGET']);
     parser.add_argument('--app-id', { help: 'App Id' });
 
     const args = parser.parse_args();
-    const appId = args.app_id
+    let appId = args.app_id || "dev";
+
+    if (appId === "prod") {
+        appId = "693751";
+    }
 
     const url = `http://${config.ROKU_DEV_TARGET}:8060/launch/${appId}?restart=true`;
     console.log("Restarting app", appId);
