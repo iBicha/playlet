@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Web app "Open in Invidious" when built-in backend is selected
 - Playlist continuation showing invalid items at the end of playlists
 
-## Changed
+### Changed
 
 - Skip "Create on the Rise" that show up in trending
   - They end up hijacking the feed
