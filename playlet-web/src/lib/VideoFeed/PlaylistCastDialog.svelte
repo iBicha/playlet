@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore, tr } from "lib/Stores";
+  import { playletStateStore, translate } from "lib/Stores";
   import PlaylistThumbnail from "./PlaylistThumbnail.svelte";
 
   export let title: string | undefined = undefined;
@@ -102,22 +102,24 @@
     <div class="flex flex-col">
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>
-          {$tr("Play on %1").replace("%1", tvName)}
+          {$translate("Play on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={queueOnTv}>
-          {$tr("Queue on %1").replace("%1", tvName)}
+          {$translate("Queue on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openOnTv}>
-          {$tr("Open on %1").replace("%1", tvName)}
+          {$translate("Open on %1").replace("%1", tvName)}
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
-          {$tr("Open in Invidious")}
+          {$translate("Open in Invidious")}
         </button>
-        <button class="btn join-item hover:btn-accent">{$tr("Cancel")}</button>
+        <button class="btn join-item hover:btn-accent"
+          >{$translate("Cancel")}</button
+        >
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>{$tr("Close")}</button>
+    <button>{$translate("Close")}</button>
   </form>
 </dialog>

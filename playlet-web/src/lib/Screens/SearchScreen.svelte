@@ -5,7 +5,7 @@
 
   import { InvidiousApi } from "lib/Api/InvidiousApi";
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore, searchHistoryStore, tr } from "lib/Stores";
+  import { playletStateStore, searchHistoryStore, translate } from "lib/Stores";
   import VideoCell from "lib/VideoFeed/VideoCell.svelte";
   import PlaylistCell from "lib/VideoFeed/PlaylistCell.svelte";
   import ChannelCell from "lib/VideoFeed/ChannelCell.svelte";
@@ -133,7 +133,7 @@
         <input
           type="search"
           dir="auto"
-          placeholder="{$tr('Search')}..."
+          placeholder="{$translate('Search')}..."
           class="join-item input w-full border border-neutral rounded-full"
           bind:this={searchBox}
           bind:value={searchBoxText}
@@ -213,14 +213,14 @@
             await searchVideos(searchContinuation);
           }}
         >
-          {$tr("Load more")}
+          {$translate("Load more")}
         </button>
       </div>
     {/if}
 
     {#if isLoading}
       <div class="w-full h-1/2 z-50 flex justify-center items-center">
-        <span class="loading loading-spinner loading-md" />
+        <span class="loading loading-spinner loading-md"></span>
       </div>
     {/if}
   </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { tr, userPreferencesStore } from "lib/Stores";
+  import { translate, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
@@ -23,7 +23,7 @@
 
 <div class="form-control m-5">
   <label class="label p-0 cursor-pointer">
-    <div class="label-text {textSizes[level]}">{$tr(displayText)}</div>
+    <div class="label-text {textSizes[level]}">{$translate(displayText)}</div>
     <input
       type="checkbox"
       name={key}
@@ -32,5 +32,5 @@
       class="checkbox"
     />
   </label>
-  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
+  <div class="text-xs text-gray-500">{@html $translate(description)}</div>
 </div>
