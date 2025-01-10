@@ -2,7 +2,7 @@
   import {
     homeLayoutFileStore,
     homeLayoutStore,
-    tr,
+    translate,
     userPreferencesStore,
   } from "lib/Stores";
   import ArrowUpIcon from "assets/remote-control/arrow-up.svg.svelte";
@@ -89,10 +89,10 @@
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{$tr(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
+  <div class={textSizes[level]}>{$translate(displayText)}</div>
+  <div class="text-xs text-gray-500">{@html $translate(description)}</div>
   <button class="btn m-1" on:click={openHomeScreenEditor}
-    >{$tr("Edit home screen")}</button
+    >{$translate("Edit home screen")}</button
   >
 </div>
 
@@ -100,51 +100,57 @@
   <div class="modal-box bg-base-100">
     {#if value && homeLayout}
       <table class="w-full">
-        {#each value as item, i (i)}
-          <tr>
-            <td>
-              <div class="tooltip" data-tip="Move up">
-                <button
-                  class="btn btn-outline btn-sm"
-                  on:click={() => moveUp(i)}
-                  disabled={i === 0}
-                >
-                  <ArrowUpIcon />
-                </button>
-              </div>
-            </td>
-            <td>
-              <label class="label p-0 cursor-pointer">
-                <div class="label-text">{$tr(homeLayout[item.id].title)}</div>
-                <input
-                  type="checkbox"
-                  name={item.id}
-                  bind:checked={item.enabled}
-                  class="toggle toggle-primary"
-                />
-              </label>
-            </td>
-            <td class="text-right">
-              <div class="tooltip" data-tip="Move down">
-                <button
-                  class="btn btn-outline btn-sm m-2"
-                  on:click={() => moveDown(i)}
-                  disabled={i === value.length - 1}
-                >
-                  <ArrowDownIcon />
-                </button>
-              </div>
-            </td>
-          </tr>
-        {/each}
+        <tbody>
+          {#each value as item, i (i)}
+            <tr>
+              <td>
+                <div class="tooltip" data-tip="Move up">
+                  <button
+                    class="btn btn-outline btn-sm"
+                    on:click={() => moveUp(i)}
+                    disabled={i === 0}
+                  >
+                    <ArrowUpIcon />
+                  </button>
+                </div>
+              </td>
+              <td>
+                <label class="label p-0 cursor-pointer">
+                  <div class="label-text">
+                    {$translate(homeLayout[item.id].title)}
+                  </div>
+                  <input
+                    type="checkbox"
+                    name={item.id}
+                    bind:checked={item.enabled}
+                    class="toggle toggle-primary"
+                  />
+                </label>
+              </td>
+              <td class="text-right">
+                <div class="tooltip" data-tip="Move down">
+                  <button
+                    class="btn btn-outline btn-sm m-2"
+                    on:click={() => moveDown(i)}
+                    disabled={i === value.length - 1}
+                  >
+                    <ArrowDownIcon />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
       </table>
       <form method="dialog" class="flex justify-center space-x-2">
-        <button class="btn btn-primary" on:click={save}>{$tr("Save")}</button>
-        <button class="btn btn-primary">{$tr("Close")}</button>
+        <button class="btn btn-primary" on:click={save}
+          >{$translate("Save")}</button
+        >
+        <button class="btn btn-primary">{$translate("Close")}</button>
       </form>
     {/if}
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>{$tr("Close")}</button>
+    <button>{$translate("Close")}</button>
   </form>
 </dialog>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { playletStateStore, tr } from "lib/Stores";
+  import { playletStateStore, translate } from "lib/Stores";
   import PlaylistCastDialog from "./PlaylistCastDialog.svelte";
   import PlaylistThumbnail from "./PlaylistThumbnail.svelte";
   import { get } from "svelte/store";
@@ -33,7 +33,7 @@
       return "";
     }
 
-    const trFn = get(tr);
+    const trFn = get(translate);
 
     const totalDays = Math.floor(span / 86400);
     if (totalDays > 365) {
@@ -79,7 +79,12 @@
   }
 </script>
 
-<button class="w-80 p-2" on:click={modal.show()}>
+<button
+  class="w-80 p-2"
+  on:click={() => {
+    modal.show();
+  }}
+>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <PlaylistThumbnail
       bind:title

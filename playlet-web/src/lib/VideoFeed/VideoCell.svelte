@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { playletStateStore, tr } from "lib/Stores";
+  import { playletStateStore, translate } from "lib/Stores";
   import VideoCastDialog from "./VideoCastDialog.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
   import ChannelCastDialog from "./ChannelCastDialog.svelte";
@@ -74,7 +74,7 @@
       return "";
     }
 
-    const trFn = get(tr);
+    const trFn = get(translate);
 
     const currentTime = Math.floor(Date.now() / 1000);
     let timeLeft = premiereTimestamp - currentTime;
@@ -126,7 +126,7 @@
     if (isNaN(published)) {
       return "";
     }
-    const trFn = get(tr);
+    const trFn = get(translate);
     const currentTime = Math.floor(Date.now() / 1000);
     const span = currentTime - published;
     if (span < 1) {
@@ -181,7 +181,12 @@
   }
 </script>
 
-<button class="w-80 p-2" on:click={videoModal.show()}>
+<button
+  class="w-80 p-2"
+  on:click={() => {
+    videoModal.show();
+  }}
+>
   <div class="card card-compact bg-base-100 shadow-xl border border-neutral">
     <VideoThumbnail
       bind:videoId
@@ -197,15 +202,23 @@
     />
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title || ""}</h3>
-      <button
-        class="font-semibold link"
+      <span
+        class="font-semibold link cursor-pointer"
+        role="button"
+        tabindex="0"
         on:click={(e) => {
           e.stopPropagation();
           channelModal.show();
         }}
+        on:keydown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            channelModal.show();
+          }
+        }}
       >
         {author || ""}
-      </button>
+      </span>
       <div>{getViewCountDateText()}</div>
     </div>
   </div>

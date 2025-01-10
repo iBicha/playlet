@@ -10,7 +10,7 @@
     {#if pref.visibility !== "tv"}
       <SettingsNode {...pref} />
       {#if i !== $preferencesModelStore.length - 1}
-        <div class="divider" />
+        <div class="divider"></div>
       {/if}
     {/if}
   {/each}

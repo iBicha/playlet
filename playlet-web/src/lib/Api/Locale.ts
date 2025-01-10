@@ -1,4 +1,4 @@
-import { tr } from "lib/Stores";
+import { translate } from "lib/Stores";
 import { PlayletApi } from "./PlayletApi";
 import { get } from "svelte/store";
 
@@ -31,14 +31,14 @@ export async function fetchLocale(locale: string) {
             }
             translations[source[0].textContent] = translation[0].textContent;
         }
-        tr.set((s) => translations[s] || s);
+        translate.set((s) => translations[s] || s);
     } catch (error) {
         console.error(error);
     }
 }
 
 export function getPluralString(c: number, zeroString: string, oneString: string, pluralString: string) {
-    const trFn = get(tr);
+    const trFn = get(translate);
 
     c = c || 0;
     if (c === 0) {
@@ -51,7 +51,7 @@ export function getPluralString(c: number, zeroString: string, oneString: string
 }
 
 export function getFormattedPluralString(c: number, zeroString: string, oneString: string, pluralString: string) {
-    const trFn = get(tr);
+    const trFn = get(translate);
 
     c = c || 0;
     if (c === 0) {
