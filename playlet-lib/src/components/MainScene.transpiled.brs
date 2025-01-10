@@ -8,10 +8,28 @@
 function Init()
     InitializeBindings() ' auto-generated!
     m.scene = m.top.getScene()
+    SetScenePalette(m.scene)
     ' At this point, the "MainScene" node is not yet added to the scene, and does not have a parent yet.
     ' Let's wait until it has one.
     m.MainSceneContainer = m.scene.findNode("MainSceneContainer")
     m.MainSceneContainer.ObserveField("change", FuncName(MainSceneContainerChanged))
+end function
+
+function SetScenePalette(scene as object) as void
+    palette = scene.palette
+    if palette <> invalid
+        return
+    end if
+    palette = CreateObject("roSGNode", "RSGPalette")
+    palette.colors = {
+        DialogBackgroundColor: "#242424FF"
+        DialogFocusColor: "#CECECEFF"
+        DialogFocusItemColor: "#202020FF"
+        DialogSecondaryTextColor: "#EBEBEBFF"
+        DialogSecondaryItemColor: "#FF1C30FF"
+        DialogTextColor: "#EBEBEBFF"
+    }
+    scene.palette = palette
 end function
 
 function MainSceneContainerChanged()
