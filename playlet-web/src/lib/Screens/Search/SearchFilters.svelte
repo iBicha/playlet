@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tr } from "lib/Stores";
+  import { translate } from "lib/Stores";
 
   let modal;
 
@@ -11,7 +11,7 @@
     modal.close();
   }
 
-  export let label = $tr("Filters");
+  export let label = $translate("Filters");
 
   export const filters = {
     date: "",
@@ -38,7 +38,7 @@
     count += filters.features.length;
     count += filters.sort ? 1 : 0;
 
-    label = $tr("Filters") + `${count > 0 ? ` (${count})` : ""}`;
+    label = $translate("Filters") + `${count > 0 ? ` (${count})` : ""}`;
   }
 
   const options = {
@@ -181,37 +181,37 @@
       <h2 class="text-xl font-bold mb-4">{label}</h2>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">{$tr("Upload date")}</h3>
+        <h3 class="text-lg font-bold mb-2">{$translate("Upload date")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.date}>
           {#each options.date as { title, value }}
-            <option {value}>{$tr(title)}</option>
+            <option {value}>{$translate(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">{$tr("Type")}</h3>
+        <h3 class="text-lg font-bold mb-2">{$translate("Type")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.type}>
           {#each options.type as { title, value }}
-            <option {value}>{$tr(title)}</option>
+            <option {value}>{$translate(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">{$tr("Duration")}</h3>
+        <h3 class="text-lg font-bold mb-2">{$translate("Duration")}</h3>
         <select
           class="input input-bordered w-full"
           bind:value={filters.duration}
         >
           {#each options.duration as { title, value }}
-            <option {value}>{$tr(title)}</option>
+            <option {value}>{$translate(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">{$tr("Features")}</h3>
+        <h3 class="text-lg font-bold mb-2">{$translate("Features")}</h3>
         {#each options.features as { title, value }}
           <label class="flex items-center">
             <input
@@ -220,26 +220,26 @@
               class="form-checkbox"
               bind:checked={features_kv[value]}
             />
-            <span class="ml-2">{$tr(title)}</span>
+            <span class="ml-2">{$translate(title)}</span>
           </label>
         {/each}
       </div>
 
       <div class="mb-4">
-        <h3 class="text-lg font-bold mb-2">{$tr("Sort by")}</h3>
+        <h3 class="text-lg font-bold mb-2">{$translate("Sort by")}</h3>
         <select class="input input-bordered w-full" bind:value={filters.sort}>
           {#each options.sort as { title, value }}
-            <option {value}>{$tr(title)}</option>
+            <option {value}>{$translate(title)}</option>
           {/each}
         </select>
       </div>
 
       <div class="flex justify-end">
-        <button class="btn btn-outline">{$tr("Close")}</button>
+        <button class="btn btn-outline">{$translate("Close")}</button>
       </div>
     </div>
   </form>
   <form method="dialog" class="modal-backdrop">
-    <button>{$tr("Close")}</button>
+    <button>{$translate("Close")}</button>
   </form>
 </dialog>

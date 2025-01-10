@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getHost } from "lib/Api/Host";
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { playletStateStore, tr } from "lib/Stores";
+  import { playletStateStore, translate } from "lib/Stores";
 
   export let visibility: boolean;
 
@@ -164,9 +164,9 @@ ${JSON.stringify(profilesInfo, null, 2)}
 
 <div class={visibility ? "" : "hidden"}>
   <div class="text-base text-center m-8">
-    {$tr("Thank you for using Playlet.")}
+    {$translate("Thank you for using Playlet.")}
     <br />
-    {@html $tr(feedbackMessageRaw)
+    {@html $translate(feedbackMessageRaw)
       .replace(
         "%IssueStart%",
         `<a class="link" href="${githubUrlIssue}" target="_blank" rel="noopener noreferrer">`
@@ -194,11 +194,9 @@ ${JSON.stringify(profilesInfo, null, 2)}
           </tr>
         {/each}
 
-        <thead>
-          <tr>
-            <th>App internal state</th>
-          </tr>
-        </thead>
+        <tr>
+          <th>App internal state</th>
+        </tr>
 
         {#each internalStateLinks as item}
           <tr>

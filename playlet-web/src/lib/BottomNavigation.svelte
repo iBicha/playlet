@@ -6,7 +6,7 @@
   import BookmarksIcon from "../assets/star-icon.svg.svelte";
   import RemoteIcon from "../assets/remote-control.svg.svelte";
 
-  import { appStateStore, tr } from "lib/Stores";
+  import { appStateStore, translate } from "lib/Stores";
   import { ScreenNames, type AppState } from "lib/Types";
   import { onMount } from "svelte";
 
@@ -57,7 +57,7 @@
     <div class="h-6">
       <SearchIcon />
     </div>
-    <span class="text-xs">{$tr("Search")}</span>
+    <span class="text-xs">{$translate("Search")}</span>
   </button>
   <button
     on:click={() => setScreen("home")}
@@ -66,7 +66,7 @@
     <div class="h-6">
       <HomeIcon />
     </div>
-    <span class="text-xs">{$tr("Home")}</span>
+    <span class="text-xs">{$translate("Home")}</span>
   </button>
   <button
     on:click={() => setScreen("bookmarks")}
@@ -75,7 +75,7 @@
     <div class="h-6">
       <BookmarksIcon />
     </div>
-    <span class="text-xs">{$tr("Bookmarks")}</span>
+    <span class="text-xs">{$translate("Bookmarks")}</span>
   </button>
   <button
     on:click={() => setScreen("settings")}
@@ -84,7 +84,7 @@
     <div class="h-6">
       <SettingsIcon />
     </div>
-    <span class="text-xs">{$tr("Settings")}</span>
+    <span class="text-xs">{$translate("Settings")}</span>
   </button>
   <button
     on:click={() => setScreen("remote")}
@@ -93,7 +93,7 @@
     <div class="h-6">
       <RemoteIcon />
     </div>
-    <span class="text-xs">{$tr("Remote")}</span>
+    <span class="text-xs">{$translate("Remote")}</span>
   </button>
   <button
     on:click={() => setScreen("info")}
@@ -102,6 +102,6 @@
     <div class="h-6">
       <InfoIcon />
     </div>
-    <span class="text-xs">{$tr("Info")}</span>
+    <span class="text-xs">{$translate("Info")}</span>
   </button>
 </div>
