@@ -385,6 +385,8 @@ namespace Http
                 return m.GetPlaylist(context)
             else if route.StartsWith("/playlet-invidious-backend/api/v1/channels/")
                 return m.GetChannel(context)
+            else if route.StartsWith("/playlet-invidious-backend/channel")
+                return m.RedirectChannel(context)
             end if
 
             return false
@@ -529,6 +531,61 @@ namespace Http
 
             return false
         end function
+
+        @get("/playlet-invidious-backend/watch")
+        function RedirectWatch(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            videoId = request.query.v
+            if StringUtils.IsNullOrEmpty(videoId)
+                response.Json({
+                    "error": "Missing 'v' query parameter"
+                })
+                response.http_code = 400
+                return true
+            end if
+
+            response.Redirect(`https://redirect.invidious.io/watch?v=${videoId}`)
+            return true
+        end function
+
+        @get("/playlet-invidious-backend/playlist")
+        function RedirectPlaylist(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            playlistId = request.query.list
+            if StringUtils.IsNullOrEmpty(playlistId)
+                response.Json({
+                    "error": "Missing 'list' query parameter"
+                })
+                response.http_code = 400
+                return true
+            end if
+
+            response.Redirect(`https://redirect.invidious.io/playlist?list=${playlistId}`)
+            return true
+        end function
+
+        function RedirectChannel(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            channelId = route.Mid("/playlet-invidious-backend/channel/".Len())
+            if StringUtils.IsNullOrEmpty(channelId)
+                response.Json({
+                    "error": "Missing 'channelId' path parameter"
+                })
+                response.http_code = 400
+                return true
+            end if
+
+            response.Redirect(`https://redirect.invidious.io/channel/${channelId}`)
+            return true
+        end function
+
     end class
 
 end namespace
