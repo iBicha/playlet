@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { tr, userPreferencesStore } from "lib/Stores";
+  import { translate, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
   const qualityLabels = {
@@ -37,7 +37,7 @@
       }, {});
       displayValue = originalValue
         .split(",")
-        .map((item) => $tr(qualityLabels[item] || item))
+        .map((item) => $translate(qualityLabels[item] || item))
         .join(", ");
     }
   }
@@ -117,38 +117,42 @@
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{$tr(displayText)}</div>
-  <div class="text-xs text-gray-500">{@html $tr(description)}</div>
+  <div class={textSizes[level]}>{$translate(displayText)}</div>
+  <div class="text-xs text-gray-500">{@html $translate(description)}</div>
   <button class="btn m-1" on:click={openQualitySelector}>{displayValue}</button>
 </div>
 
 <dialog bind:this={modal} class="modal" on:close={onClose}>
   <div class="modal-box bg-base-100">
     <table class="w-full">
-      {#each Object.keys(qualityLabels) as quality}
-        <tr>
-          <td>
-            <label class="label p-0 cursor-pointer">
-              <div class="label-text text-lg">
-                {$tr(qualityLabels[quality])}
-              </div>
-              <input
-                type="checkbox"
-                checked={valueCheckedStates[quality]}
-                on:change={(e) => onChange(e, quality)}
-                class="toggle toggle-primary"
-              />
-            </label>
-          </td>
-        </tr>
-      {/each}
+      <tbody>
+        {#each Object.keys(qualityLabels) as quality}
+          <tr>
+            <td>
+              <label class="label p-0 cursor-pointer">
+                <div class="label-text text-lg">
+                  {$translate(qualityLabels[quality])}
+                </div>
+                <input
+                  type="checkbox"
+                  checked={valueCheckedStates[quality]}
+                  on:change={(e) => onChange(e, quality)}
+                  class="toggle toggle-primary"
+                />
+              </label>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
     </table>
     <form method="dialog" class="flex justify-center space-x-2">
-      <button class="btn btn-primary" on:click={save}>{$tr("Save")}</button>
-      <button class="btn btn-primary">{$tr("Close")}</button>
+      <button class="btn btn-primary" on:click={save}
+        >{$translate("Save")}</button
+      >
+      <button class="btn btn-primary">{$translate("Close")}</button>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop">
-    <button>{$tr("Close")}</button>
+    <button>{$translate("Close")}</button>
   </form>
 </dialog>

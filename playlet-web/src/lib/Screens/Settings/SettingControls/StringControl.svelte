@@ -1,6 +1,6 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { tr, userPreferencesStore } from "lib/Stores";
+  import { translate, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
   const invidiousPublicInstancesLink = `<a class="link" href="https://api.invidious.io" target="_blank" rel="noopener noreferrer">https://api.invidious.io</a>`;
@@ -27,10 +27,10 @@
 </script>
 
 <div class="m-5">
-  <div class={textSizes[level]}>{$tr(displayText)}</div>
+  <div class={textSizes[level]}>{$translate(displayText)}</div>
   <div class="text-xs text-gray-500">
     <!-- TODO:P2 this should not be hardcoded here -->
-    {@html $tr(description).replace(
+    {@html $translate(description).replace(
       "%INVIDIOUS_PUBLIC_INSTANCES%",
       invidiousPublicInstancesLink
     )}
@@ -45,7 +45,8 @@
       class="join-item input w-full mr-1"
     />
     {#if inputValue !== currentValue}
-      <button class="join-item btn" on:click={save}>{$tr("Save")}</button>
+      <button class="join-item btn" on:click={save}>{$translate("Save")}</button
+      >
     {/if}
   </div>
 </div>

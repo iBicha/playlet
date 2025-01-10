@@ -1,6 +1,10 @@
 <script lang="ts">
   import { InvidiousApi } from "lib/Api/InvidiousApi";
-  import { invidiousVideoApiStore, playletStateStore, tr } from "lib/Stores";
+  import {
+    invidiousVideoApiStore,
+    playletStateStore,
+    translate,
+  } from "lib/Stores";
   import VideoCell from "./VideoCell.svelte";
   import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
@@ -268,7 +272,7 @@
 -->
 {#if feedLoadState !== FeedLoadState.Loaded || videos.length !== 0}
   <div class="text-lg font-semibold ml-4">
-    {$tr(feed.title)}
+    {$translate(feed.title)}
   </div>
   <div
     class="carousel carousel-center rounded-box w-full space-x-4"
