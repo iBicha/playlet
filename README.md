@@ -40,7 +40,7 @@ More under [Screenshots](./docs/screenshots/README.md)
 
 ## Installation
 
-[Playlet on Roku channel store](https://channelstore.roku.com/details/840aec36f51bfe6d96cf6db9055a372a/playlet)
+[Playlet on Roku channel store](https://channelstore.roku.com/details/840aec36f51bfe6d96cf6db9055a372a/playlet) or search "Playlet" in the Roku channel store on your device.
 
 Can't install from the store? See [How to install Playlet as a sideloaded/dev app](https://github.com/iBicha/playlet/discussions/371)
 
