@@ -1,8 +1,9 @@
 // integration test to play a video on the Roku device
 // 1. Run dev channel on the Roku device (Playlet (dev))
-// 2 npm run restart-app && npm run test:integration
+// 2. npm run restart-app && npm run test:integration
 import { ecp, odc } from 'roku-test-automation';
 import { setupEnvironment } from './common';
+import { Key } from 'roku-test-automation/client/dist/ECP';
 
 setupEnvironment();
 
@@ -16,6 +17,8 @@ setupEnvironment();
     });
 
     console.log("Video started playing");
+
+    await ecp.sendKeypress(Key.Back);
 
     await odc.shutdown();
 })();
