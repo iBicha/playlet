@@ -106,6 +106,7 @@ namespace Innertube
 
         tabsNames = []
         tabsParams = {}
+        tabsTitles = {}
 
         tabs = ObjectUtils.Dig(responseData, ["contents", "twoColumnBrowseResultsRenderer", "tabs"])
         if tabs <> invalid
@@ -126,13 +127,17 @@ namespace Innertube
                     continue for
                 end if
 
-                tabParams = ObjectUtils.Dig(tabRenderer, ["endpoint", "browseEndpoint", "params"])
-                if tabParams = invalid
-                    continue for
+                tabsNames.Push(tabName)
+
+                tabTitle = tabRenderer["title"]
+                if IsString(tabTitle)
+                    tabsTitles[tabName] = tabTitle
                 end if
 
-                tabsNames.Push(tabName)
-                tabsParams[tabName] = tabParams
+                tabParams = ObjectUtils.Dig(tabRenderer, ["endpoint", "browseEndpoint", "params"])
+                if IsString(tabParams)
+                    tabsParams[tabName] = tabParams
+                end if
             end for
         end if
 
@@ -154,6 +159,7 @@ namespace Innertube
             "authorSubTitle": authorSubTitle
             "tabs": tabsNames
             "tabsParams": tabsParams
+            "tabsTitles": tabsTitles
             "items": items
         }
 

@@ -92,11 +92,11 @@ function OnContentSet() as void
     if (authorId <> m.authorId or author <> m.author) and IsArray(content.tabs)
         m.authorId = authorId
         m.author = author
-        m.rowList.feeds = CreateChannelFeeds(m.authorId, author, content.tabs, content.tabsParams)
+        m.rowList.feeds = CreateChannelFeeds(m.authorId, author, content.tabs, content.tabsParams, content.tabsTitles)
     end if
 end function
 
-function CreateChannelFeeds(authorId as string, author as string, tabs as object, tabsParams as object) as object
+function CreateChannelFeeds(authorId as string, author as string, tabs as object, tabsParams as object, tabsTitles as object) as object
     if authorId = ""
         return invalid
     end if
@@ -111,7 +111,13 @@ function CreateChannelFeeds(authorId as string, author as string, tabs as object
                 params = ""
             end if
 
-            feeds.Push(m.tabs[tabName](authorId, author, params))
+            if tabsTitles <> invalid and tabsTitles.DoesExist(tabName)
+                title = tabsTitles[tabName]
+            else
+                title = ""
+            end if
+
+            feeds.Push(m.tabs[tabName](authorId, author, title, params))
         end if
     end for
 
@@ -197,26 +203,47 @@ end function
 
 function InitializeTabs()
     m.tabs = {
-        "videos": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Videos", "channel_videos", authorId, author, params)
+        "videos": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Videos"
+            end if
+            return CreateChannelFeed(title, "channel_videos", authorId, author, params)
         end function
-        "shorts": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Shorts", "channel_shorts", authorId, author, params)
+        "shorts": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Shorts"
+            end if
+            return CreateChannelFeed(title, "channel_shorts", authorId, author, params)
         end function
-        "streams": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Live", "channel_streams", authorId, author, params)
+        "streams": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Live"
+            end if
+            return CreateChannelFeed(title, "channel_streams", authorId, author, params)
         end function
-        "releases": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Releases", "channel_releases", authorId, author, params)
+        "releases": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Releases"
+            end if
+            return CreateChannelFeed(title, "channel_releases", authorId, author, params)
         end function
-        "podcasts": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Podcasts", "channel_podcasts", authorId, author, params)
+        "podcasts": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Podcasts"
+            end if
+            return CreateChannelFeed(title, "channel_podcasts", authorId, author, params)
         end function
-        "playlists": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Playlists", "channel_playlists", authorId, author, params)
+        "playlists": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Playlists"
+            end if
+            return CreateChannelFeed(title, "channel_playlists", authorId, author, params)
         end function
-        "courses": function(authorId as string, author as string, params as string) as object
-            return CreateChannelFeed("Courses", "channel_courses", authorId, author, params)
+        "courses": function(authorId as string, author as string, title as string, params as string) as object
+            if StringUtils.IsNullOrEmpty(title)
+                title = "Courses"
+            end if
+            return CreateChannelFeed(title, "channel_courses", authorId, author, params)
         end function
     }
 end function
