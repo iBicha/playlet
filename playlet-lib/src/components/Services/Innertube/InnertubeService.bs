@@ -18,6 +18,7 @@ namespace InnertubeService
         cancellation = invalid
         fetchNext = true
         ctt = ""
+        raw = false
 
         if options <> invalid
             if options.DoesExist("cancellation")
@@ -28,6 +29,9 @@ namespace InnertubeService
             end if
             if options.DoesExist("ctt")
                 ctt = options.ctt
+            end if
+            if options.DoesExist("raw")
+                raw = options.raw
             end if
         end if
 
@@ -58,6 +62,16 @@ namespace InnertubeService
 
         if fetchNext
             nextResponse = nextRequest.Await()
+        end if
+
+        if raw
+            rawResponse = {
+                "playerResponse": playerResponse.Json()
+            }
+            if fetchNext
+                rawResponse["nextResponse"] = nextResponse.Json()
+            end if
+            return rawResponse
         end if
 
         parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json())
@@ -158,6 +172,7 @@ namespace InnertubeService
         searchFilters = invalid
         continuation = ""
         cancellation = invalid
+        raw = false
 
         if options <> invalid
             if options.DoesExist("searchFilters")
@@ -169,14 +184,18 @@ namespace InnertubeService
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
             end if
+            if options.DoesExist("raw")
+                raw = options.raw
+            end if
         end if
 
-        return Innertube.Search(query, searchFilters, continuation, cancellation)
+        return Innertube.Search(query, searchFilters, continuation, cancellation, raw)
     end function
 
     function GetTrending(options = invalid as object) as object
         cancellation = invalid
         params = ""
+        raw = false
 
         if options <> invalid
             if options.DoesExist("cancellation")
@@ -193,6 +212,9 @@ namespace InnertubeService
                     params = "4gIKGgh0cmFpbGVycw%3D%3D"
                 end if
             end if
+            if options.DoesExist("raw")
+                raw = options.raw
+            end if
         end if
 
         request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, params)
@@ -203,8 +225,11 @@ namespace InnertubeService
             return invalid
         end if
 
-        json = response.Json()
-        feeds = Innertube.ParseResponseDataForFeeds(json, { skipCreatorOnTheRise: true })
+        if raw
+            return response.Json()
+        end if
+
+        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), { skipCreatorOnTheRise: true })
 
         result = {
             feeds: feeds
@@ -270,6 +295,7 @@ namespace InnertubeService
         continuation = ""
         params = ""
         cancellation = invalid
+        raw = false
 
         if options <> invalid
             if options.DoesExist("continuation")
@@ -280,6 +306,9 @@ namespace InnertubeService
             end if
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
+            end if
+            if options.DoesExist("raw")
+                raw = options.raw
             end if
         end if
 
@@ -293,8 +322,11 @@ namespace InnertubeService
             }
         end if
 
-        json = response.Json()
-        result = Innertube.ParseChannelPageResponseData(json)
+        if raw
+            return response.Json()
+        end if
+
+        result = Innertube.ParseChannelPageResponseData(response.Json())
         if result.authorId = invalid and result.error = invalid
             result["authorId"] = channelId
         end if
@@ -310,6 +342,7 @@ namespace InnertubeService
     function GetPlaylist(playlistId as string, options = invalid as object) as object
         continuation = ""
         cancellation = invalid
+        raw = false
 
         if options <> invalid
             if options.DoesExist("continuation")
@@ -317,6 +350,9 @@ namespace InnertubeService
             end if
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
+            end if
+            if options.DoesExist("raw")
+                raw = options.raw
             end if
         end if
 
@@ -334,8 +370,11 @@ namespace InnertubeService
             }
         end if
 
-        json = response.Json()
-        result = Innertube.ParsePlaylistPageResponseData(json)
+        if raw
+            return response.Json()
+        end if
+
+        result = Innertube.ParsePlaylistPageResponseData(response.Json())
 
         cacheControl = Innertube.ParseResponseForCacheControl(response)
         if cacheControl <> invalid
@@ -348,6 +387,7 @@ namespace InnertubeService
     function GetMix(mixId as string, options = invalid as object) as object
         videoId = ""
         cancellation = invalid
+        raw = false
 
         if options <> invalid
             if options.DoesExist("videoId")
@@ -355,6 +395,9 @@ namespace InnertubeService
             end if
             if options.DoesExist("cancellation")
                 cancellation = options.cancellation
+            end if
+            if options.DoesExist("raw")
+                raw = options.raw
             end if
         end if
 
@@ -372,8 +415,11 @@ namespace InnertubeService
             }
         end if
 
-        json = response.Json()
-        return Innertube.ParseMixPageResponseData(json)
+        if raw
+            return response.Json()
+        end if
+
+        return Innertube.ParseMixPageResponseData(response.Json())
     end function
 
     function ResolveUrl(url as string, options = invalid as object) as object

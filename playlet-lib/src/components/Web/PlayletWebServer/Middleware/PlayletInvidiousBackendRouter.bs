@@ -185,7 +185,19 @@ namespace Http
             request = context.request
             response = context.response
 
-            result = InnertubeService.GetTrending({ type: request.query.type })
+            raw = request.query.raw <> invalid
+
+            options = {
+                raw: raw
+                type: request.query.type
+            }
+
+            result = InnertubeService.GetTrending(options)
+            if raw
+                response.Json(result)
+                return true
+            end if
+
             if result.error <> invalid
                 response.Json(result)
                 response.http_code = 500
@@ -239,6 +251,11 @@ namespace Http
 
             query = request.query.q
             continuation = request.query.continuation
+            raw = request.query.raw <> invalid
+
+            options = {
+                raw: raw
+            }
 
             searchFilters = {}
             sort = request.query.sort
@@ -262,7 +279,6 @@ namespace Http
                 searchFilters.features = features.Split(",")
             end if
 
-            options = {}
             if searchFilters.Count() > 0
                 options.searchFilters = searchFilters
             end if
@@ -274,6 +290,11 @@ namespace Http
             if result.error <> invalid
                 response.Json(result)
                 response.http_code = 500
+                return true
+            end if
+
+            if raw
+                response.Json(result)
                 return true
             end if
 
@@ -299,6 +320,8 @@ namespace Http
             response = context.response
 
             url = request.query.url
+            raw = request.query.raw <> invalid
+
             if StringUtils.IsNullOrEmpty(url)
                 response.Json({
                     "error": "Missing 'url' query parameter"
@@ -307,12 +330,17 @@ namespace Http
                 return true
             end if
 
-            json = InnertubeService.ResolveUrl(url, response)
+            json = InnertubeService.ResolveUrl(url)
             if json = invalid
                 response.Json({
                     "error": "Failed to resolve URL"
                 })
                 response.http_code = 500
+                return true
+            end if
+
+            if raw
+                response.Json(json)
                 return true
             end if
 
@@ -392,8 +420,16 @@ namespace Http
             route = request.route
 
             videoId = route.Mid("/playlet-invidious-backend/api/v1/videos/".Len())
+            if videoId.InStr("?") > 0
+                videoId = videoId.Left(videoId.InStr("?"))
+            end if
+            raw = request.query.raw <> invalid
 
-            metadata = InnertubeService.GetVideoMetadata(videoId)
+            options = {
+                raw: raw
+            }
+
+            metadata = InnertubeService.GetVideoMetadata(videoId, options)
             response.Json(metadata)
 
             if metadata.error <> invalid
@@ -409,9 +445,16 @@ namespace Http
             route = request.route
 
             playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
+            if playlistId.InStr("?") > 0
+                playlistId = playlistId.Left(playlistId.InStr("?"))
+            end if
             continuation = request.query.continuation
+            raw = request.query.raw <> invalid
 
-            options = {}
+            options = {
+                raw: raw
+            }
+
             if playlistId.StartsWith("RD")
                 if not StringUtils.IsNullOrEmpty(continuation)
                     options.videoId = continuation
@@ -429,6 +472,11 @@ namespace Http
                 end if
 
                 playlist = InnertubeService.GetPlaylist(playlistId, options)
+            end if
+
+            if raw
+                response.Json(playlist)
+                return true
             end if
 
             if playlist.error <> invalid
@@ -456,10 +504,17 @@ namespace Http
             route = request.route
 
             channelAndTab = route.Mid("/playlet-invidious-backend/api/v1/channels/".Len())
+            if channelAndTab.InStr("?") > 0
+                channelAndTab = channelAndTab.Left(channelAndTab.InStr("?"))
+            end if
             channelAndTab = channelAndTab.Split("/")
 
-            options = {}
             continuation = request.query.continuation
+            raw = request.query.raw <> invalid
+
+            options = {
+                raw: raw
+            }
 
             if not StringUtils.IsNullOrEmpty(continuation)
                 options.continuation = continuation
@@ -468,6 +523,11 @@ namespace Http
             if channelAndTab.Count() = 1
                 channelId = channelAndTab[0]
                 channel = InnertubeService.GetChannel(channelId, options)
+                if raw
+                    response.Json(channel)
+                    return true
+                end if
+
                 if channel.error <> invalid
                     response.Json(channel)
                     response.http_code = 500
@@ -490,6 +550,11 @@ namespace Http
                 end if
 
                 channel = InnertubeService.GetChannel(channelId, options)
+                if raw
+                    response.Json(channel)
+                    return true
+                end if
+
                 if channel.error <> invalid
                     response.Json(channel)
                     response.http_code = 500
