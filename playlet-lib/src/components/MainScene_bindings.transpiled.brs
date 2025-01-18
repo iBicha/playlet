@@ -18,6 +18,7 @@ function InitializeBindings()
             "VideoQueue": {
                 "appController": "/AppController", 
                 "videoContainer": "../VideoContainer", 
+                "innertube": "../Innertube", 
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
                 "preferences": "../Preferences", 
@@ -38,6 +39,7 @@ function InitializeBindings()
             "WebServer": {
                 "appController": "/AppController", 
                 "applicationInfo": "../ApplicationInfo", 
+                "innertube": "../Innertube", 
                 "invidious": "../Invidious", 
                 "profilesService": "../ProfilesService", 
                 "preferences": "../Preferences", 

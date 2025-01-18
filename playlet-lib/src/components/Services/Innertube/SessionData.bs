@@ -1,0 +1,91 @@
+import "pkg:/components/Services/Innertube/Constants.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+namespace Innertube
+
+    const SESSION_DATA_VERSION = 1
+    const INNERTUBE_VISITOR_DATA_LIFESPAN = 1000 * 60 * 60 * 24
+
+    function GetSessionData() as object
+        sessionData = ReadSessionDataFromRegistry()
+        if sessionData <> invalid
+            return sessionData
+        end if
+
+        sessionData = RequestSessionData()
+        if sessionData = invalid
+            return invalid
+        end if
+
+        RegistryUtils.Write(RegistryUtils.INNERTUBE_SESSION_DATA, FormatJson(sessionData))
+        return sessionData
+    end function
+
+    function RequestSessionData() as object
+        request = HttpClient.Get("https://www.youtube.com/sw.js_data")
+        request.Headers({
+            "Accept-Language": "en-US,en;q=0.9"
+            "User-Agent": INNERTUBE_WEB_USER_AGENT
+            "Accept": "*/*"
+            "Referer": "https://www.youtube.com/sw.js"
+        })
+
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError("Failed to fetch session data", response.ErrorMessage())
+            return invalid
+        end if
+
+        text = ValidString(response.Text())
+        if not text.StartsWith(")]}'")
+            LogError("Invalid session data response", text)
+            return invalid
+        end if
+
+        text = text.Replace(")]}'", "")
+        json = ParseJson(text)
+        if json = invalid
+            LogError("Failed to parse session data", text)
+            return invalid
+        end if
+
+        visitorData = ObjectUtils.Dig(json, [0, 2, 0, 0, 13])
+        if StringUtils.IsNullOrEmpty(visitorData)
+            LogError("Visitor data not found", text)
+            return invalid
+        end if
+
+        return {
+            "__version": SESSION_DATA_VERSION
+            "timestamp": TimeUtils.Now().AsSeconds()
+            "visitorData": visitorData
+        }
+    end function
+
+    function ReadSessionDataFromRegistry() as object
+        sessionData = RegistryUtils.Read(RegistryUtils.INNERTUBE_SESSION_DATA)
+        if StringUtils.IsNullOrEmpty(sessionData)
+            return invalid
+        end if
+
+        sessionData = ParseJson(sessionData)
+        if sessionData = invalid
+            RegistryUtils.Delete(RegistryUtils.INNERTUBE_SESSION_DATA)
+            return invalid
+        end if
+
+        timestamp = sessionData.timestamp
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        if nowSeconds - timestamp > INNERTUBE_VISITOR_DATA_LIFESPAN
+            RegistryUtils.Delete(RegistryUtils.INNERTUBE_SESSION_DATA)
+            return invalid
+        end if
+
+        return sessionData
+    end function
+end namespace
