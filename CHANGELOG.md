@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Added `Visitor Data` to payload in Playlet backend
+  - Session data persists for 24 hours
+  - It reduces the privacy of the app, but can help with `Sign in to confirm you're not a bot errors`
+
+## Changed
+
+- Video queue view might be missing video titles and durations
+  - This is done to reduce the risk of rate limiting. No video titles in the queue is better than no videos playing at all.
+  - Only affects casting playlists from the YouTube mobile app.
 
 ## [0.36.0] - 2025-01-16
 
