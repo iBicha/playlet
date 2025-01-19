@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `Visitor Data` to payload in Playlet backend
   - Session data persists for 24 hours
-  - It reduces the privacy of the app, but can help with `Sign in to confirm you're not a bot errors`
+  - It reduces the privacy of the app, but can help with `Sign in to confirm you're not a bot` errors
 
 ## Changed
 
