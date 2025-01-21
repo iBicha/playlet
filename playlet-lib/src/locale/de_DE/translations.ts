@@ -1268,5 +1268,9 @@
         <source>Buffering</source>
         <translation type="unfinished">Puffert</translation>
     </message>
+    <message>
+        <source>Do not show again</source>
+        <translation>Nicht wieder anzeigen</translation>
+    </message>
 </context>
 </TS>
