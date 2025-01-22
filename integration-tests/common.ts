@@ -6,7 +6,12 @@ import { utils } from 'roku-test-automation';
 const envFile = path.join(__dirname, '../.env');
 const config = getEnvVars(['ROKU_DEV_TARGET', 'ROKU_DEVPASSWORD']);
 
-export function setupEnvironment() {
+export enum AppId {
+    DEV = 'dev',
+    PROD = '693751',
+}
+
+export function setupEnvironment(appId = AppId.DEV) {
     utils.setupEnvironmentFromConfig({
         RokuDevice: {
             devices: [{
@@ -16,7 +21,7 @@ export function setupEnvironment() {
         },
         ECP: {
             default: {
-                launchChannelId: 'dev'
+                launchChannelId: appId,
             }
         },
         OnDeviceComponent: {

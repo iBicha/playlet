@@ -1,14 +1,14 @@
 // integration test to play a video on the Roku device
-// 1. Run dev channel on the Roku device (Playlet (dev))
-// 2. npm run restart-app && npm run test:integration
+
 import { ecp, odc } from 'roku-test-automation';
-import { setupEnvironment } from './common';
+import { AppId, setupEnvironment } from './common';
 import { Key } from 'roku-test-automation/client/dist/ECP';
 
-setupEnvironment();
+async function playVideoDev() {
+    setupEnvironment(AppId.DEV);
 
-(async () => {
-    await ecp.sendInput({ params: { contentId: "jNQXAC9IVRw" } });
+    await ecp.sendLaunchChannel({ params: { contentId: "jNQXAC9IVRw" } });
+    await ecp.sleep(5000);
 
     await odc.onFieldChangeOnce({
         base: "scene",
@@ -18,7 +18,35 @@ setupEnvironment();
 
     console.log("Video started playing");
 
-    await ecp.sendKeypress(Key.Back);
-
     await odc.shutdown();
+    await ecp.sendKeypress(Key.Home);
+}
+
+async function playVideoProd() {
+    setupEnvironment(AppId.PROD);
+
+    let playerState = (await ecp.getMediaPlayer()).state;
+    await ecp.sendLaunchChannel({ params: { contentId: "jNQXAC9IVRw" } });
+
+    const TIMEOUT = 20000;
+    const start = Date.now();
+    while (Date.now() - start < TIMEOUT) {
+        const newPlayerState = (await ecp.getMediaPlayer()).state;
+        if (newPlayerState !== playerState) {
+            console.log("Player state changed: ", newPlayerState);
+            playerState = newPlayerState;
+        }
+        if (playerState === "play") {
+            console.log("Video started playing");
+            break;
+        }
+        await ecp.sleep(1000);
+    }
+
+    await ecp.sendKeypress(Key.Home);
+}
+
+(async () => {
+    await playVideoDev();
+    await playVideoProd();
 })();
