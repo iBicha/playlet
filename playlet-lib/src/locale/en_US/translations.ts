@@ -125,6 +125,10 @@
         <translation>Podcasts</translation>
     </message>
     <message>
+        <source>Courses</source>
+        <translation>Courses</translation>
+    </message>
+    <message>
         <source>Edit</source>
         <translation>Edit</translation>
     </message>
