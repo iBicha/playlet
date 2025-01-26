@@ -1,7 +1,9 @@
+import "BackendTypeSelectionView/BackendTypeSelectionViewUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Screens/ProfileScreen/ProfileView/ProfileViewUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -38,24 +40,56 @@ function OnRowItemSelected() as void
     row = m.profileRowList.content.GetChild(0)
     selectedProfile = row.GetChild(index)
     if selectedProfile.type = "login"
-        invidiousInstance = m.preferences["invidious.instance"]
-        if StringUtils.IsNullOrEmpty(invidiousInstance)
-            DialogUtils.ShowDialogEx({
-                title: "No Invidious Instance"
-                message: [
-                    "Playlet built-in backend does not support login yet.",
-                    "Can only login if an Invidious instance is set in the settings."
-                ]
-            })
+        #if YT_OAUTH_SUPPORT
+            backendTypeSelectionView = BackendTypeSelectionViewUtils.Open(m.appController)
+            backendTypeSelectionView.observeFieldScoped("selectedBackendType", FuncName(OnBackEndSelected))
             return
-        end if
-        dialog = CreateObject("roSGNode", "LoginDialog")
-        dialog@.BindNode()
-        m.top.getScene().dialog = dialog
-        return
+        #else
+            LoginWithInvidious()
+            return
+        #end if
     end if
 
     ProfileViewUtils.Open(selectedProfile, m.appController)
+end function
+
+function OnBackEndSelected(event as object) as void
+    backendTypeSelectionView = event.GetRoSGNode()
+    backendTypeSelectionView.unobserveFieldScoped("selectedBackendType")
+
+    selectedBackendType = event.getData()
+    if selectedBackendType = "BackendTypeInvidious"
+        LoginWithInvidious()
+    else if selectedBackendType = "BackendTypeYouTube"
+        LoginWithYouTube()
+    else
+        LogError("Unknown backend type:", selectedBackendType)
+    end if
+end function
+
+function LoginWithInvidious() as void
+    invidiousInstance = m.preferences["invidious.instance"]
+    if StringUtils.IsNullOrEmpty(invidiousInstance)
+        DialogUtils.ShowDialogEx({
+            title: "No Invidious Instance"
+            message: [
+                "Playlet built-in backend does not support login yet.",
+                "Can only login if an Invidious instance is set in the settings."
+            ]
+        })
+        return
+    end if
+
+    dialog = CreateObject("roSGNode", "LoginDialog")
+    dialog@.BindNode()
+    m.top.getScene().dialog = dialog
+end function
+
+function LoginWithYouTube() as void
+    DialogUtils.ShowDialogEx({
+        title: "YouTube"
+        message: ["Not implemented yet."]
+    })
 end function
 
 function OnCurrentProfileChanged() as void
