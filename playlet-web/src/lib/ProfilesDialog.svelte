@@ -2,6 +2,9 @@
   import { playletStateStore, translate } from "lib/Stores";
   import { PlayletApi } from "./Api/PlayletApi";
   import { get } from "svelte/store";
+  import { getHost } from "./Api/Host";
+
+  const host = () => `http://${getHost()}`;
 
   export function show() {
     modal.showModal();
@@ -23,12 +26,19 @@
 
   let authUrl;
   let currentInstance;
+  let currentInstanceName;
 
   let accordionState = null;
 
   playletStateStore.subscribe((value) => {
     authUrl = value?.invidious?.auth_url;
-    currentInstance = value?.invidious?.current_instance;
+    currentInstance = value?.invidious?.current_instance || "";
+    if (currentInstance === `${host()}/playlet-invidious-backend`) {
+      const trFn = get(translate);
+      currentInstanceName = trFn("Playlet built-in backend");
+    } else {
+      currentInstanceName = currentInstance;
+    }
     profiles = value?.profiles?.profiles ?? [];
     currentProfile = profiles.find(
       (p) => p.id === value?.profiles?.currentProfile
@@ -126,7 +136,7 @@
         <button class="btn btn-primary" on:click={login}>
           <div class="">
             <div class="text-m">{$translate("Login to Invidious")}</div>
-            <div class="text-xs font-light">{currentInstance}</div>
+            <div class="text-xs font-light">{currentInstanceName}</div>
           </div>
         </button>
         <button class="btn m-6">{$translate("Close")}</button>

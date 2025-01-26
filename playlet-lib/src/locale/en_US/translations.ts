@@ -757,6 +757,10 @@
         <translation>Instance</translation>
     </message>
     <message>
+        <source>Playlet built-in backend</source>
+        <translation>Playlet built-in backend</translation>
+    </message>
+    <message>
         <source>Invidious instance to use. Example: https://example.com</source>
         <translation>Invidious instance to use. Example: https://example.com</translation>
     </message>
