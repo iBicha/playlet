@@ -1,7 +1,6 @@
 # Playlet Brighterscript Plugins
 
 - [Json5/Yaml support](#json5yaml-support)
-- [Convert images](#convert-images)
 - [Manifest editing](#manifest-editing)
 - [Validation](#validation)
 - [Includes](#includes)
@@ -32,21 +31,6 @@ Brightscript can only parse json natively using [ParseJson](https://developer.ro
 ### How
 
 At the end of the build, the plugin scans for certain files (`jsonc`, `json`, `json5` and `yaml`), and converts them to plain json, while keeping the original file name. That way they are all parsable by the [ParseJson](https://developer.roku.com/en-ca/docs/references/brightscript/language/global-utility-functions.md#parsejsonjsonstring-as-string-flags---as-string-as-object) function, even though their original format is not compatible.
-
-## Convert images
-
-**[Source](/tools/bs-plugins/image-gen-plugin.ts)**
-
-This plugin allows us to convert svg files to png files.
-
-### Why
-
-This is used to convert splash screen, app poster, as well as icons in the app. Having svg images (or vector images in general) as the source of truth is better, in case images need to be modified or resized. Since Roku can't load them, we convert them to png.
-
-### How
-
-Each `.svg` file found will have an associated `.svg.meta.json5` file, which will contain the hash (MD5) of the svg, conversion paramters, and the hash of the output files. This allows us to hash existing files and see if a conversion is needed.
-Notice how each `.svg` file can be configured to generate multiple png files. This is especially the case to generate the app artwork (splash screen/poster) with different sizes from the same logo `.svg` file.
 
 ## Manifest editing
 
