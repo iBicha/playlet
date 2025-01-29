@@ -1,5 +1,6 @@
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
 
 namespace Innertube
 
@@ -14,7 +15,9 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            throw `Failed to get client id: ${response.ErrorMessage()}`
+            return {
+                "error": `Failed to get client id: ${response.ErrorMessage()}`
+            }
         end if
 
         text = response.Text()
@@ -23,7 +26,9 @@ namespace Innertube
 
         match = scriptRegex.Match(text)
         if match.Count() < 2
-            throw "Could not find base-js script"
+            return {
+                "error": "Could not find base-js script"
+            }
         end if
 
         baseJsUrl = "https://www.youtube.com" + match[1]
@@ -33,7 +38,9 @@ namespace Innertube
         response = request.Await()
 
         if not response.IsSuccess()
-            throw `Failed to get base js: ${response.ErrorMessage()}`
+            return {
+                "error": `Failed to get base js: ${response.ErrorMessage()}`
+            }
         end if
 
         text = response.Text()
@@ -42,7 +49,9 @@ namespace Innertube
 
         match = clientIdRegex.Match(text)
         if match.Count() < 3
-            throw "Could not find client id"
+            return {
+                "error": "Could not find client id and secret"
+            }
         end if
 
         return {
@@ -66,13 +75,17 @@ namespace Innertube
         response = request.Await()
 
         if not response.IsSuccess()
-            throw `Failed to get device code: ${response.ErrorMessage()}`
+            return {
+                "error": `Failed to get device code: ${response.ErrorMessage()}`
+            }
         end if
 
         responseData = ToCamelCase(response.Json())
 
         if responseData.DoesExist("errorCode")
-            throw "Failed to get device code: " + ToString(responseData)
+            return {
+                "error": "Failed to get device code: " + ToString(responseData)
+            }
         end if
 
         if responseData.DoesExist("expiresIn")
@@ -130,11 +143,13 @@ namespace Innertube
                 end if
                 continue while
             else if responseData.error = "expired_token"
-                throw "Failed to get access token: " + ToString(responseData)
+                return responseData
             else if responseData.error = "access_denied"
-                throw "Failed to get access token: " + ToString(responseData)
+                return responseData
             else
-                throw "Failed to get access token: " + ToString(responseData)
+                return {
+                    "error": "Failed to get access token: " + ToString(responseData)
+                }
             end if
         end while
 
@@ -175,6 +190,64 @@ namespace Innertube
             LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
         end if
         return success
+    end function
+
+    function ListAccounts(accessToken as string, cancellation = invalid as dynamic) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo, "", "")
+            "accountReadMask": {
+                "returnOwner": true
+                "returnBrandAccounts": true
+                "returnPersonaAccounts": true
+                "returnFamilyChildAccounts": true
+            }
+        }
+
+        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/account/accounts_list", payload)
+        headers = {
+            "Authorization": `Bearer ${accessToken}`
+        }
+        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Headers(headers)
+        request.Cancellation(cancellation)
+
+        response = request.Await()
+
+        if not response.IsSuccess()
+            return {
+                "error": `Failed to list accounts: ${response.ErrorMessage()}`
+            }
+        end if
+
+        accounts = ObjectUtils.Dig(response.Json(), ["contents", 0, "accountSectionListRenderer", "contents", 0, "accountItemSectionRenderer", "contents"])
+        if not IsArray(accounts)
+            return {
+                "error": "Could not parse accounts"
+            }
+        end if
+
+        parsedAccounts = []
+        for each account in accounts
+            accountItem = account["accountItem"]
+            if not IsAssociativeArray(accountItem)
+                continue for
+            end if
+
+            parsedAccount = {
+                "accountName": ParseText(accountItem["accountName"])
+                "accountPhoto": ObjectUtils.Dig(accountItem, ["accountPhoto", "thumbnails", 0, "url"])
+                "isSelected": ValidBool(accountItem["isSelected"])
+                "isDisabled": ValidBool(accountItem["isDisabled"])
+                "hasChannel": ValidBool(accountItem["hasChannel"])
+                "accountByline": ParseText(accountItem["accountByline"])
+                "channelHandle": ParseText(accountItem["channelHandle"])
+            }
+            parsedAccounts.Push(parsedAccount)
+        end for
+
+        return parsedAccounts
     end function
 
     function ToCamelCase(obj as object) as object

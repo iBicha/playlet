@@ -61,7 +61,7 @@ function OnBackEndSelected(event as object) as void
     if selectedBackendType = "BackendTypeInvidious"
         LoginWithInvidious()
     else if selectedBackendType = "BackendTypeYouTube"
-        LoginWithYouTube()
+        ShowLoginWithYouTubeDialog()
     else
         LogError("Unknown backend type:", selectedBackendType)
     end if
@@ -85,11 +85,31 @@ function LoginWithInvidious() as void
     m.top.getScene().dialog = dialog
 end function
 
-function LoginWithYouTube() as void
-    DialogUtils.ShowDialogEx({
-        title: "YouTube"
-        message: ["Not implemented yet."]
+function ShowLoginWithYouTubeDialog() as void
+    dialog = DialogUtils.ShowDialogEx({
+        title: "Disclaimer"
+        message: "Playlet authors acknowledge that all trademarks and registered trademarks mentioned in this application and related pages are the property of their respective owners. The use of these trademarks or trade names is for identification purposes only and does not imply any endorsement, affiliation, or sponsorship by the trademark owner."
+        buttons: [
+            Tr(Locale.Buttons.OK)
+            Tr(Locale.Buttons.Cancel)
+        ]
     })
+    dialog.ObserveField("buttonSelected", FuncName(OnLoginWithYouTubeDialogButtonSelected))
+end function
+
+function OnLoginWithYouTubeDialogButtonSelected(event as object) as void
+    buttonSelected = event.getData()
+    if buttonSelected <> 0
+        return
+    end if
+
+    LoginWithYouTube()
+end function
+
+function LoginWithYouTube() as void
+    dialog = CreateObject("roSGNode", "YouTubeLoginDialog")
+    dialog@.BindNode()
+    m.top.getScene().dialog = dialog
 end function
 
 function OnCurrentProfileChanged() as void

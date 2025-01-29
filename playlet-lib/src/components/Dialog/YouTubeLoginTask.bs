@@ -1,0 +1,118 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+
+@asynctask
+function YouTubeLoginTask(input as object) as object
+    profilesNode = input.profilesService
+    dialogNode = input.dialog
+
+    cancellation = m.top.cancellation
+    ' TODO:P2 cache client identity
+    authCode = InnertubeService.AuthGetCode(cancellation)
+
+    if CancellationUtils.IsCancelled(cancellation)
+        return invalid
+    end if
+
+    if authCode.error <> invalid
+        LogError(authCode.error)
+        DialogUtils.ShowDialogEx({
+            title: "Error"
+            message: authCode.error
+            large: true
+        })
+        return invalid
+    end if
+
+    url = InnertubeService.AuthGetActivationUrl(authCode)
+
+    LogInfo("Login url:", url)
+
+    dialogNode.url = url
+    dialogNode.code = authCode.userCode
+
+    accessToken = InnertubeService.AuthPollForAccessToken(authCode, cancellation)
+
+    if CancellationUtils.IsCancelled(cancellation)
+        return invalid
+    end if
+
+    if accessToken.error <> invalid
+        LogError(accessToken.error)
+        DialogUtils.ShowDialogEx({
+            title: "Error"
+            message: accessToken.error
+            large: true
+        })
+        return invalid
+    end if
+
+    accounts = InnertubeService.AuthListAccounts(accessToken.accessToken, cancellation)
+
+    if CancellationUtils.IsCancelled(cancellation)
+        return invalid
+    end if
+
+    if IsAssociativeArray(accounts) and accounts.error <> invalid
+        LogError(accounts.error)
+        DialogUtils.ShowDialogEx({
+            title: "Error"
+            message: accounts.error
+            large: true
+        })
+        return invalid
+    end if
+
+    if not IsArray(accounts) or accounts.Count() = 0
+        LogError("No accounts found")
+        DialogUtils.ShowDialogEx({
+            title: "Error"
+            message: "No accounts found"
+            large: true
+        })
+        return invalid
+    end if
+
+    selectedAccount = invalid
+    for each account in accounts
+        if ValidBool(account.isSelected)
+            selectedAccount = account
+            exit for
+        end if
+    end for
+
+    if selectedAccount = invalid
+        selectedAccount = accounts[0]
+    end if
+
+    profile = CreateProfileContentNode(selectedAccount, accessToken)
+    profilesNode@.LoginWithProfile(profile)
+
+    dialogNode.close = true
+
+    return invalid
+end function
+
+function CreateProfileContentNode(account as object, accessToken as object) as object
+    profile = CreateObject("roSGNode", "ProfileContentNode")
+    profile.type = "youtube"
+    profile.serverUrl = "http://127.0.0.1:8888/playlet-invidious-backend"
+    username = account.channelHandle
+    if StringUtils.IsNullOrEmpty(username)
+        username = account.accountByline
+    end if
+    profile.username = username
+    profile.thumbnail = account.accountPhoto
+    profile.accessToken = accessToken.accessToken
+    profile.refreshToken = accessToken.refreshToken
+    profile.scope = accessToken.scope
+    profile.tokenType = accessToken.tokenType
+    profile.expiresIn = accessToken.expiresIn
+    profile.expiresTimestamp = accessToken.expiresTimestamp
+    profile.clientId = accessToken.clientId
+    profile.clientSecret = accessToken.clientSecret
+
+    return profile
+end function
