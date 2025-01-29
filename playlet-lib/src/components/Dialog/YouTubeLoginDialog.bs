@@ -1,0 +1,51 @@
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.qrCode = m.top.findNode("QrCodePoster")
+
+    codeLabel = m.top.findNode("codeLabel")
+    if codeLabel <> invalid
+        codeLabel = codeLabel.getChild(0)
+        if codeLabel <> invalid
+            codeFont = m.top.findNode("codeFont")
+            codeLabel.font = codeFont
+        end if
+    end if
+
+    m.top.width = "920"
+    m.top.observeFieldScoped("buttonSelected", FuncName(Close))
+    m.top.observeFieldScoped("wasClosed", FuncName(OnWasClosed))
+    scanLabel = m.top.findNode("scanLabel")
+    ' TODO:P2 localize all dialog items
+    scanLabel.text = Tr(Locale.Dialogs.ScanTheQrCode)
+end function
+
+function OnNodeReady()
+    m.task = AsyncTask.Start(Tasks.YouTubeLoginTask, {
+        dialog: m.top
+        profilesService: m.top.profilesService
+    })
+end function
+
+function OnCodeSet(event as object)
+    code = event.getData()
+    m.qrCode.text = code
+end function
+
+function Close()
+    m.top.close = true
+end function
+
+function OnWasClosed()
+    if m.task <> invalid
+        m.task.cancel = true
+        m.task = invalid
+    end if
+end function
+
+function OnUrlSet()
+    m.qrCode.text = m.top.url
+end function

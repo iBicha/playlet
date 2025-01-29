@@ -455,14 +455,14 @@ namespace InnertubeService
     function AuthGetCode(cancellation = invalid as object) as object
         result = Innertube.GetClientIdentity(cancellation)
 
-        if CancellationUtils.IsCancelled(cancellation)
-            return invalid
+        if CancellationUtils.IsCancelled(cancellation) or result.error <> invalid
+            return result
         end if
 
         result2 = Innertube.GetDeviceAndUserCode(result.clientId, cancellation)
 
-        if CancellationUtils.IsCancelled(cancellation)
-            return invalid
+        if CancellationUtils.IsCancelled(cancellation) or result2.error <> invalid
+            return result2
         end if
 
         result.Append(result2)
@@ -508,4 +508,7 @@ namespace InnertubeService
         return Innertube.RevokeAccessToken(accessToken["accessToken"], cancellation)
     end function
 
+    function AuthListAccounts(accessToken as string, cancellation = invalid as object) as object
+        return Innertube.ListAccounts(accessToken, cancellation)
+    end function
 end namespace
