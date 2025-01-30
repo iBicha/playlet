@@ -22,6 +22,33 @@ namespace Http
             return true
         end function
 
+        @post("/playlet-invidious-backend/api/v1/auth/tokens/unregister")
+        function UnregisterToken(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            accessToken = request.body
+
+            if StringUtils.IsNullOrEmpty(accessToken)
+                response.Json({
+                    "error": "Missing 'accessToken' body parameter"
+                })
+                response.http_code = 400
+                return true
+            end if
+
+            if not InnertubeService.AuthRevokeAccessToken({ "accessToken": accessToken })
+                response.Json({
+                    "error": "Failed to unregister token"
+                })
+                response.http_code = 500
+                return true
+            end if
+
+            response.Default(204, "OK")
+            return true
+        end function
+
         @get("/playlet-invidious-backend/api/v1/auth/feed")
         function GetAuthFeed(context as object) as boolean
             request = context.request
