@@ -32,24 +32,41 @@ function OnContentSet() as void
         return
     end if
 
-    m.top.circlePosterInnerUri = "pkg:/images/white-circle.png"
-    m.top.circlePosterInnerBlendColor = content.color
     username = content.username
     m.top.username = username
-    if not StringUtils.IsNullOrEmpty(username)
-        m.top.letter = UCase(username.Left(1))
-    else
+
+    thumbnail = content.thumbnail
+    if not StringUtils.IsNullOrEmpty(thumbnail)
+        m.top.circlePosterInnerUri = thumbnail
+        ' bs:disable-next-line LINT3023
+        m.top.circlePosterInnerBlendColor = "#FFFFFFFF"
         m.top.letter = ""
+    else
+        m.top.circlePosterInnerUri = "pkg:/images/white-circle.png"
+        m.top.circlePosterInnerBlendColor = content.color
+
+        if not StringUtils.IsNullOrEmpty(username)
+            letter = username.Left(1)
+            if letter = "@" and Len(username) > 1
+                letter = username.Mid(1, 1)
+            end if
+            m.top.letter = UCase(letter)
+        else
+            m.top.letter = ""
+        end if
     end if
-    m.top.serverUrl = content.serverUrl
+
     m.top.crownVisible = content.isSelected
 
     backendType = content.type
     if backendType = "invidious"
+        m.top.serverUrl = content.serverUrl
         m.top.backendTypePosterUri = "pkg:/images/invidious-logo.png"
     else if backendType = "youtube"
+        m.top.serverUrl = "YouTube"
         m.top.backendTypePosterUri = "pkg:/images/youtube-logo.png"
     else
+        m.top.serverUrl = ""
         m.top.backendTypePosterUri = ""
     end if
 

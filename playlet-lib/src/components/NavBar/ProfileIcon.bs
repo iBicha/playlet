@@ -23,13 +23,28 @@ function OnCurrentProfile() as void
         return
     end if
 
-    username = currentProfile.username
-    if not StringUtils.IsNullOrEmpty(username)
-        m.letterLabel.text = UCase(username.Left(1))
-    else
+    thumbnail = currentProfile.thumbnail
+    if not StringUtils.IsNullOrEmpty(thumbnail)
+        m.circlePosterInner.uri = thumbnail
+        ' bs:disable-next-line LINT3023
+        m.circlePosterInner.blendColor = "#FFFFFFFF"
         m.letterLabel.text = ""
+    else
+        m.circlePosterInner.uri = "pkg:/images/white-circle.png"
+        m.circlePosterInner.blendColor = currentProfile.color
+
+        username = currentProfile.username
+
+        if not StringUtils.IsNullOrEmpty(username)
+            letter = username.Left(1)
+            if letter = "@" and Len(username) > 1
+                letter = username.Mid(1, 1)
+            end if
+            m.letterLabel.text = UCase(letter)
+        else
+            m.letterLabel.text = ""
+        end if
     end if
-    m.circlePosterInner.blendColor = currentProfile.color
 
     m.circlePoster.visible = true
     m.buttonIcon.visible = false
