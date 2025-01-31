@@ -162,21 +162,18 @@ export class LoggerPlugin implements CompilerPlugin {
 
         const func = logFunctions[level as 'LogError' | 'LogWarn' | 'LogInfo' | 'LogDebug'];
 
-        // https://github.com/microsoft/vscode/issues/571
-        const USE_COLOR = false;
-
-        const RED = '[31m';
-        const YELLOW = '[33m';
-        const GREEN = '[32m';
-        const BOLD = '[1m';
-        const BOLD_RED = '[1;31m';
-        const BOLD_YELLOW = '[1;33m';
-        const BOLD_GREEN = '[1;32m';
-        const CLEAR = '[0m';
-
         let logLine = '';
 
-        if (isDebug && USE_COLOR) {
+        if (isDebug) {
+            const RED = '[31m';
+            const YELLOW = '[33m';
+            const GREEN = '[32m';
+            const BOLD = '[1m';
+            const BOLD_RED = '[1;31m';
+            const BOLD_YELLOW = '[1;33m';
+            const BOLD_GREEN = '[1;32m';
+            const CLEAR = '[0m';
+
             switch (func.stringLevel) {
                 case 'ERROR':
                     logLine = `Chr(27) + "${BOLD_RED}" + "[${func.stringLevel}]" + Chr(27) + "${RED}" + ${msg} + Chr(27) + "${CLEAR}"`;
