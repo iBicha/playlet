@@ -1272,5 +1272,13 @@
         <source>Do not show again</source>
         <translation>Nicht wieder anzeigen</translation>
     </message>
+    <message>
+        <source>Courses</source>
+        <translation>Kurse</translation>
+    </message>
+    <message>
+        <source>Playlet built-in backend</source>
+        <translation>Playlet eingebautes Backend</translation>
+    </message>
 </context>
 </TS>
