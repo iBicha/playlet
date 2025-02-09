@@ -266,7 +266,7 @@
     </message>
     <message>
         <source>Show notifications when a segment is skipped</source>
-        <translation>Monstrar notificaciones cuando un segmento es saltado</translation>
+        <translation>Mostrar notificaciones cuando un segmento es saltado</translation>
     </message>
     <message>
         <source>This year</source>
@@ -1207,6 +1207,78 @@
     <message>
         <source>The instance can fetch with CORS from %1</source>
         <translation>La instancia puede obtener con CORS desde %1</translation>
+    </message>
+    <message>
+        <source>Courses</source>
+        <translation>Cursos</translation>
+    </message>
+    <message>
+        <source>Playlet built-in backend</source>
+        <translation>Backend de Playlet</translation>
+    </message>
+    <message>
+        <source>Filler</source>
+        <translation>Relleno</translation>
+    </message>
+    <message>
+        <source>Preview/Recap</source>
+        <translation>Avance/Resumen</translation>
+    </message>
+    <message>
+        <source>Preview/Recap/Hook</source>
+        <translation>Avance/Resumen/Gancho</translation>
+    </message>
+    <message>
+        <source>Sponsor</source>
+        <translation>Mensaje patrocinado</translation>
+    </message>
+    <message>
+        <source>Intermission</source>
+        <translation>Pausa</translation>
+    </message>
+    <message>
+        <source>Endcards/Credits</source>
+        <translation>Tarjeta final/Créditos</translation>
+    </message>
+    <message>
+        <source>Filler Tangent/Jokes</source>
+        <translation>Digresión/Chistes</translation>
+    </message>
+    <message>
+        <source>Intermission/Intro Animation</source>
+        <translation>Animación de Intermedio/Intro</translation>
+    </message>
+    <message>
+        <source>Non-Music</source>
+        <translation>Sin música</translation>
+    </message>
+    <message>
+        <source>Interaction Reminder (Subscribe)</source>
+        <translation>Recordatorio de interacción (Suscribete)</translation>
+    </message>
+    <message>
+        <source>Unpaid/Self Promotion</source>
+        <translation>Promoción propia/No pagada</translation>
+    </message>
+    <message>
+        <source>Music: Non-Music Section</source>
+        <translation>Música: Parte no musical</translation>
+    </message>
+    <message>
+        <source>Buffering</source>
+        <translation>Cargando</translation>
+    </message>
+    <message>
+        <source>Interaction Reminder</source>
+        <translation>Recordatorio de interacción</translation>
+    </message>
+    <message>
+        <source>Highlight</source>
+        <translation>Momento destacado</translation>
+    </message>
+    <message>
+        <source>Do not show again</source>
+        <translation>No mostrar de nuevo</translation>
     </message>
 </context>
 </TS>
