@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - They end up hijacking the feed
   - Might become a setting in the future
 
+### Changed
+
+- Access tokens on now stored encrypted on device
+
 ## [0.35.5] - 2025-01-09
 
 ### Added
