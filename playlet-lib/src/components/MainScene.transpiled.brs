@@ -51,8 +51,8 @@ function StartWebServer()
     m.dialServer.callfunc("StartServer", invalid)
 end function
 
-function ShowAnnouncement()
-    DialogUtils_ShowDialogOnce({
+function ShowAnnouncement() as void
+    dialog = DialogUtils_ShowDialogOnce({
         messageId: "1736288537"
         title: "Announcement - Playlet backend"
         message: [
@@ -65,5 +65,14 @@ function ShowAnnouncement()
         alwaysOnTop: true
         marginWidth: 180
     })
+    if dialog = invalid
+        return
+    end if
+    m.scene.signalBeacon("AppDialogInitiate")
+    m.top.observeField("wasClosed", FuncName(OnAnnouncementDialogClosed))
+end function
+
+function OnAnnouncementDialogClosed()
+    m.scene.signalBeacon("AppDialogComplete")
 end function
 '//# sourceMappingURL=./MainScene.brs.map
