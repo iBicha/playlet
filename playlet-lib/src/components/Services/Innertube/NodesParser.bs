@@ -1,3 +1,7 @@
+' Throw an error if an unknown node is encountered.
+' Only used in debug mode.
+#const THROW_ON_UNKNOWN_NODES = true
+
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -22,6 +26,11 @@ namespace Innertube
             directive = directives[key]
             if directive = invalid
                 LogWarn("Unknown node", key)
+                #if THROW_ON_UNKNOWN_NODES
+                    #if DEBUG
+                        throw "Unknown node: " + key
+                    #end if
+                #end if
                 continue for
             end if
 
@@ -80,6 +89,10 @@ namespace Innertube
             "horizontalCardListRenderer": ParseNotImplemented
             ' expandableTabRenderer contains the search tab with a channel. Ignored.
             "expandableTabRenderer": ParseNotImplemented
+            ' Shows a view of an official channel (like an artist) with tracks or albums.
+            ' Shows up in search results. Safe to ignore since the channel itself will also
+            ' be shown in the search results, so this is kind of a duplicate.
+            "officialCardViewModel": ParseNotImplemented
             ' Usually contains a "X unavailable video(s) are hidden" message. Ignored.
             "messageRenderer": ParseNotImplemented
             "clickTrackingParams": ParseNotImplemented
@@ -672,6 +685,11 @@ namespace Innertube
         end if
 
         LogWarn("Unknown content type:", contentType, `\n`, nodeData)
+        #if THROW_ON_UNKNOWN_NODES
+            #if DEBUG
+                throw "Unknown content type: " + contentType
+            #end if
+        #end if
         return invalid
     end function
 
@@ -857,6 +875,11 @@ namespace Innertube
         end if
 
         LogWarn("Unknown content type:", contentType, `\n`, nodeData)
+        #if THROW_ON_UNKNOWN_NODES
+            #if DEBUG
+                throw "Unknown content type: " + contentType
+            #end if
+        #end if
         return invalid
     end function
 
