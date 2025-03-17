@@ -5,6 +5,7 @@
   export let key: string;
   export let icon;
   export let small: boolean = false;
+  export let singlePressEvent: boolean = false;
 
   let button;
 
@@ -37,11 +38,18 @@
   let isDown = false;
   function pressKeyDown() {
     isDown = true;
-    ExternalControlProtocol.pressKeyDown(key);
+    if (singlePressEvent) {
+      ExternalControlProtocol.pressKey(key);
+    } else {
+      ExternalControlProtocol.pressKeyDown(key);
+    }
   }
 
   function pressKeyUp() {
     isDown = false;
+    if (singlePressEvent) {
+      return;
+    }
     ExternalControlProtocol.pressKeyUp(key);
   }
 

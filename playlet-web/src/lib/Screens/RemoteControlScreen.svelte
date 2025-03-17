@@ -153,9 +153,24 @@ And set it to "Enabled".`;
       <RemoteButton key={BUTTONS.fwd} icon={FastForwardIcon} small />
     </div>
     <div class="flex space-x-2 m-1">
-      <RemoteButton key={BUTTONS.volumeMute} icon={VolumeMuteIcon} small />
-      <RemoteButton key={BUTTONS.volumeDown} icon={VolumeDownIcon} small />
-      <RemoteButton key={BUTTONS.volumeUp} icon={VolumeUpIcon} small />
+      <RemoteButton
+        key={BUTTONS.volumeMute}
+        icon={VolumeMuteIcon}
+        small
+        singlePressEvent
+      />
+      <RemoteButton
+        key={BUTTONS.volumeDown}
+        icon={VolumeDownIcon}
+        small
+        singlePressEvent
+      />
+      <RemoteButton
+        key={BUTTONS.volumeUp}
+        icon={VolumeUpIcon}
+        small
+        singlePressEvent
+      />
     </div>
     <button
       on:click={showRemoteNotWorkingDialog}
