@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Playlet backend parsing issue in search results
+- Bug with saving search history
 
 ## [0.36.2] - 2025-02-28
 
