@@ -9,6 +9,7 @@ import "pkg:/source/utils/StringUtils.bs"
 
 ' TODO:P1 add the ability to change color of profiles
 function Init()
+    m.encryptedSensitiveFields = ["accessToken", "refreshToken"]
     m.disableSavingToRegistry = false
     content = m.top.findNode("ProfilesContent")
     m.top.content = content
@@ -25,22 +26,26 @@ function LoadProfilesFromRegistry()
     ' Step 1: Load user profiles from registry
     userProfiles = RegistryUtils.Read(RegistryUtils.USER_PROFILES)
 
-    if userProfiles = invalid
+    if StringUtils.IsNullOrEmpty(userProfiles)
         userProfiles = {
             profiles: []
             currentProfile: invalid
         }
     else
         userProfiles = ParseJson(userProfiles)
+        if not IsAssociativeArray(userProfiles)
+            userProfiles = {
+                profiles: []
+                currentProfile: invalid
+            }
+        end if
     end if
 
     ' Step 2: Migrate existing profiles to new format (if needed)
     isDirty = MigrateExistingProfiles(userProfiles)
 
-    ' Step 3: Save user preferences (if needed)
-    if isDirty
-        SaveUserProfilesToRegistry()
-    end if
+    ' Step 3: Decrypt sensitive fields
+    DecryptSensitiveFields(userProfiles)
 
     ' Step 4: Load user profiles into content nodes
     profileNodes = []
@@ -81,6 +86,11 @@ function LoadProfilesFromRegistry()
         end for
     end if
 
+    ' Step 5: Save user preferences (if needed)
+    if isDirty
+        SaveUserProfilesToRegistry()
+    end if
+
     if profileNodes.Count() > 0
         AsyncTask.Start(Tasks.ProfilesVerifyTokensTask, {
             profilesService: m.top
@@ -91,40 +101,57 @@ function LoadProfilesFromRegistry()
 end function
 
 function MigrateExistingProfiles(userProfiles as object) as boolean
+    isDirty = false
+
+    ' v0 -> v1
     tokenPayload = RegistryUtils.Read(RegistryUtils.INVIDIOUS_TOKEN)
-    if tokenPayload = invalid
-        return false
-    end if
+    if tokenPayload <> invalid
+        authToken = ParseJson(tokenPayload)
+        RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+        if IsAssociativeArray(authToken) and IsString(authToken.instance) and IsString(authToken.token) and IsString(authToken.username)
+            id = CreateProfileId(authToken.username, authToken.instance)
+            profileExists = false
+            for each profile in userProfiles.profiles
+                if profile.id = id
+                    profileExists = true
+                    exit for
+                end if
+            end for
+            if not profileExists
+                profile = {
+                    "id": id
+                    "type": "invidious"
+                    "username": authToken.username
+                    "serverUrl": authToken.instance
+                    "accessToken": authToken.token
+                    "color": ColorUtils.RandomSoftColorHex()
+                }
 
-    authToken = ParseJson(tokenPayload)
-    RegistryUtils.Delete(RegistryUtils.INVIDIOUS_TOKEN)
+                userProfiles.profiles.Unshift(profile)
+                if StringUtils.IsNullOrEmpty(userProfiles["currentProfile"])
+                    userProfiles["currentProfile"] = profile.id
+                end if
 
-    if authToken = invalid or authToken.instance = invalid or authToken.token = invalid or authToken.username = invalid
-        return false
-    end if
-
-    id = CreateProfileId(authToken.username, authToken.instance)
-    for each profile in userProfiles.profiles
-        if profile.id = id
-            return false
+                isDirty = true
+            end if
         end if
-    end for
-
-    profile = {
-        "id": id
-        "type": "invidious"
-        "username": authToken.username
-        "serverUrl": authToken.instance
-        "accessToken": authToken.token
-        "color": ColorUtils.RandomSoftColorHex()
-    }
-
-    userProfiles.profiles.Unshift(profile)
-    if StringUtils.IsNullOrEmpty(userProfiles["currentProfile"])
-        userProfiles["currentProfile"] = profile.id
     end if
 
-    return true
+    if ValidInt(userProfiles.__version) = 0
+        userProfiles.__version = 1
+        isDirty = true
+    end if
+
+    ' v1 -> v2
+    ' v2 tokens are encrypted when saved to registry
+    if userProfiles.__version = 1
+        userProfiles.__version = 2
+
+        EncryptSensitiveFields(userProfiles)
+        isDirty = true
+    end if
+
+    return isDirty
 end function
 
 function SaveUserProfilesToRegistry() as void
@@ -133,13 +160,15 @@ function SaveUserProfilesToRegistry() as void
     end if
 
     userProfiles = GetProfilesDto(true)
+    ' encrypting sensitive fields before saving to registry starting from v2
+    EncryptSensitiveFields(userProfiles)
 
-    userProfiles.__version = m.top.__version
     RegistryUtils.Write(RegistryUtils.USER_PROFILES, FormatJson(userProfiles))
 end function
 
 function GetProfilesDto(includeAccessToken as boolean) as object
     userProfiles = {
+        "__version": m.top.__version
         "profiles": []
         "currentProfile": invalid
     }
@@ -186,6 +215,26 @@ function GetProfilesDto(includeAccessToken as boolean) as object
     end if
 
     return userProfiles
+end function
+
+function EncryptSensitiveFields(userProfiles as object) as void
+    for each profile in userProfiles.profiles
+        for each field in m.encryptedSensitiveFields
+            if IsString(profile[field])
+                profile[field] = CryptoUtils.ChannelEncrypt(profile[field])
+            end if
+        end for
+    end for
+end function
+
+function DecryptSensitiveFields(userProfiles as object) as void
+    for each profile in userProfiles.profiles
+        for each field in m.encryptedSensitiveFields
+            if IsString(profile[field])
+                profile[field] = CryptoUtils.ChannelDecrypt(profile[field])
+            end if
+        end for
+    end for
 end function
 
 function LoginWithProfile(newProfile as object)
