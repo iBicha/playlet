@@ -39,7 +39,6 @@ function MainSceneContainerChanged()
     InitEcpArgs()
     m.scene.signalBeacon("AppLaunchComplete")
     CopyLoadingMessagesToCache()
-    ShowAnnouncement()
 end function
 
 function StartWebServer()
