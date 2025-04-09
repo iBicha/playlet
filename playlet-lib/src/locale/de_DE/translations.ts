@@ -1266,7 +1266,7 @@
     </message>
     <message>
         <source>Buffering</source>
-        <translation type="unfinished">Puffert</translation>
+        <translation>Pufferung</translation>
     </message>
     <message>
         <source>Do not show again</source>
