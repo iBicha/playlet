@@ -1268,5 +1268,17 @@
         <source>Add to %1 bookmark</source>
         <translation>Adicionar %1 ao marcadores</translation>
     </message>
+    <message>
+        <source>Courses</source>
+        <translation>Cursos</translation>
+    </message>
+    <message>
+        <source>Playlet built-in backend</source>
+        <translation>Back-end integrado do playlet</translation>
+    </message>
+    <message>
+        <source>Do not show again</source>
+        <translation>Não mostrar novamente</translation>
+    </message>
 </context>
 </TS>
