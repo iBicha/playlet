@@ -15,7 +15,7 @@
   <a href="/LICENSE">
     <img alt="AGPL-3.0 license" src="https://img.shields.io/github/license/iBicha/playlet.svg"/>
   </a>
-  <a href="https://channelstore.roku.com/details/840aec36f51bfe6d96cf6db9055a372a/playlet">
+  <a href="https://channelstore.roku.com/details/4a41d0921265a5e31429a7679442153f:b5bcb5b630c28b01e93bf59856317b43/playlet">
     <img alt="Roku Channel Store" src="https://img.shields.io/badge/Roku%20Store-Install-blueviolet?logo=roku&logoColor=blueviolet&labelColor=white"/>
   </a>
   <a href="https://github.com/iBicha/playlet/wiki">
