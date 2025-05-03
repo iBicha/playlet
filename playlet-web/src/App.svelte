@@ -69,8 +69,11 @@
   <LinkDragDrop />
 
   <NavBar />
-  <!-- TODO:P2 a better way to make the BottomNavigation not hide screens -->
-  <div style="margin-bottom: 4rem">
+  <!-- 
+    Bottom navigation is of 4rem height, plus the safe area at the bottom.
+    Added so that bottom navigation does not overlap with the content.
+  -->
+  <div style="margin-bottom: calc(4rem + env(safe-area-inset-bottom))">
     <SearchScreen visibility={currentScreen == "search"} />
 
     <HomeScreen visibility={currentScreen == "home"} />
