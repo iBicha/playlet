@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Small UI bug in web app nav bar
+- Backend logging to improve debugging
 
 ## [0.36.5] - 2025-05-02
 
