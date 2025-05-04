@@ -9,6 +9,7 @@ import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/OptionUtils.bs"
 
 namespace Invidious
     const INSTANCES_API = "https://api.invidious.io/instances.json?sort_by=type,users"
@@ -65,10 +66,7 @@ namespace Invidious
         end function
 
         function GetInstance() as string
-            if m.preferences = invalid
-                m.preferences = m.invidiousNode.preferences
-            end if
-            instance = m.preferences["invidious.instance"]
+            instance = m.GetInstanceFromPreferences()
             if not StringUtils.IsNullOrEmpty(instance)
                 return instance
             end if
@@ -80,6 +78,13 @@ namespace Invidious
             end if
 
             return instance
+        end function
+
+        function GetInstanceFromPreferences() as string
+            if m.preferences = invalid
+                m.preferences = m.invidiousNode.preferences
+            end if
+            return m.preferences["invidious.instance"]
         end function
 
         function MarkVideoWatched(videoId as dynamic) as void
@@ -258,7 +263,10 @@ namespace Invidious
             return feedSource
         end function
 
-        function MakeRequest(feedSource as object, additionalQueryParams = invalid as object, cancellation = invalid as object) as object
+        function MakeRequest(feedSource as object, options = invalid as dynamic) as object
+            additionalQueryParams = OptionUtils.Get(options, "additionalQueryParams")
+            cancellation = OptionUtils.Get(options, "cancellation")
+
             if m.endpoints = invalid
                 m.endpoints = m.invidiousNode.apiDefinitions
             end if
