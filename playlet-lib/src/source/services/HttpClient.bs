@@ -661,18 +661,6 @@ namespace HttpClient
                 return invalid
             end if
             m._json = ParseJson(text)
-            ' TODO:P2 remove workaround (fix landed, but remove after March 2025 as a precaution)
-            if m._json = invalid and m.IsSuccess() and not m._json_workaround_tried = true
-                ' A bug was introduced in Roku OS 14.1 that causes ParseJson to return invalid parsing some unicode characters.
-                ' So we filter out \uXXXX characters and try to parse again.
-                ' These characters are mostly emojis, and can't render anyway.
-                ' Update: a fix has landed in 14.1 (tested on 14.1.4.7709)
-                m._json_workaround_tried = true
-                filter = /\\u[0-9a-fA-F]{4}/
-                text = filter.ReplaceAll(text, "")
-                m._json = ParseJson(text)
-                LogWarn("Failed to parse JSON. Workaround applied. Success:", m._json <> invalid)
-            end if
             return m._json
         end function
 
