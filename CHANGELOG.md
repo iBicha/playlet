@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.7] - 2025-05-04
+
+### Fixed
+
+- Playlet backend error caused by Roku 14.5 update on Canada devices
+
+## [0.36.6] - 2025-05-03
+
+### Fixed
+
+- Small UI bug in web app nav bar
+- Backend logging to improve debugging
+
+## [0.36.5] - 2025-05-02
+
+### Fixed
+
+- Small error handling bug in Playlet backend
+
 ## [0.36.4] - 2025-04-19
 
 ### Added

@@ -49,7 +49,8 @@
   }
 </script>
 
-<div class="btm-nav">
+<!-- https://github.com/saadeghi/daisyui/issues/1732#issuecomment-1747818200 -->
+<div class="btm-nav box-content">
   <button
     on:click={() => setScreen("search")}
     class={$appStateStore.screen === "search" ? "active" : ""}

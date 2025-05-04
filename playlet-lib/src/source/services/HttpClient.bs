@@ -279,6 +279,11 @@ namespace HttpClient
             return m
         end function
 
+        function LogCurlCommand() as HttpRequest
+            m._logCurlCommand = true
+            return m
+        end function
+
         function ToCurlCommand() as string
             command = `curl "${m.BuildUrl()}"`
             if m._method = "HEAD"
@@ -350,8 +355,12 @@ namespace HttpClient
             LogInfo("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
 
             #if DEBUG
-                ? `════════ curl command ════════\n${m.ToCurlCommand()}\n══════════════════════════════`
+                m._logCurlCommand = true
             #end if
+
+            if m._logCurlCommand = true
+                LogInfo(`======== curl command ========\n${m.ToCurlCommand()}\n==============================`)
+            end if
 
             if m._method = "POST"
                 body = m._body
