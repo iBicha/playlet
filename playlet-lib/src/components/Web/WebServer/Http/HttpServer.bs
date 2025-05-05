@@ -195,6 +195,22 @@ namespace Http
             stats = stats + "  Bytes" + Stri(m.total_in) + " in," + Stri(m.total_out) + " out"
             return stats
         end function
+
+        function ProcessRequestLocal(method as string, uri as string, headers as object, body as string) as object
+            LogInfo(`Processing request locally ${method} ${uri}`)
+            request = new HttpRequest()
+            request.FromParsedData(method, uri, headers, body)
+
+            response = new HttpResponse(request, m, m.settings)
+            response.Process({})
+
+            return {
+                http_code: response.http_code
+                headers: response.headers
+                body: response.body_buffer
+            }
+        end function
+
     end class
 
 end namespace

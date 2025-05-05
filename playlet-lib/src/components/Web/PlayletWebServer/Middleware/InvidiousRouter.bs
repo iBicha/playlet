@@ -9,6 +9,7 @@ namespace Http
         function new(server as object)
             super()
 
+            m.server = server
             task = server.task
             m.profilesNode = task.profilesService
             m.invidiousNode = task.invidious
@@ -72,12 +73,15 @@ namespace Http
                 return true
             end if
 
-            additionalQueryParams = invalid
+            options = {
+                httpServer: m.server
+            }
             if feedSource.state <> invalid and feedSource.state.queryParams <> invalid
-                additionalQueryParams = feedSource.state.queryParams
+                options.additionalQueryParams = feedSource.state.queryParams
             end if
 
-            invResponse = m.invidiousService.MakeRequest(feedSource, additionalQueryParams)
+            invResponse = m.invidiousService.MakeRequest(feedSource, options)
+
             if not invResponse.success
                 response.Default(500, `Failed to make request: ${invResponse.error}`)
                 return true
