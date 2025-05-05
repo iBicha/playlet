@@ -266,6 +266,7 @@ namespace Invidious
         function MakeRequest(feedSource as object, options = invalid as dynamic) as object
             additionalQueryParams = OptionUtils.Get(options, "additionalQueryParams")
             cancellation = OptionUtils.Get(options, "cancellation")
+            httpServer = OptionUtils.Get(options, "httpServer")
 
             if m.endpoints = invalid
                 m.endpoints = m.invidiousNode.apiDefinitions
@@ -342,7 +343,7 @@ namespace Invidious
 
             request.Cancellation(cancellation)
 
-            response = request.Await()
+            response = m.SendRequest(request, httpServer)
 
             responseHandler = invalid
             if IsString(endpoint.responseHandler) and m.DoesExist(endpoint.responseHandler)
@@ -368,6 +369,33 @@ namespace Invidious
                     error: response.ErrorMessage()
                 }
             end if
+        end function
+
+        function SendRequest(request as HttpClient.HttpRequest, httpServer as dynamic) as dynamic
+            if httpServer = invalid
+                return request.Await()
+            end if
+
+            isDefaultInstance = StringUtils.IsNullOrEmpty(m.GetInstanceFromPreferences())
+            if not isDefaultInstance
+                return request.Await()
+            end if
+
+            parsedUrl = UrlUtils.ParseUrl(request.BuildUrl())
+            method = request.GetMethod()
+            uri = parsedUrl.path
+            headers = request.GetHeaders()
+            body = ValidString(request.GetBody())
+            responseObj = httpServer.ProcessRequestLocal(method, uri, headers, body)
+            response = new HttpClient.HttpResponse(request, invalid)
+            response.OverrideStatusCode(responseObj.http_code)
+            response.OverrideHeaders(responseObj.headers)
+            body = ""
+            if responseObj.body <> invalid
+                body = responseObj.body.ToAsciiString()
+            end if
+            response.OverrideText(body)
+            return response
         end function
 
         function DefaultHandler(context as object) as object
