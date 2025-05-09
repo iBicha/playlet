@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- A bug where Session data did not refresh after 24 hours
 
 ## [0.36.7] - 2025-05-04
 
