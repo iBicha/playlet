@@ -524,24 +524,19 @@ namespace InnertubeService
         return Innertube.PollForAccessToken(code, code, cancellation)
     end function
 
-    function AuthRefreshAccessTokenIfNeeded(accessToken as object, cancellation = invalid as object) as boolean
+    function AuthRefreshAccessToken(accessToken as object, cancellation = invalid as object) as boolean
         if not IsAssociativeArray(accessToken)
             return false
         end if
 
-        nowSeconds = TimeUtils.Now().AsSeconds()
-        expiresTimestamp = accessToken["expires_timestamp"]
+        refreshed = Innertube.RefreshAccessToken(accessToken, cancellation)
 
-        if expiresTimestamp = invalid or expiresTimestamp < nowSeconds
-            refreshed = Innertube.RefreshAccessToken(accessToken, cancellation)
-
-            if IsAssociativeArray(refreshed) and refreshed.DoesExist("accessToken")
-                accessToken.Append(refreshed)
-                if accessToken.DoesExist("expiresIn")
-                    accessToken["expiresTimestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expiresIn"]
-                end if
-                return true
+        if IsAssociativeArray(refreshed) and refreshed.DoesExist("accessToken")
+            accessToken.Append(refreshed)
+            if accessToken.DoesExist("expiresIn")
+                accessToken["expiresTimestamp"] = TimeUtils.Now().AsSeconds() + accessToken["expiresIn"]
             end if
+            return true
         end if
 
         return false
