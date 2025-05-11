@@ -1,0 +1,56 @@
+import "pkg:/source/AsyncTask/AsyncTask.bs"
+import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+function HasValidAccessToken(_unused as dynamic) as boolean
+    serverType = m.top.type
+    accessToken = m.top.accessToken
+    if StringUtils.IsNullOrEmpty(accessToken)
+        return false
+    end if
+
+    if serverType = "invidious"
+        return true
+    end if
+
+    nowSeconds = TimeUtils.Now().AsSeconds()
+    expiresTimestamp = m.top.expiresTimestamp
+
+    ' We should refresh the token if it's about to expire in 30 minutes
+    ' Although the current token might be valid, we can let current request
+    ' wait for the new token
+    shouldRefreshToken = expiresTimestamp < nowSeconds + 60 * 30
+
+    if shouldRefreshToken
+        RefreshAccessToken()
+    end if
+
+    return not shouldRefreshToken
+end function
+
+function RefreshAccessToken() as void
+    if m.refreshTokenTask <> invalid
+        return
+    end if
+
+    if m.profilesService = invalid
+        m.profilesService = m.top.getScene().findNode("ProfilesService")
+    end if
+
+    LogInfo("Refreshing access token for profile:", m.top.username)
+    m.refreshTokenTask = AsyncTask.Start(Tasks.ProfileRefreshTokenTask, {
+        profile: m.top
+        profilesService: m.profilesService
+        accessTokenObject: {
+            clientId: m.top.clientId
+            clientSecret: m.top.clientSecret
+            refreshToken: m.top.refreshToken
+        }
+    }, OnProfileRefreshTokenTaskResult)
+end function
+
+function OnProfileRefreshTokenTaskResult(output as object) as void
+    m.refreshTokenTask = invalid
+end function

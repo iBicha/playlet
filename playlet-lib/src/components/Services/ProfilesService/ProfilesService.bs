@@ -39,7 +39,7 @@ function LoadProfilesFromRegistry()
 
     ' Step 3: Save user preferences (if needed)
     if isDirty
-        SaveUserProfilesToRegistry()
+        SaveUserProfilesToRegistry(invalid)
     end if
 
     ' Step 4: Load user profiles into content nodes
@@ -127,7 +127,7 @@ function MigrateExistingProfiles(userProfiles as object) as boolean
     return true
 end function
 
-function SaveUserProfilesToRegistry() as void
+function SaveUserProfilesToRegistry(_unused as dynamic) as void
     if m.disableSavingToRegistry
         return
     end if
@@ -322,7 +322,7 @@ function SetCurrentProfile(newActiveProfile as object) as void
         m.top.currentProfile = invalid
         m.invidious.authToken = invalid
         LogInfo("Current profile set to <invalid>")
-        SaveUserProfilesToRegistry()
+        SaveUserProfilesToRegistry(invalid)
         return
     end if
 
@@ -333,9 +333,10 @@ function SetCurrentProfile(newActiveProfile as object) as void
         token: newActiveProfile.accessToken
         instance: newActiveProfile.serverUrl
         username: newActiveProfile.username
+        profileNode: newActiveProfile
     }
     LogInfo("Current profile set to", newActiveProfile.username, "@", newActiveProfile.serverUrl)
-    SaveUserProfilesToRegistry()
+    SaveUserProfilesToRegistry(invalid)
 end function
 
 function RefreshActiveProfileState(activeProfile as object) as void
