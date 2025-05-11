@@ -18,13 +18,16 @@ function HasValidAccessToken(_unused as dynamic) as boolean
     nowSeconds = TimeUtils.Now().AsSeconds()
     expiresTimestamp = m.top.expiresTimestamp
 
-    isTokenExpired = expiresTimestamp < nowSeconds
-    shouldRefresh = expiresTimestamp - nowSeconds < 60 * 30
-    if shouldRefresh
+    ' We should refresh the token if it's about to expire in 30 minutes
+    ' Although the current token might be valid, we can let current request
+    ' wait for the new token
+    shouldRefreshToken = expiresTimestamp < nowSeconds + 60 * 30
+
+    if shouldRefreshToken
         RefreshAccessToken()
     end if
 
-    return not isTokenExpired
+    return not shouldRefreshToken
 end function
 
 function RefreshAccessToken() as void
