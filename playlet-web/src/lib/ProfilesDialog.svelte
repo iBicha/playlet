@@ -98,9 +98,13 @@
                     : ''} "
                   style="background-color: {profile.color}"
                 >
-                  <span class="text-xl font-medium text-gray-200"
-                    >{profile.username.substring(0, 1).toUpperCase()}</span
-                  >
+                  {#if profile.type === "youtube" && profile.thumbnail}
+                    <img src={profile.thumbnail} alt="Avatar" />
+                  {:else}
+                    <span class="text-xl font-medium text-gray-200"
+                      >{profile.username.substring(0, 1).toUpperCase()}</span
+                    >
+                  {/if}
                 </div>
               </div>
             </div>
@@ -109,12 +113,16 @@
                 {profile.username}
               </div>
               <div class="text-xs font-light">
-                <a
-                  class="link"
-                  href={profile.serverUrl}
-                  target="_blank"
-                  rel="noopener noreferrer">{profile.serverUrl}</a
-                >
+                {#if profile.type === "youtube"}
+                  <div>YouTube</div>
+                {:else}
+                  <a
+                    class="link"
+                    href={profile.serverUrl}
+                    target="_blank"
+                    rel="noopener noreferrer">{profile.serverUrl}</a
+                  >
+                {/if}
               </div>
             </div>
           </div>

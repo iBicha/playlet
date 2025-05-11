@@ -19,9 +19,13 @@
         class="rounded-full w-8 ring ring-offset-base-100 ring-offset-2"
         style="background-color: {currentProfile.color}"
       >
-        <span class="text-xl font-medium text-gray-200"
-          >{currentProfile.username.substring(0, 1).toUpperCase()}</span
-        >
+        {#if currentProfile.type === "youtube" && currentProfile.thumbnail}
+          <img src={currentProfile.thumbnail} alt="Avatar" />
+        {:else}
+          <span class="text-xl font-medium text-gray-200"
+            >{currentProfile.username.substring(0, 1).toUpperCase()}</span
+          >
+        {/if}
       </div>
     </div>
   {:else}
