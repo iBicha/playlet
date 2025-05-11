@@ -67,7 +67,11 @@ namespace Invidious
         end function
 
         function GetInstance() as string
-            instance = m.GetInstanceFromPreferences()
+            if m.preferences = invalid
+                m.preferences = m.invidiousNode.preferences
+            end if
+            instance = m.preferences["invidious.instance"]
+
             if not StringUtils.IsNullOrEmpty(instance)
                 return instance
             end if
@@ -79,13 +83,6 @@ namespace Invidious
             end if
 
             return instance
-        end function
-
-        function GetInstanceFromPreferences() as string
-            if m.preferences = invalid
-                m.preferences = m.invidiousNode.preferences
-            end if
-            return m.preferences["invidious.instance"]
         end function
 
         function MarkVideoWatched(videoId as dynamic) as void
@@ -392,12 +389,13 @@ namespace Invidious
                 return request.Await()
             end if
 
-            isDefaultInstance = StringUtils.IsNullOrEmpty(m.GetInstanceFromPreferences())
-            if not isDefaultInstance
+            url = request.BuildUrl()
+            isUrlToLocalServer = url.StartsWith("http://127.0.0.1:8888") or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
+            if not isUrlToLocalServer
                 return request.Await()
             end if
 
-            parsedUrl = UrlUtils.ParseUrl(request.BuildUrl())
+            parsedUrl = UrlUtils.ParseUrl(url)
             method = request.GetMethod()
             uri = parsedUrl.path
             headers = request.GetHeaders()
