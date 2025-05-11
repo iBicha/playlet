@@ -96,9 +96,8 @@ function VideoRowListRowContentTask(input as object) as object
                     feedContentNode.title += " (Failed to load)"
                 end if
 
-                if response.cancelled <> true
-                    HandleFeedLoadErrorDialog(response.error, rowList)
-                end if
+                isCancelled = response.cancelled = true
+                HandleFeedLoadErrorDialog(response.error, isCancelled, rowList)
                 continue while
             end if
 
@@ -153,7 +152,7 @@ function VideoRowListRowContentTask(input as object) as object
         end while
 
     catch error
-        HandleFeedLoadErrorDialog(error, rowList)
+        HandleFeedLoadErrorDialog(error, false, rowList)
         return {
             success: false
             error: error
@@ -188,11 +187,14 @@ function RemovePlaceHolderItems(contentNode as object)
     end if
 end function
 
-function HandleFeedLoadErrorDialog(error as object, rowList as object) as void
+function HandleFeedLoadErrorDialog(error as object, isCancelled as boolean, rowList as object) as void
     error = ErrorUtils.Format(error)
     LogError(error)
     rowList.onError = error
     if rowList.hasField("dispose") and rowList.dispose
+        return
+    end if
+    if isCancelled
         return
     end if
     DialogUtils.ShowDialogEx({
