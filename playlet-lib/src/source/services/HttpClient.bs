@@ -321,7 +321,15 @@ namespace HttpClient
 
             if m._headers <> invalid
                 for each key in m._headers
-                    command += ` \\\n  -H '${key}: ${m._headers[key]}'`
+                    #if DEBUG
+                        command += ` \\\n  -H '${key}: ${m._headers[key]}'`
+                    #else
+                        if LCase(key) = "authorization"
+                            command += ` \\\n  -H '${key}: <REDACTED>'`
+                        else
+                            command += ` \\\n  -H '${key}: ${m._headers[key]}'`
+                        end if
+                    #end if
                 end for
             end if
 
