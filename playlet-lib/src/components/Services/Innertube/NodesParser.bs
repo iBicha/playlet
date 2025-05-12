@@ -57,6 +57,7 @@ namespace Innertube
             "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
             "channelFeaturedContentRenderer": ParseChannelFeaturedContentRenderer
             "playlistVideoListRenderer": ParsePlaylistVideoListRenderer
+            "playlistVideoListContinuation": ParsePlaylistVideoListContinuation
             "videoRenderer": ParseVideoRenderer
             "gridVideoRenderer": ParseGridVideoRenderer
             "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
@@ -74,6 +75,7 @@ namespace Innertube
             "tvSurfaceContentRenderer": ParseTvSurfaceContentRenderer
             "tvSecondaryNavRenderer": ParseTvSecondaryNavRenderer
             "tvSecondaryNavSectionRenderer": ParseTvSecondaryNavSectionRenderer
+            "twoColumnRenderer": ParseTwoColumnRenderer
             "tileRenderer": ParseTileRenderer
             "gridRenderer": ParseGridRenderer
             "richGridRenderer": ParseRichGridRenderer
@@ -192,7 +194,19 @@ namespace Innertube
         return nodeData["items"]
     end function
 
-    function ParsePlaylistVideoListRenderer(nodeData as object, _context as object) as object
+    function ParsePlaylistVideoListRenderer(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuations", 0, "nextContinuationData", "continuation"])
+        if IsString(continuation)
+            context.currentFeed.continuation = continuation
+        end if
+        return nodeData["contents"]
+    end function
+
+    function ParsePlaylistVideoListContinuation(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuations", 0, "nextContinuationData", "continuation"])
+        if IsString(continuation)
+            context.currentFeed.continuation = continuation
+        end if
         return nodeData["contents"]
     end function
 
@@ -882,6 +896,13 @@ namespace Innertube
         return nodeData["tabs"]
     end function
 
+    function ParseTwoColumnRenderer(nodeData as object, context as object) as object
+        ' twoColumnRenderer is used for Playlists on TV.
+        ' The right column has the videos (and continuation)
+        ' The left column has the playlist info (title, description, etc) which was already parsed
+        return nodeData["rightColumn"]
+    end function
+
     function ParseTileRenderer(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
         if contentType = "TILE_CONTENT_TYPE_VIDEO"
@@ -1040,6 +1061,44 @@ namespace Innertube
             return text
         end if
         return ""
+    end function
+
+    function ParseLineRenderer(data as object) as string
+        if data = invalid
+            return ""
+        end if
+        if IsString(data)
+            return data
+        end if
+        if not IsAssociativeArray(data) or not data.DoesExist("items")
+            return ""
+        end if
+        items = data["items"]
+        if not IsArray(items)
+            return ""
+        end if
+        texts = []
+        for each item in items
+            if IsString(item)
+                texts.Push(item)
+            else if IsAssociativeArray(item) and item.DoesExist("lineItemRenderer")
+                texts.Push(ParseLineItemRenderer(item["lineItemRenderer"]))
+            end if
+        end for
+        return texts.Join(" ")
+    end function
+
+    function ParseLineItemRenderer(data as object) as string
+        if data = invalid
+            return ""
+        end if
+        if IsString(data)
+            return data
+        end if
+        if not IsAssociativeArray(data) or not data.DoesExist("text")
+            return ""
+        end if
+        return ParseText(data["text"])
     end function
 
     function StartNewFeed(title as string, context as object) as void

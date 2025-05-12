@@ -184,44 +184,85 @@ namespace Innertube
             }
         end if
 
+        playlistId = invalid
+        title = invalid
+        author = invalid
+        authorId = invalid
+        description = invalid
+        videoCount = -1
+        thumbnail = invalid
+        statsText = invalid
+
         playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
+        if playlistSidebarRendererItems <> invalid
+            primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
+            secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
 
-        primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
-        secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
+            playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
+            title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
+            description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
+            videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
+            thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
 
-        playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
-        title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
-        description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
-        videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).ToInt()
-        thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
+            author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
+            authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
+            stats = ObjectUtils.Dig(primaryInfo, ["stats"])
+            if IsArray(stats)
+                statsTexts = []
+                for each stat in stats
+                    statText = ParseText(stat)
+                    if statText <> ""
+                        statsTexts.Push(statText)
+                    end if
+                end for
+                statsText = statsTexts.Join(" • ")
+            end if
+        end if
 
-        author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
-        authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
-
-        statsText = ""
-        stats = ObjectUtils.Dig(primaryInfo, ["stats"])
-        if IsArray(stats)
-            statsTexts = []
-            for each stat in stats
-                statText = ParseText(stat)
-                if statText <> ""
-                    statsTexts.Push(statText)
+        twoColumnRenderer = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "content", "twoColumnRenderer"])
+        if twoColumnRenderer <> invalid
+            entityMetadataRenderer = ObjectUtils.Dig(twoColumnRenderer, ["leftColumn", "entityMetadataRenderer"])
+            if entityMetadataRenderer <> invalid
+                if title = invalid
+                    title = ParseText(entityMetadataRenderer["title"])
                 end if
-            end for
-            statsText = statsTexts.Join(" • ")
+                if statsText = invalid
+                    statsText = ParseLineRenderer(ObjectUtils.Dig(entityMetadataRenderer, ["bylines", 0, "lineRenderer"]))
+                end if
+                if description = invalid
+                    description = ParseText(entityMetadataRenderer["description"])
+                end if
+                if playlistId = invalid
+                    playlistId = ObjectUtils.Dig(twoColumnRenderer, ["rightColumn", "playlistVideoListRenderer", "playlistId"])
+                end if
+            end if
         end if
 
         playlist = {
-            "playlistId": playlistId
-            "title": title
-            "author": author
-            "authorId": authorId
-            "description": description
             "videoCount": videoCount
-            "thumbnail": thumbnail
             "videos": []
-            "statsText": statsText
         }
+        if playlistId <> invalid
+            playlist["playlistId"] = playlistId
+        end if
+        if title <> invalid
+            playlist["title"] = title
+        end if
+        if author <> invalid
+            playlist["author"] = author
+        end if
+        if authorId <> invalid
+            playlist["authorId"] = authorId
+        end if
+        if description <> invalid
+            playlist["description"] = description
+        end if
+        if thumbnail <> invalid
+            playlist["thumbnail"] = thumbnail
+        end if
+        if statsText <> invalid
+            playlist["statsText"] = statsText
+        end if
 
         feeds = ParseResponseDataForFeeds(responseData)
         if feeds.Count() > 0
@@ -229,6 +270,10 @@ namespace Innertube
             if feeds[0].DoesExist("continuation")
                 playlist["continuation"] = feeds[0].continuation
             end if
+        end if
+
+        if playlist["thumbnail"] = invalid and playlist["videos"].Count() > 0
+            playlist["thumbnail"] = ObjectUtils.Dig(playlist, ["videos", 0, "thumbnails", 0, "url"])
         end if
 
         return playlist

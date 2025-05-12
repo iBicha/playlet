@@ -389,6 +389,7 @@ namespace InnertubeService
         continuation = ""
         cancellation = invalid
         raw = false
+        accessToken = invalid
 
         if options <> invalid
             if options.DoesExist("continuation")
@@ -400,14 +401,25 @@ namespace InnertubeService
             if options.DoesExist("raw")
                 raw = options.raw
             end if
+            if options.DoesExist("accessToken")
+                accessToken = options.accessToken
+            end if
         end if
 
         if not playlistId.StartsWith("VL")
             playlistId = "VL" + playlistId
         end if
 
-        request = Innertube.CreateBrowseRequest(playlistId, Innertube.ClientType.Web, "", continuation)
+        client = Innertube.ClientType.Web
+        if accessToken <> invalid
+            client = Innertube.ClientType.Tv
+        end if
+
+        request = Innertube.CreateBrowseRequest(playlistId, client, "", continuation)
         request.Cancellation(cancellation)
+        if accessToken <> invalid
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
         if raw
             request.LogCurlCommand()
             request.NoCache()
@@ -425,6 +437,10 @@ namespace InnertubeService
         end if
 
         result = Innertube.ParsePlaylistPageResponseData(response.Json())
+
+        if result.playlistId = invalid and result.error = invalid
+            result["playlistId"] = playlistId
+        end if
 
         cacheControl = Innertube.ParseResponseForCacheControl(response)
         if cacheControl <> invalid

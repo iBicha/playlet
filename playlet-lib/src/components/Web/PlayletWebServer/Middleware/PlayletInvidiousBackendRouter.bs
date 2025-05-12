@@ -505,6 +505,8 @@ namespace Http
                 return m.GetVideo(context)
             else if route.StartsWith("/playlet-invidious-backend/api/v1/playlists/")
                 return m.GetPlaylist(context)
+            else if route.StartsWith("/playlet-invidious-backend/api/v1/auth/playlists/")
+                return m.GetAuthPlaylist(context)
             else if route.StartsWith("/playlet-invidious-backend/api/v1/channels/")
                 return m.GetChannel(context)
             else if route.StartsWith("/playlet-invidious-backend/channel")
@@ -557,9 +559,12 @@ namespace Http
             response = context.response
             route = request.route
 
-            playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
-            if playlistId.InStr("?") > 0
-                playlistId = playlistId.Left(playlistId.InStr("?"))
+            playlistId = context.playlistId
+            if StringUtils.IsNullOrEmpty(playlistId)
+                playlistId = route.Mid("/playlet-invidious-backend/api/v1/playlists/".Len())
+                if playlistId.InStr("?") > 0
+                    playlistId = playlistId.Left(playlistId.InStr("?"))
+                end if
             end if
             continuation = request.query.continuation
             raw = request.query.raw <> invalid
@@ -567,6 +572,11 @@ namespace Http
             options = {
                 raw: raw
             }
+
+            accessToken = request.headers["authorization"]
+            if not StringUtils.IsNullOrEmpty(accessToken) and accessToken.StartsWith("Bearer ")
+                options["accessToken"] = accessToken.Mid("Bearer ".Len())
+            end if
 
             if playlistId.StartsWith("RD")
                 if not StringUtils.IsNullOrEmpty(continuation)
@@ -609,6 +619,29 @@ namespace Http
 
             response.Json(playlist)
             return true
+        end function
+
+        function GetAuthPlaylist(context as object) as boolean
+            request = context.request
+            response = context.response
+            route = request.route
+
+            accessToken = request.headers["authorization"]
+            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
+                response.Json({
+                    "error": "Missing or invalid 'Authorization' header"
+                })
+                response.http_code = 403
+                return true
+            end if
+
+            playlistId = route.Mid("/playlet-invidious-backend/api/v1/auth/playlists/".Len())
+            if playlistId.InStr("?") > 0
+                playlistId = playlistId.Left(playlistId.InStr("?"))
+            end if
+
+            context.playlistId = playlistId
+            return m.GetPlaylist(context)
         end function
 
         function GetChannel(context as object) as boolean

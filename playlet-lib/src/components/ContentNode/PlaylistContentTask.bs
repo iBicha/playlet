@@ -60,7 +60,12 @@ function PlaylistContentTask(input as object) as object
         videoCount = ValidInt(metadata.videoCount)
 
         hasContinuation = not StringUtils.IsNullOrEmpty(metadata.continuation)
-        if (hadContinuation and not hasContinuation) or (metadata.videos.Count() = 0 or childCount >= videoCount)
+
+        noMoreContinuation = hadContinuation and not hasContinuation
+        noVideosReturned = metadata.videos.Count() = 0
+        reachedVideoCount = videoCount <> -1 and childCount >= videoCount
+
+        if noMoreContinuation or noVideosReturned or reachedVideoCount
             contentNode.loadState = FeedLoadState.Loaded
             return {
                 success: true
