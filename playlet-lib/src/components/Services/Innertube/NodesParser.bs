@@ -54,6 +54,7 @@ namespace Innertube
             "reelShelfRenderer": ParseReelShelfRenderer
             "verticalListRenderer": ParseVerticalListRenderer
             "horizontalListRenderer": ParseHorizontalListRenderer
+            "horizontalListContinuation": ParseHorizontalListContinuation
             "expandedShelfContentsRenderer": ParseExpandedShelfContentsRenderer
             "channelFeaturedContentRenderer": ParseChannelFeaturedContentRenderer
             "playlistVideoListRenderer": ParsePlaylistVideoListRenderer
@@ -103,6 +104,9 @@ namespace Innertube
             "messageRenderer": ParseNotImplemented
             ' Messages like "Videos you watch will be saved here"
             "genericPromoRenderer": ParseNotImplemented
+            ' "Sign in to see the latest videos tailored to your interests"
+            "feedNudgeRenderer": ParseNotImplemented
+            "searchBarRenderer": ParseNotImplemented
             "clickTrackingParams": ParseNotImplemented
             "promoShelfRenderer": ParseNotImplemented
             "adSlotRenderer": ParseNotImplemented
@@ -181,8 +185,25 @@ namespace Innertube
         return nodeData["items"]
     end function
 
-    function ParseHorizontalListRenderer(nodeData as object, _context as object) as object
-        ' TODO: handle continuations
+    function ParseHorizontalListRenderer(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuations", 0, "nextContinuationData", "continuation"])
+        if IsString(continuation)
+            if not StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
+                StartNewFeed("", context)
+            end if
+            context.currentFeed.continuation = continuation
+        end if
+        return nodeData["items"]
+    end function
+
+    function ParseHorizontalListContinuation(nodeData as object, context as object) as object
+        continuation = ObjectUtils.Dig(nodeData, ["continuations", 0, "nextContinuationData", "continuation"])
+        if IsString(continuation)
+            if not StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
+                StartNewFeed("", context)
+            end if
+            context.currentFeed.continuation = continuation
+        end if
         return nodeData["items"]
     end function
 

@@ -284,6 +284,11 @@ namespace Http
             request = context.request
             response = context.response
 
+            isRecommended = request.query.recommended = "true"
+            if isRecommended
+                return m.GetAuthRecommended(context)
+            end if
+
             raw = request.query.raw <> invalid
 
             options = {
@@ -316,6 +321,61 @@ namespace Http
                 response.headers["cache-control"] = result["cache-control"]
             end if
 
+            return true
+        end function
+
+        function GetAuthRecommended(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            accessToken = request.headers["authorization"]
+            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
+                response.Json({
+                    "error": "Missing or invalid 'Authorization' header"
+                })
+                response.http_code = 403
+                return true
+            end if
+
+            options = {
+                "accessToken": accessToken.Mid("Bearer ".Len())
+            }
+
+            continuation = request.query.continuation
+            if not StringUtils.IsNullOrEmpty(continuation)
+                options.continuation = continuation
+            end if
+
+            feeds = InnertubeService.GetHome(options)
+            if feeds = invalid
+                response.Json({
+                    "error": "Failed to get auth home feed"
+                })
+                response.http_code = 500
+                return true
+            end if
+
+            if IsAssociativeArray(feeds)
+                if feeds.error <> invalid
+                    response.Json(feeds)
+                    response.http_code = 500
+                    return true
+                end if
+                return true
+            end if
+
+            result = {
+                "items": []
+            }
+
+            if feeds.Count() > 0
+                result["items"] = ValidArray(feeds[0].items)
+                if feeds[0].DoesExist("continuation")
+                    result["continuation"] = feeds[0].continuation
+                end if
+            end if
+
+            response.Json(result)
             return true
         end function
 

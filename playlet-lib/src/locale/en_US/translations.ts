@@ -77,6 +77,10 @@
         <translation>Subscriptions</translation>
     </message>
     <message>
+        <source>Recommended</source>
+        <translation>Recommended</translation>
+    </message>
+    <message>
         <source>Playlists</source>
         <translation>Playlists</translation>
     </message>
