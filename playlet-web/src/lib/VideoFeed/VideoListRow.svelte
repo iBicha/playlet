@@ -171,7 +171,13 @@
         let hasContinuation = !!result.continuation;
         feedSource.state.continuation = result.continuation || "";
 
-        if (result.items.length > 0) {
+        // See brightscript version for the "inv_auth_playlists" case
+        const items =
+          feedSource.id === "inv_auth_playlists"
+            ? deduplicateAuthPlaylists(result.items)
+            : result.items || [];
+
+        if (items.length > 0) {
           const paginationType = feedSource.state.paginationType;
           if (hadContinuation && !hasContinuation) {
             feedSource.state.loadState = FeedLoadState.Loaded;
@@ -195,32 +201,30 @@
           feedLoadState = FeedLoadState.LoadedPage;
         }
 
-        if (result && result.items) {
-          const newVideos = result.items;
+        const newVideos = items;
 
-          newVideos.forEach((item) => {
-            if (item.videoId) {
-              item.type = "video";
-            } else if (item.playlistId) {
-              item.type = "playlist";
-            }
-          });
-
-          const newItemWidths = newVideos.map((video) => {
-            if (video.type === "channel") {
-              return channelItemWidth;
-            } else {
-              return videoItemWidth;
-            }
-          });
-
-          itemWidths = [...itemWidths, ...newItemWidths];
-          videos = [...(videos || []), ...newVideos];
-
-          totalFetchedItems += result.items.length;
-          if (totalFetchedItems >= 6) {
-            break;
+        newVideos.forEach((item) => {
+          if (item.videoId) {
+            item.type = "video";
+          } else if (item.playlistId) {
+            item.type = "playlist";
           }
+        });
+
+        const newItemWidths = newVideos.map((video) => {
+          if (video.type === "channel") {
+            return channelItemWidth;
+          } else {
+            return videoItemWidth;
+          }
+        });
+
+        itemWidths = [...itemWidths, ...newItemWidths];
+        videos = [...(videos || []), ...newVideos];
+
+        totalFetchedItems += items.length;
+        if (totalFetchedItems >= 6) {
+          break;
         }
       } catch (error) {
         // TODO:P0 handle case of unauthenticated calls
@@ -230,6 +234,28 @@
         feedSource.state.loadState = FeedLoadState.Error;
       }
     }
+  }
+
+  function deduplicateAuthPlaylists(items) {
+    if (!items || items.length === 0) {
+      return [];
+    }
+
+    if (videos.length === 0) {
+      return items;
+    }
+
+    const existingPlaylistIds = new Set(
+      videos.map((video) => video.playlistId).filter((id) => id)
+    );
+
+    const newItems = items.filter((item) => {
+      if (item.playlistId && existingPlaylistIds.has(item.playlistId)) {
+        return false;
+      }
+      return true;
+    });
+    return newItems;
   }
 
   function recalculateVisibileCells() {

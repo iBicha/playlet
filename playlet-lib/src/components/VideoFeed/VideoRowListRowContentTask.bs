@@ -111,12 +111,23 @@ function VideoRowListRowContentTask(input as object) as object
             end for
 
             RemovePlaceHolderItems(feedContentNode)
-            feedContentNode.appendChildren(itemNodes)
+
+            addedItemCount = 0
+            ' For some reason, Innertube's "FEplaylist_aggregation" (which maps to "inv_auth_playlists"
+            ' aka Authenticated user playlists) returns continuation for the next page, but returns
+            ' items from the first page. So we deduplicate to avoid loading this feed infnitely,
+            ' with the same items repeating.
+            if feedSource.id = "inv_auth_playlists"
+                addedItemCount = DeduplicateAppendAuthPlaylists(feedContentNode, itemNodes)
+            else
+                feedContentNode.appendChildren(itemNodes)
+                addedItemCount = itemNodes.Count()
+            end if
 
             hasContinuation = not StringUtils.IsNullOrEmpty(response.result.continuation)
             feedSource.state.continuation = ValidString(response.result.continuation)
 
-            if response.result.items.Count() > 0
+            if addedItemCount > 0
                 pageType = feedSource.state.paginationType
                 if response.result.isLastPage = true or (hadContinuation and not hasContinuation)
                     feedSource.state.loadState = FeedLoadState.Loaded
@@ -140,12 +151,12 @@ function VideoRowListRowContentTask(input as object) as object
                 feedContentNode.loadState = FeedLoadState.LoadedPage
             end if
 
-            if itemNodes.Count() > 0 and not someContentReadySet
+            if addedItemCount > 0 and not someContentReadySet
                 someContentReadySet = true
                 rowList.someContentReady = true
             end if
 
-            totalfetchedItems += response.result.items.Count()
+            totalfetchedItems += addedItemCount
             if totalfetchedItems > 3
                 exit while
             end if
@@ -185,6 +196,47 @@ function RemovePlaceHolderItems(contentNode as object)
     if removeCount > 0
         contentNode.removeChildrenIndex(removeCount, removeIndex)
     end if
+end function
+
+function DeduplicateAppendAuthPlaylists(feedContentNode as object, itemNodes as object) as integer
+    if itemNodes.Count() = 0
+        return 0
+    end if
+
+    currentChildCount = feedContentNode.getChildCount()
+    if currentChildCount = 0
+        feedContentNode.appendChildren(itemNodes)
+        return itemNodes.Count()
+    end if
+
+    currentChildren = feedContentNode.getChildren(-1, 0)
+    currentChildrenMap = {}
+    for i = 0 to currentChildCount - 1
+        playlistId = currentChildren[i].playlistId
+        if StringUtils.IsNullOrEmpty(playlistId)
+            continue for
+        end if
+        currentChildrenMap[playlistId] = true
+    end for
+
+    nodesToAdd = []
+    for i = 0 to itemNodes.Count() - 1
+        itemNode = itemNodes[i]
+        playlistId = itemNode.playlistId
+        if StringUtils.IsNullOrEmpty(playlistId)
+            continue for
+        end if
+        if currentChildrenMap[playlistId] = true
+            continue for
+        end if
+        currentChildrenMap[playlistId] = true
+        nodesToAdd.Push(itemNode)
+    end for
+    if nodesToAdd.Count() = 0
+        return 0
+    end if
+    feedContentNode.appendChildren(nodesToAdd)
+    return nodesToAdd.Count()
 end function
 
 function HandleFeedLoadErrorDialog(error as object, isCancelled as boolean, rowList as object) as void
