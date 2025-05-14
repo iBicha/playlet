@@ -159,6 +159,10 @@ function OnDispose()
         m.subscribeTask.cancel = true
         m.subscribeTask = invalid
     end if
+    if m.fetchSubscriptionStatusTask <> invalid
+        m.fetchSubscriptionStatusTask.cancel = true
+        m.fetchSubscriptionStatusTask = invalid
+    end if
 end function
 
 function OnSubscribeButtonSelected()
@@ -166,11 +170,11 @@ function OnSubscribeButtonSelected()
         m.subscribeTask.cancel = true
     end if
 
-    isSubbed = IsSubscribed()
     m.subscribeTask = AsyncTask.Start(Tasks.SubscribeTask, {
+        channelView: m.top
         invidious: m.invidious
         ucid: m.authorId
-        subscribe: not isSubbed
+        subscribe: not m.top.isSubscribed
     })
 end function
 
@@ -350,25 +354,10 @@ function IsLoggedIn() as boolean
     return m.invidious.authToken <> invalid
 end function
 
-function IsSubscribed() as boolean
-    authorId = m.top.authorId
-    if StringUtils.IsNullOrEmpty(authorId)
-        return false
-    end if
-
-    subscriptions = m.invidious.subscriptions
-    if subscriptions = invalid
-        return false
-    end if
-    if not subscriptions.DoesExist(authorId)
-        return false
-    end if
-    return subscriptions[authorId]
-end function
-
 function OnAuthorIdChange()
     SetSubscribeButtonVisibility()
     OnSubscriptionChanged()
+    FetchSubscriptionStatus()
 end function
 
 function SetSubscribeButtonVisibility()
@@ -380,9 +369,35 @@ function SetSubscribeButtonVisibility()
     end if
 end function
 
+function FetchSubscriptionStatus() as void
+    if not IsLoggedIn()
+        return
+    end if
+
+    authorId = m.top.authorId
+    if StringUtils.IsNullOrEmpty(authorId)
+        return
+    end if
+
+    if m.fetchSubscriptionStatusTask <> invalid
+        return
+    end if
+
+    m.fetchSubscriptionStatusTask = AsyncTask.Start(Tasks.FetchSubscriptionStatusTask, {
+        channelView: m.top
+        ucid: authorId
+        authToken: m.invidious.authToken
+        invidious: m.invidious
+    })
+end function
+
+function OnFetchSubscriptionStatusResult(result as object) as void
+    m.fetchSubscriptionStatusTask = invalid
+end function
+
 function OnSubscriptionChanged()
-    isSubbed = IsSubscribed()
-    if isSubbed
+    isSubscribed = m.top.isSubscribed
+    if isSubscribed
         m.subscribeButton.text = Tr(Locale.Buttons.Unsubscribe)
     else
         m.subscribeButton.text = Tr(Locale.Buttons.Subscribe)
