@@ -40,7 +40,7 @@ namespace InnertubeService
             end if
         end if
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, ctt, visitorData)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, ctt, visitorData, Innertube.ClientType.IOS)
         playerRequest.Cancellation(cancellation)
         if raw
             playerRequest.LogCurlCommand()
@@ -316,22 +316,71 @@ namespace InnertubeService
         return Innertube.ParseResponseDataForFeeds(json)
     end function
 
-    function AuthMarkVideoWatched(videoId as string, options = invalid as object) as object
-        ' cancellation = invalid
-        ' accessToken = invalid
+    function AuthMarkVideoWatched(videoId as string, options as object) as boolean
+        cancellation = invalid
+        accessToken = options.accessToken
 
-        ' if options <> invalid
-        '     if options.DoesExist("cancellation")
-        '         cancellation = options.cancellation
-        '     end if
-        '     if options.DoesExist("accessToken")
-        '         accessToken = options.accessToken
-        '     end if
-        ' end if
+        if options.DoesExist("cancellation")
+            cancellation = options.cancellation
+        end if
 
-        ' TODO:P1 : Implement this
-        LogInfo(`Marking video as watched: ${videoId} - not implemented`)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, "", "", Innertube.ClientType.Tv)
+        playerRequest.Cancellation(cancellation)
+        playerRequest.Header("Authorization", "Bearer " + accessToken)
+
+        playerResponse = playerRequest.Await()
+        if not playerResponse.IsSuccess()
+            LogError("Error marking video as watched:", playerResponse.ErrorMessage())
+            return false
+        end if
+
+        if CancellationUtils.IsCancelled(cancellation)
+            return false
+        end if
+
+        json = playerResponse.Json()
+        videostatsPlaybackUrl = ObjectUtils.Dig(json, ["playbackTracking", "videostatsPlaybackUrl", "baseUrl"])
+        if StringUtils.IsNullOrEmpty(videostatsPlaybackUrl)
+            LogError("No videostatsPlaybackUrl found in response")
+            return false
+        end if
+
+        videostatsPlaybackUrl = videostatsPlaybackUrl.replace("https://s.youtube.com", "https://www.youtube.com")
+        queryParams = UrlUtils.ParseQueryComponents(videostatsPlaybackUrl)
+        queryParams["c"] = "TVHTML5"
+        queryParams["cbrver"] = INNERTUBE_TV_CLIENT_VERSION
+        queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
+        queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
+        queryParams["fmt"] = "251"
+        queryParams["rtn"] = "0"
+        queryParams["rt"] = "0"
+        queryParams["ver"] = "2"
+        videostatsPlaybackUrl = UrlUtils.SetQueryParams(videostatsPlaybackUrl, queryParams)
+
+        trackingRequest = HttpClient.Get(videostatsPlaybackUrl)
+        trackingRequest.Header("Authorization", "Bearer " + accessToken)
+
+        trackingResponse = trackingRequest.Await()
+        if not trackingResponse.IsSuccess()
+            LogError("Error marking video as watched:", trackingResponse.ErrorMessage())
+            return false
+        end if
+
+        LogDebug("Marked video as watched:", videoId)
         return true
+    end function
+
+    function CreateClientPlaybackNonce() as string
+        length = 16
+        result = []
+
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        alphabetLen = alphabet.len()
+        for i = 1 to length
+            result.push(alphabet.mid(Rnd(alphabetLen - 1), 1))
+        end for
+
+        return result.join("")
     end function
 
     function GetChannel(channelId as string, options = invalid as object) as object
