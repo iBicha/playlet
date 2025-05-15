@@ -409,14 +409,16 @@ namespace InnertubeService
             }
         end if
 
-        json = response.Json()
-        if json.DoesExist("error")
+        responseData = response.Json()
+        error = Innertube.ParseResponseDataForError(responseData)
+
+        if error <> ""
             return {
-                error: json.error
+                error: error
             }
         end if
 
-        channelHeaderButtons = ObjectUtils.Dig(json, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "header", "channelHeaderRenderer", "buttons"])
+        channelHeaderButtons = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "header", "channelHeaderRenderer", "buttons"])
         if not IsArray(channelHeaderButtons)
             return {
                 error: "Node 'contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.header.channelHeaderRenderer.buttons' not found"
