@@ -1,0 +1,60 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace Innertube
+
+    function CreateSubscribeRequest(channelIds as dynamic, params as string) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo, "", "")
+        }
+
+        if IsString(channelIds)
+            channelIds = [channelIds]
+        end if
+        payload["channelIds"] = channelIds
+
+        if not StringUtils.IsNullOrEmpty(params)
+            payload["params"] = params
+        end if
+
+        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/subscription/subscribe?prettyPrint=false&alt=json", payload)
+        headers = {
+            "accept": "*/*"
+            "accept-language": "*"
+        }
+        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Headers(headers)
+
+        return request
+    end function
+
+    function CreateUnsubscribeRequest(channelIds as dynamic, params as string) as object
+        deviceInfo = CreateObject("roDeviceInfo")
+
+        payload = {
+            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo, "", "")
+        }
+
+        if IsString(channelIds)
+            channelIds = [channelIds]
+        end if
+        payload["channelIds"] = channelIds
+
+        if not StringUtils.IsNullOrEmpty(params)
+            payload["params"] = params
+        end if
+
+        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/subscription/unsubscribe?prettyPrint=false&alt=json", payload)
+        headers = {
+            "accept": "*/*"
+            "accept-language": "*"
+        }
+        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Headers(headers)
+
+        return request
+    end function
+
+end namespace

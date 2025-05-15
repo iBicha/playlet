@@ -7,6 +7,7 @@ import "pkg:/components/Services/Innertube/PlayerEndpoint.bs"
 import "pkg:/components/Services/Innertube/ResolveUrlEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchFilters.bs"
+import "pkg:/components/Services/Innertube/SubscriptionEndpoint.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
@@ -383,6 +384,118 @@ namespace InnertubeService
         end if
 
         return result
+    end function
+
+    function GetSubscriptionStatusForChannel(channelId as string, options = invalid as object) as object
+        cancellation = invalid
+        accessToken = options.accessToken
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Tv, "", "")
+        request.Cancellation(cancellation)
+        if accessToken <> invalid
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        responseData = response.Json()
+        error = Innertube.ParseResponseDataForError(responseData)
+
+        if error <> ""
+            return {
+                error: error
+            }
+        end if
+
+        channelHeaderButtons = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "header", "channelHeaderRenderer", "buttons"])
+        if not IsArray(channelHeaderButtons)
+            return {
+                error: "Node 'contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.header.channelHeaderRenderer.buttons' not found"
+            }
+        end if
+
+        subscribeButtonRenderer = invalid
+        for each button in channelHeaderButtons
+            if not IsAssociativeArray(button) or not button.DoesExist("subscribeButtonRenderer")
+                continue for
+            end if
+            subscribeButtonRenderer = button.subscribeButtonRenderer
+            exit for
+        end for
+
+        if subscribeButtonRenderer = invalid
+            return {
+                error: "no 'subscribeButtonRenderer' found under 'buttons'"
+            }
+        end if
+
+        if not IsBool(subscribeButtonRenderer["subscribed"])
+            return {
+                error: "no 'subscribed' status found under 'subscribeButtonRenderer'"
+            }
+        end if
+
+        return {
+            success: true
+            isSubscribed: subscribeButtonRenderer["subscribed"]
+        }
+    end function
+
+    function SubscribeToChannel(channelId as string, options = invalid as object) as object
+        cancellation = invalid
+        accessToken = options.accessToken
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        request = Innertube.CreateSubscribeRequest(channelId, "")
+        request.Cancellation(cancellation)
+        if accessToken <> invalid
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
+
+        response = request.Await()
+        return {
+            success: response.IsSuccess()
+            error: response.ErrorMessage()
+        }
+    end function
+
+    function UnsubscribeFromChannel(channelId as string, options = invalid as object) as object
+        cancellation = invalid
+        accessToken = options.accessToken
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        request = Innertube.CreateUnsubscribeRequest(channelId, "")
+        request.Cancellation(cancellation)
+        if accessToken <> invalid
+            request.Header("Authorization", "Bearer " + accessToken)
+        end if
+
+        response = request.Await()
+        return {
+            success: response.IsSuccess()
+            error: response.ErrorMessage()
+        }
     end function
 
     function GetPlaylist(playlistId as string, options = invalid as object) as object
