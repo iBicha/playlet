@@ -32,6 +32,11 @@ Playlet makes requests directly to Innertube instead of Invidious.
 Similar to Invidious requests, only the bare minimum and necessary information
 is sent, which is used to enable the viewing of content.
 
+Additionally, when a YouTube account is used in Playlet, Innertube traffic can
+become associated with the account, which further reduces user privacy. This
+is necessary to use features associated with YouTube accounts, such as
+subscriptions, playlists, and watch history.
+
 ## SponsorBlock
 
 Playlet may request information from a [SponsorBlock](https://github.com/ajayyy/SponsorBlock)
