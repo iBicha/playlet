@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- YouTube account support. The following features are now available:
+  - The ability to login to one or multiple accounts
+  - Both YouTube accounts and Invidious accounts are supported side-by-side
+  - Subscritions
+  - User playlists
+  - Watch History
+  - Watched videos on Playlet are added to the watch history
+  - Subscribe/Unsubscribe
+  - Recommended videos for logged in YouTube user are available in the home screen
+    - This feed can be enabled/disabled from the settings
+    - When an Invidious user is logged in, this becomes "popular" since Invidious does not support recommendations
+
 ### Fixed
 
 - A bug where Session data did not refresh after 24 hours
