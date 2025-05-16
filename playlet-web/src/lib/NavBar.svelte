@@ -67,7 +67,11 @@
     <ThemeSelect />
     {#if currentProfile && currentProfile.username}
       <div class="badge badge-outline">
-        <span>{currentProfile.username}</span>
+        <span>
+          {currentProfile.username.length > 5
+            ? `${currentProfile.username.slice(0, 5)}…`
+            : currentProfile.username}
+        </span>
       </div>
     {/if}
     <button
