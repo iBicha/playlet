@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A bug where Session data did not refresh after 24 hours
 
+### Changed
+
+- [advanced users]: the Playlet web server's CORS headers are no longer set to `*`, for security reasons.
+
 ## [0.36.7] - 2025-05-04
 
 ### Fixed
