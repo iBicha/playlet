@@ -67,12 +67,16 @@
     refreshProfiles();
   }
 
-  function login() {
+  function loginToInvidious() {
     if (!authUrl) {
       alert("Error with login, please refresh the page.");
       return;
     }
     window.location = authUrl;
+  }
+
+  function loginToYoutube() {
+    alert("Please use your Roku device to login to YouTube.");
   }
 </script>
 
@@ -141,13 +145,20 @@
         </div>
       {/each}
       <div class="flex items-center">
-        <button class="btn btn-primary" on:click={login}>
-          <div class="">
-            <div class="text-m">{$translate("Login to Invidious")}</div>
-            <div class="text-xs font-light">{currentInstanceName}</div>
-          </div>
-        </button>
-        <button class="btn m-6">{$translate("Close")}</button>
+        <div class="flex flex-col">
+          <button class="btn btn-primary m-2" on:click={loginToYoutube}>
+            <div class="">
+              <div class="text-m">{$translate("Login to YouTube")}</div>
+            </div>
+          </button>
+          <button class="btn btn-primary m-2" on:click={loginToInvidious}>
+            <div class="">
+              <div class="text-m">{$translate("Login to Invidious")}</div>
+              <div class="text-xs font-light">{currentInstanceName}</div>
+            </div>
+          </button>
+        </div>
+        <button class="btn m-2">{$translate("Close")}</button>
       </div>
     </div>
   </form>
