@@ -18,11 +18,20 @@ function OnContentSet() as void
     end if
 
     m.top.title = content.title
-    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    m.top.author = content._author
+    lines = content.lines
 
+    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
+    author = content._author
+    if StringUtils.IsNullOrEmpty(author)
+        if IsArray(lines) and lines.Count() > 0
+            author = lines[0]
+        end if
+    end if
+    m.top.author = author
+
+    viewCountDate = ""
     if content.isUpcoming = true
-        m.top.viewCountDate = content.premiereTimestampText
+        viewCountDate = content.premiereTimestampText
     else
         publishedText = content.publishedText
         viewCountText = content.viewCountText
@@ -33,8 +42,14 @@ function OnContentSet() as void
         end if
         label += viewCountText
 
-        m.top.viewCountDate = label
+        viewCountDate = label
     end if
+    if StringUtils.IsNullOrEmpty(viewCountDate)
+        if IsArray(lines) and lines.Count() > 1
+            viewCountDate = lines[1]
+        end if
+    end if
+    m.top.viewCountDate = viewCountDate
 
     m.top.thumbnailUri = content.thumbnail
 

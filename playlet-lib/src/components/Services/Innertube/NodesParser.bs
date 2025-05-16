@@ -975,6 +975,17 @@ namespace Innertube
             end if
         end if
 
+        renderedLines = []
+        lines = ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "lines"])
+        if IsArray(lines)
+            for each line in lines
+                if not IsAssociativeArray(line)
+                    continue for
+                end if
+                renderedLines.Push(ParseLineRenderer(line["lineRenderer"]))
+            end for
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
@@ -983,6 +994,7 @@ namespace Innertube
             "lengthText": lengthText
             "liveNow": liveNow
             "isUpcoming": isUpcoming
+            "lines": renderedLines
         }
 
         PushFeedItem(video, context)
@@ -1007,12 +1019,24 @@ namespace Innertube
             end for
         end if
 
+        renderedLines = []
+        lines = ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "lines"])
+        if IsArray(lines)
+            for each line in lines
+                if not IsAssociativeArray(line)
+                    continue for
+                end if
+                renderedLines.Push(ParseLineRenderer(line["lineRenderer"]))
+            end for
+        end if
+
         playlist = {
             "type": "playlist"
             "playlistId": playlistId
             "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
             "playlistThumbnail": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails", 0, "url"])
             "videoCountText": videoCountText
+            "lines": renderedLines
         }
 
         PushFeedItem(playlist, context)

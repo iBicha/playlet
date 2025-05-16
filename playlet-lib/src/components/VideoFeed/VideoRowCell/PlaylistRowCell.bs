@@ -1,4 +1,5 @@
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
     m.videoCountRect = m.top.FindNode("videoCountRect")
@@ -13,9 +14,24 @@ function OnContentSet() as void
     end if
 
     m.top.title = content.title
+    lines = content.lines
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    m.top.author = content._author
-    m.top.updated = content.updatedText
+    author = content._author
+    if StringUtils.IsNullOrEmpty(author)
+        if IsArray(lines) and lines.Count() > 0
+            author = lines[0]
+        end if
+    end if
+    m.top.author = author
+
+    updatedText = content.updatedText
+    if StringUtils.IsNullOrEmpty(updatedText)
+        if IsArray(lines) and lines.Count() > 1
+            updatedText = lines[1]
+        end if
+    end if
+    m.top.updated = updatedText
+
 
     m.top.thumbnailUri = content.thumbnail
 

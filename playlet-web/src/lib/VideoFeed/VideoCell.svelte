@@ -18,6 +18,7 @@
   export let lengthSeconds: number = undefined;
   export let lengthText: string | undefined = undefined;
   export let liveNow: boolean = undefined;
+  export let lines: string[] | undefined = undefined;
 
   // svelte-ignore unused-export-let
   export let type: string = undefined;
@@ -179,6 +180,13 @@
       return trFn("1 minute ago");
     }
   }
+
+  function openChannelModal() {
+    if (!authorId) {
+      return;
+    }
+    channelModal.show();
+  }
 </script>
 
 <button
@@ -208,18 +216,18 @@
         tabindex="0"
         on:click={(e) => {
           e.stopPropagation();
-          channelModal.show();
+          openChannelModal();
         }}
         on:keydown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            channelModal.show();
+            openChannelModal();
           }
         }}
       >
-        {author || ""}
+        {author || (lines?.length > 0 ? lines[0] : "")}
       </span>
-      <div>{getViewCountDateText()}</div>
+      <div>{getViewCountDateText() || (lines?.length > 1 ? lines[1] : "")}</div>
     </div>
   </div>
 </button>

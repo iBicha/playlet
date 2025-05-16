@@ -12,6 +12,7 @@
   export let videoCountText: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
   export let updated: number | undefined = undefined;
+  export let lines: string[] | undefined = undefined;
 
   // svelte-ignore unused-export-let
   export let type: string = undefined;
@@ -96,8 +97,10 @@
     />
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title}</h3>
-      <div class="font-semibold">{author}</div>
-      <div>{getUpdatedText()}</div>
+      <div class="font-semibold">
+        {author || (lines?.length > 0 ? lines[0] : "")}
+      </div>
+      <div>{getUpdatedText() || (lines?.length > 1 ? lines[1] : "")}</div>
     </div>
   </div>
 </button>
