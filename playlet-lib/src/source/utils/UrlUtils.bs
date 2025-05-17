@@ -246,4 +246,28 @@ namespace UrlUtils
         }
     end function
 
+    function BuildUrlFromParts(parts as object) as string
+        url = ""
+        if not StringUtils.IsNullOrEmpty(parts.protocol)
+            url += parts.protocol + "://"
+        end if
+
+        if not StringUtils.IsNullOrEmpty(parts.host)
+            url += parts.host
+        end if
+
+        if (not StringUtils.IsNullOrEmpty(parts.port)) and ((parts.protocol = "http" and parts.port <> "80") or (parts.protocol = "https" and parts.port <> "443") or (parts.protocol <> "http" and parts.protocol <> "https"))
+            url += ":" + parts.port
+        end if
+
+        if not StringUtils.IsNullOrEmpty(parts.path)
+            if not parts.path.StartsWith("/")
+                url += "/"
+            end if
+            url += parts.path
+        end if
+
+        return url
+    end function
+
 end namespace

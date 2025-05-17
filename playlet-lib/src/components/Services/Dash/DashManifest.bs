@@ -12,7 +12,6 @@ class DashManifest
         m.invidiousInstance = invidiousInstance
 
         m.utils = new Http.Utils()
-        m.urlRegex = /https?:\/\/\S+(\/\S+)/i
 
         ' https://github.com/LuanRT/YouTube.js/blob/6082b4a52ee07a622735e6e9128a0531a5ae3bfb/src/utils/StreamingInfo.ts#L332-L349
         m.colorInfo = {
@@ -38,8 +37,11 @@ class DashManifest
         adaptiveFormats.Append(metadata.adaptiveFormats)
 
         if local
+            parsedInvidiousUrl = UrlUtils.ParseUrl(m.invidiousInstance)
             for i = 0 to adaptiveFormats.Count() - 1
-                adaptiveFormats[i].url = m.urlRegex.replace(adaptiveFormats[i].url, m.invidiousInstance + "\1")
+                parsedUrl = UrlUtils.ParseUrl(adaptiveFormats[i].url)
+                parsedInvidiousUrl.path = UrlUtils.AppendQueryParams(parsedUrl.path, { host: parsedUrl.host })
+                adaptiveFormats[i].url = UrlUtils.BuildUrlFromParts(parsedInvidiousUrl)
             end for
         end if
 
