@@ -312,8 +312,18 @@ namespace InnertubeService
             }
         end if
 
-        json = response.Json()
-        return Innertube.ParseResponseDataForFeeds(json)
+        feeds = Innertube.ParseResponseDataForFeeds(response.Json())
+
+        result = {
+            feeds: feeds
+        }
+
+        cacheControl = Innertube.ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
     function AuthMarkVideoWatched(videoId as string, options as object) as boolean
@@ -651,7 +661,14 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        return Innertube.ParseMixPageResponseData(response.Json())
+        result = Innertube.ParseMixPageResponseData(response.Json())
+
+        cacheControl = Innertube.ParseResponseForCacheControl(response)
+        if cacheControl <> invalid
+            result["cache-control"] = cacheControl
+        end if
+
+        return result
     end function
 
     function ResolveUrl(url as string, options = invalid as object) as object
