@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - YouTube account support. The following features are now available:
   - The ability to login to one or multiple accounts
   - Both YouTube accounts and Invidious accounts are supported side-by-side
-  - Subscritions
+  - Subscriptions
   - User playlists
   - Watch History
   - Watched videos on Playlet are added to the watch history
