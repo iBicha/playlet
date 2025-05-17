@@ -71,36 +71,35 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            feeds = InnertubeService.GetSubscriptions(options)
-            if feeds = invalid
-                response.Json({
-                    "error": "Failed to get auth feed"
-                })
+            result = InnertubeService.GetSubscriptions(options)
+            if result.error <> invalid
+                response.Json(result)
                 response.http_code = 500
                 return true
             end if
 
-            if IsAssociativeArray(feeds)
-                if feeds.error <> invalid
-                    response.Json(feeds)
-                    response.http_code = 500
-                    return true
-                end if
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
+                ' Not an error, just no subscriptions
+                response.Json({
+                    "videos": []
+                })
                 return true
             end if
 
-            result = {
-                "videos": []
+            responseBody = {
+                "videos": ValidArray(result.feeds[0].items)
             }
 
-            if feeds.Count() > 0
-                result["videos"] = ValidArray(feeds[0].items)
-                if feeds[0].DoesExist("continuation")
-                    result["continuation"] = feeds[0].continuation
-                end if
+            if result.feeds[0].DoesExist("continuation")
+                responseBody.continuation = result.feeds[0].continuation
             end if
 
-            response.Json(result)
+            response.Json(responseBody)
+
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
+            end if
+
             return true
         end function
 
@@ -144,8 +143,14 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            feeds = InnertubeService.GetPlaylists(options)
-            if feeds = invalid
+            result = InnertubeService.GetPlaylists(options)
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = 500
+                return true
+            end if
+
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
                 response.Json({
                     "error": "Failed to get auth playlists"
                 })
@@ -153,23 +158,12 @@ namespace Http
                 return true
             end if
 
-            if IsAssociativeArray(feeds)
-                if feeds.error <> invalid
-                    response.Json(feeds)
-                    response.http_code = 500
-                    return true
-                end if
-                return true
+            response.Json(result.feeds[0])
+
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
             end if
 
-            if feeds.Count() > 0
-                response.Json(feeds[0])
-                return true
-            end if
-
-            response.Json({
-                "items": []
-            })
             return true
         end function
 
@@ -195,32 +189,27 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            feeds = InnertubeService.GetWatchHistory(options)
-            if feeds = invalid
-                response.Json({
-                    "error": "Failed to get auth history"
-                })
+            result = InnertubeService.GetWatchHistory(options)
+            if result.error <> invalid
+                response.Json(result)
                 response.http_code = 500
                 return true
             end if
 
-            if IsAssociativeArray(feeds)
-                if feeds.error <> invalid
-                    response.Json(feeds)
-                    response.http_code = 500
-                    return true
-                end if
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
+                ' Not an error, just no history
+                response.Json({
+                    "items": []
+                })
                 return true
             end if
 
-            if feeds.Count() > 0
-                response.Json(feeds[0])
-                return true
+            response.Json(result.feeds[0])
+
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
             end if
 
-            response.Json({
-                "items": []
-            })
             return true
         end function
 
@@ -317,6 +306,7 @@ namespace Http
             end if
 
             response.Json(ValidArray(result.feeds[0].items))
+
             if result.DoesExist("cache-control")
                 response.headers["cache-control"] = result["cache-control"]
             end if
@@ -346,36 +336,27 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            feeds = InnertubeService.GetHome(options)
-            if feeds = invalid
-                response.Json({
-                    "error": "Failed to get auth home feed"
-                })
+            result = InnertubeService.GetHome(options)
+            if result.error <> invalid
+                response.Json(result)
                 response.http_code = 500
                 return true
             end if
 
-            if IsAssociativeArray(feeds)
-                if feeds.error <> invalid
-                    response.Json(feeds)
-                    response.http_code = 500
-                    return true
-                end if
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
+                ' Not an error, just no recommended videos, usually when there's no history
+                response.Json({
+                    "items": []
+                })
                 return true
             end if
 
-            result = {
-                "items": []
-            }
+            response.Json(result.feeds[0])
 
-            if feeds.Count() > 0
-                result["items"] = ValidArray(feeds[0].items)
-                if feeds[0].DoesExist("continuation")
-                    result["continuation"] = feeds[0].continuation
-                end if
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
             end if
 
-            response.Json(result)
             return true
         end function
 
@@ -460,7 +441,7 @@ namespace Http
 
             if not IsArray(result.feeds) or result.feeds.Count() = 0
                 response.Json({
-                    "error": "Failed to search"
+                    "error": "Failed to search: no results found"
                 })
                 response.http_code = 500
                 return true
