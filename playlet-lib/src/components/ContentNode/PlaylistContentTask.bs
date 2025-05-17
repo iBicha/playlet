@@ -54,18 +54,19 @@ function PlaylistContentTask(input as object) as object
             }
         end if
 
+        beforeChildCount = contentNode.getChildCount()
         InvidiousContent.ToPlaylistContentNode(contentNode, metadata, instance)
-        childCount = contentNode.getChildCount()
+        afterChildCount = contentNode.getChildCount()
 
         videoCount = ValidInt(metadata.videoCount)
 
         hasContinuation = not StringUtils.IsNullOrEmpty(metadata.continuation)
 
         noMoreContinuation = hadContinuation and not hasContinuation
-        noVideosReturned = metadata.videos.Count() = 0
-        reachedVideoCount = videoCount <> -1 and childCount >= videoCount
+        noVideosAdded = afterChildCount = beforeChildCount
+        reachedVideoCount = videoCount <> -1 and afterChildCount >= videoCount
 
-        if noMoreContinuation or noVideosReturned or reachedVideoCount
+        if noMoreContinuation or noVideosAdded or reachedVideoCount
             contentNode.loadState = FeedLoadState.Loaded
             return {
                 success: true

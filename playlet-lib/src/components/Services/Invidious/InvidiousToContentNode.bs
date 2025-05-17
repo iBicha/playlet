@@ -80,19 +80,38 @@ namespace InvidiousContent
         SetIfExists(node, "statsText", item, "statsText")
         SetIfExists(node, "lines", item, "lines")
 
-        if item.videos <> invalid
+        if IsArray(item.videos) and item.videos.Count() > 0
             childCount = node.getChildCount()
+
+            ' Innertube's TV client doesn't return the index for videos in playlists.
+            ' So we rely on video ids to detect duplicates.
+            videosHasIndex = IsInt(item.videos[0].index)
+
+            videoIds = invalid
+            if not videosHasIndex
+                videoIds = {}
+                childVideos = node.getChildren(-1, 0)
+                for each child in childVideos
+                    videoIds[child.videoId] = true
+                end for
+            end if
+
             newNodes = []
             for each video in item.videos
-                ' TODO:P1 sometimes we're parsing "recommended playlists" that
-                ' show up in the end of the playlist. We should ignore them,
-                ' until the parsing is fixed.
+                ' Sometimes we're parsing "recommended playlists" that show up
+                ' in the end of the playlist. In this context they are ignored.
                 if ValidString(video.type) = "playlist"
                     continue for
                 end if
                 video.type = "video"
                 videoNode = ToVideoContentNode(invalid, video, instance)
                 if videoNode <> invalid
+                    if not videosHasIndex
+                        if videoIds[video.videoId] = true
+                            continue for
+                        end if
+                    end if
+
                     index = video.index
                     if index <> invalid and index > -1 and index < childCount
                         node.replaceChild(videoNode, index)
@@ -101,6 +120,7 @@ namespace InvidiousContent
                     end if
                 end if
             end for
+
             if newNodes.Count() > 0
                 node.appendChildren(newNodes)
             end if
