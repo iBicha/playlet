@@ -3,7 +3,8 @@ import { CompilerPlugin, Program, SourceObj } from "brighterscript";
 
 const types = [
     { name: 'Bool', interface: 'ifBoolean', type: 'boolean', defaultValue: 'false' },
-    { name: 'Int', interface: 'ifInt', type: 'integer', defaultValue: '0' },
+    { name: 'Int', interface: 'ifInt', type: 'integer', defaultValue: '0%' },
+    { name: 'Float', interface: 'ifFloat', type: 'float', defaultValue: '0!' },
     { name: 'Double', interface: 'ifDouble', type: 'double', defaultValue: '0#' },
     { name: 'String', interface: 'ifString', type: 'string', defaultValue: '""' },
     { name: 'Array', interface: 'ifArray', type: 'object', defaultValue: '[]' },

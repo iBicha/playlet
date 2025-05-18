@@ -126,6 +126,8 @@ function PlayWithContent(contentNode as object)
     end if
     if ValidInt(contentNode.timestamp) <> -1
         videoContentNode.AddFields({ timestamp: contentNode.timestamp })
+    else if contentNode.percentDurationWatched > 0 and contentNode.percentDurationWatched < 100
+        videoContentNode.AddFields({ percentDurationWatched: contentNode.percentDurationWatched })
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.title)
         videoContentNode.title = contentNode.title
@@ -194,9 +196,11 @@ function OnVideoContentTaskResults(output as object) as void
     SponsorBlock.FetchSponsorBlock(content.metadata)
 
     timestamp = content.timestamp
+    percentDurationWatched = content.percentDurationWatched
     hasTimestamp = IsInt(timestamp)
+    hasPercentDurationWatched = IsFloat(percentDurationWatched)
 
-    if IsLiveVideo() and not hasTimestamp
+    if IsLiveVideo() and not hasTimestamp and not hasPercentDurationWatched
         duration = m.top.duration
         if duration > 0
             SeekToEndOfStream()
@@ -209,6 +213,13 @@ function OnVideoContentTaskResults(output as object) as void
 
     if hasTimestamp and timestamp > 0
         m.top.seek = content.timestamp
+    else if hasPercentDurationWatched
+        duration = m.top.duration
+        if duration > 0
+            SeekToPercentDurationWatched()
+        else
+            m.top.ObserveField("duration", FuncName(SeekToPercentDurationWatched))
+        end if
     end if
 end function
 
@@ -408,13 +419,31 @@ function OnVideoPlayerStateChange() as void
     end if
 end function
 
-function SeekToEndOfStream()
+function SeekToEndOfStream() as void
     m.top.UnobserveField("duration")
     duration = m.top.duration
-    ' If the stream is less than 30 seconds, it's not worth seeking to the end
-    if duration > 30
-        LogInfo("Seeking to end of live stream", duration)
-        m.top.seek = duration
+    ' If the stream is less than 30 seconds, it's not worth seeking
+    if duration < 30
+        return
+    end if
+
+    LogInfo("Seeking to end of live stream", duration)
+    m.top.seek = duration
+end function
+
+function SeekToPercentDurationWatched() as void
+    m.top.UnobserveField("duration")
+    duration = m.top.duration
+    ' If the stream is less than 30 seconds, it's not worth seeking
+    if duration < 30
+        return
+    end if
+
+    percentDurationWatched = m.top.content.percentDurationWatched
+    seek = (MathUtils.Clamp(percentDurationWatched, 0, 100) / 100.0) * duration
+    if seek > 0
+        LogInfo("Seeking to percent duration watched", seek)
+        m.top.seek = seek
     end if
 end function
 
