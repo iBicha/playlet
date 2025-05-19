@@ -213,49 +213,6 @@ namespace Http
             return true
         end function
 
-        function AuthMarkVideoWatched(context as object) as boolean
-            request = context.request
-            response = context.response
-            route = request.route
-
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
-                return true
-            end if
-
-            videoId = route.Mid("/playlet-invidious-backend/api/v1/auth/history/".Len())
-            if videoId.InStr("?") > 0
-                videoId = videoId.Left(videoId.InStr("?"))
-            end if
-
-            if StringUtils.IsNullOrEmpty(videoId)
-                response.Json({
-                    "error": "Missing 'videoId' path parameter"
-                })
-                response.http_code = 400
-                return true
-            end if
-
-            options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
-            }
-
-            if not InnertubeService.AuthMarkVideoWatched(videoId, options)
-                response.Json({
-                    "error": "Failed to mark video as watched"
-                })
-                response.http_code = 500
-                return true
-            end if
-
-            response.Default(204, "OK")
-            return true
-        end function
-
         @get("/playlet-invidious-backend/api/v1/stats")
         function GetStats(context as object) as boolean
             response = context.response
@@ -562,9 +519,7 @@ namespace Http
             request = context.request
             route = request.route
 
-            if route.StartsWith("/playlet-invidious-backend/api/v1/auth/history/")
-                return m.AuthMarkVideoWatched(context)
-            else if route.StartsWith("/playlet-invidious-backend/api/v1/auth/subscriptions/")
+            if route.StartsWith("/playlet-invidious-backend/api/v1/auth/subscriptions/")
                 return m.SubscribeToChannel(context)
             end if
 

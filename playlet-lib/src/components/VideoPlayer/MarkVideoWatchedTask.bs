@@ -1,12 +1,74 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
 
 @asynctask
 function MarkVideoWatchedTask(input as object) as object
     videoId = input.videoId
     invidiousNode = input.invidious
+    authToken = input.authToken
+    profileType = input.profileType
+    cancellation = m.top.cancellation
 
-    service = new Invidious.InvidiousService(invidiousNode)
-    service.MarkVideoWatched(videoId)
+    if profileType = "invidious"
+        service = new Invidious.InvidiousService(invidiousNode)
+        service.MarkVideoWatched(videoId, cancellation)
+        return invalid
+    end if
 
+    if profileType <> "youtube"
+        LogError("MarkVideoWatchedTask: Unsupported profile type:", profileType)
+        return invalid
+    end if
+
+    playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
+        accessToken: authToken.token
+        cancellation: cancellation
+    })
+
+    if playbackTrackingUrls.error <> invalid
+        LogError("MarkVideoWatchedTask: Failed to get playback tracking URLs:", playbackTrackingUrls.error)
+        return invalid
+    end if
+
+    if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl)
+        LogError("MarkVideoWatchedTask: videostatsPlaybackUrl is empty")
+        return invalid
+    end if
+
+    markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
+        accessToken: authToken.token
+        cancellation: cancellation
+    })
+    if not markedAsWatched
+        return invalid
+    end if
+
+    if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
+        LogError("MarkVideoWatchedTask: videostatsWatchtimeUrl is empty")
+        return invalid
+    end if
+
+    if CancellationUtils.IsCancelled(cancellation)
+        return invalid
+    end if
+
+    port = CreateObject("roMessagePort")
+    MessagePortUtils.ObserveFieldScopedExSafe(m.top, "watchTime", port)
+    CancellationUtils.ObserveCancellationScoped(cancellation, port)
+    while true
+        message = wait(60000, port)
+        if CancellationUtils.IsCancellationEvent(cancellation, message)
+            return invalid
+        end if
+        if message = invalid
+            continue while
+        end if
+        watchTime = message.getData()
+        InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
+            accessToken: authToken.token
+            cancellation: cancellation
+        })
+    end while
     return invalid
 end function

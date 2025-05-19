@@ -970,12 +970,17 @@ namespace Innertube
         lengthText = ""
         isUpcoming = false
         liveNow = false
+        percentDurationWatched = 0
         thumbnailOverlays = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnailOverlays"])
         if IsArray(thumbnailOverlays)
             for each overlay in thumbnailOverlays
                 maybeLengthText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
                 if maybeLengthText <> ""
                     lengthText = maybeLengthText
+                end if
+                maybePercentDurationWatched = ObjectUtils.Dig(overlay, ["thumbnailOverlayResumePlaybackRenderer", "percentDurationWatched"])
+                if maybePercentDurationWatched <> invalid
+                    percentDurationWatched = maybePercentDurationWatched
                 end if
                 liveNow = liveNow or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE")
                 isUpcoming = isUpcoming or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "UPCOMING")
@@ -1005,6 +1010,7 @@ namespace Innertube
             "liveNow": liveNow
             "isUpcoming": isUpcoming
             "lines": renderedLines
+            "percentDurationWatched": percentDurationWatched
         }
 
         PushFeedItem(video, context)

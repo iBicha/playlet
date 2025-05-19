@@ -326,7 +326,7 @@ namespace InnertubeService
         return result
     end function
 
-    function AuthMarkVideoWatched(videoId as string, options as object) as boolean
+    function AuthGetPlaybackTrackingUrls(videoId as string, options as object) as object
         cancellation = invalid
         accessToken = options.accessToken
 
@@ -340,43 +340,95 @@ namespace InnertubeService
 
         playerResponse = playerRequest.Await()
         if not playerResponse.IsSuccess()
-            LogError("Error marking video as watched:", playerResponse.ErrorMessage())
-            return false
-        end if
-
-        if CancellationUtils.IsCancelled(cancellation)
-            return false
+            return {
+                error: playerResponse.ErrorMessage()
+            }
         end if
 
         json = playerResponse.Json()
+
         videostatsPlaybackUrl = ObjectUtils.Dig(json, ["playbackTracking", "videostatsPlaybackUrl", "baseUrl"])
-        if StringUtils.IsNullOrEmpty(videostatsPlaybackUrl)
-            LogError("No videostatsPlaybackUrl found in response")
-            return false
+        videostatsWatchtimeUrl = ObjectUtils.Dig(json, ["playbackTracking", "videostatsWatchtimeUrl", "baseUrl"])
+
+        return {
+            videostatsPlaybackUrl: videostatsPlaybackUrl
+            videostatsWatchtimeUrl: videostatsWatchtimeUrl
+        }
+    end function
+
+    function AuthMarkVideoWatched(videostatsPlaybackUrl as string, options as object) as boolean
+        cancellation = invalid
+        accessToken = options.accessToken
+
+        if options.DoesExist("cancellation")
+            cancellation = options.cancellation
         end if
 
-        videostatsPlaybackUrl = videostatsPlaybackUrl.replace("https://s.youtube.com", "https://www.youtube.com")
+        videostatsPlaybackUrl = videostatsPlaybackUrl.replace("https://s.", "https://www.")
         queryParams = UrlUtils.ParseQueryComponents(videostatsPlaybackUrl)
         queryParams["c"] = "TVHTML5"
         queryParams["cbrver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
-        queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
-        queryParams["fmt"] = "251"
-        queryParams["rtn"] = "0"
-        queryParams["rt"] = "0"
         queryParams["ver"] = "2"
+        queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
+        queryParams["cmt"] = 0
+        queryParams["final"] = "1"
         videostatsPlaybackUrl = UrlUtils.SetQueryParams(videostatsPlaybackUrl, queryParams)
 
-        trackingRequest = HttpClient.Get(videostatsPlaybackUrl)
-        trackingRequest.Header("Authorization", "Bearer " + accessToken)
+        request = HttpClient.Get(videostatsPlaybackUrl)
+        request.Cancellation(cancellation)
+        request.NoCache()
+        request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Header("Authorization", "Bearer " + accessToken)
 
-        trackingResponse = trackingRequest.Await()
-        if not trackingResponse.IsSuccess()
-            LogError("Error marking video as watched:", trackingResponse.ErrorMessage())
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError("Error marking video as watched:", response.ErrorMessage())
             return false
         end if
 
-        LogDebug("Marked video as watched:", videoId)
+        LogDebug("Marked video as watched")
+        return true
+    end function
+
+    function AuthMarkVideoWatchTime(time as float, videostatsWatchtimeUrl as string, options = invalid as object) as boolean
+        cancellation = invalid
+        accessToken = options.accessToken
+
+        if options <> invalid
+            if options.DoesExist("cancellation")
+                cancellation = options.cancellation
+            end if
+        end if
+
+        timeStr = time.ToStr("%.3f")
+
+        videostatsWatchtimeUrl = videostatsWatchtimeUrl.replace("https://s.", "https://www.")
+        queryParams = UrlUtils.ParseQueryComponents(videostatsWatchtimeUrl)
+        queryParams["c"] = "TVHTML5"
+        queryParams["cbrver"] = INNERTUBE_TV_CLIENT_VERSION
+        queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
+        queryParams["ver"] = "2"
+        queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
+        queryParams["cmt"] = 0
+        queryParams["final"] = "1"
+        queryParams["st"] = timeStr
+        queryParams["et"] = timeStr
+        videostatsWatchtimeUrl = UrlUtils.SetQueryParams(videostatsWatchtimeUrl, queryParams)
+
+        request = HttpClient.Get(videostatsWatchtimeUrl)
+        request.Cancellation(cancellation)
+        request.NoCache()
+        request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Header("Authorization", "Bearer " + accessToken)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError("Error marking video watch time:", response.ErrorMessage())
+            return false
+        end if
+
+        LogDebug("Marked video watch time:", timeStr)
         return true
     end function
 

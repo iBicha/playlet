@@ -21,6 +21,7 @@ function Init()
     m.fullScreenHintTimer.ObserveField("fire", FuncName(OnFullScreenHintTimer))
     m.trickplayUITimer = m.top.findNode("trickplayUITimer")
     m.trickplayUITimer.ObserveField("fire", FuncName(OnTrickplayUITimer))
+    m.top.notificationInterval = 1
 
     ' videoPlayingSuccess indicates if we started playing a video successfully
     ' We use it to detect if we should try another link for a video, or if another error
@@ -126,6 +127,8 @@ function PlayWithContent(contentNode as object)
     end if
     if ValidInt(contentNode.timestamp) <> -1
         videoContentNode.AddFields({ timestamp: contentNode.timestamp })
+    else if contentNode.percentDurationWatched > 0 and contentNode.percentDurationWatched < 100
+        videoContentNode.AddFields({ percentDurationWatched: contentNode.percentDurationWatched })
     end if
     if not StringUtils.IsNullOrEmpty(contentNode.title)
         videoContentNode.title = contentNode.title
@@ -143,8 +146,6 @@ function StartVideoContentTask(videoContentNode as object)
     if m.videoContentTask <> invalid
         m.videoContentTask.cancel = true
     end if
-
-    MarkVideoWatched(videoContentNode.videoId)
 
     m.top.content = videoContentNode
 
@@ -194,22 +195,25 @@ function OnVideoContentTaskResults(output as object) as void
     SponsorBlock.FetchSponsorBlock(content.metadata)
 
     timestamp = content.timestamp
+    percentDurationWatched = content.percentDurationWatched
     hasTimestamp = IsInt(timestamp)
+    hasPercentDurationWatched = IsFloat(percentDurationWatched)
 
-    if IsLiveVideo() and not hasTimestamp
-        duration = m.top.duration
-        if duration > 0
-            SeekToEndOfStream()
-        else
-            m.top.ObserveField("duration", FuncName(SeekToEndOfStream))
+    if IsLiveVideo() and not hasTimestamp and not hasPercentDurationWatched
+        ' If live, seek to end of stream
+        m.seekToPercent = 100.0
+        SeekToPercentOfDuration()
+    else
+        if hasTimestamp and timestamp > 0
+            m.top.seek = content.timestamp
+        else if hasPercentDurationWatched
+            m.seekToPercent = percentDurationWatched
+            SeekToPercentOfDuration()
         end if
     end if
 
     PlayAfterPreviousPlayerHasStopped()
-
-    if hasTimestamp and timestamp > 0
-        m.top.seek = content.timestamp
-    end if
+    MarkVideoWatched(content.videoId)
 end function
 
 function PlayAfterPreviousPlayerHasStopped() as void
@@ -272,12 +276,48 @@ function MarkVideoWatched(videoId as dynamic) as void
         return
     end if
 
-    if m.top.invidious.authToken <> invalid
-        AsyncTask.Start(Tasks.MarkVideoWatchedTask, {
-            videoId: videoId
-            invidious: m.top.invidious
-        })
+    invidious = m.top.invidious
+    authToken = invidious.authToken
+    if authToken = invalid
+        return
     end if
+
+    if m.markVideoWatchedTask <> invalid
+        m.markVideoWatchedTask.cancel = true
+    end if
+
+    profileType = authToken.profileNode.type
+    m.markVideoWatchedTask = AsyncTask.Create(Tasks.MarkVideoWatchedTask, {
+        videoId: videoId
+        invidious: invidious
+        authToken: authToken
+        profileType: profileType
+    })
+    m.markVideoWatchedTask.addField("watchTime", "float", false)
+    m.markVideoWatchedTask.control = "RUN"
+
+    if profileType <> "youtube"
+        return
+    end if
+
+    ' Progress reported to Innertube. It is the position in seconds,
+    ' with 20 second steps.
+    m.watchTimeMarker = -1
+    m.top.ObserveFieldScoped("position", FuncName(OnPositionChangeMarkWatchTime))
+end function
+
+function OnPositionChangeMarkWatchTime() as void
+    if m.markVideoWatchedTask = invalid
+        return
+    end if
+
+    currentPosition = m.top.position
+    currentWatchTimeMarker = m.watchTimeMarker
+    m.watchTimeMarker = (currentPosition \ 20) * 20
+    if currentWatchTimeMarker = currentPosition
+        return
+    end if
+    m.markVideoWatchedTask.watchTime = m.watchTimeMarker
 end function
 
 function OnClose()
@@ -285,6 +325,10 @@ function OnClose()
 
     m.top.previousPlayer = invalid
 
+    if m.markVideoWatchedTask <> invalid
+        m.markVideoWatchedTask.cancel = true
+        m.markVideoWatchedTask = invalid
+    end if
     if m.videoContentTask <> invalid
         m.videoContentTask.cancel = true
         m.videoContentTask = invalid
@@ -408,13 +452,43 @@ function OnVideoPlayerStateChange() as void
     end if
 end function
 
-function SeekToEndOfStream()
+function SeekToEndOfStream() as void
     m.top.UnobserveField("duration")
     duration = m.top.duration
-    ' If the stream is less than 30 seconds, it's not worth seeking to the end
-    if duration > 30
-        LogInfo("Seeking to end of live stream", duration)
-        m.top.seek = duration
+    ' If the stream is less than 30 seconds, it's not worth seeking
+    if duration < 30
+        return
+    end if
+
+    LogInfo("Seeking to end of live stream", duration)
+    m.top.seek = duration
+end function
+
+function SeekToPercentOfDuration() as void
+    m.top.UnobserveField("duration")
+
+    seekToPercent = m.seekToPercent
+    if seekToPercent = invalid
+        return
+    end if
+    m.seekToPercent = invalid
+
+    duration = m.top.duration
+    if duration = 0
+        ' If the duration is not available, wait for it to be set
+        m.top.ObserveField("duration", FuncName(SeekToPercentOfDuration))
+        return
+    end if
+
+    ' If the stream is less than 30 seconds, it's not worth seeking
+    if duration < 30
+        return
+    end if
+
+    seek = (MathUtils.Clamp(seekToPercent, 0, 100) / 100.0) * duration
+    if seek > 0
+        LogInfo("Seeking to percent duration watched", seek)
+        m.top.seek = seek
     end if
 end function
 
