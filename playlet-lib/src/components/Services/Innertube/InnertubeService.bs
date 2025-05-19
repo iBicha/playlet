@@ -371,18 +371,19 @@ namespace InnertubeService
         queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["ver"] = "2"
         queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
-        queryParams["fmt"] = "251"
-        queryParams["rtn"] = "0"
-        queryParams["rt"] = "0"
+        queryParams["cmt"] = 0
+        queryParams["final"] = "1"
         videostatsPlaybackUrl = UrlUtils.SetQueryParams(videostatsPlaybackUrl, queryParams)
 
-        trackingRequest = HttpClient.Get(videostatsPlaybackUrl)
-        trackingRequest.Header("Authorization", "Bearer " + accessToken)
-        trackingRequest.Cancellation(cancellation)
+        request = HttpClient.Get(videostatsPlaybackUrl)
+        request.Cancellation(cancellation)
+        request.NoCache()
+        request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Header("Authorization", "Bearer " + accessToken)
 
-        trackingResponse = trackingRequest.Await()
-        if not trackingResponse.IsSuccess()
-            LogError("Error marking video as watched:", trackingResponse.ErrorMessage())
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError("Error marking video as watched:", response.ErrorMessage())
             return false
         end if
 
@@ -409,19 +410,21 @@ namespace InnertubeService
         queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["ver"] = "2"
         queryParams["cpn"] = InnertubeService.CreateClientPlaybackNonce()
+        queryParams["cmt"] = 0
+        queryParams["final"] = "1"
         queryParams["st"] = timeStr
         queryParams["et"] = timeStr
-        queryParams["cmt"] = timeStr
-        queryParams["final"] = "1"
         videostatsWatchtimeUrl = UrlUtils.SetQueryParams(videostatsWatchtimeUrl, queryParams)
 
-        trackingRequest = HttpClient.Get(videostatsWatchtimeUrl)
-        trackingRequest.Header("Authorization", "Bearer " + accessToken)
-        trackingRequest.Cancellation(cancellation)
+        request = HttpClient.Get(videostatsWatchtimeUrl)
+        request.Cancellation(cancellation)
+        request.NoCache()
+        request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+        request.Header("Authorization", "Bearer " + accessToken)
 
-        trackingResponse = trackingRequest.Await()
-        if not trackingResponse.IsSuccess()
-            LogError("Error marking video watch time:", trackingResponse.ErrorMessage())
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError("Error marking video watch time:", response.ErrorMessage())
             return false
         end if
 

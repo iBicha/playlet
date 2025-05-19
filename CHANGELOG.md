@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Watch progress for YouTube accounts: Progress is saved as you watch. Progress bar is shown on video thumbnails (only on user feeds, such as recommendations, subscriptions, and watch history)
+  - Known bug: Watch progress doesn't update for all videos.
 
 ### Fixed
 
