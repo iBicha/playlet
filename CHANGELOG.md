@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Watch progress for YouTube accounts: Progress is saved as you watch. Progress bar is shown on video thumbnails (only on user feeds, such as recommendations, subscriptions, and watch history)
+
 ### Fixed
 
 - A few issues related to Playlet backend feeds and caching
