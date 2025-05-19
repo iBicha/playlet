@@ -10,6 +10,7 @@
   export let viewCount: number | undefined = undefined;
   export let isUpcoming: boolean | undefined = undefined;
   export let premiereTimestamp: number | undefined = undefined;
+  export let percentDurationWatched: number | undefined = undefined;
 
   export let invidiousInstance;
 
@@ -91,5 +92,11 @@
     >
       {getFormattedTime(lengthText, lengthSeconds)}
     </div>
+  {/if}
+  {#if percentDurationWatched}
+    <div
+      class="absolute left-0 bottom-0 h-1 bg-red-600 rounded-box"
+      style="width: {Math.min(percentDurationWatched, 100)}%;"
+    ></div>
   {/if}
 </figure>

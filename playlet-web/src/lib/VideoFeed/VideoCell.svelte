@@ -19,6 +19,7 @@
   export let lengthText: string | undefined = undefined;
   export let liveNow: boolean = undefined;
   export let lines: string[] | undefined = undefined;
+  export let percentDurationWatched: number | undefined = undefined;
 
   // svelte-ignore unused-export-let
   export let type: string = undefined;
@@ -207,6 +208,7 @@
       bind:lengthText
       bind:viewCount
       bind:invidiousInstance
+      bind:percentDurationWatched
     />
     <div class="card-body">
       <h3 class="card-title text-base line-clamp-2 min-h-12">{title || ""}</h3>
