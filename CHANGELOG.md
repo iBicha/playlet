@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An error when Invidious doesn't return valid video metadata
 - A bug where playlists with small number of videos has duplicates
 - A bug where DASH manifest was not generated correctly for proxied Invidious videos
+- A bug where watch history videos repeat indefinitely
 
 ## [0.37.0] - 2025-05-16
 

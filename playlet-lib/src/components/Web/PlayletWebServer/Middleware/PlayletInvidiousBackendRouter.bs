@@ -184,9 +184,22 @@ namespace Http
             options = {
                 "accessToken": accessToken.Mid("Bearer ".Len())
             }
+
             continuation = request.query.continuation
-            if not StringUtils.IsNullOrEmpty(continuation)
+            hasContinuation = not StringUtils.IsNullOrEmpty(continuation)
+            if hasContinuation
                 options.continuation = continuation
+            end if
+
+            if not hasContinuation
+                page = ValidString(request.query.page).ToInt()
+                if page > 1
+                    LogError("Playlet backend does not use history pagination (use continuation instead)")
+                    response.Json({
+                        "items": []
+                    })
+                    return true
+                end if
             end if
 
             result = InnertubeService.GetWatchHistory(options)
