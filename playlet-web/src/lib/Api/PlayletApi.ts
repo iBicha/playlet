@@ -78,6 +78,13 @@ export class PlayletApi {
                 args.timestamp = parseInt(args.timestamp);
             }
         }
+
+        if (args.percentDurationWatched !== undefined) {
+            if (typeof args.percentDurationWatched === "string") {
+                args.percentDurationWatched = parseFloat(args.percentDurationWatched);
+            }
+        }
+
         await PlayletApi.postJson(`${PlayletApi.host()}/api/queue/play`, args);
     }
 
@@ -99,6 +106,13 @@ export class PlayletApi {
                 args.timestamp = parseInt(args.timestamp);
             }
         }
+
+        if (args.percentDurationWatched !== undefined) {
+            if (typeof args.percentDurationWatched === "string") {
+                args.percentDurationWatched = parseFloat(args.percentDurationWatched);
+            }
+        }
+
         await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 

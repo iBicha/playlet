@@ -245,6 +245,7 @@
   bind:isUpcoming
   bind:premiereTimestamp
   bind:viewCount
+  bind:percentDurationWatched
   videoStartAtChecked={false}
   videoStartAtTimestamp={0}
 />

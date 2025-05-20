@@ -14,6 +14,7 @@
   export let viewCount: number | undefined = undefined;
   export let isUpcoming: boolean = undefined;
   export let premiereTimestamp: number | undefined = undefined;
+  export let percentDurationWatched: number | undefined = undefined;
 
   export let videoStartAtChecked;
   export let videoStartAtTimestamp;
@@ -69,6 +70,7 @@
       liveNow,
       viewCount,
       timestamp,
+      percentDurationWatched,
     };
   }
 
@@ -103,6 +105,7 @@
           bind:isUpcoming
           bind:premiereTimestamp
           bind:invidiousInstance
+          bind:percentDurationWatched
         />
       </div>
       <div class="m-4">{title || ""}</div>

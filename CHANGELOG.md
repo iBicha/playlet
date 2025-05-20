@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Fix cache issue for watch history
+### Fixed
+
+- Cache issue for watch history
 - Video progress not showing in web app
+- Video does not continuing from previous progress when opened
 
 ## [0.38.0] - 2025-05-19
 
