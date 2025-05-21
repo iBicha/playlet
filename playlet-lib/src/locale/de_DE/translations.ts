@@ -1280,5 +1280,9 @@
         <source>Playlet built-in backend</source>
         <translation>Playlet eingebautes Backend</translation>
     </message>
+    <message>
+        <source>Recommended</source>
+        <translation>Empfohlen</translation>
+    </message>
 </context>
 </TS>
