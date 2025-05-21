@@ -938,6 +938,8 @@ namespace Innertube
 
         if contentType = "TILE_CONTENT_TYPE_VIDEO"
             return TileRendererTypeVideo(nodeData, context)
+        else if contentType = "TILE_CONTENT_TYPE_SHORTS"
+            return TileRendererTypeShorts(nodeData, context)
         else if contentType = "TILE_CONTENT_TYPE_PLAYLIST"
             return TileRendererTypePlaylist(nodeData, context)
         end if
@@ -1011,6 +1013,44 @@ namespace Innertube
             "isUpcoming": isUpcoming
             "lines": renderedLines
             "percentDurationWatched": percentDurationWatched
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function TileRendererTypeShorts(nodeData as object, context as object) as object
+        videoId = nodeData["contentId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        title = ""
+        thumbnailOverlays = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnailOverlays"])
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                title = ParseText(ObjectUtils.Dig(overlay, ["tileMetadataRenderer", "title"]))
+                if title <> ""
+                    exit for
+                end if
+            end for
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
