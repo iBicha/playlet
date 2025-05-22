@@ -1,3 +1,4 @@
+import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -15,7 +16,23 @@ function OnContentSet() as void
 
     m.top.title = content.title
     ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    m.top.author = content._author
+    author = content._author
+    if not StringUtils.IsNullOrEmpty(author)
+        videoInfo = content.videoInfo
+        if not StringUtils.IsNullOrEmpty(videoInfo)
+            author += `\n` + videoInfo
+        end if
+    else
+        lines = content.lines
+        if IsArray(lines) and lines.Count() > 0
+            author = lines[0]
+            if lines.Count() > 1
+                author += `\n` + lines[1]
+            end if
+        end if
+    end if
+    m.top.author = author
+
     m.top.thumbnailUri = content.thumbnail
 
     SetDurationText(content.lengthText)

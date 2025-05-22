@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - German translation
 
+### Fixed
+
+- Display issue in playlist view
+
 ## [0.38.1] - 2025-05-20
 
 ### Fixed
