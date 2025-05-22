@@ -30,10 +30,3 @@ const parsedVersion = semverParse(version);
 [".", "playlet-app", "playlet-lib", "playlet-web"].forEach(function (packageFolder) {
     execSync(`npm version ${version} --allow-same-version --no-git-tag-version`, { cwd: packageFolder });
 });
-
-const webApi = "docs/playlet-web-api.yml"
-let webApiContent = fs.readFileSync(webApi, { encoding: 'utf8', flag: 'r' });
-// replace version in web api with regex
-const webApiVersionPattern = /version: (\d+\.\d+\.\d+)/;
-webApiContent = webApiContent.replace(webApiVersionPattern, `version: ${version}`);
-fs.writeFileSync(webApi, webApiContent);

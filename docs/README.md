@@ -166,8 +166,6 @@ Playlet lib comes equipped with a web server that runs on port 8888 when the app
 
 The web server runs on a continuously running [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) and uses a middeware system to manage routes, serve static files, [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS), and more.
 
-The server's API enpoints are described through the Open API spec file [playlet-web-api.yml](./playlet-web-api.yml)
-
 Please note: while we would like to keep the API stable as much as possible, Playlet can't reasonbly maintain multiple versions of the API like traditional web apis, because it adds complexity and maintainablity burden on an app the runs in constrained environment. In short, we'll try not to break the API, but we might from time to time.
 
 #### Debug endpoints
@@ -276,7 +274,7 @@ The Playlet web app uses [Tailwind CSS](https://tailwindcss.com/) as its base st
 
 ### API calls
 
-The Playlet web app communicates with the Playlet Roku app using web APIs. Most of the APIs used are described in the OpenAPI spec [playlet-web-api.yml](./playlet-web-api.yml). The web app also uses Invidious apis documented at [https://docs.invidious.io/api](https://docs.invidious.io/api)
+The Playlet web app communicates with the Playlet Roku app using web APIs. The web app also uses Invidious apis documented at [https://docs.invidious.io/api](https://docs.invidious.io/api)
 
 #### API calls (proxy authenticated)
 

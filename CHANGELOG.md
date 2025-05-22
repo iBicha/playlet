@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Settings: Added a "backend" section, and removed backend selection from Playback to avoid confusion
 
+### Removed
+
+- [advanced users]: `playlet-web-api.yml` was removed. It was getting outdated, and too hard to maintain to justify keeping it
+
 ### Fixed
 
 - Display issue in playlist view
