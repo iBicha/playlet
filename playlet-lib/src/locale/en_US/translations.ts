@@ -753,6 +753,22 @@
         <translation>Auto</translation>
     </message>
     <message>
+        <source>Backend</source>
+        <translation>Backend</translation>
+    </message>
+    <message>
+        <source>Backend preferences</source>
+        <translation>Backend preferences</translation>
+    </message>
+    <message>
+        <source>Selected backend</source>
+        <translation>Selected backend</translation>
+    </message>
+    <message>
+        <source>The backend used for browsing and playing videos.</source>
+        <translation>The backend used for browsing and playing videos.</translation>
+    </message>
+    <message>
         <source>Invidious preferences</source>
         <translation>Invidious preferences</translation>
     </message>
