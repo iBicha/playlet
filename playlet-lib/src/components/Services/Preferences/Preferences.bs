@@ -1,4 +1,5 @@
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -93,23 +94,21 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
     isDirty = false
 
     ' v0 -> v1
-    instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
-    if instances <> invalid
-        currentInstance = userPrefs["invidious.instance"]
-        if currentInstance = invalid or currentInstance = ""
-            instances = ParseJson(instances)
-            if instances.Count() > 0
-                instance = instances[0]
-                if instance <> invalid and instance <> ""
-                    userPrefs["invidious.instance"] = instance
-                    isDirty = true
+    if ValidInt(userPrefs.__version) = 0
+        instances = RegistryUtils.Read(RegistryUtils.INVIDIOUS_INSTANCES)
+        if not StringUtils.IsNullOrEmpty(instances)
+            currentInstance = userPrefs["invidious.instance"]
+            if StringUtils.IsNullOrEmpty(currentInstance)
+                instances = ParseJson(instances)
+                if IsArray(instances) and instances.Count() > 0
+                    instance = instances[0]
+                    if not StringUtils.IsNullOrEmpty(instance)
+                        userPrefs["invidious.instance"] = instance
+                    end if
                 end if
             end if
+            RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
         end if
-        RegistryUtils.Delete(RegistryUtils.INVIDIOUS_INSTANCES)
-    end if
-
-    if ValidInt(userPrefs.__version) = 0
         userPrefs.__version = 1
         isDirty = true
     end if
