@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - German translation
 
+### Changed
+
+- Settings: Added a "backend" section, and removed backend selection from Playback to avoid confusion
+
 ### Fixed
 
 - Display issue in playlist view

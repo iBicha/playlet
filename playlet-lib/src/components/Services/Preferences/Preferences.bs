@@ -143,7 +143,23 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
         isDirty = true
     end if
 
+    if userPrefs.__version = 3
+        if IsString(userPrefs["playback.backend"])
+            backend = userPrefs["playback.backend"]
+            userPrefs.Delete("playback.backend")
+            userPrefs["backend.selected"] = backend
+        end if
+        userPrefs.__version = 4
+        isDirty = true
+    end if
+
     ' TODO:P2 handle case where saved preferences version is higher than current version (e.g. user downgraded)
+
+    #if DEBUG
+        if userPrefs.__version <> m.top.__version
+            throw "Preferences version mismatch. Expected: " + m.top.__version + ", found: " + userPrefs.__version
+        end if
+    #end if
     return isDirty
 end function
 
