@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New settings category: `Feed Customization`
+- New settings category: `Content Feed`
   - New setting: `Disable Shorts`
 
 ## [0.38.2] - 2025-05-22
