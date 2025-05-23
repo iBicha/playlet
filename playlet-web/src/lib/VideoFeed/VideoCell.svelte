@@ -47,7 +47,7 @@
   let invidiousInstance;
 
   playletStateStore.subscribe((value) => {
-    invidiousInstance = value?.invidious?.current_instance;
+    invidiousInstance = value?.invidious?.instance;
   });
 
   function getViewCountDateText() {

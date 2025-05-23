@@ -24,7 +24,7 @@
   let invidiousApi = new InvidiousApi();
 
   playletStateStore.subscribe((value) => {
-    invidiousApi.instance = value?.invidious?.current_instance;
+    invidiousApi.instance = value?.invidious?.instance;
   });
 
   onMount(async () => {

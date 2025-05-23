@@ -21,7 +21,7 @@
 
   playletStateStore.subscribe((value) => {
     tvName = value?.device?.friendly_name ?? "Roku TV";
-    invidiousInstance = value?.invidious?.current_instance;
+    invidiousInstance = value?.invidious?.instance;
   });
 
   async function openOnTv() {

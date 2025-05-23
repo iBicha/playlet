@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New settings category: `Content Feed`
   - New setting: `Disable Shorts`
 
+### Fixed
+
+- A regression with thumbnails not showing from previous release
+- Inability to login to Invidious when selected backend is Playlet (local)
+
 ## [0.38.2] - 2025-05-22
 
 ### Added

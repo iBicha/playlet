@@ -22,8 +22,15 @@
         videoThumbnails.find((thumbnail) => thumbnail.quality === "medium") ||
         videoThumbnails[0];
       let url = videoThumbnail.url;
-      if (url.startsWith("/") && invidiousInstance) {
-        url = invidiousInstance + url;
+      if (url.startsWith("/")) {
+        if (
+          invidiousInstance &&
+          !invidiousInstance.includes(":8888/playlet-invidious-backend")
+        ) {
+          url = invidiousInstance + url;
+        } else {
+          url = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+        }
       }
       thumbnailUrl = url;
     } else if (invidiousInstance) {

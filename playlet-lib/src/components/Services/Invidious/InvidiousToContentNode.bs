@@ -170,15 +170,16 @@ namespace InvidiousContent
         end if
     end function
 
-    function VideoSetThumbnail(node as object, videoItem as object, instance as dynamic, quality = "medium" as string) as boolean
+    function VideoSetThumbnail(node as object, videoItem as object, instance as dynamic, quality = "medium" as string) as void
         videoThumbnails = videoItem.videoThumbnails
+        hasValidInstance = not StringUtils.IsNullOrEmpty(instance) and instance.InStr(":8888/playlet-invidious-backend") = -1
         if videoThumbnails = invalid or videoThumbnails.Count() = 0
-            if StringUtils.IsNullOrEmpty(instance)
-                node.thumbnail = `https://i.ytimg.com/vi/${videoItem.videoId}/mqdefault.jpg`
-            else
+            if hasValidInstance
                 node.thumbnail = `${instance}/vi/${videoItem.videoId}/mqdefault.jpg`
+            else
+                node.thumbnail = `https://i.ytimg.com/vi/${videoItem.videoId}/mqdefault.jpg`
             end if
-            return false
+            return
         end if
         url = invalid
         for each thumbnail in videoThumbnails
@@ -191,13 +192,13 @@ namespace InvidiousContent
             url = videoThumbnails[0].url
         end if
         if url.startsWith("/")
-            if StringUtils.IsNullOrEmpty(instance)
-                return false
+            if hasValidInstance
+                url = instance + url
+            else
+                url = `https://i.ytimg.com/vi/${videoItem.videoId}/mqdefault.jpg`
             end if
-            url = instance + url
         end if
         node.thumbnail = url
-        return true
     end function
 
     function VideoIsLive(videoItem as object) as boolean
@@ -288,16 +289,16 @@ namespace InvidiousContent
         end if
 
         thumbnail = ""
+        hasValidInstance = not StringUtils.IsNullOrEmpty(instance) and instance.InStr(":8888/playlet-invidious-backend") = -1
         if IsString(playlistItem.playlistThumbnail)
             thumbnailUrl = playlistItem.playlistThumbnail
-            if thumbnailUrl.startsWith("/") and not StringUtils.IsNullOrEmpty(playlistItem.instance)
+            if thumbnailUrl.startsWith("/") and hasValidInstance
                 thumbnailUrl = playlistItem.instance + thumbnailUrl
             end if
             thumbnail = thumbnailUrl
         else if playlistItem.videos <> invalid and playlistItem.videos.Count() > 0 and playlistItem.videos[0].index = 0
-            if VideoSetThumbnail(node, playlistItem.videos[0], instance, quality)
-                return
-            end if
+            VideoSetThumbnail(node, playlistItem.videos[0], instance, quality)
+            return
         else if node.getChildCount() > 0
             thumbnail = node.getChild(0).thumbnail
         end if

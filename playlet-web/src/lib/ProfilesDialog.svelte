@@ -32,7 +32,8 @@
 
   playletStateStore.subscribe((value) => {
     authUrl = value?.invidious?.auth_url;
-    currentInstance = value?.invidious?.current_instance || "";
+    currentInstance =
+      value?.invidious?.invidious_instance || value?.invidious?.instance || "";
     if (currentInstance === `${host()}/playlet-invidious-backend`) {
       const trFn = get(translate);
       currentInstanceName = trFn("Playlet built-in backend");

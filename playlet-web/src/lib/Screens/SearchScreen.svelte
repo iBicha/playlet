@@ -31,7 +31,7 @@
   let searchFiltersLabel;
 
   playletStateStore.subscribe((value) => {
-    invidiousApi.instance = value?.invidious?.current_instance;
+    invidiousApi.instance = value?.invidious?.instance;
     let userCountryCode = value?.device?.user_country_code;
     if (!userCountryCode || userCountryCode === "OT") {
       userCountryCode = "US";
