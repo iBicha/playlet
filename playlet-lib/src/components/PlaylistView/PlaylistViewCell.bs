@@ -1,3 +1,4 @@
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -5,6 +6,7 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.durationRect = m.top.FindNode("durationRect")
     m.durationLabel = m.top.FindNode("durationLabel")
+    m.progressRect = m.top.FindNode("progressRect")
 end function
 
 function OnContentSet() as void
@@ -35,6 +37,8 @@ function OnContentSet() as void
 
     m.top.thumbnailUri = content.thumbnail
 
+    m.top.percentDurationWatched = content.percentDurationWatched
+
     SetDurationText(content.lengthText)
 end function
 
@@ -59,4 +63,13 @@ function SetDurationText(text as string) as void
 
     rect.width = size.width + 16
     rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+end function
+
+function OnPercentDurationWatched() as void
+    if m.progressRect = invalid
+        return
+    end if
+
+    percent = MathUtils.Clamp(m.top.percentDurationWatched, 0, 100) / 100.0
+    m.progressRect.scale = [percent, 1]
 end function
