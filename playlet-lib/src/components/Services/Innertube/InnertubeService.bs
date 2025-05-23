@@ -182,32 +182,13 @@ namespace InnertubeService
     end function
 
     function Search(query as string, options = invalid as object) as object
-        searchFilters = invalid
-        continuation = ""
-        cancellation = invalid
-        raw = false
-
-        if options <> invalid
-            if options.DoesExist("searchFilters")
-                searchFilters = options.searchFilters
-            end if
-            if options.DoesExist("continuation")
-                continuation = options.continuation
-            end if
-            if options.DoesExist("cancellation")
-                cancellation = options.cancellation
-            end if
-            if options.DoesExist("raw")
-                raw = options.raw
-            end if
-        end if
-
-        return Innertube.Search(query, searchFilters, continuation, cancellation, raw)
+        return Innertube.Search(query, options)
     end function
 
     function GetTrending(options = invalid as object) as object
         cancellation = invalid
         params = ""
+        disableShorts = false
         raw = false
 
         if options <> invalid
@@ -227,6 +208,9 @@ namespace InnertubeService
                     ' {"44:proto": {"3:string": "trailers"}}
                     params = "4gIKGgh0cmFpbGVycw%3D%3D"
                 end if
+            end if
+            if options.DoesExist("disableShorts")
+                disableShorts = options.disableShorts
             end if
             if options.DoesExist("raw")
                 raw = options.raw
@@ -252,7 +236,10 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), { skipCreatorOnTheRise: true })
+        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
+            disableCreatorOnTheRise: true
+            disableShorts: disableShorts
+        })
 
         result = {
             feeds: feeds
@@ -286,6 +273,7 @@ namespace InnertubeService
         cancellation = invalid
         accessToken = invalid
         continuation = ""
+        disableShorts = false
 
         if options <> invalid
             if options.DoesExist("cancellation")
@@ -296,6 +284,9 @@ namespace InnertubeService
             end if
             if options.DoesExist("continuation")
                 continuation = options.continuation
+            end if
+            if options.DoesExist("disableShorts")
+                disableShorts = options.disableShorts
             end if
         end if
 
@@ -312,7 +303,7 @@ namespace InnertubeService
             }
         end if
 
-        feeds = Innertube.ParseResponseDataForFeeds(response.Json())
+        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), { disableShorts: disableShorts })
 
         result = {
             feeds: feeds

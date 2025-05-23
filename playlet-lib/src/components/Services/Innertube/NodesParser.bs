@@ -156,13 +156,13 @@ namespace Innertube
     end function
 
     function ParseShelfRenderer(nodeData as object, context as object) as object
-        if context.skipCreatorOnTheRise = true
+        if context.disableCreatorOnTheRise = true
             badges = nodeData["badges"]
             if IsArray(badges)
                 for each badge in badges
                     if ValidString(ObjectUtils.Dig(badge, ["metadataBadgeRenderer", "style"])) = "BADGE_STYLE_TYPE_FEATURED"
                         label = ParseText(ObjectUtils.Dig(badge, ["metadataBadgeRenderer", "label"]))
-                        LogInfo(`Skipping 'Create on the Rise' shelf (${label})`)
+                        LogInfo(`Skipping 'Creator on the Rise' shelf (${label})`)
                         return invalid
                     end if
                 end for
@@ -179,7 +179,11 @@ namespace Innertube
         return nodeData["contents"]
     end function
 
-    function ParseReelShelfRenderer(nodeData as object, _context as object) as object
+    function ParseReelShelfRenderer(nodeData as object, context as object) as object
+        if context.disableShorts = true
+            LogInfo("Skipping ReelShelfRenderer based on user settings")
+            return invalid
+        end if
         ' TODO: handle reelShelfRenderer.title
         return nodeData["items"]
     end function
@@ -276,20 +280,33 @@ namespace Innertube
             end if
         end if
 
-        liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
-        if not liveNow
-            thumbnailOverlays = nodeData["thumbnailOverlays"]
-            if IsArray(thumbnailOverlays)
-                for each overlay in thumbnailOverlays
-                    if ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE"
-                        liveNow = true
-                        exit for
+        isUpcoming = false
+        liveNow = false
+
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                if parsedTimeStatusRenderer = invalid
+                    continue for
+                end if
+
+                if parsedTimeStatusRenderer.isShort
+                    if context.disableShorts = true
+                        LogInfo("Skipping Short based on user settings")
+                        return invalid
                     end if
-                end for
-            end if
+                end if
+
+                liveNow = liveNow or parsedTimeStatusRenderer.isLive
+                isUpcoming = isUpcoming or parsedTimeStatusRenderer.isUpcoming
+            end for
         end if
 
-        isUpcoming = false
+        if ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
+            liveNow = true
+        end if
+
         premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
         if IsString(premiereTimestamp)
             premiereTimestamp = premiereTimestamp.ToInt()
@@ -362,7 +379,11 @@ namespace Innertube
             thumbnailOverlays = nodeData["thumbnailOverlays"]
             if IsArray(thumbnailOverlays)
                 for each overlay in thumbnailOverlays
-                    lengthText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
+                    parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                    if parsedTimeStatusRenderer = invalid
+                        continue for
+                    end if
+                    lengthText = parsedTimeStatusRenderer.text
                     if lengthText <> ""
                         exit for
                     end if
@@ -518,8 +539,20 @@ namespace Innertube
         thumbnailOverlays = nodeData["thumbnailOverlays"]
         if IsArray(thumbnailOverlays)
             for each overlay in thumbnailOverlays
-                liveNow = liveNow or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE")
-                isUpcoming = isUpcoming or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "UPCOMING")
+                parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                if parsedTimeStatusRenderer = invalid
+                    continue for
+                end if
+
+                if parsedTimeStatusRenderer.isShort
+                    if context.disableShorts = true
+                        LogInfo("Skipping Short based on user settings")
+                        return invalid
+                    end if
+                end if
+
+                liveNow = liveNow or parsedTimeStatusRenderer.isLive
+                isUpcoming = isUpcoming or parsedTimeStatusRenderer.isUpcoming
             end for
         end if
 
@@ -869,6 +902,11 @@ namespace Innertube
     end function
 
     function ParseShortsLockupViewModel(nodeData as object, context as object) as object
+        if context.disableShorts = true
+            LogInfo("Skipping Short based on user settings")
+            return invalid
+        end if
+
         videoId = ObjectUtils.Dig(nodeData, ["onTap", "innertubeCommand", "reelWatchEndpoint", "videoId"])
         if not IsString(videoId)
             LogWarn("Invalid video ID", nodeData)
@@ -978,17 +1016,32 @@ namespace Innertube
         thumbnailOverlays = ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnailOverlays"])
         if IsArray(thumbnailOverlays)
             for each overlay in thumbnailOverlays
-                maybeLengthText = ParseText(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "text"]))
+                parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                if parsedTimeStatusRenderer = invalid
+                    continue for
+                end if
+
+                if parsedTimeStatusRenderer.isShort
+                    if context.disableShorts = true
+                        LogInfo("Skipping Short based on user settings")
+                        return invalid
+                    end if
+                end if
+
+                maybeLengthText = parsedTimeStatusRenderer.text
                 if maybeLengthText <> ""
                     lengthText = maybeLengthText
                 end if
+
+                liveNow = liveNow or parsedTimeStatusRenderer.isLive
+                isUpcoming = isUpcoming or parsedTimeStatusRenderer.isUpcoming
+
                 maybePercentDurationWatched = ObjectUtils.Dig(overlay, ["thumbnailOverlayResumePlaybackRenderer", "percentDurationWatched"])
                 if maybePercentDurationWatched <> invalid
                     percentDurationWatched = maybePercentDurationWatched
                 end if
-                liveNow = liveNow or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "LIVE")
-                isUpcoming = isUpcoming or (ValidString(ObjectUtils.Dig(overlay, ["thumbnailOverlayTimeStatusRenderer", "style"])) = "UPCOMING")
             end for
+
             if liveNow or isUpcoming
                 lengthText = ""
             end if
@@ -1022,6 +1075,11 @@ namespace Innertube
     end function
 
     function TileRendererTypeShorts(nodeData as object, context as object) as object
+        if context.disableShorts = true
+            LogInfo("Skipping Short based on user settings")
+            return invalid
+        end if
+
         videoId = nodeData["contentId"]
         if not IsString(videoId)
             LogWarn("Invalid video ID", nodeData)
@@ -1202,6 +1260,34 @@ namespace Innertube
             return ""
         end if
         return ParseText(data["text"])
+    end function
+
+    function ParseThumbnailOverlayTimeStatusRenderer(data as object) as object
+        if data = invalid
+            return invalid
+        end if
+        if not IsAssociativeArray(data) or not data.DoesExist("thumbnailOverlayTimeStatusRenderer")
+            return invalid
+        end if
+
+        renderer = data["thumbnailOverlayTimeStatusRenderer"]
+        if not IsAssociativeArray(renderer)
+            return invalid
+        end if
+
+        text = ParseText(renderer["text"])
+
+        overlayStyle = ValidString(renderer["style"])
+        isLive = overlayStyle = "LIVE"
+        isUpcoming = overlayStyle = "UPCOMING"
+        isShort = overlayStyle = "SHORTS"
+
+        return {
+            "text": text
+            "isLive": isLive
+            "isUpcoming": isUpcoming
+            "isShort": isShort
+        }
     end function
 
     function StartNewFeed(title as string, context as object) as void

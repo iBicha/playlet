@@ -101,9 +101,16 @@ function CreateChannelFeeds(authorId as string, author as string, tabs as object
         return invalid
     end if
 
+    disableShorts = m.preferences["content_feed.disable_shorts"]
+
     feeds = []
     for i = 0 to tabs.count() - 1
         tabName = tabs[i]
+        if tabName = "shorts" and disableShorts
+            LogInfo(`Skipping "Shorts" tab based on user settings`)
+            continue for
+        end if
+
         if m.tabs.DoesExist(tabName)
             if tabsParams <> invalid and tabsParams.DoesExist(tabName)
                 params = tabsParams[tabName]

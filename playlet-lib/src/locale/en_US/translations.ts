@@ -769,6 +769,22 @@
         <translation>The backend used for browsing and playing videos.</translation>
     </message>
     <message>
+        <source>Content Feed</source>
+        <translation>Content Feed</translation>
+    </message>
+    <message>
+        <source>Feed preferences</source>
+        <translation>Feed preferences</translation>
+    </message>
+    <message>
+        <source>Disable Shorts</source>
+        <translation>Disable Shorts</translation>
+    </message>
+    <message>
+        <source>Disable short videos.</source>
+        <translation>Disable short videos.</translation>
+    </message>
+    <message>
         <source>Invidious preferences</source>
         <translation>Invidious preferences</translation>
     </message>
