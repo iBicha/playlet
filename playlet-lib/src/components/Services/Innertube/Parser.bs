@@ -333,16 +333,37 @@ namespace Innertube
     end function
 
     function ParseResponseDataForError(responseData as object) as string
+        error = ""
         if responseData = invalid
-            return ""
+            return error
         end if
 
-        alert = ObjectUtils.Dig(responseData, ["alerts", 0, "alertRenderer"])
-        if IsAssociativeArray(alert) and alert.type = "ERROR"
-            return ParseText(alert.text)
+        alerts = responseData["alerts"]
+        if not IsArray(alerts) or alerts.Count() = 0
+            return error
         end if
 
-        return ""
+        for each alert in alerts
+            if not IsAssociativeArray(alert)
+                continue for
+            end if
+
+            alertRenderer = alert["alertRenderer"]
+            if alertRenderer = invalid
+                alertRenderer = alert["alertWithButtonRenderer"]
+            end if
+            if not IsAssociativeArray(alertRenderer)
+                continue for
+            end if
+
+            alertText = ParseText(alertRenderer.text)
+            LogWarn("Innertube Alert:", `[${alertRenderer.type}]`, alertText)
+            if alertRenderer.type = "ERROR"
+                error += alertText
+            end if
+        end for
+
+        return error
     end function
 
     function ParseResponseForCacheControl(response as object) as dynamic
