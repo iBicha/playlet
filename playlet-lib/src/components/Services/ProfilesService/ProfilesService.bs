@@ -53,6 +53,7 @@ function LoadProfilesFromRegistry()
         profileNode.thumbnail = profile.thumbnail
         profileNode.accessToken = profile.accessToken
 
+        profileNode.activeIdentifyToken = ValidString(profile.activeIdentifyToken)
         profileNode.refreshToken = profile.refreshToken
         profileNode.scope = profile.scope
         profileNode.tokenType = profile.tokenType
@@ -103,7 +104,7 @@ function MigrateExistingProfiles(userProfiles as object) as boolean
         return false
     end if
 
-    id = CreateProfileId(authToken.username, authToken.instance)
+    id = CreateProfileId(authToken.username, "", authToken.instance)
     for each profile in userProfiles.profiles
         if profile.id = id
             return false
@@ -161,6 +162,7 @@ function GetProfilesDto(includeAccessToken as boolean) as object
             "id": profileNode.id
             "type": profileNode.type
             "username": profileNode.username
+            "activeIdentifyToken": profileNode.activeIdentifyToken
             "serverUrl": profileNode.serverUrl
             "thumbnail": profileNode.thumbnail
             "color": color
@@ -191,7 +193,7 @@ end function
 function LoginWithProfile(newProfile as object)
     isNewProfile = true
     if StringUtils.IsNullOrEmpty(newProfile.id)
-        newProfile.id = CreateProfileId(newProfile.username, newProfile.serverUrl)
+        newProfile.id = CreateProfileId(newProfile.username, newProfile.activeIdentifyToken, newProfile.serverUrl)
     end if
 
     existingProfile = invalid
@@ -206,6 +208,7 @@ function LoginWithProfile(newProfile as object)
 
     if not isNewProfile
         existingProfile.username = newProfile.username
+        existingProfile.activeIdentifyToken = newProfile.activeIdentifyToken
         existingProfile.thumbnail = newProfile.thumbnail
         existingProfile.accessToken = newProfile.accessToken
         existingProfile.refreshToken = newProfile.refreshToken
@@ -333,6 +336,7 @@ function SetCurrentProfile(newActiveProfile as object) as void
         token: newActiveProfile.accessToken
         instance: newActiveProfile.serverUrl
         username: newActiveProfile.username
+        activeIdentifyToken: newActiveProfile.activeIdentifyToken
         profileNode: newActiveProfile
     }
     LogInfo("Current profile set to", newActiveProfile.username, "@", newActiveProfile.serverUrl)
@@ -353,6 +357,6 @@ function RefreshActiveProfileState(activeProfile as object) as void
     end for
 end function
 
-function CreateProfileId(username as string, serverUrl as string) as string
-    return "v1:" + CryptoUtils.GetMd5(username + serverUrl)
+function CreateProfileId(username as string, activeIdentifyToken as string, serverUrl as string) as string
+    return "v1:" + CryptoUtils.GetMd5(username + activeIdentifyToken + serverUrl)
 end function

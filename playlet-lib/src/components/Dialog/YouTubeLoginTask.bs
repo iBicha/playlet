@@ -65,7 +65,8 @@ function YouTubeLoginTask(input as object) as object
         return invalid
     end if
 
-    if not IsArray(accounts) or accounts.Count() = 0
+    accountItem = SelectAccount(accounts)
+    if accountItem = invalid
         LogError("No accounts found")
         DialogUtils.ShowDialogEx({
             title: "Error"
@@ -75,19 +76,7 @@ function YouTubeLoginTask(input as object) as object
         return invalid
     end if
 
-    selectedAccount = invalid
-    for each account in accounts
-        if ValidBool(account.isSelected)
-            selectedAccount = account
-            exit for
-        end if
-    end for
-
-    if selectedAccount = invalid
-        selectedAccount = accounts[0]
-    end if
-
-    profile = CreateProfileContentNode(selectedAccount, accessToken)
+    profile = CreateProfileContentNode(accountItem, accessToken)
     profilesNode@.LoginWithProfile(profile)
 
     dialogNode.close = true
@@ -95,16 +84,37 @@ function YouTubeLoginTask(input as object) as object
     return invalid
 end function
 
-function CreateProfileContentNode(account as object, accessToken as object) as object
+function SelectAccount(accounts as object) as object
+    if not IsArray(accounts) or accounts.Count() = 0
+        return invalid
+    end if
+
+    selectedAccountItem = invalid
+    for each accountItem in accounts
+        if ValidBool(accountItem.isSelected)
+            selectedAccountItem = accountItem
+            exit for
+        end if
+    end for
+
+    if selectedAccountItem = invalid
+        selectedAccountItem = accounts[0]
+    end if
+
+    return selectedAccountItem
+end function
+
+function CreateProfileContentNode(accountItem as object, accessToken as object) as object
     profile = CreateObject("roSGNode", "ProfileContentNode")
     profile.type = "youtube"
     profile.serverUrl = "http://127.0.0.1:8888/playlet-invidious-backend"
-    username = account.channelHandle
+    username = accountItem.channelHandle
     if StringUtils.IsNullOrEmpty(username)
-        username = account.accountByline
+        username = accountItem.accountByline
     end if
     profile.username = username
-    profile.thumbnail = account.accountPhoto
+    profile.activeIdentifyToken = GetActiveIdentityToken(accountItem)
+    profile.thumbnail = accountItem.accountPhoto
     profile.accessToken = accessToken.accessToken
     profile.refreshToken = accessToken.refreshToken
     profile.scope = accessToken.scope
@@ -115,4 +125,42 @@ function CreateProfileContentNode(account as object, accessToken as object) as o
     profile.clientSecret = accessToken.clientSecret
 
     return profile
+end function
+
+function GetActiveIdentityToken(accountItem as object) as string
+    if ValidBool(accountItem.isSelected)
+        return ""
+    end if
+
+    supportedTokens = ObjectUtils.Dig(accountItem, "serviceEndpoint", "selectActiveIdentityEndpoint", "supportedTokens")
+    if not IsArray(supportedTokens) or supportedTokens.Count() = 0
+        return ""
+    end if
+
+    for each supportedToken in supportedTokens
+        if not IsAssociativeArray(supportedToken)
+            continue for
+        end if
+
+        pageId = ObjectUtils.Dig(supportedToken, "pageIdToken", "pageId")
+        if not StringUtils.IsNullOrEmpty(pageId)
+            return pageId
+        end if
+
+        obfuscatedGaiaId = ObjectUtils.Dig(supportedToken, "accountStateToken", "obfuscatedGaiaId")
+        if not StringUtils.IsNullOrEmpty(obfuscatedGaiaId)
+            return obfuscatedGaiaId
+        end if
+
+        datasyncIdToken = ObjectUtils.Dig(supportedToken, "datasyncIdToken", "datasyncIdToken")
+        if not StringUtils.IsNullOrEmpty(datasyncIdToken)
+            ' "datasyncIdToken": "123456789012345678901||123456789012345678901"
+            match = /(\d+)\|\|(\d+)/.match(datasyncIdToken)
+            if match.Count() = 3
+                return match[1]
+            end if
+        end if
+    end for
+
+    return ""
 end function

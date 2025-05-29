@@ -8,6 +8,7 @@ import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
+import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
@@ -140,21 +141,9 @@ namespace Invidious
             ' have the exact expiration time, we'll use 5 hours. Invidious currently
             ' Does a fresh fetch if the cache is older than 10 minutes.
             ' https://github.com/iv-org/invidious/blob/069e91d2a609b1df94bdfbb693335969b2a281d8/src/invidious/videos.cr#L349
-            cacheSeconds = 18000 ' 5 hours
-            cancellation = invalid
-            tryCount = 2
-
-            if options <> invalid
-                if options.DoesExist("cacheSeconds")
-                    cacheSeconds = options.cacheSeconds
-                end if
-                if options.DoesExist("cancellation")
-                    cancellation = options.cancellation
-                end if
-                if options.DoesExist("tryCount")
-                    tryCount = options.tryCount
-                end if
-            end if
+            cacheSeconds = OptionUtils.GetOrDefault(options, "cacheSeconds", 18000) ' 5 hours
+            cancellation = OptionUtils.Get(options, "cancellation")
+            tryCount = OptionUtils.GetOrDefault(options, "tryCount", 2)
 
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
