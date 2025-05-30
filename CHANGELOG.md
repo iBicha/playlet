@@ -761,7 +761,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Xmas theme logo - can't publish it before end of year... ([link](https://blog.roku.com/developer/channel-store-blackouts-2023))
+- Xmas theme logo - can't publish it before end of year... ([channel-store-blackouts-2023](https://blog.roku.com/developer/channel-store-blackouts-2023))
 
 ## [0.17.3] - 2023-12-13
 
