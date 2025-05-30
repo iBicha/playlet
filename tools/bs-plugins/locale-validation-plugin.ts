@@ -20,13 +20,18 @@ import {
     isBrsFile,
     isXmlFile
 } from "brighterscript";
-import { existsSync, readFileSync } from "fs";
-import { join as pathJoin } from "path";
+import fs from "fs";
+import path from "path";
 import * as xml2js from 'xml2js';
 import { globSync } from 'glob';
 import { SGNode } from "brighterscript/dist/parser/SGTypes";
+import json5 from 'json5';
+import YAML from "yaml";
 
-const translatableXmlAttributes = ["text", "title", "primaryTitle", "displayText", "description"];
+const translatableXmlAttributes = ["text", "title", "short_title", "primaryTitle", "displayText", "description"];
+
+const jsonExtensions = ['.json', '.jsonc', '.json5'];
+const yamlExtensions = ['.yaml', '.yml'];
 
 export class LocaleValidationPlugin implements CompilerPlugin {
     public name = 'LocaleValidationPlugin';
@@ -45,6 +50,18 @@ export class LocaleValidationPlugin implements CompilerPlugin {
     }
 
     afterFileValidate(file: BscFile) {
+        // There isn't a great way to validate files outside of the program.
+        // We're just attaching diagnostics to known file (like "Locale.bs") which
+        // is too specific.
+        // Additinally, config files do contain a couple of translatable values
+        // that should be ignored, but there isn't a simple mechianim to do that.
+        // Config validation disabled for now.
+        // 
+        // if (file.pkgPath == "source/utils/Locale.bs") {
+        //     this.validateConfigFiles(file, file.program);
+        //     return;
+        // }
+
         if (!isXmlFile(file)) {
             return;
         }
@@ -150,8 +167,8 @@ export class LocaleValidationPlugin implements CompilerPlugin {
         const rootDir = program.options.rootDir!;
         const translationFiles = globSync(`locale/**/translations.ts`, { cwd: rootDir });
         translationFiles.forEach((translationFile) => {
-            const srcPath = pathJoin(rootDir, translationFile);
-            const pkgPath = pathJoin('pkg:/', translationFile);
+            const srcPath = path.join(rootDir, translationFile);
+            const pkgPath = path.join('pkg:/', translationFile);
             const xmlFile = new XmlFile(srcPath, pkgPath, program);
             this.validateTranslations(xmlFile, program, this.localeValues, this.enums[0].file);
         });
@@ -180,8 +197,8 @@ export class LocaleValidationPlugin implements CompilerPlugin {
 
     validateEnglishTranslations(program: Program, localeValues: string[], file: BrsFile) {
         const translationFile = 'locale/en_US/translations.ts';
-        const srcPath = pathJoin(program.options.rootDir!, translationFile);
-        const pkgPath = pathJoin('pkg:/', translationFile);
+        const srcPath = path.join(program.options.rootDir!, translationFile);
+        const pkgPath = path.join('pkg:/', translationFile);
         const xmlFile = new XmlFile(srcPath, pkgPath, program);
         const englishTranslations = this.loadTranslationsFile(program, xmlFile);
 
@@ -232,10 +249,10 @@ export class LocaleValidationPlugin implements CompilerPlugin {
 
     loadTranslationsFile(program: Program, translationFile: XmlFile) {
         // load xml ts translation file
-        if (!existsSync(translationFile.srcPath)) {
+        if (!fs.existsSync(translationFile.srcPath)) {
             return null;
         }
-        const content = readFileSync(translationFile.srcPath, 'utf8');
+        const content = fs.readFileSync(translationFile.srcPath, 'utf8');
         const xml = this.parseXml(content);
         if (!xml || !xml.TS || !xml.TS.context || !xml.TS.context[0].message) {
             return null;
@@ -333,6 +350,69 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             }
         }
         return false
+    }
+
+    validateConfigFiles(file: BscFile, program: Program) {
+        const extensions = [...jsonExtensions, ...yamlExtensions]
+        const rootDir = program.options.rootDir!;
+
+        const configFiles = globSync(`config/**`, { cwd: rootDir })
+            .filter(filePath => extensions.includes(path.extname(filePath)))
+            .map(filePath => path.join(rootDir, filePath));
+
+        const localeValues = this.localeValues;
+        configFiles.forEach(configFile => this.validateConfigFile(configFile, file, localeValues, program))
+    }
+
+    validateConfigFile(configFile: string, file: BscFile, localeValues: string[], program: Program) {
+        const configData = this.parseConfigFile(configFile);
+        this.validateConfigData(configData, configFile, file, localeValues, program);
+    }
+
+    validateConfigData(configData: any, configPath: string, file: BscFile, localeValues: string[], program: Program) {
+        if (!configData) {
+            return
+        }
+
+        if (Array.isArray(configData)) {
+            configData.forEach(item => this.validateConfigData(item, configPath, file, localeValues, program))
+            return;
+        }
+
+        if (typeof configData === 'object') {
+            for (var key in configData) {
+                const value = configData[key];
+                if (typeof value === 'string') {
+                    const isKeyTranslatable = translatableXmlAttributes.includes(key)
+                    const isValueTranslated = localeValues.includes(value)
+                    if (isKeyTranslatable && !isValueTranslated) {
+                        file.addDiagnostics([{
+                            file: file,
+                            range: {
+                                start: { line: 0, character: 0 },
+                                end: { line: 0, character: 0 }
+                            },
+                            message: `The attribute "${key}" with value "${value}" should be localized, but not found in locale files. Config file: ${configPath}`,
+                            severity: DiagnosticSeverity.Error,
+                            code: 'LOCALE_MISSING_TRANSLATIONS',
+                        }]);
+                    }
+                    continue;
+                }
+                this.validateConfigData(value, configPath, file, localeValues, program);
+            }
+        }
+    }
+
+    parseConfigFile(configFile: string) {
+        if (jsonExtensions.includes(path.extname(configFile))) {
+            const contents = fs.readFileSync(configFile, 'utf8');
+            return json5.parse(contents);
+        }
+        if (yamlExtensions.includes(path.extname(configFile))) {
+            const contents = fs.readFileSync(configFile, 'utf8');
+            return YAML.parse(contents);
+        }
     }
 }
 
