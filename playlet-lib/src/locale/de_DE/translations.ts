@@ -1284,5 +1284,37 @@
         <source>Recommended</source>
         <translation>Empfohlen</translation>
     </message>
+    <message>
+        <source>Disable short videos.</source>
+        <translation>Kurze Videos ausblenden.</translation>
+    </message>
+    <message>
+        <source>Disable Shorts</source>
+        <translation>Shorts ausblenden</translation>
+    </message>
+    <message>
+        <source>Backend</source>
+        <translation>Backend</translation>
+    </message>
+    <message>
+        <source>Backend preferences</source>
+        <translation>Backend-Einstellungen</translation>
+    </message>
+    <message>
+        <source>Selected backend</source>
+        <translation>Ausgewähltes Backend</translation>
+    </message>
+    <message>
+        <source>The backend used for browsing and playing videos.</source>
+        <translation>Das für das Durchstöbern und Anschauen von Videos genutzte Backend.</translation>
+    </message>
+    <message>
+        <source>Content Feed</source>
+        <translation>Inhalts-Feed</translation>
+    </message>
+    <message>
+        <source>Feed preferences</source>
+        <translation>Feed-Einstellungen</translation>
+    </message>
 </context>
 </TS>

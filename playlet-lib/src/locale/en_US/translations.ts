@@ -265,6 +265,34 @@
         <translation>Failed to get session data. Please restart Playlet to use the cast function.</translation>
     </message>
     <message>
+        <source>Select a service to login</source>
+        <translation>Select a service to login</translation>
+    </message>
+    <message>
+        <source>Login to YouTube</source>
+        <translation>Login to YouTube</translation>
+    </message>
+    <message>
+        <source>Open the link %1 and enter the following code:</source>
+        <translation>Open the link %1 and enter the following code:</translation>
+    </message>
+    <message>
+        <source>Disclaimer</source>
+        <translation>Disclaimer</translation>
+    </message>
+    <message>
+        <source>Playlet is a third-party app and is not affiliated with, endorsed by, or sponsored by YouTube or Google. All trademarks and registered trademarks mentioned are the property of their respective owners and are used only for identification purposes.</source>
+        <translation>Playlet is a third-party app and is not affiliated with, endorsed by, or sponsored by YouTube or Google. All trademarks and registered trademarks mentioned are the property of their respective owners and are used only for identification purposes.</translation>
+    </message>
+    <message>
+        <source>By using Playlet and signing in with your YouTube account, you acknowledge that you do so at your own risk. The developers of Playlet are not liable for any harm, including but not limited to data loss, account suspension or ban, hacking, or loss of content.</source>
+        <translation>By using Playlet and signing in with your YouTube account, you acknowledge that you do so at your own risk. The developers of Playlet are not liable for any harm, including but not limited to data loss, account suspension or ban, hacking, or loss of content.</translation>
+    </message>
+    <message>
+        <source>Use responsibly, especially if your YouTube account is tied to business or monetization.</source>
+        <translation>Use responsibly, especially if your YouTube account is tied to business or monetization.</translation>
+    </message>
+    <message>
         <source>Invidious custom instance</source>
         <translation>Invidious custom instance</translation>
     </message>

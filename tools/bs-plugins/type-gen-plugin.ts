@@ -7,7 +7,7 @@ const types = [
     { name: 'Float', interface: 'ifFloat', type: 'float', defaultValue: '0!' },
     { name: 'Double', interface: 'ifDouble', type: 'double', defaultValue: '0#' },
     { name: 'String', interface: 'ifString', type: 'string', defaultValue: '""' },
-    { name: 'Array', interface: 'ifArray', type: 'object', defaultValue: '[]' },
+    { name: 'Array', interface: 'ifArray', type: 'object', defaultValue: 'CreateObject("roArray", 0, true)' },
     { name: 'AssociativeArray', interface: 'ifAssociativeArray', type: 'object', defaultValue: '{}' },
     { name: 'ByteArray', interface: 'ifByteArray', type: null, defaultValue: null },
     { name: 'Function', interface: 'ifFunction', type: null, defaultValue: null },
