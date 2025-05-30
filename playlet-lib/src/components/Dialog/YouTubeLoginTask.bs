@@ -128,7 +128,7 @@ function CreateProfileContentNode(accountItem as object, accessToken as object) 
         username = accountItem.accountByline
     end if
     profile.username = username
-    profile.activeIdentifyToken = GetActiveIdentityToken(accountItem)
+    profile.activeIdentifyToken = accountItem.activeIdentifyToken
     profile.thumbnail = accountItem.accountPhoto
     profile.accessToken = accessToken.accessToken
     profile.refreshToken = accessToken.refreshToken
@@ -140,42 +140,4 @@ function CreateProfileContentNode(accountItem as object, accessToken as object) 
     profile.clientSecret = accessToken.clientSecret
 
     return profile
-end function
-
-function GetActiveIdentityToken(accountItem as object) as string
-    if ValidBool(accountItem.isSelected)
-        return ""
-    end if
-
-    supportedTokens = ObjectUtils.Dig(accountItem, "serviceEndpoint", "selectActiveIdentityEndpoint", "supportedTokens")
-    if not IsArray(supportedTokens) or supportedTokens.Count() = 0
-        return ""
-    end if
-
-    for each supportedToken in supportedTokens
-        if not IsAssociativeArray(supportedToken)
-            continue for
-        end if
-
-        pageId = ObjectUtils.Dig(supportedToken, "pageIdToken", "pageId")
-        if not StringUtils.IsNullOrEmpty(pageId)
-            return pageId
-        end if
-
-        obfuscatedGaiaId = ObjectUtils.Dig(supportedToken, "accountStateToken", "obfuscatedGaiaId")
-        if not StringUtils.IsNullOrEmpty(obfuscatedGaiaId)
-            return obfuscatedGaiaId
-        end if
-
-        datasyncIdToken = ObjectUtils.Dig(supportedToken, "datasyncIdToken", "datasyncIdToken")
-        if not StringUtils.IsNullOrEmpty(datasyncIdToken)
-            ' "datasyncIdToken": "123456789012345678901||123456789012345678901"
-            match = /(\d+)\|\|(\d+)/.match(datasyncIdToken)
-            if match.Count() = 3
-                return match[1]
-            end if
-        end if
-    end for
-
-    return ""
 end function
