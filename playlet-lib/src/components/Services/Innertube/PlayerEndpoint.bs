@@ -6,14 +6,10 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function CreatePlayerRequest(videoId as string, credentialTransferToken as string, visitorData as string, client as Innertube.ClientType) as object
+    function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
-        ' TODO: Do we need "onBehalfOfUser" here?
-        context = Innertube.CreateContext(client, deviceInfo, {
-            "credentialTransferToken": credentialTransferToken
-            "visitorData": visitorData
-        })
+        context = Innertube.CreateContext(client, deviceInfo, options)
 
         payload = {
             "videoId": videoId
@@ -38,12 +34,7 @@ namespace Innertube
         }
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
-        headers = {
-            "accept": "*/*"
-            "accept-language": "*"
-        }
-        headers.Append(Innertube.CreateHeaders(client))
-        request.Headers(headers)
+        request.Headers(Innertube.CreateHeaders(client))
 
         return request
     end function

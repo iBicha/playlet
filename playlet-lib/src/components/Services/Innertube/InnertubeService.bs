@@ -19,11 +19,9 @@ namespace InnertubeService
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
         fetchNext = OptionUtils.GetOrDefault(options, "fetchNext", true)
-        credentialTransferToken = OptionUtils.GetOrDefault(options, "credentialTransferToken", "")
-        visitorData = OptionUtils.GetOrDefault(options, "visitorData", "")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, credentialTransferToken, visitorData, Innertube.ClientType.IOS)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.IOS, options)
         playerRequest.Cancellation(cancellation)
         if raw
             playerRequest.LogCurlCommand()
@@ -34,7 +32,7 @@ namespace InnertubeService
         nextRequest = invalid
         nextResponse = invalid
         if fetchNext
-            nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, credentialTransferToken)
+            nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
             nextRequest.Cancellation(cancellation)
             if raw
                 nextRequest.LogCurlCommand()
@@ -98,7 +96,7 @@ namespace InnertubeService
         retry = OptionUtils.GetOrDefault(options, "retry", true)
 
         params = Innertube.GetEncodedNextParams(videoIds)
-        request = Innertube.CreateNextRequest({ "params": params }, "")
+        request = Innertube.CreateNextRequest({ "params": params })
         request.Cancellation(cancellation)
 
         response = request.Await()
@@ -177,7 +175,7 @@ namespace InnertubeService
             params = "4gIKGgh0cmFpbGVycw%3D%3D"
         end if
 
-        request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, params)
+        request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, { params: params })
         request.Cancellation(cancellation)
 
         if raw
@@ -232,10 +230,10 @@ namespace InnertubeService
     function GetBrowseAuthenticatedPage(browserId as string, options = invalid as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
-        continuation = OptionUtils.GetOrDefault(options, "continuation", "")
         disableShorts = OptionUtils.GetOrDefault(options, "disableShorts", false)
 
-        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, "", continuation)
+        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, options)
+
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
         end if
@@ -270,7 +268,7 @@ namespace InnertubeService
             cancellation = options.cancellation
         end if
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, "", "", Innertube.ClientType.Tv)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
         playerRequest.Cancellation(cancellation)
         playerRequest.Header("Authorization", "Bearer " + accessToken)
 
@@ -376,12 +374,10 @@ namespace InnertubeService
     end function
 
     function GetChannel(channelId as string, options = invalid as object) as object
-        continuation = OptionUtils.GetOrDefault(options, "continuation", "")
-        params = OptionUtils.GetOrDefault(options, "params", "")
         cancellation = OptionUtils.Get(options, "cancellation")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, params, continuation)
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, options)
         request.Cancellation(cancellation)
         if raw
             request.LogCurlCommand()
@@ -416,7 +412,7 @@ namespace InnertubeService
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
 
-        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Tv, "", "")
+        request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Tv, options)
         request.Cancellation(cancellation)
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
@@ -476,7 +472,7 @@ namespace InnertubeService
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
 
-        request = Innertube.CreateSubscribeRequest(channelId, "")
+        request = Innertube.CreateSubscribeRequest(channelId, options)
         request.Cancellation(cancellation)
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
@@ -493,7 +489,7 @@ namespace InnertubeService
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
 
-        request = Innertube.CreateUnsubscribeRequest(channelId, "")
+        request = Innertube.CreateUnsubscribeRequest(channelId, options)
         request.Cancellation(cancellation)
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
@@ -507,7 +503,6 @@ namespace InnertubeService
     end function
 
     function GetPlaylist(playlistId as string, options = invalid as object) as object
-        continuation = OptionUtils.GetOrDefault(options, "continuation", "")
         cancellation = OptionUtils.Get(options, "cancellation")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
         accessToken = OptionUtils.Get(options, "accessToken")
@@ -521,7 +516,7 @@ namespace InnertubeService
             client = Innertube.ClientType.Tv
         end if
 
-        request = Innertube.CreateBrowseRequest(playlistId, client, "", continuation)
+        request = Innertube.CreateBrowseRequest(playlistId, client, options)
         request.Cancellation(cancellation)
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
@@ -565,7 +560,7 @@ namespace InnertubeService
         if not StringUtils.IsNullOrEmpty(videoId)
             args["videoId"] = videoId
         end if
-        request = Innertube.CreateNextRequest(args, "")
+        request = Innertube.CreateNextRequest(args)
         request.Cancellation(cancellation)
         if raw
             request.LogCurlCommand()

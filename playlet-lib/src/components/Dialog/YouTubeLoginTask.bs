@@ -1,4 +1,5 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Screens/ProfileScreen/YouTubeAccountSelectionView/YouTubeAccountSelectionViewUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -6,6 +7,7 @@ import "pkg:/source/utils/Logging.bs"
 @asynctask
 function YouTubeLoginTask(input as object) as object
     profilesNode = input.profilesService
+    appController = input.appController
     dialogNode = input.dialog
 
     cancellation = m.top.cancellation
@@ -65,7 +67,7 @@ function YouTubeLoginTask(input as object) as object
         return invalid
     end if
 
-    accountItem = SelectAccount(accounts)
+    accountItem = SelectAccount(accounts, appController)
     if accountItem = invalid
         LogError("No accounts found")
         DialogUtils.ShowDialogEx({
@@ -84,24 +86,37 @@ function YouTubeLoginTask(input as object) as object
     return invalid
 end function
 
-function SelectAccount(accounts as object) as object
+function SelectAccount(accounts as object, appController as object) as object
     if not IsArray(accounts) or accounts.Count() = 0
         return invalid
     end if
 
-    selectedAccountItem = invalid
-    for each accountItem in accounts
-        if ValidBool(accountItem.isSelected)
-            selectedAccountItem = accountItem
-            exit for
-        end if
-    end for
-
-    if selectedAccountItem = invalid
-        selectedAccountItem = accounts[0]
+    if accounts.Count() = 1
+        return accounts[0]
     end if
 
-    return selectedAccountItem
+    accountSelectionView = YouTubeAccountSelectionViewUtils.Open(appController)
+    accountSelectionView.accounts = accounts
+
+    messagePort = CreateObject("roMessagePort")
+    MessagePortUtils.ObserveFieldScopedExSafe(accountSelectionView, "selectedAccount", messagePort)
+    MessagePortUtils.ObserveFieldScopedExSafe(accountSelectionView, "wasClosed", messagePort)
+
+    msg = wait(0, messagePort)
+
+    accountSelectionView.unobserveFieldScoped("selectedAccount")
+    accountSelectionView.unobserveFieldScoped("wasClosed")
+
+    if msg = invalid
+        return invalid
+    end if
+
+    field = msg.getField()
+    if field = "wasClosed"
+        return invalid
+    end if
+
+    return msg.getData()
 end function
 
 function CreateProfileContentNode(accountItem as object, accessToken as object) as object
