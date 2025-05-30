@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Show videos watch progress in playlist view
+- Missing localization in certain views
 
 ## [0.39.1] - 2025-05-23
 

@@ -5,6 +5,7 @@
 // 4. Xml components do not have values that can be translated by accident
 //   - an accidental translation can be a translated node id that's not supposed to be translated
 //   - For that reason, only certain attributes (like "text" and "title") are allowed to have localized values
+// 5. Xml components with attributes that SHOULD be translated, are translated
 
 import {
     BrsFile,
@@ -25,7 +26,7 @@ import * as xml2js from 'xml2js';
 import { globSync } from 'glob';
 import { SGNode } from "brighterscript/dist/parser/SGTypes";
 
-const allowedXmlAttributes = ["text", "title", "primaryTitle", "displayText", "description"];
+const translatableXmlAttributes = ["text", "title", "primaryTitle", "displayText", "description"];
 
 export class LocaleValidationPlugin implements CompilerPlugin {
     public name = 'LocaleValidationPlugin';
@@ -64,7 +65,7 @@ export class LocaleValidationPlugin implements CompilerPlugin {
                 const value = field.value;
                 if (value && localeValues.includes(value)) {
                     const id = field.id;
-                    if (!allowedXmlAttributes.includes(id)) {
+                    if (!translatableXmlAttributes.includes(id)) {
                         file.addDiagnostics([{
                             file: file,
                             range: field.range!,
@@ -87,17 +88,32 @@ export class LocaleValidationPlugin implements CompilerPlugin {
     validateSgNode(node: SGNode, localeValues: string[], file: XmlFile) {
         node.attributes.forEach((attribute) => {
             const value = attribute.value.text;
-            if (value && localeValues.includes(value)) {
-                const key = attribute.key.text;
-                if (!allowedXmlAttributes.includes(key)) {
-                    file.addDiagnostics([{
-                        file: file,
-                        range: attribute.value.range!,
-                        message: `Locale value found in xml component: "${value}" but the attribute "${key}" is not allowed to be localized.`,
-                        severity: DiagnosticSeverity.Error,
-                        code: 'LOCALE_VALUE_IN_XML',
-                    }]);
-                }
+            if (!value) {
+                return;
+            }
+
+            const key = attribute.key.text;
+            const isKeyTranslatable = translatableXmlAttributes.includes(key)
+            const isValueTranslated = localeValues.includes(value)
+
+            if (isValueTranslated && !isKeyTranslatable) {
+                file.addDiagnostics([{
+                    file: file,
+                    range: attribute.value.range!,
+                    message: `Locale value found in xml component: "${value}" but the attribute "${key}" is not allowed to be localized.`,
+                    severity: DiagnosticSeverity.Error,
+                    code: 'LOCALE_VALUE_IN_XML',
+                }]);
+            }
+
+            if (isKeyTranslatable && !isValueTranslated) {
+                file.addDiagnostics([{
+                    file: file,
+                    range: attribute.value.range!,
+                    message: `The attribute "${key}" with value "${value}" should be localized, but not found in locale files.`,
+                    severity: DiagnosticSeverity.Warning,
+                    code: 'LOCALE_MISSING_TRANSLATIONS',
+                }]);
             }
         });
 
