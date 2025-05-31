@@ -1,6 +1,10 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Screens/ProfileScreen/YouTubeAccountSelectionView/YouTubeAccountSelectionViewUtils.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
@@ -28,7 +32,47 @@ function OnNodeReady()
     m.task = AsyncTask.Start(Tasks.YouTubeLoginTask, {
         dialog: m.top
         profilesService: m.top.profilesService
-    })
+    }, OnYouTubeLoginTaskResult)
+end function
+
+function OnYouTubeLoginTaskResult(output as object) as void
+    m.task = invalid
+
+    if output.cancelled
+        Close()
+        return
+    end if
+
+    if not output.success or not output.result.success
+        ' output.error for unhandled exception
+        error = output.error
+        if error = invalid
+            ' output.result.error for network errors
+            error = output.result.error
+        end if
+        error = ErrorUtils.Format(error)
+        LogError(error)
+        DialogUtils.ShowDialogEx({
+            message: error
+            title: Tr(Locale.Generic.Error)
+            large: true
+        })
+        return
+    end if
+
+    accounts = output.result.accounts
+    accessToken = output.result.accessToken
+    ' if accounts is invalid, we're going to assume a profile is already created.
+    if accounts = invalid or accessToken = invalid
+        Close()
+        return
+    end if
+
+    ' The accountSelectionView will take over the creation of the profile.
+    accountSelectionView = YouTubeAccountSelectionViewUtils.Open(m.top.appController)
+    accountSelectionView.accessToken = accessToken
+    accountSelectionView.accounts = accounts
+    Close()
 end function
 
 function OnCodeSet(event as object)

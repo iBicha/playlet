@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Innertube/Constants.bs"
+import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 namespace Innertube
@@ -12,18 +13,24 @@ namespace Innertube
     function CreateHeaders(clienType as Innertube.ClientType) as object
         if clienType = ClientType.Web
             return {
+                "accept": "*/*"
+                "accept-language": "*"
                 "user-agent": INNERTUBE_WEB_USER_AGENT
                 "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
             }
         else if clienType = ClientType.IOS
             return {
+                "accept": "*/*"
+                "accept-language": "*"
                 "user-agent": INNERTUBE_IOS_USER_AGENT
                 "x-youtube-client-name": INNERTUBE_IOS_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_IOS_CLIENT_VERSION
             }
         else if clienType = ClientType.Tv
             return {
+                "accept": "*/*"
+                "accept-language": "*"
                 "user-agent": INNERTUBE_TV_USER_AGENT
                 "x-youtube-client-name": INNERTUBE_TV_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_TV_CLIENT_VERSION
@@ -33,7 +40,7 @@ namespace Innertube
         end if
     end function
 
-    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object, ctt as string, visitorData as string) as object
+    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object, options = invalid as object) as object
         client = invalid
         if clienType = ClientType.Web
             client = CreateContextClientWeb(deviceInfo)
@@ -44,6 +51,10 @@ namespace Innertube
         else
             throw "Invalid client type"
         end if
+
+        credentialTransferToken = OptionUtils.Get(options, "credentialTransferToken")
+        visitorData = OptionUtils.Get(options, "visitorData")
+        onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
 
         context = {
             "client": client
@@ -57,15 +68,19 @@ namespace Innertube
             }
         }
 
-        if not StringUtils.IsNullOrEmpty(ctt)
+        if not StringUtils.IsNullOrEmpty(credentialTransferToken)
             context["user"]["credentialTransferTokens"] = [{
-                "token": ctt
+                "token": credentialTransferToken
                 "scope": "VIDEO"
             }]
         end if
 
         if not StringUtils.IsNullOrEmpty(visitorData)
             context["client"]["visitorData"] = visitorData
+        end if
+
+        if not StringUtils.IsNullOrEmpty(onBehalfOfUser)
+            context["user"]["onBehalfOfUser"] = onBehalfOfUser
         end if
 
         return context

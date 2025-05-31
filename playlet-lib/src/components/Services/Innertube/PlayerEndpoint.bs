@@ -6,12 +6,16 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function CreatePlayerRequest(videoId as string, ctt as string, visitorData as string, client as Innertube.ClientType) as object
+    function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
+        visitorData = OptionUtils.Get(options, "visitorData")
+
         deviceInfo = CreateObject("roDeviceInfo")
+
+        context = Innertube.CreateContext(client, deviceInfo, options)
 
         payload = {
             "videoId": videoId
-            "context": Innertube.CreateContext(client, deviceInfo, ctt, visitorData)
+            "context": context
             "playbackContext": {
                 "contentPlaybackContext": {
                     "vis": 0
@@ -32,48 +36,19 @@ namespace Innertube
         }
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
-        headers = {
-            "accept": "*/*"
-            "accept-language": "*"
-        }
-        headers.Append(Innertube.CreateHeaders(client))
-        request.Headers(headers)
+        request.Headers(Innertube.CreateHeaders(client))
+        if not StringUtils.IsNullOrEmpty(visitorData)
+            request.Header("x-goog-visitor-id", visitorData)
+        end if
 
         return request
     end function
 
     function ParseInnertubePlayerResponse(payload as object) as object
-        if not IsAssociativeArray(payload)
+        error = ParsePlayerResponseForError(payload)
+        if error <> ""
             return {
-                error: "Invalid payload"
-            }
-        end if
-
-        playabilityStatus = payload["playabilityStatus"]
-        if not IsAssociativeArray(playabilityStatus)
-            return {
-                error: "Invalid playability status"
-            }
-        end if
-
-        if playabilityStatus["status"] <> "OK"
-            errorMessage = ""
-            if IsString(playabilityStatus["reason"])
-                errorMessage = playabilityStatus["reason"]
-            end if
-
-            subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
-
-            if subreason <> ""
-                errorMessage += `\n` + subreason
-            end if
-
-            if errorMessage = ""
-                errorMessage = "Video not available"
-            end if
-
-            return {
-                error: errorMessage
+                error: error
             }
         end if
 
@@ -112,6 +87,38 @@ namespace Innertube
         }
 
         return videoInfo
+    end function
+
+    function ParsePlayerResponseForError(payload as object) as string
+        if not IsAssociativeArray(payload)
+            return "Invalid payload"
+        end if
+
+        playabilityStatus = payload["playabilityStatus"]
+        if not IsAssociativeArray(playabilityStatus)
+            return "Invalid playability status"
+        end if
+
+        if playabilityStatus["status"] = "OK"
+            return ""
+        end if
+
+        errorMessage = ""
+        if IsString(playabilityStatus["reason"])
+            errorMessage = playabilityStatus["reason"]
+        end if
+
+        subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
+
+        if subreason <> ""
+            errorMessage += `\n` + subreason
+        end if
+
+        if errorMessage = ""
+            errorMessage = "Video not available"
+        end if
+
+        return errorMessage
     end function
 
     function ParseStoryboards(payload as object, lengthSeconds as integer) as object

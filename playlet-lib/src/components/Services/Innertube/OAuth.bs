@@ -196,7 +196,7 @@ namespace Innertube
         deviceInfo = CreateObject("roDeviceInfo")
 
         payload = {
-            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo, "", "")
+            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo)
             "accountReadMask": {
                 "returnOwner": true
                 "returnBrandAccounts": true
@@ -243,11 +243,54 @@ namespace Innertube
                 "hasChannel": ValidBool(accountItem["hasChannel"])
                 "accountByline": ParseText(accountItem["accountByline"])
                 "channelHandle": ParseText(accountItem["channelHandle"])
+                "activeIdentifyToken": ParseAccountItemIdentityToken(accountItem)
             }
             parsedAccounts.Push(parsedAccount)
         end for
 
         return parsedAccounts
+    end function
+
+    function ParseAccountItemIdentityToken(accountItem as object) as string
+        ' Although selected (default) account would have a token, we usually don't
+        ' need it, since we don't need to pass the "onBehalfOfUser" argument
+        ' when using selected account.
+        if ValidBool(accountItem.isSelected)
+            return ""
+        end if
+
+        supportedTokens = ObjectUtils.Dig(accountItem, ["serviceEndpoint", "selectActiveIdentityEndpoint", "supportedTokens"])
+        if not IsArray(supportedTokens) or supportedTokens.Count() = 0
+            return ""
+        end if
+
+        for each supportedToken in supportedTokens
+            if not IsAssociativeArray(supportedToken)
+                continue for
+            end if
+
+            ' TODO:P2 should we stick with pageId, and ignore the rest?
+            pageId = ObjectUtils.Dig(supportedToken, ["pageIdToken", "pageId"])
+            if not StringUtils.IsNullOrEmpty(pageId)
+                return pageId
+            end if
+
+            obfuscatedGaiaId = ObjectUtils.Dig(supportedToken, ["accountStateToken", "obfuscatedGaiaId"])
+            if not StringUtils.IsNullOrEmpty(obfuscatedGaiaId)
+                return obfuscatedGaiaId
+            end if
+
+            datasyncIdToken = ObjectUtils.Dig(supportedToken, ["datasyncIdToken", "datasyncIdToken"])
+            if not StringUtils.IsNullOrEmpty(datasyncIdToken)
+                ' "datasyncIdToken": "123456789012345678901||123456789012345678901"
+                match = /(\d+)\|\|(\d+)/.match(datasyncIdToken)
+                if match.Count() = 3
+                    return match[1]
+                end if
+            end if
+        end for
+
+        return ""
     end function
 
     function ToCamelCase(obj as object) as object
