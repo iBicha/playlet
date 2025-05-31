@@ -31,6 +31,12 @@
     } else {
       setScreenNameInUrl("home");
     }
+
+    window.addEventListener("hashchange", OnWindowHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", OnWindowHashChange);
+    };
   });
 
   function getScreenNameInUrl(): AppState["screen"] | undefined {
@@ -46,6 +52,16 @@
 
   function setScreenNameInUrl(screen: AppState["screen"]) {
     window.location.hash = screen;
+  }
+
+  function OnWindowHashChange() {
+    const screen = getScreenNameInUrl();
+    if (screen && screen !== $appStateStore.screen) {
+      appStateStore.update((state) => {
+        state.screen = screen;
+        return state;
+      });
+    }
   }
 </script>
 

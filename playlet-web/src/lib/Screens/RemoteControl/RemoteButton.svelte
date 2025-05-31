@@ -20,19 +20,18 @@
       button.addEventListener("mouseup", pressKeyUp);
       button.addEventListener("mouseleave", onMouseLeave);
     }
-  });
 
-  onDestroy(() => {
-    const isTouchDevice = "ontouchstart" in document.documentElement;
-    if (isTouchDevice) {
-      button.removeEventListener("touchstart", pressKeyDown);
-      button.removeEventListener("touchend", pressKeyUp);
-      button.removeEventListener("touchcancel", onMouseLeave);
-    } else {
-      button.removeEventListener("mousedown", pressKeyDown);
-      button.removeEventListener("mouseup", pressKeyUp);
-      button.removeEventListener("mouseleave", onMouseLeave);
-    }
+    return () => {
+      if (isTouchDevice) {
+        button.removeEventListener("touchstart", pressKeyDown);
+        button.removeEventListener("touchend", pressKeyUp);
+        button.removeEventListener("touchcancel", onMouseLeave);
+      } else {
+        button.removeEventListener("mousedown", pressKeyDown);
+        button.removeEventListener("mouseup", pressKeyUp);
+        button.removeEventListener("mouseleave", onMouseLeave);
+      }
+    };
   });
 
   let isDown = false;
