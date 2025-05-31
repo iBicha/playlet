@@ -27,16 +27,16 @@
     invidiousApi.instance = value?.invidious?.instance;
   });
 
-  onMount(async () => {
+  onMount(() => {
     document.body.addEventListener("drop", onDrop);
     document.body.addEventListener("dragover", onDragOver);
     document.body.addEventListener("paste", onPaste);
-  });
 
-  onDestroy(() => {
-    document.body.removeEventListener("drop", onDrop);
-    document.body.removeEventListener("dragover", onDragOver);
-    document.body.removeEventListener("paste", onPaste);
+    return () => {
+      document.body.removeEventListener("drop", onDrop);
+      document.body.removeEventListener("dragover", onDragOver);
+      document.body.removeEventListener("paste", onPaste);
+    };
   });
 
   async function onPaste(event) {

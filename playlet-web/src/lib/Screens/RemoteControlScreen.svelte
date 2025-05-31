@@ -60,11 +60,11 @@
   onMount(() => {
     screen.addEventListener("keydown", onKeyDown);
     screen.addEventListener("keyup", onKeyUp);
-  });
 
-  onDestroy(() => {
-    screen.removeEventListener("keydown", onKeyDown);
-    screen.removeEventListener("keyup", onKeyUp);
+    return () => {
+      screen.removeEventListener("keydown", onKeyDown);
+      screen.removeEventListener("keyup", onKeyUp);
+    };
   });
 
   function onKeyDown(event) {

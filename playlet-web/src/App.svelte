@@ -24,7 +24,7 @@
   import RemoteControlScreen from "lib/Screens/RemoteControlScreen.svelte";
   import { fetchLocale } from "lib/Api/Locale";
 
-  onMount(async () => {
+  onMount(() => {
     PlayletApi.getState().then((value) => {
       playletStateStore.set(value);
       fetchLocale(value.device?.current_locale);
