@@ -45,37 +45,10 @@ namespace Innertube
     end function
 
     function ParseInnertubePlayerResponse(payload as object) as object
-        if not IsAssociativeArray(payload)
+        error = ParsePlayerResponseForError(payload)
+        if error <> ""
             return {
-                error: "Invalid payload"
-            }
-        end if
-
-        playabilityStatus = payload["playabilityStatus"]
-        if not IsAssociativeArray(playabilityStatus)
-            return {
-                error: "Invalid playability status"
-            }
-        end if
-
-        if playabilityStatus["status"] <> "OK"
-            errorMessage = ""
-            if IsString(playabilityStatus["reason"])
-                errorMessage = playabilityStatus["reason"]
-            end if
-
-            subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
-
-            if subreason <> ""
-                errorMessage += `\n` + subreason
-            end if
-
-            if errorMessage = ""
-                errorMessage = "Video not available"
-            end if
-
-            return {
-                error: errorMessage
+                error: error
             }
         end if
 
@@ -114,6 +87,38 @@ namespace Innertube
         }
 
         return videoInfo
+    end function
+
+    function ParsePlayerResponseForError(payload as object) as string
+        if not IsAssociativeArray(payload)
+            return "Invalid payload"
+        end if
+
+        playabilityStatus = payload["playabilityStatus"]
+        if not IsAssociativeArray(playabilityStatus)
+            return "Invalid playability status"
+        end if
+
+        if playabilityStatus["status"] = "OK"
+            return ""
+        end if
+
+        errorMessage = ""
+        if IsString(playabilityStatus["reason"])
+            errorMessage = playabilityStatus["reason"]
+        end if
+
+        subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
+
+        if subreason <> ""
+            errorMessage += `\n` + subreason
+        end if
+
+        if errorMessage = ""
+            errorMessage = "Video not available"
+        end if
+
+        return errorMessage
     end function
 
     function ParseStoryboards(payload as object, lengthSeconds as integer) as object
