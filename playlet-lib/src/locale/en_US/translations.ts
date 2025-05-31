@@ -293,6 +293,10 @@
         <translation>Use responsibly, especially if your YouTube account is tied to business or monetization.</translation>
     </message>
     <message>
+        <source>Who&#39;s watching?</source>
+        <translation>Who&#39;s watching?</translation>
+    </message>
+    <message>
         <source>Invidious custom instance</source>
         <translation>Invidious custom instance</translation>
     </message>

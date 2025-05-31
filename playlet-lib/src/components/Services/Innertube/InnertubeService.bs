@@ -291,12 +291,9 @@ namespace InnertubeService
     end function
 
     function AuthMarkVideoWatched(videostatsPlaybackUrl as string, options as object) as boolean
-        cancellation = invalid
-        accessToken = options.accessToken
-
-        if options.DoesExist("cancellation")
-            cancellation = options.cancellation
-        end if
+        cancellation = OptionUtils.Get(options, "cancellation")
+        accessToken = OptionUtils.Get(options, "accessToken")
+        onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
 
         videostatsPlaybackUrl = videostatsPlaybackUrl.replace("https://s.", "https://www.")
         queryParams = UrlUtils.ParseQueryComponents(videostatsPlaybackUrl)
@@ -314,6 +311,9 @@ namespace InnertubeService
         request.NoCache()
         request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
         request.Header("Authorization", "Bearer " + accessToken)
+        if not StringUtils.IsNullOrEmpty(onBehalfOfUser)
+            request.Header("X-Goog-Pageid", onBehalfOfUser)
+        end if
 
         response = request.Await()
         if not response.IsSuccess()
@@ -328,6 +328,7 @@ namespace InnertubeService
     function AuthMarkVideoWatchTime(time as float, videostatsWatchtimeUrl as string, options = invalid as object) as boolean
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
+        onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
 
         timeStr = time.ToStr("%.3f")
 
@@ -349,6 +350,9 @@ namespace InnertubeService
         request.NoCache()
         request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Tv))
         request.Header("Authorization", "Bearer " + accessToken)
+        if not StringUtils.IsNullOrEmpty(onBehalfOfUser)
+            request.Header("X-Goog-Pageid", onBehalfOfUser)
+        end if
 
         response = request.Await()
         if not response.IsSuccess()

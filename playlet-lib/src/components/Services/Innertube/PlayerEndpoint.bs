@@ -7,6 +7,8 @@ import "pkg:/source/utils/Types.bs"
 namespace Innertube
 
     function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
+        visitorData = OptionUtils.Get(options, "visitorData")
+
         deviceInfo = CreateObject("roDeviceInfo")
 
         context = Innertube.CreateContext(client, deviceInfo, options)
@@ -35,6 +37,9 @@ namespace Innertube
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
         request.Headers(Innertube.CreateHeaders(client))
+        if not StringUtils.IsNullOrEmpty(visitorData)
+            request.Header("x-goog-visitor-id", visitorData)
+        end if
 
         return request
     end function
