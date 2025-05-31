@@ -297,6 +297,10 @@
         <translation>Who&#39;s watching?</translation>
     </message>
     <message>
+        <source>No valid accounts found for YouTube login.</source>
+        <translation>No valid accounts found for YouTube login.</translation>
+    </message>
+    <message>
         <source>Invidious custom instance</source>
         <translation>Invidious custom instance</translation>
     </message>
@@ -351,6 +355,10 @@
     <message>
         <source>Success</source>
         <translation>Success</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Error</translation>
     </message>
     <message>
         <source>Refresh</source>
