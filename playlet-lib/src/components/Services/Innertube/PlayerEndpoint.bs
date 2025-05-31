@@ -6,12 +6,14 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function CreatePlayerRequest(videoId as string, ctt as string, visitorData as string, client as Innertube.ClientType) as object
+    function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
         deviceInfo = CreateObject("roDeviceInfo")
+
+        context = Innertube.CreateContext(client, deviceInfo, options)
 
         payload = {
             "videoId": videoId
-            "context": Innertube.CreateContext(client, deviceInfo, ctt, visitorData)
+            "context": context
             "playbackContext": {
                 "contentPlaybackContext": {
                     "vis": 0
@@ -32,12 +34,7 @@ namespace Innertube
         }
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
-        headers = {
-            "accept": "*/*"
-            "accept-language": "*"
-        }
-        headers.Append(Innertube.CreateHeaders(client))
-        request.Headers(headers)
+        request.Headers(Innertube.CreateHeaders(client))
 
         return request
     end function

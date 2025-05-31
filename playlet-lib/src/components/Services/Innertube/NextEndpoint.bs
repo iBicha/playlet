@@ -8,21 +8,18 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function CreateNextRequest(payloadArgs as object, ctt as string) as object
+    function CreateNextRequest(payloadArgs as object, options = invalid as object) as object
         deviceInfo = CreateObject("roDeviceInfo")
 
+        context = Innertube.CreateContext(Innertube.ClientType.Web, deviceInfo, options)
+
         payload = {
-            "context": Innertube.CreateContext(Innertube.ClientType.Web, deviceInfo, ctt, "")
+            "context": context
         }
         payload.Append(payloadArgs)
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", payload)
-        headers = {
-            "accept": "*/*"
-            "accept-language": "*"
-        }
-        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Web))
-        request.Headers(headers)
+        request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Web))
 
         return request
     end function

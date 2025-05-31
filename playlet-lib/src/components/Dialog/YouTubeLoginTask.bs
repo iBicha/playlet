@@ -1,4 +1,5 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Screens/ProfileScreen/YouTubeAccountSelectionView/YouTubeAccountSelectionViewUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -6,6 +7,7 @@ import "pkg:/source/utils/Logging.bs"
 @asynctask
 function YouTubeLoginTask(input as object) as object
     profilesNode = input.profilesService
+    appController = input.appController
     dialogNode = input.dialog
 
     cancellation = m.top.cancellation
@@ -65,7 +67,8 @@ function YouTubeLoginTask(input as object) as object
         return invalid
     end if
 
-    if not IsArray(accounts) or accounts.Count() = 0
+    accountItem = SelectAccount(accounts, appController)
+    if accountItem = invalid
         LogError("No accounts found")
         DialogUtils.ShowDialogEx({
             title: "Error"
@@ -75,19 +78,7 @@ function YouTubeLoginTask(input as object) as object
         return invalid
     end if
 
-    selectedAccount = invalid
-    for each account in accounts
-        if ValidBool(account.isSelected)
-            selectedAccount = account
-            exit for
-        end if
-    end for
-
-    if selectedAccount = invalid
-        selectedAccount = accounts[0]
-    end if
-
-    profile = CreateProfileContentNode(selectedAccount, accessToken)
+    profile = CreateProfileContentNode(accountItem, accessToken)
     profilesNode@.LoginWithProfile(profile)
 
     dialogNode.close = true
@@ -95,16 +86,50 @@ function YouTubeLoginTask(input as object) as object
     return invalid
 end function
 
-function CreateProfileContentNode(account as object, accessToken as object) as object
+function SelectAccount(accounts as object, appController as object) as object
+    if not IsArray(accounts) or accounts.Count() = 0
+        return invalid
+    end if
+
+    if accounts.Count() = 1
+        return accounts[0]
+    end if
+
+    accountSelectionView = YouTubeAccountSelectionViewUtils.Open(appController)
+    accountSelectionView.accounts = accounts
+
+    messagePort = CreateObject("roMessagePort")
+    MessagePortUtils.ObserveFieldScopedExSafe(accountSelectionView, "selectedAccount", messagePort)
+    MessagePortUtils.ObserveFieldScopedExSafe(accountSelectionView, "wasClosed", messagePort)
+
+    msg = wait(0, messagePort)
+
+    accountSelectionView.unobserveFieldScoped("selectedAccount")
+    accountSelectionView.unobserveFieldScoped("wasClosed")
+
+    if msg = invalid
+        return invalid
+    end if
+
+    field = msg.getField()
+    if field = "wasClosed"
+        return invalid
+    end if
+
+    return msg.getData()
+end function
+
+function CreateProfileContentNode(accountItem as object, accessToken as object) as object
     profile = CreateObject("roSGNode", "ProfileContentNode")
     profile.type = "youtube"
     profile.serverUrl = "http://127.0.0.1:8888/playlet-invidious-backend"
-    username = account.channelHandle
+    username = accountItem.channelHandle
     if StringUtils.IsNullOrEmpty(username)
-        username = account.accountByline
+        username = accountItem.accountByline
     end if
     profile.username = username
-    profile.thumbnail = account.accountPhoto
+    profile.activeIdentifyToken = accountItem.activeIdentifyToken
+    profile.thumbnail = accountItem.accountPhoto
     profile.accessToken = accessToken.accessToken
     profile.refreshToken = accessToken.refreshToken
     profile.scope = accessToken.scope
