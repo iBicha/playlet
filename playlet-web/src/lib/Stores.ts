@@ -19,6 +19,8 @@ export const homeLayoutStore = writable([] as any);
 
 export const homeLayoutFileStore = writable([] as any);
 
+export const sponsorBlockConfigStore = writable({} as any);
+
 export const bookmarksStore = writable([] as any);
 
 export const searchHistoryStore = writable([] as any);
