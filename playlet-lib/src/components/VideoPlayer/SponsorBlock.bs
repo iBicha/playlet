@@ -122,22 +122,20 @@ namespace SponsorBlock
         action = segment.option
 
         if segment.showNotification
-            if m.preferences["sponsorblock.show_notifications"] = true
-                SponsorBlock.ShowNotifcation(m.notifications, segment, action)
+            SponsorBlock.ShowNotifcation(m.notifications, segment, action)
 
-                if action = SegmentAction.ManualSkip
-                    m.manualSkipSegment = segment
-                    return
-                end if
+            if action = SegmentAction.ManualSkip
+                m.manualSkipSegment = segment
+                return
             end if
         end if
 
         if action = SegmentAction.AutoSkip
-            SkipSegment(segment)
+            SkipSegment(segment, position)
         end if
     end function
 
-    function SkipSegment(segment as object) as void
+    function SkipSegment(segment as object, position as dynamic) as void
         segmentEnd = segment.end
 
         duration = m.top.duration
@@ -145,6 +143,14 @@ namespace SponsorBlock
         if duration > 0 and segmentEnd > duration
             segmentEnd = duration
         end if
+
+        ' If we're skipping a very short distance, it's not worth it
+        ' since we can cause rebuffering
+        if Abs(segmentEnd - position) < 2
+            LogInfo("Skip position is within 2 seconds of segment end, not skipping")
+            return
+        end if
+
         ' If the segment is at the end of the video, skip the video instead of seeking
         if duration > 0 and Abs(segmentEnd - duration) < 2
             LogInfo("Skipping section:", segment.category, "at end of video")
@@ -174,14 +180,12 @@ namespace SponsorBlock
             return false
         end if
 
-        segmentStart = segment.start
-        segmentEnd = segment.end
         position = m.top.position
-        if (position < segmentStart) or ((segmentEnd - 1) < position)
+        if (segment.start < position) or (position < segment.end)
             return false
         end if
 
-        SkipSegment(segment)
+        SkipSegment(segment, position)
         SponsorBlock.RemoveNotifcation(m.notifications)
         return true
     end function
