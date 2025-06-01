@@ -84,15 +84,29 @@ namespace SponsorBlock
 
     function UpdateSponsorBlockChapter(time as double) as void
         segments = m.skipSegments
-        for each segment in segments
-            if time < segment.start or segment.end < time
-                continue for
-            end if
-
-            m.top.chapter = segment.title
+        segment = FindSegmentByTime(segments, time)
+        if segment = invalid
+            m.top.chapter = ""
             return
-        end for
-        m.top.chapter = ""
+        end if
+        m.top.chapter = segment.title
+    end function
+
+    function FindSegmentByTime(segments as object, time as dynamic) as object
+        low = 0
+        high = segments.Count() - 1
+        while low <= high
+            middle = (low + high) \ 2
+            segment = segments[middle]
+            if time < segment.start
+                high = middle - 1
+            else if time > segment.end
+                low = middle + 1
+            else
+                return segment
+            end if
+        end while
+        return invalid
     end function
 
     function OnPositionChangeSkipSponsorBlockSections() as void
@@ -103,30 +117,27 @@ namespace SponsorBlock
 
         position = m.top.position
 
-        for each segment in segments
-            segmentStart = segment.start
-            segmentEnd = segment.end
-            if (segmentStart < position) and (position < (segmentEnd - 1))
-                action = segment.option
+        segment = FindSegmentByTime(segments, position)
+        if segment = invalid
+            return
+        end if
 
-                if segment.showNotification
-                    if m.preferences["sponsorblock.show_notifications"] = true
-                        SponsorBlock.ShowNotifcation(m.notifications, segment, action)
+        action = segment.option
 
-                        if action = SegmentAction.ManualSkip
-                            m.manualSkipSegment = segment
-                            exit for
-                        end if
+        if segment.showNotification
+            if m.preferences["sponsorblock.show_notifications"] = true
+                SponsorBlock.ShowNotifcation(m.notifications, segment, action)
 
-                    end if
-                end if
-
-                if action = SegmentAction.AutoSkip
-                    SkipSegment(segment)
-                    exit for
+                if action = SegmentAction.ManualSkip
+                    m.manualSkipSegment = segment
+                    return
                 end if
             end if
-        end for
+        end if
+
+        if action = SegmentAction.AutoSkip
+            SkipSegment(segment)
+        end if
     end function
 
     function SkipSegment(segment as object) as void
