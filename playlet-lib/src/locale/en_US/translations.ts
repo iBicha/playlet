@@ -885,6 +885,14 @@
         <translation>Show notifications when a segment is skipped</translation>
     </message>
     <message>
+        <source>Categories</source>
+        <translation>Categories</translation>
+    </message>
+    <message>
+        <source>Configure which segments to skip</source>
+        <translation>Configure which segments to skip</translation>
+    </message>
+    <message>
         <source>Search History</source>
         <translation>Search History</translation>
     </message>
@@ -1007,6 +1015,22 @@
     <message>
         <source>Press OK to skip</source>
         <translation>Press OK to skip</translation>
+    </message>
+    <message>
+        <source>Disable</source>
+        <translation>Disable</translation>
+    </message>
+    <message>
+        <source>Auto Skip</source>
+        <translation>Auto Skip</translation>
+    </message>
+    <message>
+        <source>Manual Skip</source>
+        <translation>Manual Skip</translation>
+    </message>
+    <message>
+        <source>Show in Seekbar</source>
+        <translation>Show in Seekbar</translation>
     </message>
     <message>
         <source>Sponsor</source>
