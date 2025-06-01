@@ -11,6 +11,7 @@
     playletStateStore,
     preferencesModelStore,
     searchHistoryStore,
+    sponsorBlockConfigStore,
     userPreferencesStore,
   } from "lib/Stores";
   import BottomNavigation from "lib/BottomNavigation.svelte";
@@ -36,6 +37,10 @@
 
     PlayletApi.getHomeLayoutFile().then((value) => {
       homeLayoutFileStore.set(value);
+    });
+
+    PlayletApi.getSponsorBlockConfigFile().then((value) => {
+      sponsorBlockConfigStore.set(value);
     });
 
     PlayletApi.getInvidiousVideoApiFile().then((apiDefinitions) => {

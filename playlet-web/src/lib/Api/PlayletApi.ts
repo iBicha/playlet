@@ -34,6 +34,11 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getSponsorBlockConfigFile() {
+        const response = await fetch(`${PlayletApi.host()}/config/sponsorblock_config.json5`);
+        return await response.json();
+    }
+
     static async getInvidiousVideoApiFile() {
         const response = await fetch(`${PlayletApi.host()}/config/invidious_video_api.yaml`);
         return await response.json();

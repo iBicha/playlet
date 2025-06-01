@@ -12,6 +12,26 @@ namespace SponsorBlock
             m.sponsorBlockConfig = ParseJson(ReadAsciiFile("libpkg:/config/sponsorblock_config.json5"))
         end function
 
+        function GetCategories() as object
+            if m.sponsorBlockConfig = invalid
+                return []
+            end if
+
+            return ValidArray(m.sponsorBlockConfig.categoryList)
+        end function
+
+        function GetOptionsForCategory(category as string) as object
+            if m.sponsorBlockConfig = invalid
+                return []
+            end if
+
+            if not m.sponsorBlockConfig.categories.doesexist(category)
+                return []
+            end if
+
+            return ValidArray(m.sponsorBlockConfig.categories[category].options)
+        end function
+
         function SegmentColor(category as string) as integer
             if m.sponsorBlockConfig = invalid
                 return 0
@@ -54,8 +74,10 @@ namespace SponsorBlock
                 return invalid
             end if
 
-            categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "filler", "exclusive_access"]
-            actionTypes = ["skip", "mute", "chapter", "full", "poi"]
+            ' categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "filler", "exclusive_access"]
+            categories = ["sponsor", "selfpromo", "interaction", "intro", "outro", "preview", "music_offtopic", "poi_highlight", "filler"]
+            ' actionTypes = ["skip", "mute", "chapter", "full", "poi"]
+            actionTypes = ["skip", "mute", "poi"]
 
             categoriesJson = FormatJson(categories).EncodeUriComponent()
             actionTypesJson = FormatJson(actionTypes).EncodeUriComponent()
@@ -64,6 +86,11 @@ namespace SponsorBlock
             hashPrefix = CryptoUtils.GetSha256(videoId).Left(4)
             url = `${m.sponsorBlockConfig.serverAddress}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}/${hashPrefix}?categories=${categoriesJson}&actionTypes=${actionTypesJson}`
             response = HttpClient.Get(url).Await()
+            if not response.IsSuccess()
+                LogError("SponsorBlockService: GetSkipSegmentsForVideo failed", response.ErrorMessage())
+                return invalid
+            end if
+
             json = response.Json()
             if json = invalid
                 return invalid
@@ -78,13 +105,13 @@ namespace SponsorBlock
             return invalid
         end function
 
-        function PostSegmentViewed(segmentId as string) as void
+        function PostSegmentViewed(segmentId as string, cancellation = invalid as object) as void
             if m.sponsorBlockConfig = invalid or StringUtils.IsNullOrEmpty(m.sponsorBlockConfig.serverAddress)
                 return
             end if
 
             url = `${m.sponsorBlockConfig.serverAddress}${SponsorBlock.VIEWED_SEGMENT_ENDPOINT}?UUID=${segmentId}`
-            HttpClient.Post(url, "").Await()
+            HttpClient.Post(url, "").Cancellation(cancellation).Await()
         end function
 
         function GenerateProgressBarBackground(segments as object, lengthSeconds as integer, path as string)
@@ -103,8 +130,8 @@ namespace SponsorBlock
                     continue for
                 end if
 
-                pixelStart = (segment.segment[0] / videoDuration) * width
-                pixelEnd = (segment.segment[1] / videoDuration) * width
+                pixelStart = (segment.start / videoDuration) * width
+                pixelEnd = (segment.end / videoDuration) * width
                 color = m.SegmentColor(segment.category)
                 ' highlight's duration is zero, so it is not visble on the bar.
                 ' Add a few pixels to see it

@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - German translations
 - Support for multi-accounts, such as brand accounts
+- Support for manual skip in SponsorBlock
+- Customize SponsorBlock categories from the settings
 
 ### Fixed
 

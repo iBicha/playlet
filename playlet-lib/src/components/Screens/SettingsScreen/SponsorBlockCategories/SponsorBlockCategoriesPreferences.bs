@@ -1,0 +1,181 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.categoryList = m.top.findNode("categoryList")
+    m.categoryList.ObserveField("itemSelected", FuncName(OnCategorySelected))
+    m.service = new SponsorBlock.SponsorBlockService()
+
+    optionTitles = {}
+    optionTitles[SponsorBlock.SegmentAction.Disable] = Tr(Locale.SponsorBlock.Disable)
+    optionTitles[SponsorBlock.SegmentAction.AutoSkip] = Tr(Locale.SponsorBlock.AutoSkip)
+    optionTitles[SponsorBlock.SegmentAction.ManualSkip] = Tr(Locale.SponsorBlock.ManualSkip)
+    optionTitles[SponsorBlock.SegmentAction.ShowInSeekbar] = Tr(Locale.SponsorBlock.ShowInSeekbar)
+    m.optionTitles = optionTitles
+
+    SetupCategoriesUi()
+
+    m.closeButton = m.top.findNode("closeButton")
+    m.saveButton = m.top.findNode("saveButton")
+    SetButtonPositions()
+
+    SetNavigation(m.saveButton, RemoteKeys.Right, m.closeButton)
+    SetNavigation(m.closeButton, RemoteKeys.Left, m.saveButton)
+    SetNavigation(m.saveButton, RemoteKeys.Up, m.categoryList)
+    SetNavigation(m.closeButton, RemoteKeys.Up, m.categoryList)
+    SetNavigation(m.categoryList, RemoteKeys.Down, m.saveButton)
+
+    m.saveButton.observeField("buttonSelected", FuncName(OnSaveButtonSelected))
+    m.closeButton.observeField("buttonSelected", FuncName(Close))
+end function
+
+function SetupCategoriesUi() as void
+    categories = m.service.GetCategories()
+    if categories.Count() = 0
+        return
+    end if
+
+    content = CreateObject("roSGNode", "ContentNode")
+    categoryContentNodes = []
+
+    for each category in categories
+        categoryNode = CreateObject("roSGNode", "SponsorBlockCategoryContent")
+        categoryNode.category = category
+        categoryNode.categoryTitle = Tr(m.service.SegmentTitle(category))
+        categoryNode.selectedOption = SponsorBlock.SegmentAction.Disable
+        categoryNode.options = m.service.GetOptionsForCategory(category)
+        categoryNode.optionTitles = m.optionTitles
+        categoryNode.color = m.service.SegmentColor(category)
+        categoryContentNodes.push(categoryNode)
+    end for
+
+    content.appendChildren(categoryContentNodes)
+    m.categoryList.content = content
+end function
+
+function SetButtonPositions()
+    saveButtonWidth = m.saveButton.width
+    closeButtonWidth = m.closeButton.width
+    buttonsWith = closeButtonWidth + saveButtonWidth + 20
+    m.saveButton.translation = [720 / 2 - buttonsWith / 2, m.saveButton.translation[1]]
+    m.closeButton.translation = [720 / 2 + buttonsWith / 2 - closeButtonWidth, m.closeButton.translation[1]]
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.categoryList, true)
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
+        ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
+        return false
+    end if
+
+    if key = RemoteKeys.Back and press
+        Close()
+        return true
+    end if
+
+    return true
+end function
+
+function OnValueChange() as void
+    content = m.categoryList.content
+    if content = invalid
+        return
+    end if
+
+    value = m.top.value
+    if not IsAssociativeArray(value)
+        return
+    end if
+
+    categoryContentNodes = content.getChildren(-1, 0)
+    categoryNodeMap = {}
+    for each categoryContentNode in categoryContentNodes
+        categoryNodeMap[categoryContentNode.category] = categoryContentNode
+    end for
+
+    for each category in value
+        if not categoryNodeMap.DoesExist(category)
+            continue for
+        end if
+        categoryNode = categoryNodeMap[category]
+        if categoryNode = invalid
+            continue for
+        end if
+        categoryNode.selectedOption = value[category].option
+    end for
+end function
+
+function OnSaveButtonSelected()
+    m.top.save = true
+    Close()
+end function
+
+function Close()
+    m.appController@.PopScreen()
+end function
+
+function OnCategorySelected(event as object) as void
+    itemSelected = m.categoryList.itemSelected
+    itemNode = m.categoryList.content.GetChild(itemSelected)
+    if itemNode = invalid
+        LogError("Invalid item selected:", itemSelected)
+        return
+    end if
+
+    options = itemNode.options
+    optionTitles = itemNode.optionTitles
+    optionTitlesArray = []
+    for each option in options
+        optionTitlesArray.push(optionTitles[option])
+    end for
+
+    dialog = DialogUtils.ShowDialogEx({
+        title: itemNode.categoryTitle
+        message: Tr(Locale.Settings.SelectOptionFor).Replace("%1", itemNode.categoryTitle)
+        buttons: optionTitlesArray
+    })
+    if dialog = invalid
+        return
+    end if
+    dialog.addFields({
+        "categoryContentNode": itemNode
+        "options": options
+    })
+    dialog.observeField("buttonSelected", FuncName(OnCategoryDialogResult), ["buttonSelected"])
+end function
+
+function OnCategoryDialogResult(event as object) as void
+    dialog = event.getRoSGNode()
+    options = dialog.options
+    buttonIndex = event.GetData()
+
+    if not IsInt(buttonIndex) or buttonIndex < 0 or buttonIndex >= options.Count()
+        return
+    end if
+
+    selectedOption = options[buttonIndex]
+    category = dialog.categoryContentNode.category
+
+    value = m.top.value
+    value[category].option = selectedOption
+    m.top.value = value
+
+    LogInfo("SponsorBlock category", category, "set to", selectedOption)
+end function

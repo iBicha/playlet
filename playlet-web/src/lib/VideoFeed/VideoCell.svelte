@@ -23,7 +23,6 @@
 
   // svelte-ignore unused-export-let
   export let type: string = undefined;
-  // svelte-ignore unused-export-let
   export let authorId: string = undefined;
   // svelte-ignore unused-export-let
   export let authorUrl: string = undefined;

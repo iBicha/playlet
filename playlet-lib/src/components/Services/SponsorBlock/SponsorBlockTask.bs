@@ -1,17 +1,35 @@
 import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
+import "pkg:/source/utils/Types.bs"
 
 @asynctask
 function SponsorBlockTask(input as object) as object
     videoId = input.metadata.videoId
     lengthSeconds = input.metadata.lengthSeconds
+    showNotifications = input.showNotifications
+    categories = input.categories
 
     service = new SponsorBlock.SponsorBlockService()
     skipSegments = service.GetSkipSegmentsForVideo(videoId)
-    barPath = invalid
 
+    skipSegments = ProcessSkipSegments(skipSegments, showNotifications, categories, service)
+
+    barPath = invalid
     if skipSegments <> invalid
         barPath = `tmp:/sponsorblock_bar.png`
         service.GenerateProgressBarBackground(skipSegments, lengthSeconds, barPath)
+    end if
+
+    ' Usually segment.start and segment.end are equal for poi_highlight
+    ' We pad the duration for poi_highlight segments so that the chapter label
+    ' can be visible when seeking in trickplay.
+    ' Padding poi_highlight is done after generating the progress bar, so that the
+    ' highlight is not too long in the bar.
+    skipSegments = PadHightlightSegment(skipSegments, lengthSeconds)
+
+    ' Sort the segments by start time, so we can binary search them later.
+    if skipSegments <> invalid
+        skipSegments.SortBy("start")
     end if
 
     return {
@@ -19,4 +37,99 @@ function SponsorBlockTask(input as object) as object
         skipSegments: skipSegments
         barPath: barPath
     }
+end function
+
+function ProcessSkipSegments(skipSegments as object, showNotifications as boolean, categories as object, service as SponsorBlock.SponsorBlockService) as object
+    if skipSegments = invalid
+        return invalid
+    end if
+
+    processedSegments = []
+    for each segment in skipSegments
+        ' When a submission reaches the score of -2 or lower, it gets removed and will not appear anymore for users
+        ' https://wiki.sponsor.ajay.app/w/FAQ#How_does_voting_work_and_what_do_certain_amounts_of_votes_mean?
+        if ValidInt(segment.votes) < -1
+            continue for
+        end if
+
+        option = GetOptionForSegment(segment, categories)
+        if option = SponsorBlock.SegmentAction.Disable
+            continue for
+        end if
+
+        segment.option = option
+
+        segment.showNotification = showNotifications and ShouldShowNotification(segment, categories)
+        if segment.showNotification
+            if option = SponsorBlock.SegmentAction.AutoSkip
+                segment.actionText = Tr(Locale.SponsorBlock.Skipped)
+            else if option = SponsorBlock.SegmentAction.ManualSkip
+                segment.actionText = Tr(Locale.SponsorBlock.PressOkToSkip)
+            else
+                segment.actionText = ""
+            end if
+        end if
+
+        segmentRange = segment["segment"]
+        segmentStart = segmentRange[0]
+        segmentEnd = segmentRange[1]
+        segment.Delete("segment")
+        segment.start = segmentStart
+        segment.end = segmentEnd
+
+        segment.title = Tr(ValidString(service.SegmentTitle(segment.category)))
+        segment.shortTitle = Tr(ValidString(service.SegmentShortTitle(segment.category)))
+
+        processedSegments.push(segment)
+    end for
+
+    return processedSegments
+end function
+
+function GetOptionForSegment(segment as object, categories as object) as string
+    category = categories[segment.category]
+    if not IsAssociativeArray(category)
+        return false
+    end if
+
+    option = category.option
+    if StringUtils.IsNullOrEmpty(option)
+        option = SponsorBlock.SegmentAction.Disable
+    end if
+
+    return option
+end function
+
+function ShouldShowNotification(segment as object, categories as object) as boolean
+    option = GetOptionForSegment(segment, categories)
+    return option = SponsorBlock.SegmentAction.AutoSkip or option = SponsorBlock.SegmentAction.ManualSkip
+end function
+
+function PadHightlightSegment(segments as object, lengthSeconds as integer) as object
+    for each segment in segments
+        if not segment.category = "poi_highlight"
+            continue for
+        end if
+
+        segmentPaddedDuration = 5
+
+        if lengthSeconds > 0
+            if lengthSeconds < 120
+                segmentPaddedDuration = 1
+            else if lengthSeconds < 300
+                segmentPaddedDuration = 2
+            else if lengthSeconds < 900
+                segmentPaddedDuration = 5
+            else
+                segmentPaddedDuration = 10
+            end if
+        end if
+
+        segmentDuration = Abs(segment.end - segment.start)
+        padding = Abs(segmentPaddedDuration - segmentDuration) / 2
+        segment.start = segment.start - padding
+        segment.end = segment.end + padding
+    end for
+
+    return segments
 end function

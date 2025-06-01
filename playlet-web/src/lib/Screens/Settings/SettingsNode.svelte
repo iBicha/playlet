@@ -8,6 +8,7 @@
   import NumberControl from "./SettingControls/NumberControl.svelte";
   import ClearCacheControl from "./SettingControls/ClearCacheControl.svelte";
   import EditQualityControl from "./SettingControls/EditQualityControl.svelte";
+  import SponsorBlockCategoriesControl from "./SettingControls/SponsorBlockCategoriesControl.svelte";
   import { translate } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
@@ -36,6 +37,7 @@
     EditHomeScreenControl,
     PlayletLibVersionControl,
     EditQualityControl,
+    SponsorBlockCategoriesControl,
   };
 </script>
 
