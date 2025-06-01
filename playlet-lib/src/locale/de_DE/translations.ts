@@ -1316,5 +1316,17 @@
         <source>Feed preferences</source>
         <translation>Feed-Einstellungen</translation>
     </message>
+    <message>
+        <source>Disclaimer</source>
+        <translation>Haftungsausschluss</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Fehler</translation>
+    </message>
+    <message>
+        <source>Login to YouTube</source>
+        <translation>Bei YouTube anmelden</translation>
+    </message>
 </context>
 </TS>
