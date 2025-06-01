@@ -165,29 +165,29 @@ imap.once('ready', async () => {
 
         const images = []
         images.push({
-            title: 'Channel Health',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString)
+            title: 'App Health',
+            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Health', yesterdayString)
         })
         images.push({
-            title: 'Channel Engagement',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString)
+            title: 'App Engagement',
+            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString)
         })
         images.push({
             title: 'Viewership Summary',
             filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString)
         })
         images.push({
-            title: 'Channel Stability',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString)
+            title: 'App Stability',
+            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Stability', yesterdayString)
         })
 
         writeMarkDownFile(images);
 
         // TODO:P0 deleting emails hangs the process, so it's disabled for now
-        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Health', yesterdayString);
-        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Engagement', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'App Health', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString);
         // await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
-        // await moveToTrash('bdp_noreply@data.roku.com', 'Channel Stability', yesterdayString);
+        // await moveToTrash('bdp_noreply@data.roku.com', 'App Stability', yesterdayString);
 
         imap.end();
     } catch (error) {
