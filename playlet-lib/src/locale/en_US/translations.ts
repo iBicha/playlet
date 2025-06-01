@@ -1005,6 +1005,10 @@
         <translation>Skipped</translation>
     </message>
     <message>
+        <source>Press OK to skip</source>
+        <translation>Press OK to skip</translation>
+    </message>
+    <message>
         <source>Sponsor</source>
         <translation>Sponsor</translation>
     </message>

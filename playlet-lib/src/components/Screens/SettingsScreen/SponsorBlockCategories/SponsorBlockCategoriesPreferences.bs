@@ -1,0 +1,61 @@
+import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.closeButton = m.top.findNode("closeButton")
+    m.saveButton = m.top.findNode("saveButton")
+
+    SetNavigation(m.saveButton, RemoteKeys.Right, m.closeButton)
+    SetNavigation(m.closeButton, RemoteKeys.Left, m.saveButton)
+
+    m.saveButton.observeField("buttonSelected", FuncName(OnSaveButtonSelected))
+    m.closeButton.observeField("buttonSelected", FuncName(Close))
+end function
+
+function SetButtonPositions()
+    saveButtonWidth = m.saveButton.width
+    closeButtonWidth = m.closeButton.width
+    buttonsWith = closeButtonWidth + saveButtonWidth + 20
+    m.saveButton.translation = [960 / 2 - buttonsWith / 2, m.saveButton.translation[1]]
+    m.closeButton.translation = [960 / 2 + buttonsWith / 2 - closeButtonWidth, m.closeButton.translation[1]]
+end function
+
+function OnFocusChange() as void
+    if not m.top.focus
+        return
+    end if
+
+    NodeSetFocus(m.closeButton, true)
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if NavigationKeyHandler(key, press).handled
+        return true
+    end if
+
+    if key = RemoteKeys.Options or key = RemoteKeys.Play or key = RemoteKeys.Pause or key = RemoteKeys.PlayOnly
+        ' A pass-through to the app controller, so it can toggle picture-in-picture and pause/play
+        return false
+    end if
+
+    if key = RemoteKeys.Back and press
+        Close()
+        return true
+    end if
+
+    return true
+end function
+
+function OnValueChange()
+end function
+
+function OnSaveButtonSelected()
+    m.top.save = true
+    Close()
+end function
+
+function Close()
+    m.appController@.PopScreen()
+end function
