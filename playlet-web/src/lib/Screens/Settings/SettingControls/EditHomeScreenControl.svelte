@@ -12,7 +12,6 @@
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
 
   export let displayText: string = "";
-  // svelte-ignore unused-export-let
   export let key: string = "";
   export let description: string = "";
   export let level: number = 0;
