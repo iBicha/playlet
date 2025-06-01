@@ -45,7 +45,7 @@ namespace SponsorBlock
         end if
 
         skipSegments = output.result.skipSegments
-        if skipSegments = invalid
+        if skipSegments = invalid or skipSegments.Count() = 0
             return
         end if
 
@@ -62,7 +62,10 @@ namespace SponsorBlock
 
         if m.top.hasField("trickPlayPosition")
             PositionChapterLabel()
-            m.top.ObserveFieldScoped("trickPlayPosition", FuncName(OnTrickPlayPositionChange))
+            m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
+            m.chapterLabelTimer.observeField("fire", FuncName(OnChapterLabelTimer))
+            m._sponsorBlockLastTimeChaptedUpdated = 0.0#
+            m.top.trickPlayBar.observeField("visible", FuncName(OnTrickPlayBarVisible))
         end if
     end function
 
@@ -75,13 +78,28 @@ namespace SponsorBlock
         m.chapterLabel.translation = [trickPlayBarWidth / 4 - m.chapterLabel.width / 2, 25]
     end function
 
-    function OnTrickPlayPositionChange() as void
-        UpdateSponsorBlockChapter(m.top.trickPlayPosition)
+    function OnTrickPlayBarVisible()
+        if m.top.trickPlayBar.visible
+            m.top.chapter = ""
+            m.chapterLabelTimer.control = "start"
+        else
+            m.chapterLabelTimer.control = "stop"
+        end if
+    end function
+
+    function OnChapterLabelTimer() as void
+        trickPlayPosition = m.top.trickPlayPosition
+        if m._sponsorBlockLastTimeChaptedUpdated = trickPlayPosition
+            return
+        end if
+
+        m._sponsorBlockLastTimeChaptedUpdated = trickPlayPosition
+        UpdateSponsorBlockChapter(trickPlayPosition)
     end function
 
     function UpdateSponsorBlockChapter(time as double) as void
         segments = m.skipSegments
-        segment = FindSegmentByTime(segments, time)
+        segment = FindSegmentByTime(segments, time, 0)
         if segment = invalid
             m.top.chapter = ""
             return
@@ -89,7 +107,7 @@ namespace SponsorBlock
         m.top.chapter = segment.title
     end function
 
-    function FindSegmentByTime(segments as object, time as dynamic) as object
+    function FindSegmentByTime(segments as object, time as dynamic, endOffset as integer) as object
         low = 0
         high = segments.Count() - 1
         while low <= high
@@ -97,7 +115,7 @@ namespace SponsorBlock
             segment = segments[middle]
             if time < segment.start
                 high = middle - 1
-            else if time > segment.end
+            else if time > (segment.end + endOffset)
                 low = middle + 1
             else
                 return segment
@@ -114,7 +132,11 @@ namespace SponsorBlock
 
         position = m.top.position
 
-        segment = FindSegmentByTime(segments, position)
+        ' We add a small offset to the end position of the segment.
+        ' This is so that when we skip a segment, we don't get
+        ' another notification to skip it.
+        ' Seeking accuracy is not perfect, so we need to account for that.
+        segment = FindSegmentByTime(segments, position, -1)
         if segment = invalid
             return
         end if
@@ -125,6 +147,8 @@ namespace SponsorBlock
             SponsorBlock.ShowNotifcation(m.notifications, segment, action)
 
             if action = SegmentAction.ManualSkip
+                ' We'll save the segment here, and handle it in case the user
+                ' presses the OK button on the notification.
                 m.manualSkipSegment = segment
                 return
             end if
