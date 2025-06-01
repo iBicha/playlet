@@ -64,7 +64,7 @@ namespace SponsorBlock
             PositionChapterLabel()
             m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
             m.chapterLabelTimer.observeField("fire", FuncName(OnChapterLabelTimer))
-            m._sponsorBlockLastTimeChaptedUpdated = 0.0#
+            m._sponsorBlockLastTimeChapterUpdated = 0.0#
             m.top.trickPlayBar.observeField("visible", FuncName(OnTrickPlayBarVisible))
         end if
     end function
@@ -89,11 +89,11 @@ namespace SponsorBlock
 
     function OnChapterLabelTimer() as void
         trickPlayPosition = m.top.trickPlayPosition
-        if m._sponsorBlockLastTimeChaptedUpdated = trickPlayPosition
+        if m._sponsorBlockLastTimeChapterUpdated = trickPlayPosition
             return
         end if
 
-        m._sponsorBlockLastTimeChaptedUpdated = trickPlayPosition
+        m._sponsorBlockLastTimeChapterUpdated = trickPlayPosition
         UpdateSponsorBlockChapter(trickPlayPosition)
     end function
 
@@ -107,7 +107,7 @@ namespace SponsorBlock
         m.top.chapter = segment.title
     end function
 
-    function FindSegmentByTime(segments as object, time as dynamic, endOffset as integer) as object
+    function FindSegmentByTime(segments as object, time as dynamic, endOffset as integer) as dynamic
         ' Binary search for the segment that contains the time.
         ' This search sometimes fails if the segments overlap.
         ' For most cases, this is acceptable, since it is not common for segments to overlap.
@@ -129,10 +129,6 @@ namespace SponsorBlock
 
     function OnPositionChangeSkipSponsorBlockSections() as void
         segments = m.skipSegments
-        if segments = invalid or segments.Count() = 0
-            return
-        end if
-
         position = m.top.position
 
         ' We add a small offset to the end position of the segment.
@@ -190,11 +186,11 @@ namespace SponsorBlock
     end function
 
     function ManualSkipSegment() as boolean
-        if m.manualSkipSegment = invalid
+        segment = m.manualSkipSegment
+        if segment = invalid
             return false
         end if
 
-        segment = m.manualSkipSegment
         m.manualSkipSegment = invalid
 
         notification = SponsorBlock.GetCurrentNotification(m.notifications)
