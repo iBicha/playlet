@@ -893,6 +893,10 @@
         <translation>Configure which segments to skip</translation>
     </message>
     <message>
+        <source>Select option for %1</source>
+        <translation>Select option for %1</translation>
+    </message>
+    <message>
         <source>Search History</source>
         <translation>Search History</translation>
     </message>
