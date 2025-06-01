@@ -54,22 +54,25 @@
 
 <div class="navbar bg-base-100 sticky top-0 z-40">
   <div class="flex-1">
-    <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
-      {#if $appThemeStore === "dark"}
-        <PlayletLogoDark />
-      {:else}
-        <PlayletLogoLight />
-      {/if}
-    </button>
-    <h4 class="label brightness-75">{version}</h4>
+    <div class="flex flex-col justify-center items-center">
+      <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
+        {#if $appThemeStore === "dark"}
+          <PlayletLogoDark />
+        {:else}
+          <PlayletLogoLight />
+        {/if}
+      </button>
+      <div class="text-xs brightness-75">{version}</div>
+    </div>
   </div>
   <div class="flex-none">
     <ThemeSelect />
     {#if currentProfile && currentProfile.username}
       <div class="badge badge-outline">
         <span>
-          {currentProfile.username.length > 5
-            ? `${currentProfile.username.slice(0, 5)}…`
+          <!-- TODO:P2 use text-ellipsis -->
+          {currentProfile.username.length > 10
+            ? `${currentProfile.username.slice(0, 10)}…`
             : currentProfile.username}
         </span>
       </div>

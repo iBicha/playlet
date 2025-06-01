@@ -1,7 +1,7 @@
 <svg
   xmlns="http://www.w3.org/2000/svg"
-  width="82"
-  height="32"
+  width="65"
+  height="25"
   viewBox="0 0 98.161 37.571"
 >
   <g transform="translate(-22.26 -34.716)">
