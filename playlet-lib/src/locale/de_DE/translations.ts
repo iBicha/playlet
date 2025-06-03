@@ -1328,5 +1328,65 @@
         <source>Login to YouTube</source>
         <translation>Bei YouTube anmelden</translation>
     </message>
+    <message>
+        <source>Select a service to login</source>
+        <translation>Einen Dienst zum Anmelden auswählen</translation>
+    </message>
+    <message>
+        <source>Open the link %1 and enter the following code:</source>
+        <translation>Den Link %1 öffnen und diesen Code eingeben:</translation>
+    </message>
+    <message>
+        <source>Use responsibly, especially if your YouTube account is tied to business or monetization.</source>
+        <translation>Handeln Sie verantwortungsbewusst, besonders wenn Ihr YouTube-Benutzerkonto mit einem Gewerbe oder Monetarisierung zusammenhängt.</translation>
+    </message>
+    <message>
+        <source>Who&apos;s watching?</source>
+        <translation>Wer guckt gerade?</translation>
+    </message>
+    <message>
+        <source>No valid accounts found for YouTube login.</source>
+        <translation>Keine gültigen Benutzerkonten zum Anmelden auf YouTube gefunden.</translation>
+    </message>
+    <message>
+        <source>Configure which segments to skip</source>
+        <translation>Das Überspringen von Abschnitten konfigurieren</translation>
+    </message>
+    <message>
+        <source>Press OK to skip</source>
+        <translation>OK drücken, um zu überspringen</translation>
+    </message>
+    <message>
+        <source>Auto Skip</source>
+        <translation>Auto-Überspringen</translation>
+    </message>
+    <message>
+        <source>Manual Skip</source>
+        <translation>Manuelles Überspringen</translation>
+    </message>
+    <message>
+        <source>Show in Seekbar</source>
+        <translation>In der Suchleiste anzeigen</translation>
+    </message>
+    <message>
+        <source>Categories</source>
+        <translation>Kategorien</translation>
+    </message>
+    <message>
+        <source>Playlet is a third-party app and is not affiliated with, endorsed by, or sponsored by YouTube or Google. All trademarks and registered trademarks mentioned are the property of their respective owners and are used only for identification purposes.</source>
+        <translation type="unfinished">Playlet ist eine Drittanbieter-App, wird weder von YouTube noch von Google unterstützt oder gesponsert und steht in keiner Verbindung zu diesen. Alle hier erwähnten (eingetragenen) Marken sind geistiges Eigentum ihrer jeweiligen Besitzer und werden nur zu Identifikationszwecken genutzt.</translation>
+    </message>
+    <message>
+        <source>By using Playlet and signing in with your YouTube account, you acknowledge that you do so at your own risk. The developers of Playlet are not liable for any harm, including but not limited to data loss, account suspension or ban, hacking, or loss of content.</source>
+        <translation type="unfinished">Die Benutzung von Playlet und das Anmelden mit einem YouTube-Benutzerkonto erfolgt auf Ihr eigenes Risiko hin. Die Entwickler von Playlet sind für jedwegen Schaden, inklusive, aber nicht ausschließlich dem Verlust von Daten, der Sperrung/ Inaktivierung von Benutzerkonten und Hacking, nicht haftbar oder verantwortlich.</translation>
+    </message>
+    <message>
+        <source>Select option for %1</source>
+        <translation>Option für %1 auswählen</translation>
+    </message>
+    <message>
+        <source>Disable</source>
+        <translation>Deaktivieren</translation>
+    </message>
 </context>
 </TS>
