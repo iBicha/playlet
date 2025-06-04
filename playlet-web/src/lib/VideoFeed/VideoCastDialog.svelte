@@ -43,23 +43,26 @@
   });
 
   async function playOnTv() {
-    await PlayletApi.playVideo(getVideoInfo());
+    const videoInfo = getVideoInfo();
+    await PlayletApi.playVideo(videoInfo);
   }
 
   async function playOnTvYtjs() {
+    const videoInfo = getVideoInfo() as any;
+
     // measure length of time it takes to get video info
     const start = performance.now();
-    const videoInfoJs = await YoutubeJs.getVideoInfo(videoId);
+    const metadata = await YoutubeJs.getVideoInfo(videoId);
     const end = performance.now();
     console.log(`Time to get video info: ${end - start}ms`);
 
-    const videoInfo = getVideoInfo() as any;
-    videoInfo.metadata = videoInfoJs;
+    videoInfo.metadata = metadata;
     await PlayletApi.playVideo(videoInfo);
   }
 
   async function queueOnTv() {
-    await PlayletApi.queueVideo(getVideoInfo());
+    const videoInfo = getVideoInfo();
+    await PlayletApi.queueVideo(videoInfo);
   }
 
   function openInvidious() {
