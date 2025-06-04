@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A way to play longer videos using the web app (Play using ytjs)
+- German translations
 
 ### Fixed
 
