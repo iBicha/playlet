@@ -421,7 +421,7 @@ export class YoutubeJs {
 
             return {
                 label: track.name.toString(),
-                languageCode: track.language_code || '',
+                language_code: track.language_code || '',
                 url: modifiedBaseUrl
             };
         }).filter(caption => !!caption);
