@@ -3,6 +3,7 @@
   import { playletStateStore, translate } from "lib/Stores";
   import VideoStartAt from "./VideoStartAt.svelte";
   import VideoThumbnail from "./VideoThumbnail.svelte";
+  import { YoutubeJs } from "lib/Api/YoutubeJs";
 
   export let videoId: string | undefined = undefined;
   export let title: string | undefined = undefined;
@@ -43,6 +44,18 @@
 
   async function playOnTv() {
     await PlayletApi.playVideo(getVideoInfo());
+  }
+
+  async function playOnTvYtjs() {
+    // measure length of time it takes to get video info
+    const start = performance.now();
+    const videoInfoJs = await YoutubeJs.getVideoInfo(videoId);
+    const end = performance.now();
+    console.log(`Time to get video info: ${end - start}ms`);
+
+    const videoInfo = getVideoInfo() as any;
+    videoInfo.metadata = videoInfoJs;
+    await PlayletApi.playVideo(videoInfo);
   }
 
   async function queueOnTv() {
@@ -120,6 +133,9 @@
       <div class="join join-vertical m-2">
         <button class="btn join-item hover:btn-accent" on:click={playOnTv}>
           {$translate("Play on %1").replace("%1", tvName)}
+        </button>
+        <button class="btn join-item hover:btn-accent" on:click={playOnTvYtjs}>
+          {$translate("Play on %1").replace("%1", tvName)} (ytjs)
         </button>
         <button class="btn join-item hover:btn-accent" on:click={queueOnTv}>
           {$translate("Queue on %1").replace("%1", tvName)}

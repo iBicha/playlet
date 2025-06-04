@@ -10,7 +10,9 @@ namespace Http
         function new(server as object)
             super()
 
-            m.invidiousNode = server.task.invidious
+            task = server.task
+            m.videoQueueNode = task.videoQueue
+            m.invidiousNode = task.invidious
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
             ' No need to pass the invidious instance here, we will refresh it for
             ' each request to make sure we are using the latest one
@@ -25,16 +27,39 @@ namespace Http
             v = request.query.v
             local = request.query.local
             quality = request.query.quality
+            ytjs = request.query.ytjs
 
             if StringUtils.IsNullOrEmpty(v)
                 response.Default(400, "Missing video id")
                 return true
             end if
 
-            metadata = m.invidiousService.GetVideoMetadata(v)
-            if metadata.error <> invalid
-                response.Default(500, metadata.error)
-                return true
+            if ValidString(ytjs) = "true"
+                player = m.videoQueueNode.player
+                if player = invalid
+                    response.Default(500, "videoQueue.player is invalid")
+                    return true
+                end if
+                content = player.content
+                if content = invalid
+                    response.Default(500, "videoQueue.player.content is invalid")
+                    return true
+                end if
+                metadata = content.metadata
+                if not IsAssociativeArray(metadata)
+                    response.Default(500, "videoQueue.player.content.metadata is invalid")
+                    return true
+                end if
+                if metadata.videoId <> v
+                    response.Default(400, "videoQueue.playVideo.metadata.videoId does not match the requested video id")
+                    return true
+                end if
+            else
+                metadata = m.invidiousService.GetVideoMetadata(v)
+                if metadata.error <> invalid
+                    response.Default(500, metadata.error)
+                    return true
+                end if
             end if
 
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
