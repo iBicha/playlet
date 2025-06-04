@@ -2,6 +2,9 @@ import { Innertube, UniversalCache } from 'youtubei.js/web';
 import { getHost } from "lib/Api/Host";
 import { BG } from "bgutils-js";
 import { type BgConfig } from "bgutils-js";
+import type { VideoInfo } from 'node_modules/youtubei.js/dist/src/parser/youtube';
+import type { StoryboardData } from 'node_modules/youtubei.js/dist/src/parser/classes/PlayerStoryboardSpec';
+import type { PlayerLiveStoryboardSpec, PlayerStoryboardSpec } from 'node_modules/youtubei.js/dist/src/parser/nodes';
 
 // https://github.com/iv-org/invidious/blob/a021b93063f3956fc9bb3cce0fb56ea252422738/src/invidious/videos/formats.cr#L7
 const FORMATS = {
@@ -242,7 +245,56 @@ export class YoutubeJs {
 
         const info = await YoutubeJs.innerTube.getBasicInfo(videoId, 'TV');
 
-        const adaptiveFormats = info.streaming_data.adaptive_formats.map(format => {
+        // Populate a video object that is similar to Invidious format.
+        // Mostly populate only fields we care about, enough to make it work.
+        return {
+            type: "video",
+            ytjs: true,
+            title: info.basic_info.title,
+            videoId: info.basic_info.id,
+            videoThumbnails: [],
+            storyboards: YoutubeJs.getStoryboards(info),
+            description: "",
+            published: 0,
+            publishedText: "",
+            keywords: [],
+            viewCount: 0,
+            likeCount: 0,
+            dislikeCount: 0,
+            paid: false,
+            premium: false,
+            isFamilyFriendly: true,
+            allowedRegions: [],
+            genre: "",
+            genreUrl: null,
+            author: info.basic_info.author,
+            authorId: info.basic_info.channel_id,
+            authorUrl: "",
+            authorVerified: false,
+            authorThumbnails: [],
+            subCountText: "",
+            lengthSeconds: info.basic_info.duration,
+            allowRatings: true,
+            rating: 0,
+            isListed: true,
+            liveNow: info.basic_info.is_live,
+            isPostLiveDvr: info.basic_info.is_post_live_dvr,
+            isUpcoming: info.basic_info.is_upcoming,
+            dashUrl: info.streaming_data.dash_manifest_url || "",
+            hlsUrl: info.streaming_data.hls_manifest_url,
+            adaptiveFormats: YoutubeJs.getAdaptiveFormats(info),
+            formatStreams: [],
+            captions: YoutubeJs.getCaptions(info),
+            recommendedVideos: [],
+        }
+    }
+
+    static getAdaptiveFormats(videoInfo: VideoInfo) {
+        if (!videoInfo.streaming_data.adaptive_formats) {
+            return [];
+        }
+
+        return videoInfo.streaming_data.adaptive_formats.map(format => {
             const formatInfo = FORMATS[format.itag];
             const result: any = {
                 init: format.init_range ? `${format.init_range.start}-${format.init_range.end}` : "",
@@ -282,48 +334,61 @@ export class YoutubeJs {
 
             return result;
         });
+    }
 
-        // Populate a video object that is similar to Invidious format.
-        // Mostly populate only fields we care about, enough to make it work.
-        return {
-            type: "video",
-            ytjs: true,
-            title: info.basic_info.title,
-            videoId: info.basic_info.id,
-            videoThumbnails: [],
-            storyboards: [],
-            description: "",
-            published: 0,
-            publishedText: "",
-            keywords: [],
-            viewCount: 0,
-            likeCount: 0,
-            dislikeCount: 0,
-            paid: false,
-            premium: false,
-            isFamilyFriendly: true,
-            allowedRegions: [],
-            genre: "",
-            genreUrl: null,
-            author: info.basic_info.author,
-            authorId: info.basic_info.channel_id,
-            authorUrl: "",
-            authorVerified: false,
-            authorThumbnails: [],
-            subCountText: "",
-            lengthSeconds: info.basic_info.duration,
-            allowRatings: true,
-            rating: 0,
-            isListed: true,
-            liveNow: info.basic_info.is_live,
-            isPostLiveDvr: info.basic_info.is_post_live_dvr,
-            isUpcoming: info.basic_info.is_upcoming,
-            dashUrl: "",
-            hlsUrl: info.streaming_data.hls_manifest_url,
-            adaptiveFormats,
-            formatStreams: [],
-            captions: [],
-            recommendedVideos: [],
+    static getStoryboards(videoInfo: VideoInfo) {
+        if (!videoInfo.storyboards) {
+            return [];
         }
+
+        if (videoInfo.storyboards.type === 'live') {
+            const board = (videoInfo.storyboards as PlayerLiveStoryboardSpec).board
+            return [{
+                templateUrl: board.template_url,
+                width: board.thumbnail_width,
+                height: board.thumbnail_height,
+                count: -1,
+                interval: 5000,
+                storyboardWidth: board.columns,
+                storyboardHeight: board.rows,
+            }];
+        }
+
+        const storyboards = (videoInfo.storyboards as PlayerStoryboardSpec).boards;
+        return storyboards.map((board: StoryboardData) => {
+            return {
+                templateUrl: board.template_url,
+                width: board.thumbnail_width,
+                height: board.thumbnail_height,
+                count: board.thumbnail_count,
+                interval: board.interval,
+                storyboardWidth: board.columns,
+                storyboardHeight: board.rows,
+                storyboardCount: board.storyboard_count
+            };
+        });
+    }
+
+    static getCaptions(videoInfo: VideoInfo) {
+        if (!videoInfo.captions?.caption_tracks) {
+            return [];
+        }
+
+        return videoInfo.captions.caption_tracks.map(track => {
+            const baseUrl = track.base_url;
+            if (!baseUrl) {
+                return null;
+            }
+
+            const queryComponents = new URLSearchParams(baseUrl.split('?')[1]);
+            queryComponents.set('fmt', 'vtt');
+            const modifiedBaseUrl = `${baseUrl.split('?')[0]}?${queryComponents.toString()}`;
+
+            return {
+                label: track.name.toString(),
+                languageCode: track.language_code || '',
+                url: modifiedBaseUrl
+            };
+        }).filter(caption => !!caption);
     }
 }
