@@ -19,16 +19,19 @@ function VideoContentTask(input as object) as object
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
-
     backend = preferencesNode["backend.selected"]
-    if backend = "playlet"
-        metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
-            "cancellation": m.top.cancellation
-            "credentialTransferToken": loungeServiceNode.credentialTransferToken
-            "visitorData": innertubeNode.visitorData
-        })
-    else
-        metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+
+    metadata = contentNode.metadata
+    if not IsAssociativeArray(metadata)
+        if backend = "playlet"
+            metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
+                "cancellation": m.top.cancellation
+                "credentialTransferToken": loungeServiceNode.credentialTransferToken
+                "visitorData": innertubeNode.visitorData
+            })
+        else
+            metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+        end if
     end if
 
     if metadata = invalid
@@ -140,7 +143,11 @@ end function
 function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
     ' Redirect to Playet's local web server, where will will be
     ' dynamically generating the DASH manifest, and filter quality
-    dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, { v: metadata.videoId })
+    dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
+        v: metadata.videoId
+        ytjs: ValidBool(metadata.ytjs)
+    })
+
     dashUrlLocal = invalid
     dashUrlFiltered = invalid
     dashUrlFilteredLocal = invalid
