@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A way to play longer videos using the web app (Play using ytjs)
+
 ### Fixed
 
 - A bug where it says "(Failed to load)" when switching profiles
+
+### Changed
+
+- Session data duration: increased to 7 days, to avoid Innertube errors
 
 ## [0.40.0] - 2025-06-01
 
