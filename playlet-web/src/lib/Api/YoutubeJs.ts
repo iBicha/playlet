@@ -192,7 +192,41 @@ export class YoutubeJs {
         return YoutubeJs.innerTubePromise;
     }
 
+    static loadCachedPoToken() {
+        const EXPIRATION_TIME = 1000 * 60 * 60 * 24 * 7; // 7 days
+        const cachedPoToken = localStorage.getItem('ytjs_po_token');
+        if (!cachedPoToken) {
+            return;
+        }
+        const parsedPoToken = JSON.parse(cachedPoToken);
+        if (!parsedPoToken || !parsedPoToken.poToken || !parsedPoToken.visitorData) {
+            localStorage.removeItem('ytjs_po_token');
+            return;
+        }
+        const now = Date.now();
+        if (now - parsedPoToken.timestamp > EXPIRATION_TIME) {
+            localStorage.removeItem('ytjs_po_token');
+            return;
+        }
+        YoutubeJs.poToken = parsedPoToken.poToken;
+        YoutubeJs.visitorData = parsedPoToken.visitorData;
+        console.log("Loaded cached poToken and visitorData from localStorage");
+    }
+
+    static async savePoToken() {
+        // save to localStorage
+        if (YoutubeJs.poToken && YoutubeJs.visitorData) {
+            localStorage.setItem('ytjs_po_token', JSON.stringify({
+                poToken: YoutubeJs.poToken,
+                visitorData: YoutubeJs.visitorData,
+                timestamp: Date.now()
+            }));
+            console.log("Saved poToken and visitorData to localStorage");
+        }
+    }
+
     static async generatePoToken() {
+        YoutubeJs.loadCachedPoToken();
         if (YoutubeJs.poToken && YoutubeJs.visitorData) {
             return { poToken: YoutubeJs.poToken, visitorData: YoutubeJs.visitorData };
         }
@@ -236,6 +270,7 @@ export class YoutubeJs {
 
         YoutubeJs.poToken = poTokenResult.poToken;
         YoutubeJs.visitorData = visitorData;
+        YoutubeJs.savePoToken();
         YoutubeJs.innerTube = null;
     }
 
