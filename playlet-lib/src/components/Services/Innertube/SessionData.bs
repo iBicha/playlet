@@ -18,11 +18,7 @@ namespace Innertube
         end if
 
         sessionData = RequestSessionData()
-        if sessionData = invalid
-            return invalid
-        end if
-
-        RegistryUtils.Write(RegistryUtils.INNERTUBE_SESSION_DATA, FormatJson(sessionData))
+        SaveSessionDataToRegistry(sessionData)
         return sessionData
     end function
 
@@ -61,10 +57,19 @@ namespace Innertube
         end if
 
         return {
-            "__version": SESSION_DATA_VERSION
             "timestamp": TimeUtils.Now().AsSeconds()
             "visitorData": visitorData
         }
+    end function
+
+    function SaveSessionDataToRegistry(sessionData as object) as void
+        if sessionData = invalid
+            return
+        end if
+
+        sessionData.__version = SESSION_DATA_VERSION
+
+        RegistryUtils.Write(RegistryUtils.INNERTUBE_SESSION_DATA, FormatJson(sessionData))
     end function
 
     function ReadSessionDataFromRegistry() as object

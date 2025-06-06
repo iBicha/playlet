@@ -1,0 +1,91 @@
+import "pkg:/components/Services/Innertube/SessionData.bs"
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Http
+
+    class InnertubeRouter extends HttpRouter
+
+        function new(server as object)
+            super()
+
+            m.innertube = server.task.innertube
+        end function
+
+        @get("/api/innertube/session")
+        function GetSessionData(context as object) as object
+            response = context.response
+
+            sessionData = {
+                "timestamp": m.innertube.timestamp
+                "visitorData": m.innertube.visitorData
+                "poToken": m.innertube.poToken
+            }
+
+            response.Json(sessionData)
+            return true
+        end function
+
+        @post("/api/innertube/session")
+        function SetSessionData(context as object) as object
+            request = context.request
+            response = context.response
+
+            payload = request.Json()
+            if payload = invalid or not IsAssociativeArray(payload)
+                response.Default(400, "Invalid payload")
+                return true
+            end if
+
+            if not IsInt(payload.timestamp)
+                response.Default(400, "Invalid timestamp")
+                return true
+            end if
+            if StringUtils.IsNullOrEmpty(payload.visitorData)
+                response.Default(400, "Invalid visitorData")
+                return true
+            end if
+            if StringUtils.IsNullOrEmpty(payload.poToken)
+                response.Default(400, "Invalid poToken")
+                return true
+            end if
+
+            Innertube.SaveSessionDataToRegistry({
+                "timestamp": payload.timestamp
+                "visitorData": payload.visitorData
+                "poToken": payload.poToken
+            })
+
+            m.innertube.timestamp = payload.timestamp
+            m.innertube.visitorData = payload.visitorData
+            m.innertube.poToken = payload.poToken
+            response.Default(204, "Session data updated successfully")
+            return true
+        end function
+
+        @post("/api/innertube/proxy")
+        function ProxyRequest(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            requestArgs = request.Json()
+            if requestArgs = invalid
+                response.Default(400, "Invalid request body")
+                return true
+            end if
+
+            httpReq = HttpClient.FromObject(requestArgs)
+            httpRes = httpReq.Await()
+
+            result = {
+                "status": httpRes.StatusCode()
+                "headers": httpRes.Headers()
+                "body": httpRes.Text()
+            }
+
+            response.Json(result)
+            return true
+        end function
+
+    end class
+
+end namespace

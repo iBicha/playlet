@@ -142,7 +142,7 @@ export class YoutubeJs {
             CacheSeconds: -1,
         };
 
-        const response = await fetch(`http://${getHost()}/api/proxy`, {
+        const response = await fetch(`http://${getHost()}/api/innertube/proxy`, {
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -156,6 +156,48 @@ export class YoutubeJs {
             status: responseData.status,
             statusText: `${responseData.status}`,
             headers: responseData.headers,
+        });
+    }
+
+    static async initSessionData() {
+        if (YoutubeJs.visitorData && YoutubeJs.poToken) {
+            return Promise.resolve();
+        }
+
+        const sessionData = await YoutubeJs.getSessionData();
+        if (sessionData.visitorData) {
+            YoutubeJs.visitorData = sessionData.visitorData;
+            if (sessionData.poToken) {
+                YoutubeJs.poToken = sessionData.poToken;
+                return;
+            }
+        }
+
+        if (!YoutubeJs.visitorData) {
+            YoutubeJs.visitorData = await YoutubeJs.generateVisitorData();
+        }
+
+        YoutubeJs.poToken = await YoutubeJs.generatePoToken(YoutubeJs.visitorData);
+
+        await YoutubeJs.setSessionData({
+            visitorData: YoutubeJs.visitorData,
+            poToken: YoutubeJs.poToken,
+            timestamp: Math.floor(Date.now() / 1000)
+        });
+    }
+
+    static async getSessionData() {
+        const response = await fetch(`http://${getHost()}/api/innertube/session`)
+        return await response.json();
+    }
+
+    static async setSessionData(sessionData: any) {
+        await fetch(`http://${getHost()}/api/innertube/session`, {
+            method: "POST",
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(sessionData)
         });
     }
 
@@ -175,6 +217,7 @@ export class YoutubeJs {
 
         YoutubeJs.innerTubePromise = new Promise(async (resolve, reject) => {
             try {
+                await YoutubeJs.initSessionData()
                 YoutubeJs.innerTube = await Innertube.create({
                     fetch: YoutubeJs.fetch,
                     cache: new UniversalCache(true),
@@ -189,58 +232,20 @@ export class YoutubeJs {
                 reject(error);
             }
         })
+
         return YoutubeJs.innerTubePromise;
     }
 
-    static loadCachedPoToken() {
-        const EXPIRATION_TIME = 1000 * 60 * 60 * 24 * 7; // 7 days
-        const cachedPoToken = localStorage.getItem('ytjs_po_token');
-        if (!cachedPoToken) {
-            return;
-        }
-        const parsedPoToken = JSON.parse(cachedPoToken);
-        if (!parsedPoToken || !parsedPoToken.poToken || !parsedPoToken.visitorData) {
-            localStorage.removeItem('ytjs_po_token');
-            return;
-        }
-        const now = Date.now();
-        if (now - parsedPoToken.timestamp > EXPIRATION_TIME) {
-            localStorage.removeItem('ytjs_po_token');
-            return;
-        }
-        YoutubeJs.poToken = parsedPoToken.poToken;
-        YoutubeJs.visitorData = parsedPoToken.visitorData;
-        console.log("Loaded cached poToken and visitorData from localStorage");
-    }
-
-    static async savePoToken() {
-        // save to localStorage
-        if (YoutubeJs.poToken && YoutubeJs.visitorData) {
-            localStorage.setItem('ytjs_po_token', JSON.stringify({
-                poToken: YoutubeJs.poToken,
-                visitorData: YoutubeJs.visitorData,
-                timestamp: Date.now()
-            }));
-            console.log("Saved poToken and visitorData to localStorage");
-        }
-    }
-
-    static async generatePoToken() {
-        YoutubeJs.loadCachedPoToken();
-        if (YoutubeJs.poToken && YoutubeJs.visitorData) {
-            return { poToken: YoutubeJs.poToken, visitorData: YoutubeJs.visitorData };
-        }
-
-        const innertube = await YoutubeJs.getInnertube();
-        if (!innertube) {
-            throw new Error("Innertube is not initialized");
-        }
-
+    static async generateVisitorData() {
+        const innertube = await Innertube.create({ retrieve_player: false });
         const visitorData = innertube.session.context.client.visitorData;
         if (!visitorData) {
             throw new Error('Could not get visitor data');
         }
+        return visitorData;
+    }
 
+    static async generatePoToken(visitorData: string) {
         const requestKey = 'O43z0dpjhgX20SCx4KAo';
 
         const bgConfig: BgConfig = {
@@ -268,17 +273,23 @@ export class YoutubeJs {
             bgConfig
         });
 
-        YoutubeJs.poToken = poTokenResult.poToken;
-        YoutubeJs.visitorData = visitorData;
-        YoutubeJs.savePoToken();
-        YoutubeJs.innerTube = null;
+        if (!poTokenResult || !poTokenResult.poToken) {
+            throw new Error('Could not generate poToken');
+        }
+
+        return poTokenResult.poToken;
     }
 
     static async getVideoInfo(videoId: string) {
-        await YoutubeJs.generatePoToken();
         await YoutubeJs.initInnertube();
 
         const info = await YoutubeJs.innerTube.getBasicInfo(videoId, 'TV');
+
+        // We can't generate a proper dash from live videos.
+        // By returning null, we're telling Playlet to fetch video info itself.
+        if (info.basic_info.is_live) {
+            return null;
+        }
 
         // Populate a video object that is similar to Invidious format.
         // Mostly populate only fields we care about, enough to make it work.
@@ -376,7 +387,7 @@ export class YoutubeJs {
             return [];
         }
 
-        if (videoInfo.storyboards.type === 'live') {
+        if (videoInfo.storyboards.type === 'PlayerLiveStoryboardSpec') {
             const board = (videoInfo.storyboards as PlayerLiveStoryboardSpec).board
             return [{
                 templateUrl: board.template_url,

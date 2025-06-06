@@ -56,7 +56,9 @@
     const end = performance.now();
     console.log(`Time to get video info: ${end - start}ms`);
 
-    videoInfo.metadata = metadata;
+    if (metadata) {
+      videoInfo.metadata = metadata;
+    }
     await PlayletApi.playVideo(videoInfo);
   }
 
