@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A bug where it says "(Failed to load)" when switching profiles
+- A bug where seaching in web app using iOS causes page to reload
 
 ### Changed
 
