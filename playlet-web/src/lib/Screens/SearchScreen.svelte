@@ -99,6 +99,8 @@
 
     try {
       isLoading = true;
+      // blur to hide the keyboard on mobile
+      searchBox.blur();
       const response = await invidiousApi.search(
         searchBoxText,
         searchFilters,
@@ -120,73 +122,76 @@
 
 <div class={visibility ? "" : "hidden"}>
   <div class="m-4">
-    <!-- TODO:P2 use search HTML element -->
-    <form
-      on:submit={async (e) => {
-        e.preventDefault();
-        page = 1;
-        videos = [];
-        await searchVideos("");
-      }}
-    >
-      <div class="join w-full border border-neutral rounded-full">
-        <input
-          type="search"
-          dir="auto"
-          placeholder="{$translate('Search')}..."
-          class="join-item input w-full border border-neutral rounded-full"
-          bind:this={searchBox}
-          bind:value={searchBoxText}
-          on:input={searchSuggestions}
-          on:focus={searchSuggestions}
-          on:blur={() => {
-            // A delay before clearing the suggestions allows the user to click on a suggestion
-            // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
-            setTimeout(() => {
-              suggestions = { suggestions: [] };
-            }, 200);
-          }}
-        />
-        <button
-          class="join-item btn w-16"
-          on:click={async () => {
-            page = 1;
-            videos = [];
-            await searchVideos("");
-          }}
-        >
-          <div class="h-6">
-            <SearchThinIcon />
-          </div>
-        </button>
-      </div>
-      <button
-        class="btn border border-neutral rounded-full mt-1"
-        on:click={searchFiltersComponent.show()}
+    <search>
+      <form
+        on:submit={async (e) => {
+          e.preventDefault();
+          page = 1;
+          videos = [];
+          await searchVideos("");
+        }}
       >
-        <div class="h-6 w-8">
-          <FiltersIcon />
+        <div class="join w-full border border-neutral rounded-full">
+          <input
+            type="search"
+            dir="auto"
+            placeholder="{$translate('Search')}..."
+            class="join-item input w-full border border-neutral rounded-full"
+            bind:this={searchBox}
+            bind:value={searchBoxText}
+            on:input={searchSuggestions}
+            on:focus={searchSuggestions}
+            on:blur={() => {
+              // A delay before clearing the suggestions allows the user to click on a suggestion
+              // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
+              setTimeout(() => {
+                suggestions = { suggestions: [] };
+              }, 200);
+            }}
+          />
+          <button
+            type="button"
+            class="join-item btn w-16"
+            on:click={async () => {
+              page = 1;
+              videos = [];
+              await searchVideos("");
+            }}
+          >
+            <div class="h-6">
+              <SearchThinIcon />
+            </div>
+          </button>
         </div>
-        {searchFiltersLabel}
-      </button>
-
-      {#if suggestions.suggestions.length > 0}
-        <ul
-          class="dropdown-content menu z-10 p-2 shadow-xl bg-base-200 rounded-box"
+        <button
+          type="button"
+          class="btn border border-neutral rounded-full mt-1"
+          on:click={searchFiltersComponent.show()}
         >
-          {#each suggestions.suggestions as suggestion}
-            <li class="p-1">
-              <button
-                type="button"
-                on:click={async (e) => {
-                  await suggestionClicked(e.currentTarget.innerText);
-                }}>{@html suggestion}</button
-              >
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    </form>
+          <div class="h-6 w-8">
+            <FiltersIcon />
+          </div>
+          {searchFiltersLabel}
+        </button>
+
+        {#if suggestions.suggestions.length > 0}
+          <ul
+            class="dropdown-content menu z-10 p-2 shadow-xl bg-base-200 rounded-box"
+          >
+            {#each suggestions.suggestions as suggestion}
+              <li class="p-1">
+                <button
+                  type="button"
+                  on:click={async (e) => {
+                    await suggestionClicked(e.currentTarget.innerText);
+                  }}>{@html suggestion}</button
+                >
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </form>
+    </search>
   </div>
 
   <div>
@@ -207,6 +212,7 @@
     {#if !isLoading && videos.length > 0 && searchBoxText}
       <div class="flex justify-center items-center">
         <button
+          type="button"
           class="btn w-1/2"
           on:click={async () => {
             page++;
