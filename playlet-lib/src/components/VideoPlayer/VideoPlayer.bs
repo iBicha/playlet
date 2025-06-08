@@ -13,6 +13,10 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 
+enum ActionButtons
+    PlaybackSpeed
+end enum
+
 function Init()
     SetPlayerStyle()
     SetupAnimation()
@@ -39,7 +43,7 @@ function Init()
     m.isSeekingPosition = false
 
     ' Checks if current RokuOS version has showUI field in Video node
-    m.showUIEnabled = m.top.hasField("showUI")
+    m.showUIEnabled = false
     LogInfo(`Custom OK handler is ${m.showUIEnabled ? "enabled" : "disabled"}`)
 
     ' asyncStopSemantics available since Roku OS 12.5
@@ -71,6 +75,16 @@ function Init()
         m.top.observeField("_audioFormat", FuncName(OnQualityChangeDebug))
         m.top.observeField("_videoFormat", FuncName(OnQualityChangeDebug))
     #end if
+
+    if m.top.hasField("playbackActionButtons")
+        m.buttons = [{
+            text: "Playback Speed"
+            buttonType: ActionButtons.PlaybackSpeed
+        }]
+        m.top.playbackActionButtons = m.buttons
+        m.top.observeField("playbackActionButtonSelected", FuncName(OnPlaybackActionButtonSelected))
+    end if
+
 end function
 
 #if DEBUG_LOG_VIDEO_QUALITY
@@ -664,4 +678,70 @@ function OnFullScreenHintTimer()
     if showFullScreenHint
         m.top.showFullScreenHint = false
     end if
+end function
+
+function OnPlaybackActionButtonSelected(event as object) as void
+    index = event.getData()
+    if index < 0 or index >= m.buttons.Count()
+        return
+    end if
+    button = m.buttons[index]
+    if button.buttonType = ActionButtons.PlaybackSpeed
+        OnPlaybackSpeedButtonSelected()
+    end if
+end function
+
+function OnPlaybackSpeedButtonSelected() as void
+    speeds = [{
+        "text": "0.5x"
+        "value": 0.5
+    }, {
+        "text": "0.75x"
+        "value": 0.75
+    }, {
+        "text": "1.0x"
+        "value": 1.0
+    }, {
+        "text": "1.25x"
+        "value": 1.25
+    }, {
+        "text": "1.5x"
+        "value": 1.5
+    }, {
+        "text": "1.75x"
+        "value": 1.75
+    }, {
+        "text": "2.0x"
+        "value": 2.0
+    }]
+
+    buttons = []
+    for each speed in speeds
+        buttons.push(speed.text)
+    end for
+
+    dialog = DialogUtils.ShowDialogEx({
+        title: "Select Playback Speed"
+        buttons: buttons
+    })
+    if dialog = invalid
+        return
+    end if
+
+    dialog.addFields({ speeds: speeds })
+    dialog.observeField("buttonSelected", FuncName(OnPlaybackSpeedDialogButtonSelected), ["buttonSelected"])
+end function
+
+function OnPlaybackSpeedDialogButtonSelected(event as object) as void
+    index = event.getData()
+    dialog = event.getRoSGNode()
+    speeds = dialog.speeds
+
+    if index < 0 or index >= speeds.Count()
+        return
+    end if
+
+    speed = speeds[index].value
+    LogInfo(`Setting playback speed to ${speed}`)
+    m.top.playbackSpeed = speed
 end function
