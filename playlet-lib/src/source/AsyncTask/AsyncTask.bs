@@ -14,10 +14,9 @@ namespace AsyncTask
         task.id = id
         task.input = input
 
-        if callback <> invalid
-            m[`asynctask_${id}_callback`] = callback
-            task.ObserveFieldScoped("state", FuncName(internal_OnTaskState))
-        end if
+        m[`asynctask_${id}`] = task
+        m[`asynctask_${id}_callback`] = callback
+        task.ObserveFieldScoped("state", FuncName(internal_OnTaskState))
 
         return task
     end function
@@ -40,6 +39,9 @@ namespace AsyncTask
             end if
         end if
 
+        task.input = invalid
+        task.output = invalid
+        m.delete(`asynctask_${id}`)
         m.delete(`asynctask_${id}_callback`)
     end function
 
