@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- [Perf] reverted a perf fix that wasn't helping
 
 ## [0.40.1] - 2025-06-07
 
