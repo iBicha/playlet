@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - [Perf] reverted a perf fix that wasn't helping
+- A bug where "Open channel" didn't show up in videos and playlists from logged user
 
 ## [0.40.1] - 2025-06-07
 

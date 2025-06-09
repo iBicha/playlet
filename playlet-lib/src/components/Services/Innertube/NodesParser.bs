@@ -1064,6 +1064,11 @@ namespace Innertube
             "percentDurationWatched": percentDurationWatched
         }
 
+        authorId = ParseTileRendererAuthorId(nodeData, context)
+        if authorId <> invalid
+            video["authorId"] = authorId
+        end if
+
         PushFeedItem(video, context)
         return invalid
     end function
@@ -1107,6 +1112,11 @@ namespace Innertube
             "videoThumbnails": videoThumbnails
         }
 
+        authorId = ParseTileRendererAuthorId(nodeData, context)
+        if authorId <> invalid
+            video["authorId"] = authorId
+        end if
+
         PushFeedItem(video, context)
         return invalid
     end function
@@ -1149,7 +1159,34 @@ namespace Innertube
             "lines": renderedLines
         }
 
+        authorId = ParseTileRendererAuthorId(nodeData, context)
+        if authorId <> invalid
+            playlist["authorId"] = authorId
+        end if
+
         PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseTileRendererAuthorId(nodeData as object, context as object) as dynamic
+        ' We're checking in the long press menu if there's a browseId that starts with "UC".
+        ' This is usually the the id of the channel.
+        menuItems = ObjectUtils.Dig(nodeData, ["onLongPressCommand", "showMenuCommand", "menu", "menuRenderer", "items"])
+        if not IsArray(menuItems)
+            return invalid
+        end if
+
+        for each item in menuItems
+            if not IsAssociativeArray(item) or not item.DoesExist("menuNavigationItemRenderer")
+                continue for
+            end if
+            menuNavigationItemRenderer = item["menuNavigationItemRenderer"]
+            browseId = ObjectUtils.Dig(menuNavigationItemRenderer, ["navigationEndpoint", "browseEndpoint", "browseId"])
+            if not IsString(browseId) or not browseId.StartsWith("UC")
+                continue for
+            end if
+            return browseId
+        end for
         return invalid
     end function
 
