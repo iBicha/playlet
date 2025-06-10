@@ -141,11 +141,15 @@ namespace Innertube
 
         items = []
         continuation = invalid
+        sortOptions = invalid
         feeds = ParseResponseDataForFeeds(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
             if feeds[0].DoesExist("continuation")
                 continuation = feeds[0].continuation
+            end if
+            if feeds[0].DoesExist("sortOptions")
+                sortOptions = feeds[0].sortOptions
             end if
         end if
 
@@ -161,8 +165,12 @@ namespace Innertube
             "items": items
         }
 
+        ' continuation and sort options are specific to certain tabs of the channel
         if continuation <> invalid
             channel["continuation"] = continuation
+        end if
+        if sortOptions <> invalid
+            channel["sortOptions"] = sortOptions
         end if
 
         return channel

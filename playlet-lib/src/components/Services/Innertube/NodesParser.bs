@@ -81,8 +81,10 @@ namespace Innertube
             "gridRenderer": ParseGridRenderer
             "richGridRenderer": ParseRichGridRenderer
             "richItemRenderer": ParseRichItemRenderer
+            "feedFilterChipBarRenderer": ParseFeedFilterChipBarRenderer
             "continuationItemRenderer": ParseContinuationItemRenderer
             "appendContinuationItemsAction": ParseAppendContinuationItemsAction
+            "reloadContinuationItemsCommand": ParseReloadContinuationItemsCommand
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
@@ -144,7 +146,26 @@ namespace Innertube
         return nodeData["content"]
     end function
 
-    function ParseSectionListRenderer(nodeData as object, _context as object) as object
+    function ParseSectionListRenderer(nodeData as object, context as object) as object
+        sortSubMenuItems = ObjectUtils.Dig(nodeData, ["subMenu", "channelSubMenuRenderer", "sortSetting", "sortFilterSubMenuRenderer", "subMenuItems"])
+        if IsArray(sortSubMenuItems)
+            sortOptions = []
+            for each item in sortSubMenuItems
+                params = ValidString(ObjectUtils.Dig(item, ["navigationEndpoint", "browseEndpoint", "params"]))
+                title = ParseText(item["title"])
+                isSelected = ValidBool(item["selected"])
+                if params <> "" and title <> ""
+                    sortOptions.Push({
+                        "title": title
+                        "params": params
+                        "isSelected": isSelected
+                    })
+                end if
+            end for
+            if sortOptions.Count() > 0
+                context.currentFeed.sortOptions = sortOptions
+            end if
+        end if
         return nodeData["contents"]
     end function
 
@@ -1198,12 +1219,57 @@ namespace Innertube
         return nodeData["items"]
     end function
 
-    function ParseRichGridRenderer(nodeData as object, _context as object) as object
+    function ParseRichGridRenderer(nodeData as object, context as object) as object
+        feedFilterChipBarRenderer = ObjectUtils.Dig(nodeData, ["header", "feedFilterChipBarRenderer"])
+        if feedFilterChipBarRenderer <> invalid
+            ParseFeedFilterChipBarRenderer(feedFilterChipBarRenderer, context)
+        end if
         return nodeData["contents"]
     end function
 
     function ParseRichItemRenderer(nodeData as object, _context as object) as object
         return nodeData["content"]
+    end function
+
+    function ParseFeedFilterChipBarRenderer(nodeData as object, context as object) as object
+        contents = ObjectUtils.Dig(nodeData, ["contents"])
+        if not IsArray(contents)
+            return invalid
+        end if
+
+        sortOptions = []
+        for each item in contents
+            if not IsAssociativeArray(item) or not item.DoesExist("chipCloudChipRenderer")
+                continue for
+            end if
+            chipCloudChipRenderer = item["chipCloudChipRenderer"]
+            if not IsAssociativeArray(chipCloudChipRenderer)
+                continue for
+            end if
+            continuationCommand = ObjectUtils.Dig(chipCloudChipRenderer, ["navigationEndpoint", "continuationCommand"])
+            if not IsAssociativeArray(continuationCommand) or ValidString(continuationCommand["request"]) <> "CONTINUATION_REQUEST_TYPE_BROWSE"
+                continue for
+            end if
+
+            title = ParseText(chipCloudChipRenderer["text"])
+            token = ValidString(continuationCommand["token"])
+            isSelected = ValidBool(chipCloudChipRenderer["isSelected"])
+            if title = "" or token = ""
+                continue for
+            end if
+
+            sortOptions.Push({
+                "title": title
+                "continuation": token
+                "isSelected": isSelected
+            })
+        end for
+
+        if sortOptions.Count() > 0
+            context.currentFeed.sortOptions = sortOptions
+        end if
+
+        return invalid
     end function
 
     function ParseContinuationItemRenderer(nodeData as object, context as object) as object
@@ -1219,6 +1285,10 @@ namespace Innertube
     end function
 
     function ParseAppendContinuationItemsAction(nodeData as object, _context as object) as object
+        return nodeData["continuationItems"]
+    end function
+
+    function ParseReloadContinuationItemsCommand(nodeData as object, _context as object) as object
         return nodeData["continuationItems"]
     end function
 

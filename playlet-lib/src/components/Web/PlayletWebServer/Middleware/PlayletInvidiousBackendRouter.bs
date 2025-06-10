@@ -735,6 +735,24 @@ namespace Http
                     options.params = params
                 end if
 
+                ' sort by is a special sorting argument handled by Playlet backend.
+                ' It's a JSON object that could have the "params" key or "continuation"
+                ' key. In this case, we will override these options with the values
+                ' from the "sort_by" query parameter. If we do get an Invidious "sort_by"
+                ' (such as "newest", "oldest", etc.), we'll ignore it, as it is not supported.
+                sortBy = request.query.sort_by
+                if not StringUtils.IsNullOrEmpty(sortBy) and sortBy.StartsWith("{")
+                    sortBy = ParseJson(sortBy)
+                    if IsAssociativeArray(sortBy)
+                        if sortBy.DoesExist("params")
+                            options.params = sortBy.params
+                        end if
+                        if sortBy.DoesExist("continuation")
+                            options.continuation = sortBy.continuation
+                        end if
+                    end if
+                end if
+
                 channel = InnertubeService.GetChannel(channelId, options)
                 if raw
                     response.Json(channel)
@@ -747,28 +765,52 @@ namespace Http
                     return true
                 end if
 
+                result = {}
                 if _tab = "playlists" or _tab = "podcasts" or _tab = "releases" or _tab = "courses"
-                    result = {
-                        "playlists": channel.items
-                    }
-                    if channel.DoesExist("continuation")
-                        result.continuation = channel.continuation
-                    end if
-                    response.Json(result)
-                    if channel.DoesExist("cache-control")
-                        response.headers["cache-control"] = channel["cache-control"]
-                    end if
+                    result ["playlists"] = channel.items
                 else
-                    result = {
-                        "videos": channel.items
-                    }
-                    if channel.DoesExist("continuation")
-                        result.continuation = channel.continuation
+                    result ["videos"] = channel.items
+                end if
+                if channel.DoesExist("continuation")
+                    result.continuation = channel.continuation
+                end if
+                if channel.DoesExist("sortOptions")
+                    ' Transform sort options from:
+                    '   [{
+                    '    "title": "string",
+                    '    "isSelected": "boolean"
+                    '    "params?": "string",
+                    '    "continuation?": "string"
+                    '   }]
+                    ' to:
+                    '   [{
+                    '    "title": "string",
+                    '    "isSelected": "boolean"
+                    '    "params?": "string",
+                    '    "continuation?": "string"
+                    '    "id": "{ \"params\": \"string\", \"continuation\": \"string\" }"
+                    '   }]
+                    ' This so sorting doesn't interfere with actual params or continuation.
+                    ' Sort options are later parsed by Playlet backend.
+                    sortOptions = channel.sortOptions
+                    if IsArray(sortOptions) and sortOptions.Count() > 0
+                        for i = 0 to sortOptions.Count() - 1
+                            sortOption = sortOptions[i]
+                            sortOptionId = {}
+                            if sortOption.DoesExist("params")
+                                sortOptionId["params"] = sortOption.params
+                            end if
+                            if sortOption.DoesExist("continuation")
+                                sortOptionId["continuation"] = sortOption.continuation
+                            end if
+                            sortOption.id = FormatJson(sortOptionId)
+                        end for
                     end if
-                    response.Json(result)
-                    if channel.DoesExist("cache-control")
-                        response.headers["cache-control"] = channel["cache-control"]
-                    end if
+                    result["sortOptions"] = sortOptions
+                end if
+                response.Json(result)
+                if channel.DoesExist("cache-control")
+                    response.headers["cache-control"] = channel["cache-control"]
                 end if
 
                 return true
