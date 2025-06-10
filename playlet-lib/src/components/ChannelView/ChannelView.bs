@@ -349,14 +349,17 @@ function GetSortingContextMenuOptionsForItem(video as object) as object
     end if
 
     feedSource = feedSources[0]
-    endpoint = feedSource.endpoint
-    if not m.sortOptions.DoesExist(endpoint)
-        return []
+    sortOptions = feedSource.state.sortOptions
+    if not IsArray(sortOptions)
+        endpoint = feedSource.endpoint
+        if not m.sortOptions.DoesExist(endpoint)
+            return []
+        end if
+
+        sortOptions = m.sortOptions[endpoint]
     end if
 
     title = Tr(Locale.Dialogs.SortFeedBy).replace("%1", `"${feedSource.title}"`)
-    sortOptions = m.sortOptions[endpoint]
-
     return [ContextMenuUtils.CreateOption(title + "...", m.top, "ShowSortDialog", [title, sortOptions, feedContentNode])]
 end function
 

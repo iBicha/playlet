@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Channel sort options in Playlet backend (sort videos by Newest, Oldest, Popular)
+
 ### Fixed
 
 - [Perf] reverted a perf fix that wasn't helping
