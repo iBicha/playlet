@@ -1,0 +1,50 @@
+import "pkg:/source/utils/Logging.bs"
+
+function Init()
+    m.top.functionName = "JobTaskLoop"
+end function
+
+function JobTaskLoop() as void
+    msgPort = CreateObject("roMessagePort")
+
+    m.top.observeField("shutdown", msgPort)
+    m.top.observeField("request", msgPort)
+
+    m.top.ready = true
+
+    while true
+        msg = wait(0, msgPort)
+        msgType = type(msg)
+
+        if msgType = "roSGNodeEvent"
+            field = msg.GetField()
+            if field = "shutdown" and msg.getData()
+                return
+            end if
+            if field = "request"
+                request = msg.getData()
+                LogInfo("Received job request:", request)
+                ExecuteJobRequest(request)
+                LogInfo("Job request executed:", request.jobName)
+            end if
+        end if
+    end while
+end function
+
+function ExecuteJobRequest(request as object) as void
+    job = CreateObject("roSGNode", request.jobName)
+    if job = invalid
+        LogError("Failed to create job node:", request.jobName)
+        return
+    end if
+
+    if request.input <> invalid
+        job.input = request.input
+    end if
+
+    if request.callback <> invalid
+        job.callback = request.callback
+    end if
+
+    job@.Execute()
+end function

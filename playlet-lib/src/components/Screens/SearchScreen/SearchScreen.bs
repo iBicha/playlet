@@ -11,6 +11,7 @@ import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 
 function Init()
     m.top.focusable = true
@@ -39,6 +40,8 @@ function Init()
     }
 
     m.top.ObserveField("filters", FuncName(OnFiltersChange))
+
+    m.jobQueue = m.top.getScene().findNode("JobQueue")
 end function
 
 function OnNodeReady()
@@ -153,11 +156,14 @@ function OnSearchSuggestionsTaskResults(output as object) as void
     m.suggestions.focusable = m.suggestions.buttons.Count() > 0
 end function
 
-function OnFiltersButtonSelected()
-    searchFilters = CreateObject("roSGNode", "SearchFilters")
-    m.appController@.PushScreen(searchFilters)
-    searchFilters.searchScreen = m.top
-    searchFilters@.BindNode()
+function OnFiltersButtonSelected() as void
+    for i = 0 to 100
+        JobSystem.QueueJob(m.jobQueue, "MyJob", { foo: "bar" })
+    end for
+    ' searchFilters = CreateObject("roSGNode", "SearchFilters")
+    ' m.appController@.PushScreen(searchFilters)
+    ' searchFilters.searchScreen = m.top
+    ' searchFilters@.BindNode()
 end function
 
 function OnSearchButtonSelected()
@@ -315,6 +321,8 @@ function ScrollDown() as void
 end function
 
 function OnKeyEvent(key as string, press as boolean) as boolean
+    JobSystem.QueueJob(m.jobQueue, "MyJob", { foo: "bar" })
+
     navigation = NavigationKeyHandler(key, press)
     if navigation.handled
         m.currentNavigtionNode = navigation.node

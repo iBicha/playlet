@@ -1,0 +1,84 @@
+import "pkg:/source/utils/ErrorUtils.bs"
+
+function GetInput() as dynamic
+    return m.top.input
+end function
+
+function GetCallbackNode() as dynamic
+    return m.top.callback
+end function
+
+function JobSuccess() as void
+    callbackNode = m.top.callback
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.success = true
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobError(errorMessage as string) as void
+    callbackNode = m.top.callback
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.error = errorMessage
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobCancel() as void
+    callbackNode = m.top.callback
+    if callbackNode = invalid
+        return
+    end if
+
+    callbackNode.cancelled = true
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function IsJobCancelled() as boolean
+    callbackNode = m.top.callback
+    if callbackNode = invalid
+        return false
+    end if
+
+    return callbackNode.cancelled = true
+end function
+
+function Execute(_unused as dynamic) as void
+    #if DEBUG
+        ValidateThreadInfoOrThrow()
+    #end if
+    try
+        ExecuteJob()
+    catch error
+        JobError(ErrorUtils.Format(error))
+    end try
+    if not m.jobStateSet = true
+        JobSuccess()
+    end if
+end function
+
+function ExecuteJob() as void
+    throw "ExecuteJob abstract method must be implemented in derived class"
+end function
+
+function ValidateThreadInfoOrThrow() as void
+    threadInfo = m.top.threadInfo()
+    if threadInfo.currentThread.type <> "Task"
+        throw "This job can only be executed in a Task thread. This is a bug."
+    end if
+
+    if threadInfo.node.owningThread.id <> threadInfo.currentThread.id
+        throw "This job must be executed on the same thread that created it. This is a bug."
+    end if
+
+    if threadInfo.node.willRendezvousFromCurrentThread <> "No"
+        throw "threadInfo.node.willRendezvousFromCurrentThread must be 'No' for this job. This is a bug."
+    end if
+end function

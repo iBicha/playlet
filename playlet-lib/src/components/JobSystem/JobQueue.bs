@@ -1,0 +1,79 @@
+import "pkg:/source/utils/Types.bs"
+
+const JOB_TASK_COUNT = 5
+
+function Init()
+    m.jobTasks = []
+    m.jobTasksPendingInit = {}
+    m.jobTasksReady = false
+    for i = 0 to JOB_TASK_COUNT - 1
+        jobTask = CreateObject("roSGNode", "JobTask")
+        jobTask.id = StrI(rnd(2147483647), 36)
+        jobTask.observeFieldScoped("ready", FuncName(OnJobTaskReady))
+        m.jobTasksPendingInit[jobTask.id] = true
+        jobTask.control = "run"
+        m.jobTasks.push(jobTask)
+    end for
+    m.currentJobTaskIndex = 0
+
+    m.top.observeField("shutdown", FuncName(OnShutdown))
+    m.top.observeField("request", FuncName(OnRequest))
+end function
+
+function OnJobTaskReady(event as object) as void
+    jobTask = event.getRoSGNode()
+    jobTask.unobserveFieldScoped("ready")
+
+    m.jobTasksPendingInit.Delete(jobTask.id)
+    if m.jobTasksPendingInit.Count() > 0
+        return
+    end if
+
+    m.jobTasksReady = true
+    m.jobTasksPendingInit = invalid
+
+    pendingRequestEvents = m.pendingRequestEvents
+    if pendingRequestEvents = invalid
+        return
+    end if
+
+    m.pendingRequestEvents = invalid
+    for each requestEvent in pendingRequestEvents
+        OnRequest(requestEvent)
+    end for
+end function
+
+function OnShutdown(event as object) as void
+    m.top.unobserveField("shutdown")
+    m.top.unobserveField("request")
+
+    for each jobTask in m.jobTasks
+        jobTask.cancel = true
+        jobTask.unobserveFieldScoped("ready")
+    end for
+
+    m.jobTasks = invalid
+    m.jobTasksPendingInit = invalid
+    m.jobTasksReady = false
+    m.currentJobTaskIndex = 0
+    m.pendingRequestEvents = invalid
+end function
+
+function OnRequest(event as object) as void
+    if not m.jobTasksReady
+        if m.pendingRequestEvents = invalid
+            m.pendingRequestEvents = []
+        end if
+        m.pendingRequestEvents.push(event)
+        return
+    end if
+
+    request = event.getData()
+    if not IsAssociativeArray(request)
+        return
+    end if
+
+    jobTask = m.jobTasks[m.currentJobTaskIndex]
+    m.currentJobTaskIndex = (m.currentJobTaskIndex + 1) mod m.jobTasks.Count()
+    jobTask.request = request
+end function
