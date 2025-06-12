@@ -99,26 +99,35 @@ namespace Innertube
             return "Invalid playability status"
         end if
 
-        if playabilityStatus["status"] = "OK"
+        status = ValidString(playabilityStatus["status"])
+        if status = "OK"
             return ""
         end if
 
-        errorMessage = ""
-        if IsString(playabilityStatus["reason"])
-            errorMessage = playabilityStatus["reason"]
+        errorLines = []
+        if not StringUtils.IsNullOrEmpty(playabilityStatus["reason"])
+            errorLines.Push(playabilityStatus["reason"])
+        end if
+
+        if not StringUtils.IsNullOrEmpty(playabilityStatus["reasonTitle"])
+            errorLines.Push(playabilityStatus["reasonTitle"])
         end if
 
         subreason = ParseText(ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorMessageRenderer", "subreason"]))
-
         if subreason <> ""
-            errorMessage += `\n` + subreason
+            errorLines.Push(subreason)
         end if
 
-        if errorMessage = ""
-            errorMessage = "Video not available"
+        if errorLines.Count() = 0
+            errorLines.Push("Video not available (Unknown)")
         end if
 
-        return errorMessage
+        if status = "LOGIN_REQUIRED"
+            ' TODO:P2 localize
+            errorLines.Push("Hint: Log in to the YouTube app on your phone, then cast the video to Playlet.")
+        end if
+
+        return errorLines.Join(`\n`)
     end function
 
     function ParseStoryboards(payload as object, lengthSeconds as integer) as object
