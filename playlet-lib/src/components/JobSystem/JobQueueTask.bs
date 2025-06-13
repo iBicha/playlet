@@ -1,18 +1,104 @@
-' JobQueueTask should belong to JobQueue
-' JobQueueTask starts with no JobTasks
-' auto scales up and down
-' JobTasks signal when they are ready to take on new work
-
+' Maximum number of JobTasks that can be created
+const MAX_JOB_TASK_COUNT = 10
+' Minimum number of JobTasks that will be kept alive
+const MIN_JOB_TASK_COUNT = 2
+' Time in milliseconds to wait before scaling down JobTasks
+const SCALE_DOWN_THRESHOLD_MS = 5000
 
 function Init()
     m.top.functionName = "JobQueueTaskLoop"
 end function
 
 function JobQueueTaskLoop() as void
-    msgPort = CreateObject("roMessagePort")
+    messagePort = CreateObject("roMessagePort")
 
-    m.top.observeField("shutdown", msgPort)
-    m.top.observeField("request", msgPort)
+    m.top.observeField("shutdown", messagePort)
+    m.top.observeField("request", messagePort)
 
+    m.top.ready = true
 
+    m.busyJobTasks = {}
+    m.idleJobTasks = []
+
+    requests = []
+
+    while true
+        while requests.count() > 0
+            if m.idleJobTasks.Count() > 0
+                ? "Scheduling request from queue to idle JobTask."
+                ScheduleRequest(requests.Shift(), m.idleJobTasks.Pop())
+                continue while
+            end if
+
+            if m.idleJobTasks.Count() + m.busyJobTasks.Count() < MAX_JOB_TASK_COUNT
+                jobTask = CreateObject("roSGNode", "JobTask")
+                jobTask.id = "JobTask-" + StrI(rnd(2147483647), 36)
+                jobTask.ObserveFieldScoped("ready", messagePort)
+                m.busyJobTasks[jobTask.id] = jobTask
+                jobTask.control = "run"
+                ? "Created new JobTask with ID: "; jobTask.id
+            end if
+
+            exit while
+        end while
+
+        scaleDownThresholdMs = m.idleJobTasks.Count() > MIN_JOB_TASK_COUNT ? SCALE_DOWN_THRESHOLD_MS : 0
+        message = wait(scaleDownThresholdMs, messagePort)
+        if message = invalid
+            if m.idleJobTasks.Count() > 0
+                jobTask = m.idleJobTasks.Pop()
+                jobTask.UnobserveFieldScoped("ready")
+                jobTask.shutdown = true
+                ? "JobTask "; jobTask.id; " is idle for "; SCALE_DOWN_THRESHOLD_MS; "ms. Shutting down."
+                ? "Remaining idle job tasks:", m.idleJobTasks.Count()
+            end if
+            continue while
+        end if
+
+        messageType = Type(message)
+        if messageType = "roSGNodeEvent"
+            field = message.GetField()
+
+            if field = "request"
+                request = message.GetData()
+                requests.Push(request)
+            else if field = "ready" and message.GetData()
+                jobTask = message.GetRoSGNode()
+                m.busyJobTasks.Delete(jobTask.id)
+                m.idleJobTasks.Push(jobTask)
+            else if field = "shutdown" and message.GetData()
+                Shutdown()
+                return
+            else
+                ? "Unknown field:", field
+            end if
+        end if
+    end while
+end function
+
+function ScheduleRequest(request as dynamic, jobTask as dynamic)
+    ? "Scheduling request for job task:"; jobTask.id; "with request:"; request
+    m.busyJobTasks[jobTask.id] = jobTask
+    jobTask.request = request
+end function
+
+function Shutdown()
+    m.top.UnobserveFieldScoped("request")
+    m.top.UnobserveFieldScoped("shutdown")
+    m.top.request = invalid
+    m.top.ready = false
+
+    for each jobTaskId in m.busyJobTasks
+        jobTask = m.busyJobTasks[jobTaskId]
+        jobTask.UnobserveFieldScoped("ready")
+        jobTask.shutdown = true
+    end for
+
+    for each jobTask in m.idleJobTasks
+        jobTask.UnobserveFieldScoped("ready")
+        jobTask.shutdown = true
+    end for
+
+    m.busyJobTasks = invalid
+    m.idleJobTasks = invalid
 end function
