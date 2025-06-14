@@ -4,6 +4,7 @@
 'import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 'import "pkg:/source/utils/LoadingScreen.bs"
 'import "pkg:/source/utils/Locale.bs"
+'import "pkg:/components/JobSystem/JobSystem.bs"
 
 function Init()
     InitializeBindings() ' auto-generated!
@@ -13,6 +14,11 @@ function Init()
     ' Let's wait until it has one.
     m.MainSceneContainer = m.scene.findNode("MainSceneContainer")
     m.MainSceneContainer.ObserveField("change", FuncName(MainSceneContainerChanged))
+    m.jobQueue = m.top.findNode("JobQueue")
+    JobSystem_QueueJob(m.jobQueue, "MyJob", {
+        foo: "bar"
+        "main": true
+    })
 end function
 
 function SetScenePalette(scene as object) as void

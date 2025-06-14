@@ -25,7 +25,6 @@ function JobQueueTaskLoop() as void
     while true
         while requests.count() > 0
             if m.idleJobTasks.Count() > 0
-                ? "Scheduling request from queue to idle JobTask."
                 ScheduleRequest(requests.Shift(), m.idleJobTasks.Pop())
                 continue while
             end if
@@ -36,7 +35,6 @@ function JobQueueTaskLoop() as void
                 jobTask.ObserveFieldScoped("ready", messagePort)
                 m.busyJobTasks[jobTask.id] = jobTask
                 jobTask.control = "run"
-                ? "Created new JobTask with ID: "; jobTask.id
             end if
 
             exit while
@@ -49,8 +47,6 @@ function JobQueueTaskLoop() as void
                 jobTask = m.idleJobTasks.Pop()
                 jobTask.UnobserveFieldScoped("ready")
                 jobTask.shutdown = true
-                ? "JobTask "; jobTask.id; " is idle for "; SCALE_DOWN_THRESHOLD_MS; "ms. Shutting down."
-                ? "Remaining idle job tasks:", m.idleJobTasks.Count()
             end if
             continue while
         end if
@@ -69,15 +65,12 @@ function JobQueueTaskLoop() as void
             else if field = "shutdown" and message.GetData()
                 Shutdown()
                 return
-            else
-                ? "Unknown field:", field
             end if
         end if
     end while
 end function
 
 function ScheduleRequest(request as dynamic, jobTask as dynamic)
-    ? "Scheduling request for job task:"; jobTask.id; "with request:"; request
     m.busyJobTasks[jobTask.id] = jobTask
     jobTask.request = request
 end function

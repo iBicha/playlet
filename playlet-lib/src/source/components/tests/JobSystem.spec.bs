@@ -1,0 +1,52 @@
+import "pkg:/components/JobSystem/JobSystem.bs"
+
+namespace Tests
+
+    @suite
+    class JobSystemTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.logger = CreateObject("roSGNode", "Logger")
+        end function
+
+        @describe("JobSystem")
+        @it("Queues and processes jobs correctly")
+        function _()
+            successCalls = 0
+            errorCalls = 0
+
+            messagePort = CreateObject("roMessagePort")
+
+            jobQueue = CreateObject("roSGNode", "JobQueue")
+            for i = 1 to 100
+                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode.observeField("done", messagePort, ["success"])
+                JobSystem.QueueJob(jobQueue, "SimpleTestJob", { sleep: 50, success: i mod 2 = 0 }, callbackNode)
+            end for
+
+            while true
+                msg = wait(1000, messagePort)
+
+                if msg = invalid
+                    m.testSuite.fail("Waiting for job messages timed out after 1000ms")
+                end if
+
+                if type(msg) = "roSGNodeEvent"
+                    if msg.getField() = "done"
+                        info = msg.getInfo()
+                        if info.success
+                            successCalls += 1
+                        else
+                            errorCalls += 1
+                        end if
+                    end if
+                end if
+
+                if successCalls = 50 and errorCalls = 50
+                    exit while
+                end if
+            end while
+        end function
+    end class
+
+end namespace
