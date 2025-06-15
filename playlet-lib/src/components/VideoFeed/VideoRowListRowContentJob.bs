@@ -1,0 +1,256 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
+
+function ExecuteJob() as void
+    try
+        input = JobGetInput()
+        rowList = input.rowList
+        feedContentNode = input.feedContentNode
+        invidiousNode = input.invidious
+
+        callbackNode = JobGetCallbackNode()
+        cancallation = CancellationUtils.CreateCancellation(callbackNode, "cancel", true)
+
+        service = new Invidious.InvidiousService(invidiousNode)
+        instance = service.GetInstance()
+
+        totalfetchedItems = 0
+
+        someContentReadySet = false
+
+        while true
+            if JobIsCancelled()
+                feedContentNode.loadState = FeedLoadState.None
+                JobCancel()
+                return
+            end if
+
+            feedSources = feedContentNode.feedSources
+            feedSourcesIndex = feedContentNode.feedSourcesIndex
+
+            if feedSourcesIndex >= feedSources.Count()
+                feedContentNode.loadState = FeedLoadState.Loaded
+
+                if not someContentReadySet
+                    rowList.someContentReady = false
+                end if
+                JobSuccess()
+                return
+            end if
+
+            feedSource = feedSources[feedSourcesIndex]
+
+            if feedSource.state.loadState = FeedLoadState.Loaded or feedSource.state.loadState = FeedLoadState.Error
+                feedSourcesIndex += 1
+                if feedSourcesIndex >= feedSources.Count()
+                    feedContentNode.loadState = FeedLoadState.Loaded
+                    if not someContentReadySet
+                        rowList.someContentReady = false
+                    end if
+                    JobSuccess()
+                    return
+                end if
+                feedContentNode.feedSourcesIndex = feedSourcesIndex
+                continue while
+            end if
+
+            feedSource = service.MarkFeedPagination(feedContentNode)
+            hadContinuation = not StringUtils.IsNullOrEmpty(feedSource.state.continuation)
+
+            response = service.MakeRequest(feedSource, {
+                additionalQueryParams: feedSource.state.queryParams
+                cancellation: cancallation
+            })
+
+            if not response.success
+                if response.error = Invidious.ERROR_NOT_AUTHENTICATED
+                    if feedSources.Count() = 1
+                        parent = feedContentNode.getParent()
+                        parent.removeChild(feedContentNode)
+                        JobSuccess()
+                        return
+                    end if
+
+                    continue while
+                end if
+
+                if response.error.instr("Administrator has disabled this endpoint.") > -1
+                    LogWarn(feedSource.endpoint, "feedSource not available:", response.error)
+                    if feedSources.Count() = 1
+                        parent = feedContentNode.getParent()
+                        parent.removeChild(feedContentNode)
+                        JobSuccess()
+                        return
+                    end if
+
+                    continue while
+                end if
+
+                feedSource.state.loadState = FeedLoadState.Error
+                feedSources[feedSourcesIndex] = feedSource
+                feedContentNode.feedSources = feedSources
+
+                isCancelled = response.cancelled = true
+                if not isCancelled
+                    if feedContentNode.title.instr(" (Failed to load)") = -1
+                        feedContentNode.title += " (Failed to load)"
+                    end if
+                end if
+
+                HandleFeedLoadErrorDialog(response.error, isCancelled, rowList)
+                continue while
+            end if
+
+            itemNodes = []
+            for each item in response.result.items
+                itemNode = InvidiousContent.ToRowCellContentNode(item, instance)
+                if itemNode <> invalid
+                    itemNode.feedSourcesIndex = feedSourcesIndex
+                    itemNodes.Push(itemNode)
+                end if
+            end for
+
+            RemovePlaceHolderItems(feedContentNode)
+
+            addedItemCount = 0
+            ' For some reason, Innertube's "FEplaylist_aggregation" (which maps to "inv_auth_playlists"
+            ' aka Authenticated user playlists) returns continuation for the next page, but returns
+            ' items from the first page. So we deduplicate to avoid loading this feed infnitely,
+            ' with the same items repeating.
+            if feedSource.id = "inv_auth_playlists"
+                addedItemCount = DeduplicateAppendAuthPlaylists(feedContentNode, itemNodes)
+            else
+                feedContentNode.appendChildren(itemNodes)
+                addedItemCount = itemNodes.Count()
+            end if
+
+            hasContinuation = not StringUtils.IsNullOrEmpty(response.result.continuation)
+            feedSource.state.continuation = ValidString(response.result.continuation)
+
+            if response.result.sortOptions <> invalid
+                feedSource.state.sortOptions = response.result.sortOptions
+            end if
+
+            if addedItemCount > 0
+                pageType = feedSource.state.paginationType
+                if response.result.isLastPage = true or (hadContinuation and not hasContinuation)
+                    feedSource.state.loadState = FeedLoadState.Loaded
+                else if hasContinuation
+                    feedSource.state.loadState = FeedLoadState.LoadedPage
+                else if pageType = PaginationType.Pages
+                    feedSource.state.loadState = FeedLoadState.LoadedPage
+                else
+                    feedSource.state.loadState = FeedLoadState.Loaded
+                end if
+            else
+                feedSource.state.loadState = FeedLoadState.Loaded
+            end if
+
+            feedSources[feedSourcesIndex] = feedSource
+            feedContentNode.feedSources = feedSources
+
+            if feedSource.state.loadState = FeedLoadState.Loaded and feedSourcesIndex = feedSources.Count() - 1
+                feedContentNode.loadState = FeedLoadState.Loaded
+            else
+                feedContentNode.loadState = FeedLoadState.LoadedPage
+            end if
+
+            if addedItemCount > 0 and not someContentReadySet
+                someContentReadySet = true
+                rowList.someContentReady = true
+            end if
+
+            totalfetchedItems += addedItemCount
+            if totalfetchedItems > 3
+                exit while
+            end if
+        end while
+
+    catch error
+        HandleFeedLoadErrorDialog(error, false, rowList)
+        JobError(error)
+        return
+    end try
+end function
+
+function RemovePlaceHolderItems(contentNode as object)
+    childCount = contentNode.getChildCount()
+    removeIndex = childCount
+    removeCount = 0
+
+    index = childCount - 1
+    isLoading = true
+    while isLoading and index >= 0
+        child = contentNode.getChild(index)
+        isLoading = ValidString(child.type) = "loading"
+        if not isLoading
+            exit while
+        end if
+        removeCount += 1
+        removeIndex -= 1
+        index -= 1
+    end while
+
+    if removeCount > 0
+        contentNode.removeChildrenIndex(removeCount, removeIndex)
+    end if
+end function
+
+function DeduplicateAppendAuthPlaylists(feedContentNode as object, itemNodes as object) as integer
+    if itemNodes.Count() = 0
+        return 0
+    end if
+
+    currentChildCount = feedContentNode.getChildCount()
+    if currentChildCount = 0
+        feedContentNode.appendChildren(itemNodes)
+        return itemNodes.Count()
+    end if
+
+    currentChildren = feedContentNode.getChildren(-1, 0)
+    currentChildrenMap = {}
+    for i = 0 to currentChildCount - 1
+        playlistId = currentChildren[i].playlistId
+        if StringUtils.IsNullOrEmpty(playlistId)
+            continue for
+        end if
+        currentChildrenMap[playlistId] = true
+    end for
+
+    nodesToAdd = []
+    for i = 0 to itemNodes.Count() - 1
+        itemNode = itemNodes[i]
+        playlistId = itemNode.playlistId
+        if StringUtils.IsNullOrEmpty(playlistId)
+            continue for
+        end if
+        if currentChildrenMap[playlistId] = true
+            continue for
+        end if
+        currentChildrenMap[playlistId] = true
+        nodesToAdd.Push(itemNode)
+    end for
+    if nodesToAdd.Count() = 0
+        return 0
+    end if
+    feedContentNode.appendChildren(nodesToAdd)
+    return nodesToAdd.Count()
+end function
+
+function HandleFeedLoadErrorDialog(error as object, isCancelled as boolean, rowList as object) as void
+    error = ErrorUtils.Format(error)
+    LogError(error)
+    rowList.onError = error
+    if rowList.hasField("dispose") and rowList.dispose
+        return
+    end if
+    if isCancelled
+        return
+    end if
+    DialogUtils.ShowDialogEx({
+        message: error
+        title: "Failed to load feed"
+        large: true
+    })
+end function

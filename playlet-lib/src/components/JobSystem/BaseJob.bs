@@ -1,15 +1,27 @@
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
 
-function GetInput() as dynamic
-    return m.top.input
+function JobGetInput() as dynamic
+    if m._input = invalid
+        m._input = m.top.input
+    end if
+    return m._input
 end function
 
-function GetCallbackNode() as dynamic
-    return m.top.callback
+function JobGetCallbackNode() as dynamic
+    if m._callback = invalid
+        input = JobGetInput()
+        if input = invalid
+            return invalid
+        end if
+        m._callback = input._callback
+    end if
+
+    return m._callback
 end function
 
 function JobSuccess() as void
-    callbackNode = m.top.callback
+    callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return
     end if
@@ -19,7 +31,7 @@ function JobSuccess() as void
 end function
 
 function JobError(errorMessage as string) as void
-    callbackNode = m.top.callback
+    callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return
     end if
@@ -30,32 +42,29 @@ function JobError(errorMessage as string) as void
 end function
 
 function JobCancel() as void
-    callbackNode = m.top.callback
+    callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return
     end if
 
-    callbackNode.cancelled = true
+    callbackNode.cancel = true
     callbackNode.success = false
     callbackNode.done = true
     m.jobStateSet = true
 end function
 
-function IsJobCancelled() as boolean
-    callbackNode = m.top.callback
+function JobIsCancelled() as boolean
+    callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return false
     end if
 
-    return callbackNode.cancelled = true
+    return callbackNode.cancel = true
 end function
 
 function Execute(_unused as dynamic) as void
-    #if TEST_MODE
-    #else
-        #if DEBUG
-            ValidateThreadInfoOrThrow()
-        #end if
+    #if DEBUG
+        ValidateThreadInfoOrThrow()
     #end if
     try
         ExecuteJob()

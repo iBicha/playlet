@@ -9,6 +9,10 @@ namespace Tests
             m.logger = CreateObject("roSGNode", "Logger")
         end function
 
+        protected override function beforeEach()
+            m.jobQueue = CreateObject("roSGNode", "JobQueue")
+        end function
+
         @describe("JobSystem")
         @it("Queues and processes jobs correctly")
         function _()
@@ -17,11 +21,10 @@ namespace Tests
 
             messagePort = CreateObject("roMessagePort")
 
-            jobQueue = CreateObject("roSGNode", "JobQueue")
             for i = 1 to 100
                 callbackNode = CreateObject("roSGNode", "JobCallback")
                 callbackNode.observeField("done", messagePort, ["success"])
-                JobSystem.QueueJob(jobQueue, "SimpleTestJob", { sleep: 50, success: i mod 2 = 0 }, callbackNode)
+                JobSystem.QueueJob(m.jobQueue, "SimpleTestJob", { sleep: 50, success: i mod 2 = 0 }, callbackNode)
             end for
 
             while true
@@ -29,6 +32,7 @@ namespace Tests
 
                 if msg = invalid
                     m.testSuite.fail("Waiting for job messages timed out after 1000ms")
+                    exit while
                 end if
 
                 if type(msg) = "roSGNodeEvent"
@@ -47,6 +51,96 @@ namespace Tests
                 end if
             end while
         end function
+
+        @it("Cancels jobs correctly")
+        function _()
+            cancelCalls = 0
+
+            messagePort = CreateObject("roMessagePort")
+
+            callbacks = []
+            for i = 1 to 10
+                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode.observeField("done", messagePort, ["success", "cancel"])
+                callbacks.push(callbackNode)
+                JobSystem.QueueJob(m.jobQueue, "SimpleTestJob", { sleep: 5000, success: true }, callbackNode)
+            end for
+
+            ' Wait for jobs to start before we start cancelling them
+            sleep (1000)
+
+            for i = 1 to 10
+                callbackNode = callbacks[i - 1]
+                callbackNode.cancel = true
+            end for
+
+            while true
+                msg = wait(1000, messagePort)
+
+                if msg = invalid
+                    m.testSuite.fail("Waiting for job messages timed out after 1000ms")
+                    exit while
+                end if
+
+                if type(msg) = "roSGNodeEvent"
+                    if msg.getField() = "done"
+                        info = msg.getInfo()
+                        if info.cancel and not info.success
+                            cancelCalls += 1
+                        else if info.success
+                            m.testSuite.fail("Job should not have succeeded after cancellation")
+                            exit while
+                        end if
+                    end if
+                end if
+
+                if cancelCalls = 10
+                    exit while
+                end if
+            end while
+        end function
+
+        @it("Cancels jobs after they start immediately")
+        function _()
+            cancelCalls = 0
+
+            messagePort = CreateObject("roMessagePort")
+
+            callbacks = []
+            for i = 1 to 10
+                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode.observeField("done", messagePort, ["success", "cancel"])
+                callbacks.push(callbackNode)
+                JobSystem.QueueJob(m.jobQueue, "SimpleTestJob", { sleep: 5000, success: true }, callbackNode)
+                callbackNode.cancel = true
+            end for
+
+            while true
+                msg = wait(1000, messagePort)
+
+                if msg = invalid
+                    m.testSuite.fail("Waiting for job messages timed out after 1000ms")
+                    exit while
+                end if
+
+                if type(msg) = "roSGNodeEvent"
+                    if msg.getField() = "done"
+                        info = msg.getInfo()
+                        if info.cancel and not info.success
+                            cancelCalls += 1
+                        else if info.success
+                            m.testSuite.fail("Job should not have succeeded after cancellation")
+                            exit while
+                        end if
+                    end if
+                end if
+
+                if cancelCalls = 10
+                    exit while
+                end if
+            end while
+        end function
+
     end class
 
 end namespace
