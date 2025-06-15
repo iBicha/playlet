@@ -1,5 +1,6 @@
 import "pkg:/components/ChannelView/ChannelUtils.bs"
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/PlaylistView/PlaylistUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
@@ -15,7 +16,7 @@ import "pkg:/source/utils/Types.bs"
 ' TODO:P1 add the option to remove a row if it does not have any content
 ' E.g. Subscriptions, Watch History and Playlists can be empty
 function Init()
-    m.pendingLoadTasks = {}
+    m.pendingLoadJobs = {}
 end function
 
 function OnNodeReady()
@@ -213,33 +214,40 @@ function OnAuthTokenChange()
 end function
 
 function InitContent() as void
-    CancelCurrentTasks()
+    CancelCurrentJobs()
 
     if m.top.feeds = invalid
         m.top.content = invalid
         return
     end if
 
-    task = AsyncTask.Start(Tasks.VideoRowListContentTask, {
+    input = {
         node: m.top
         feeds: m.top.feeds
-    }, OnVideoRowListContentTaskResult)
-    m.pendingLoadTasks[task.id] = { task: task }
+    }
+
+    callback = JobSystem.CreateCallback()
+    callback.observeFieldScoped("done", FuncName(OnVideoRowListContentJobDone), ["success", "cancel", "error"])
+    JobSystem.QueueJob(m.jobQueue, "VideoRowListContentJob", input, callback)
+    m.pendingLoadJobs[callback.id] = { callback: callback }
 end function
 
-function CancelCurrentTasks()
-    pendingLoadTasks = m.pendingLoadTasks
-    for each id in pendingLoadTasks
-        task = pendingLoadTasks[id].task
-        task.cancel = true
+function CancelCurrentJobs()
+    pendingLoadJobs = m.pendingLoadJobs
+    for each id in pendingLoadJobs
+        callback = pendingLoadJobs[id].callback
+        callback.cancel = true
     end for
-    m.pendingLoadTasks = {}
+    m.pendingLoadJobs = {}
 end function
 
-function OnVideoRowListContentTaskResult(output as object) as void
-    m.pendingLoadTasks.Delete(output.task.id)
+function OnVideoRowListContentJobDone(event as object) as void
+    id = event.getNode()
+    info = event.getInfo()
 
-    if output.cancelled
+    m.pendingLoadJobs.Delete(id)
+
+    if info.cancel
         return
     end if
 
@@ -290,10 +298,10 @@ function GetRowsToLoad() as object
 end function
 
 function LoadRowContent(contentNode as object) as void
-    ' Do not spin up multiple tasks for the same content node
-    for each id in m.pendingLoadTasks
-        pendingTask = m.pendingLoadTasks[id]
-        if contentNode.isSameNode(pendingTask.content) and pendingTask.task.state = "run"
+    ' Do not spin up multiple jobs for the same content node
+    for each id in m.pendingLoadJobs
+        job = m.pendingLoadJobs[id]
+        if contentNode.isSameNode(job.content) and not job.callback.done
             LogInfo("Row content already loading:", contentNode.title)
             return
         end if
@@ -302,17 +310,29 @@ function LoadRowContent(contentNode as object) as void
     LogInfo("Loading row content:", contentNode.title)
 
     contentNode.loadState = FeedLoadState.Loading
-    task = AsyncTask.Start(Tasks.VideoRowListRowContentTask, {
+    input = {
         rowList: m.top
         feedContentNode: contentNode
         invidious: m.invidious
-    }, OnVideoRowListRowContentTaskResult)
-    m.pendingLoadTasks[task.id] = { task: task, content: contentNode }
+    }
+
+    callback = JobSystem.CreateCallback()
+    callback.observeFieldScoped("done", FuncName(OnVideoRowListRowContentJobDone), ["success", "cancel", "error"])
+    JobSystem.QueueJob(m.jobQueue, "VideoRowListRowContentJob", input, callback)
+
+    m.pendingLoadJobs[callback.id] = {
+        callback: callback
+        content: contentNode
+    }
 end function
 
-function OnVideoRowListRowContentTaskResult(output as object) as void
-    m.pendingLoadTasks.Delete(output.task.id)
-    if output.cancelled
+function OnVideoRowListRowContentJobDone(event as object) as void
+    id = event.getNode()
+    info = event.getInfo()
+
+    m.pendingLoadJobs.Delete(id)
+
+    if info.cancel
         return
     end if
 
@@ -347,7 +367,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 end function
 
 function OnDispose()
-    CancelCurrentTasks()
+    CancelCurrentJobs()
     DisposeObservers()
     m.top.screen = invalid
     m.top.content = invalid

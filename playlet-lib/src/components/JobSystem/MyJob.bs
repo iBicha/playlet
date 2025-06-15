@@ -1,0 +1,19 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Logging.bs"
+
+function ExecuteJob() as void
+    input = JobGetInput()
+    callback = JobGetCallbackNode()
+    LogInfo("Input:", input)
+
+    request = HttpClient.Get("http://192.168.18.5:8095/api/v1/popular")
+    request.Cancellation(CancellationUtils.CreateCancellation(callback, "cancel", true))
+    response = request.Await()
+
+    if response.IsSuccess()
+        LogInfo("Request successful:", response.Json().Count(), "items received")
+    else
+        LogError("Request failed:", response.GetErrorMessage())
+        JobError("Failed to fetch data from API: " + response.GetErrorMessage())
+    end if
+end function

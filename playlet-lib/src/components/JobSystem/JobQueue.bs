@@ -1,0 +1,55 @@
+import "pkg:/source/utils/MessagePortUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.jobQueueTaskReady = false
+    m.jobQueueTask = CreateObject("roSGNode", "JobQueueTask")
+    m.jobQueueTask.observeFieldScoped("ready", FuncName(OnJobQueueTaskReady))
+    m.jobQueueTask.control = "run"
+    m.top.observeField("shutdown", FuncName(OnShutdown))
+    m.top.observeField("request", FuncName(OnRequest))
+end function
+
+function OnJobQueueTaskReady(event as object) as void
+    jobQueueTask = event.getRoSGNode()
+    jobQueueTask.unobserveFieldScoped("ready")
+
+    m.jobQueueTaskReady = true
+
+    pendingRequestEvents = m.pendingRequestEvents
+    if pendingRequestEvents = invalid
+        return
+    end if
+
+    m.pendingRequestEvents = invalid
+    for each requestEvent in pendingRequestEvents
+        OnRequest(requestEvent)
+    end for
+end function
+
+function OnShutdown() as void
+    m.top.unobserveField("shutdown")
+    m.top.unobserveField("request")
+    m.jobQueueTaskReady = false
+    m.jobQueueTask.unobserveField("ready")
+    m.jobQueueTask.shutdown = true
+    m.jobQueueTask = invalid
+    m.pendingRequestEvents = invalid
+end function
+
+function OnRequest(event as object) as void
+    if not m.jobQueueTaskReady
+        if m.pendingRequestEvents = invalid
+            m.pendingRequestEvents = []
+        end if
+        m.pendingRequestEvents.push(event)
+        return
+    end if
+
+    request = event.getData()
+    if not IsAssociativeArray(request)
+        return
+    end if
+
+    m.jobQueueTask.request = request
+end function

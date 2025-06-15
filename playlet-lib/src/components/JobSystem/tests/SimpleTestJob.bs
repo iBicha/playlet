@@ -1,0 +1,40 @@
+import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    if JobIsCancelled()
+        JobCancel()
+        LogInfo("Job cancelled before execution")
+        return
+    end if
+
+    sleepTimeMs = ValidInt(input.sleep)
+    if sleepTimeMs > 0
+        callback = JobGetCallbackNode()
+        if callback <> invalid
+            messagePort = CreateObject("roMessagePort")
+            cancellation = CancellationUtils.CreateCancellation(callback, "cancel", true)
+            CancellationUtils.ObserveCancellationScoped(cancellation, messagePort)
+            message = wait(sleepTimeMs, messagePort)
+            CancellationUtils.UnobserveCancellationScoped(cancellation)
+            if CancellationUtils.IsCancellationEvent(cancellation, message)
+                LogInfo("Job cancelled during execution")
+                JobCancel()
+                return
+            end if
+        else
+            sleep(sleepTimeMs)
+        end if
+    end if
+
+    if not input.success
+        error = "Simulated job error for testing purposes"
+        LogError(error)
+        JobError(error)
+        return
+    end if
+
+    LogInfo("Simulated job success for testing purposes")
+end function

@@ -1,0 +1,105 @@
+import "pkg:/source/utils/MessagePortUtils.bs"
+
+' Maximum number of JobTasks that can be created
+const MAX_JOB_TASK_COUNT = 8
+' Minimum number of JobTasks that will be kept alive
+const MIN_JOB_TASK_COUNT = 2
+' Time in milliseconds to wait before scaling down JobTasks
+const SCALE_DOWN_THRESHOLD_MS = 5000
+
+function Init()
+    m.top.functionName = "JobQueueTaskLoop"
+end function
+
+function JobQueueTaskLoop() as void
+    messagePort = CreateObject("roMessagePort")
+
+    m.top.observeField("shutdown", messagePort)
+    m.top.observeField("request", messagePort)
+
+    m.top.ready = true
+
+    m.busyJobTasks = {}
+    m.idleJobTasks = []
+
+    requests = []
+
+    while true
+        while requests.count() > 0
+            if m.idleJobTasks.Count() > 0
+                ScheduleRequest(requests.Shift(), m.idleJobTasks.Pop())
+                continue while
+            end if
+
+            if m.idleJobTasks.Count() + m.busyJobTasks.Count() < MAX_JOB_TASK_COUNT
+                jobTask = CreateObject("roSGNode", "JobTask")
+                jobTaskId = "JobTask-" + StrI(rnd(2147483647), 36)
+                jobTask.id = jobTaskId
+                jobTaskObject = {
+                    id: jobTaskId
+                    node: jobTask
+                }
+                m.busyJobTasks[jobTaskId] = jobTaskObject
+                MessagePortUtils.ObserveFieldScopedExSafe(jobTask, "ready", messagePort)
+                jobTask.control = "run"
+            end if
+
+            exit while
+        end while
+
+        scaleDownThresholdMs = m.idleJobTasks.Count() > MIN_JOB_TASK_COUNT ? SCALE_DOWN_THRESHOLD_MS : 0
+        message = wait(scaleDownThresholdMs, messagePort)
+        if message = invalid
+            if m.idleJobTasks.Count() > 0
+                jobTaskObject = m.idleJobTasks.Pop()
+                jobTaskObject.node.UnobserveFieldScoped("ready")
+                jobTaskObject.node.shutdown = true
+            end if
+            continue while
+        end if
+
+        messageType = Type(message)
+        if messageType = "roSGNodeEvent"
+            field = message.GetField()
+
+            if field = "request"
+                request = message.GetData()
+                requests.Push(request)
+            else if field = "ready" and message.GetData()
+                jobTaskId = message.GetNode()
+                jobTaskObject = m.busyJobTasks[jobTaskId]
+                m.busyJobTasks.Delete(jobTaskId)
+                m.idleJobTasks.Push(jobTaskObject)
+            else if field = "shutdown" and message.GetData()
+                Shutdown()
+                return
+            end if
+        end if
+    end while
+end function
+
+function ScheduleRequest(request as dynamic, jobTaskObject as dynamic)
+    m.busyJobTasks[jobTaskObject.id] = jobTaskObject
+    jobTaskObject.node.request = request
+end function
+
+function Shutdown()
+    m.top.UnobserveFieldScoped("request")
+    m.top.UnobserveFieldScoped("shutdown")
+    m.top.request = invalid
+    m.top.ready = false
+
+    for each jobTaskId in m.busyJobTasks
+        jobTask = m.busyJobTasks[jobTaskId]
+        jobTask.node.UnobserveFieldScoped("ready")
+        jobTask.node.shutdown = true
+    end for
+
+    for each jobTask in m.idleJobTasks
+        jobTask.node.UnobserveFieldScoped("ready")
+        jobTask.node.shutdown = true
+    end for
+
+    m.busyJobTasks = invalid
+    m.idleJobTasks = invalid
+end function
