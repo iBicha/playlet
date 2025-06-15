@@ -1,0 +1,96 @@
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
+
+function JobGetInput() as dynamic
+    if m._input = invalid
+        m._input = m.top.input
+    end if
+    return m._input
+end function
+
+function JobGetCallbackNode() as dynamic
+    if m._callback = invalid
+        input = JobGetInput()
+        if input = invalid
+            return invalid
+        end if
+        m._callback = input._callback
+    end if
+
+    return m._callback
+end function
+
+function JobSuccess() as void
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.success = true
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobError(errorMessage as string) as void
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.error = errorMessage
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobCancel() as void
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+
+    callbackNode.cancel = true
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobIsCancelled() as boolean
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return false
+    end if
+
+    return callbackNode.cancel = true
+end function
+
+function Execute(_unused as dynamic) as void
+    #if DEBUG
+        ValidateThreadInfoOrThrow()
+    #end if
+    try
+        ExecuteJob()
+    catch error
+        JobError(ErrorUtils.Format(error))
+    end try
+    if not m.jobStateSet = true
+        JobSuccess()
+    end if
+end function
+
+function ExecuteJob() as void
+    throw "ExecuteJob abstract method must be implemented in derived class"
+end function
+
+function ValidateThreadInfoOrThrow() as void
+    threadInfo = m.top.threadInfo()
+    if threadInfo.currentThread.type <> "Task"
+        throw "This job can only be executed in a Task thread. This is a bug."
+    end if
+
+    if threadInfo.node.owningThread.id <> threadInfo.currentThread.id
+        throw "This job must be executed on the same thread that created it. This is a bug."
+    end if
+
+    if threadInfo.node.willRendezvousFromCurrentThread <> "No"
+        throw "threadInfo.node.willRendezvousFromCurrentThread must be 'No' for this job. This is a bug."
+    end if
+end function

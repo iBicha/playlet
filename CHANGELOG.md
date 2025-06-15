@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- [perf] Added a job system to control background tasks.
+
 ### Fixed
 
 - Added a "hint" in the error message when playing a video and login is required.

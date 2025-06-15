@@ -2,13 +2,16 @@ import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
-' TODO:P1 handle case where all feedSources are empty
-@asynctask
-function VideoRowListRowContentTask(input as object) as object
+@job("VideoRowListRowContentJob")
+function ExecuteJob() as void
     try
+        input = JobGetInput()
         rowList = input.rowList
         feedContentNode = input.feedContentNode
         invidiousNode = input.invidious
+
+        callbackNode = JobGetCallbackNode()
+        cancallation = CancellationUtils.CreateCancellation(callbackNode, "cancel", true)
 
         service = new Invidious.InvidiousService(invidiousNode)
         instance = service.GetInstance()
@@ -18,9 +21,10 @@ function VideoRowListRowContentTask(input as object) as object
         someContentReadySet = false
 
         while true
-            if m.top.cancel
+            if JobIsCancelled()
                 feedContentNode.loadState = FeedLoadState.None
-                return invalid
+                JobCancel()
+                return
             end if
 
             feedSources = feedContentNode.feedSources
@@ -32,9 +36,8 @@ function VideoRowListRowContentTask(input as object) as object
                 if not someContentReadySet
                     rowList.someContentReady = false
                 end if
-                return {
-                    success: true
-                }
+                JobSuccess()
+                return
             end if
 
             feedSource = feedSources[feedSourcesIndex]
@@ -46,9 +49,8 @@ function VideoRowListRowContentTask(input as object) as object
                     if not someContentReadySet
                         rowList.someContentReady = false
                     end if
-                    return {
-                        success: true
-                    }
+                    JobSuccess()
+                    return
                 end if
                 feedContentNode.feedSourcesIndex = feedSourcesIndex
                 continue while
@@ -59,7 +61,7 @@ function VideoRowListRowContentTask(input as object) as object
 
             response = service.MakeRequest(feedSource, {
                 additionalQueryParams: feedSource.state.queryParams
-                cancellation: m.top.cancellation
+                cancellation: cancallation
             })
 
             if not response.success
@@ -67,9 +69,8 @@ function VideoRowListRowContentTask(input as object) as object
                     if feedSources.Count() = 1
                         parent = feedContentNode.getParent()
                         parent.removeChild(feedContentNode)
-                        return {
-                            success: true
-                        }
+                        JobSuccess()
+                        return
                     end if
 
                     continue while
@@ -80,9 +81,8 @@ function VideoRowListRowContentTask(input as object) as object
                     if feedSources.Count() = 1
                         parent = feedContentNode.getParent()
                         parent.removeChild(feedContentNode)
-                        return {
-                            success: true
-                        }
+                        JobSuccess()
+                        return
                     end if
 
                     continue while
@@ -170,15 +170,9 @@ function VideoRowListRowContentTask(input as object) as object
 
     catch error
         HandleFeedLoadErrorDialog(error, false, rowList)
-        return {
-            success: false
-            error: error
-        }
+        JobError(error)
+        return
     end try
-
-    return {
-        success: true
-    }
 end function
 
 function RemovePlaceHolderItems(contentNode as object)
