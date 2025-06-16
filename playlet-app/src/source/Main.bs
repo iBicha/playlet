@@ -51,11 +51,7 @@ function Main(args as object) as void
 
     systemLog = CreateObject("roSystemLog")
     systemLog.SetMessagePort(port)
-    ' Although all types are enabled, they are filtered in Playlet Lib to avoid spamming the logs
-    systemLog.EnableType("http.connect")
-    systemLog.EnableType("http.error")
-    systemLog.EnableType("http.complete")
-    systemLog.EnableType("bandwidth.minute")
+    scene.ObserveField("enableSystemLogType", port)
 
     #if DEBUG
         ' The following comment is to enable the SceneGraph inspector
@@ -82,6 +78,9 @@ function Main(args as object) as void
             data = msg.getData()
             if field = "exitChannel" and data = true
                 return
+            end if
+            if field = "enableSystemLogType"
+                systemLog.EnableType(data)
             end if
         else if msgType = "roInputEvent"
             scene.inputArgs = msg.getInfo()
