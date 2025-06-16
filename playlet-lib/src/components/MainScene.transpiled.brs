@@ -37,9 +37,10 @@ function MainSceneContainerChanged()
     StartWebServer()
     HideLoadingScreen()
     InitEcpArgs()
-    m.scene.signalBeacon("AppLaunchComplete")
+    if not ShowAnnouncement()
+        m.scene.signalBeacon("AppLaunchComplete")
+    end if
     CopyLoadingMessagesToCache()
-    ShowAnnouncement()
 end function
 
 function StartWebServer()
@@ -51,7 +52,7 @@ function StartWebServer()
     m.dialServer.callfunc("StartServer", invalid)
 end function
 
-function ShowAnnouncement() as void
+function ShowAnnouncement() as boolean
     dialog = DialogUtils_ShowDialogOnce({
         messageId: "1747362859"
         title: "Announcement - YouTube account support"
@@ -66,13 +67,15 @@ function ShowAnnouncement() as void
         marginWidth: 180
     })
     if dialog = invalid
-        return
+        return false
     end if
     m.scene.signalBeacon("AppDialogInitiate")
-    m.top.observeField("wasClosed", FuncName(OnAnnouncementDialogClosed))
+    dialog.observeField("wasClosed", FuncName(OnAnnouncementDialogClosed))
+    return true
 end function
 
 function OnAnnouncementDialogClosed()
     m.scene.signalBeacon("AppDialogComplete")
+    m.scene.signalBeacon("AppLaunchComplete")
 end function
 '//# sourceMappingURL=./MainScene.brs.map
