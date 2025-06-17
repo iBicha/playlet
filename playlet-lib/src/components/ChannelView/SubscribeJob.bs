@@ -1,0 +1,34 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+@job("SubscribeJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    channelView = input.channelView
+    invidiousNode = input.invidious
+    ucid = input.ucid
+    subscribe = input.subscribe
+
+    if JobIsCancelled()
+        JobCancel()
+        return
+    end if
+
+    cancallation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    service = new Invidious.InvidiousService(invidiousNode)
+
+    if subscribe
+        response = service.Subscribe(ucid, cancallation)
+    else
+        response = service.Unsubscribe(ucid, cancallation)
+    end if
+
+    if not response.IsSuccess()
+        error = "Failed to subscribe/unsubscribe to channel: " + response.ErrorMessage()
+        LogError(error)
+        JobError(error)
+        return
+    end if
+
+    channelView.isSubscribed = subscribe
+end function

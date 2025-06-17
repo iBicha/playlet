@@ -1,37 +1,45 @@
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 
-@asynctask
-function FetchSubscriptionStatusTask(input as object) as object
+@job("FetchSubscriptionStatusJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     channelView = input.channelView
     ucid = input.ucid
     invidiousNode = input.invidious
     authToken = input.authToken
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
+    cancallation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
     isInnertubeProfile = authToken.profileNode.type = "youtube"
     if isInnertubeProfile
         subscriptionStatus = InnertubeService.GetSubscriptionStatusForChannel(ucid, {
-            cancellation: m.top.cancellation
+            cancellation: cancallation
             accessToken: authToken.token
             onBehalfOfUser: authToken.activeIdentifyToken
         })
 
         if subscriptionStatus.error <> invalid
-            LogError("Failed to fetch subscription status:", subscriptionStatus.error)
-            return invalid
+            error = "Failed to fetch subscription status: " + ToString(subscriptionStatus.error)
+            LogError(error)
+            JobError(error)
+            return
         end if
         channelView.isSubscribed = subscriptionStatus.isSubscribed
     else
         service = new Invidious.InvidiousService(invidiousNode)
-        subscriptionsRequest = service.GetSubscriptions(m.top.cancellation)
+        subscriptionsRequest = service.GetSubscriptions(cancallation)
         if not subscriptionsRequest.IsSuccess()
-            error = subscriptionsRequest.ErrorMessage()
-            LogError("Failed to fetch subscriptions:", error)
-            return invalid
+            error = "Failed to fetch subscriptions: " + subscriptionsRequest.ErrorMessage()
+            LogError(error)
+            JobError(error)
+            return
         end if
         subscriptions = subscriptionsRequest.Json()
 
@@ -44,6 +52,4 @@ function FetchSubscriptionStatusTask(input as object) as object
         end for
         channelView.isSubscribed = isSubscribed
     end if
-
-    return invalid
 end function
