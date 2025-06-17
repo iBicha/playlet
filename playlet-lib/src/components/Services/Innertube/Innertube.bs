@@ -1,9 +1,27 @@
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/source/AsyncTask/AsyncTask.bs"
 import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
-    AsyncTask.Start(Tasks.InnertubeInitTask, {
+    OnRequestVisitorData()
+end function
+
+function OnRequestVisitorData() as void
+    if m.innertubeInitTask <> invalid
+        return
+    end if
+
+    visitorData = m.top.visitorData
+    if not StringUtils.IsNullOrEmpty(visitorData)
+        return
+    end if
+
+    m.innertubeInitTask = AsyncTask.Start(Tasks.InnertubeInitTask, {
         innertube: m.top
-    })
+    }, OnInnertubeInitTaskResult)
+end function
+
+function OnInnertubeInitTaskResult(output as object) as void
+    m.innertubeInitTask = invalid
 end function

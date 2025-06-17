@@ -24,10 +24,26 @@ function VideoContentTask(input as object) as object
     metadata = contentNode.metadata
     if not IsAssociativeArray(metadata)
         if backend = "playlet"
+            visitorData = innertubeNode.visitorData
+            if StringUtils.IsNullOrEmpty(visitorData)
+                messagePort = CreateObject("roMessagePort")
+                MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", messagePort)
+                innertubeNode.requestVisitorData = true
+                message = wait(10000, messagePort)
+                innertubeNode.unobserveFieldScoped("visitorData")
+                if message = invalid
+                    return {
+                        success: false
+                        error: "Failed to get visitor data. Please try again later."
+                    }
+                end if
+                visitorData = message.getData()
+            end if
+
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
                 "cancellation": m.top.cancellation
                 "credentialTransferToken": loungeServiceNode.credentialTransferToken
-                "visitorData": innertubeNode.visitorData
+                "visitorData": visitorData
             })
         else
             metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
