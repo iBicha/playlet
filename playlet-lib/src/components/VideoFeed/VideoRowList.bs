@@ -227,8 +227,7 @@ function InitContent() as void
         feeds: m.top.feeds
     }
 
-    callback = JobSystem.CreateCallback()
-    callback.observeFieldScoped("done", FuncName(OnVideoRowListContentJobDone), ["success", "cancel", "error"])
+    callback = JobSystem.CreateCallback(OnVideoRowListContentJobDone)
     JobSystem.QueueJob(m.jobQueue, Jobs.VideoRowListContentJob, input, callback)
     m.pendingLoadJobs[callback.id] = { callback: callback }
 end function
@@ -243,11 +242,10 @@ function CancelCurrentJobs()
 end function
 
 function OnVideoRowListContentJobDone(event as object) as void
-    id = event.getNode()
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.pendingLoadJobs.Delete(event.getNode())
+
     info = event.getInfo()
-
-    m.pendingLoadJobs.Delete(id)
-
     if info.cancel
         return
     end if
@@ -317,22 +315,16 @@ function LoadRowContent(contentNode as object) as void
         invidious: m.invidious
     }
 
-    callback = JobSystem.CreateCallback()
-    callback.observeFieldScoped("done", FuncName(OnVideoRowListRowContentJobDone), ["success", "cancel", "error"])
+    callback = JobSystem.CreateCallback(OnVideoRowListRowContentJobDone)
     JobSystem.QueueJob(m.jobQueue, Jobs.VideoRowListRowContentJob, input, callback)
-
-    m.pendingLoadJobs[callback.id] = {
-        callback: callback
-        content: contentNode
-    }
+    m.pendingLoadJobs[callback.id] = { callback: callback, content: contentNode }
 end function
 
 function OnVideoRowListRowContentJobDone(event as object) as void
-    id = event.getNode()
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.pendingLoadJobs.Delete(event.getNode())
+
     info = event.getInfo()
-
-    m.pendingLoadJobs.Delete(id)
-
     if info.cancel
         return
     end if
