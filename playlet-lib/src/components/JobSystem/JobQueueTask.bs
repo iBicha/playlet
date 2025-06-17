@@ -1,11 +1,12 @@
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 
 ' Maximum number of JobTasks that can be created
-const MAX_JOB_TASK_COUNT = 8
+const MAX_JOB_TASK_COUNT = 12
 ' Minimum number of JobTasks that will be kept alive
 const MIN_JOB_TASK_COUNT = 2
 ' Time in milliseconds to wait before scaling down JobTasks
-const SCALE_DOWN_THRESHOLD_MS = 5000
+const SCALE_DOWN_THRESHOLD_MS = 10000
 
 function Init()
     m.top.functionName = "JobQueueTaskLoop"
@@ -32,6 +33,7 @@ function JobQueueTaskLoop() as void
             end if
 
             if m.idleJobTasks.Count() + m.busyJobTasks.Count() < MAX_JOB_TASK_COUNT
+                LogDebug("Creating a new JobTask. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
                 jobTask = CreateObject("roSGNode", "JobTask")
                 jobTaskId = "JobTask-" + StrI(rnd(2147483647), 36)
                 jobTask.id = jobTaskId
@@ -54,6 +56,7 @@ function JobQueueTaskLoop() as void
                 jobTaskObject = m.idleJobTasks.Pop()
                 jobTaskObject.node.UnobserveFieldScoped("ready")
                 jobTaskObject.node.shutdown = true
+                LogDebug("Scaled down JobTasks. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
             end if
             continue while
         end if

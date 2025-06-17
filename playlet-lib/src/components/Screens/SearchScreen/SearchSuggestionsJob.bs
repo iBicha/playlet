@@ -2,14 +2,17 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
 
-@asynctask
-function SearchSuggestionsTask(input as object) as object
+@job("SearchSuggestionsJob")
+function ExecuteJob() as void
+    input = JobGetInput()
     q = input.q
     invidiousNode = input.invidious
     preferencesNode = input.preferences
+    seachScreenNode = input.searchScreen
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     if StringUtils.IsNullOrEmpty(q)
@@ -26,8 +29,9 @@ function SearchSuggestionsTask(input as object) as object
         end if
     end if
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     history = SearchHistoryUtils.GetSaved(preferencesNode, q)
@@ -40,7 +44,7 @@ function SearchSuggestionsTask(input as object) as object
         end if
     end if
 
-    return {
+    seachScreenNode.searchSuggestions = {
         q: q
         response: history
     }

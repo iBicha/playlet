@@ -1,50 +1,46 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 
-function LoadChannel(invidiousNode as object) as void
+function LoadChannel(invidiousNode as object, jobQueue as object) as void
     loadState = m.top.loadState
     if loadState = FeedLoadState.Loading or loadState = FeedLoadState.Loaded or loadState = FeedLoadState.Error
         return
     end if
 
-    if m.contentTask <> invalid
-        m.contentTask.cancel = true
+    if m.channelContentJob <> invalid
+        m.channelContentJob.cancel = true
     end if
 
     m.top.loadState = FeedLoadState.Loading
-    m.contentTask = AsyncTask.Start(Tasks.ChannelContentTask, {
+
+    input = {
         content: m.top
         invidious: invidiousNode
-    }, OnChannelContentTaskResult)
+    }
+
+    callback = JobSystem.CreateCallback(OnChannelContentJobDone)
+    JobSystem.QueueJob(jobQueue, Jobs.ChannelContentJob, input, callback)
+    m.channelContentJob = callback
 end function
 
-function OnChannelContentTaskResult(output as object) as void
-    m.contentTask = invalid
+function OnChannelContentJobDone(event as object) as void
+    callback = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callback)
+    m.channelContentJob = invalid
 
-    if output.cancelled
+    if callback.cancel or callback.success
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-        authorId = output.task.input.content.authorId
-        message = Tr(Locale.Dialogs.FailedToLoadChannel).Replace("%1", authorId) + `\n${error}`
-        DialogUtils.ShowDialogEx({
-            message: message
-            title: Tr(Locale.Dialogs.ChannelLoadError)
-            large: true
-        })
-    end if
+    message = Tr(Locale.Dialogs.FailedToLoadChannel).Replace("%1", m.top.authorId) + `\n${callback.error}`
+    DialogUtils.ShowDialogEx({
+        message: message
+        title: Tr(Locale.Dialogs.ChannelLoadError)
+        large: true
+    })
 end function
