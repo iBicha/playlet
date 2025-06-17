@@ -68,6 +68,12 @@ function Execute(_unused as dynamic) as void
     #if DEBUG
         AssertNodeThreadInfo()
     #end if
+
+    callback = JobGetCallbackNode()
+    if callback <> invalid
+        callback.queueFields(true)
+    end if
+
     try
         ExecuteJob()
     catch error
@@ -77,6 +83,10 @@ function Execute(_unused as dynamic) as void
     end try
     if not m.jobStateSet = true
         JobSuccess()
+    end if
+
+    if callback <> invalid
+        callback.queueFields(false)
     end if
 end function
 
