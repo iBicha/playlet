@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Issue with deep linking not working due to session data race condition
 
+### Changed
+
+- Session data duration: increased to 14 days, to avoid Innertube errors
+
 ## [0.40.4] - 2025-06-17
 
 ### Fixed
