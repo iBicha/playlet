@@ -32,12 +32,17 @@ function SetScenePalette(scene as object) as void
     scene.palette = palette
 end function
 
+
 function MainSceneContainerChanged()
     AutoBindSceneGraph()
     StartWebServer()
     HideLoadingScreen()
     InitEcpArgs()
-    if not ShowAnnouncement()
+    if false
+        if not ShowAnnouncement()
+            m.scene.signalBeacon("AppLaunchComplete")
+        end if
+    else
         m.scene.signalBeacon("AppLaunchComplete")
     end if
     CopyLoadingMessagesToCache()
