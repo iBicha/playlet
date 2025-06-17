@@ -23,18 +23,22 @@ function StopServer(_unused as dynamic) as void
     m.top.shouldQuit = true
 end function
 
+function CreateSettings(messagePort as object) as object
+    settings = new Http.HttpSettings(messagePort)
+    settings.MaxConnections = 10
+    settings.MaxRequestLength = 2097152
+    settings.PackageName = "Playlet"
+    settings.Port = 8888
+    settings.ServerName = "Playlet Web Server"
+    settings.TimeoutInMs = 30000
+    settings.WebSocketsEnabled = false
+    return settings
+end function
+
 function WebServerLoop() as void
     msgPort = CreateObject("roMessagePort")
 
-    settings = new Http.HttpSettings(msgPort)
-    settings.MaxConnections = m.top.maxConnections
-    settings.MaxRequestLength = m.top.maxRequestLength
-    settings.PackageName = m.top.packageName
-    settings.Port = m.top.port
-    settings.ServerName = m.top.serverName
-    settings.TimeoutInMs = m.top.timeoutInMs
-    settings.WebSocketsEnabled = m.top.webSocketsEnabled
-
+    settings = CreateSettings(msgPort)
     server = new Http.HttpServer(settings, m.top)
     if not server.success
         m.top.isRunning = false
