@@ -1,3 +1,4 @@
+import "pkg:/source/utils/AssertUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
@@ -65,7 +66,7 @@ end function
 
 function Execute(_unused as dynamic) as void
     #if DEBUG
-        ValidateThreadInfoOrThrow()
+        AssertNodeThreadInfo()
     #end if
     try
         ExecuteJob()
@@ -83,17 +84,10 @@ function ExecuteJob() as void
     throw "ExecuteJob abstract method must be implemented in derived class"
 end function
 
-function ValidateThreadInfoOrThrow() as void
+function AssertNodeThreadInfo() as void
     threadInfo = m.top.threadInfo()
-    if threadInfo.currentThread.type <> "Task"
-        throw "This job can only be executed in a Task thread. This is a bug."
-    end if
 
-    if threadInfo.node.owningThread.id <> threadInfo.currentThread.id
-        throw "This job must be executed on the same thread that created it. This is a bug."
-    end if
-
-    if threadInfo.node.willRendezvousFromCurrentThread <> "No"
-        throw "threadInfo.node.willRendezvousFromCurrentThread must be 'No' for this job. This is a bug."
-    end if
+    Assert.AreEqual(threadInfo.currentThread.type, "Task", "threadInfo.currentThread.type must be 'Task' for this job. This is a bug.")
+    Assert.AreEqual(threadInfo.node.owningThread.id, threadInfo.currentThread.id, "This job must be executed on the same thread that created it. This is a bug.")
+    Assert.AreEqual(threadInfo.node.willRendezvousFromCurrentThread, "No", "threadInfo.node.willRendezvousFromCurrentThread must be 'No' for this job. This is a bug.")
 end function
