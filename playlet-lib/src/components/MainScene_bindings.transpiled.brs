@@ -45,7 +45,8 @@ function InitializeBindings()
                 "preferences": "../Preferences", 
                 "videoQueue": "../VideoQueue", 
                 "bookmarksService": "../BookmarksService", 
-                "loungeService": "../LoungeService"
+                "loungeService": "../LoungeService", 
+                "jobQueue": "/JobQueue"
             }, 
             "DialServer": {
                 "webServer": "../WebServer", 
