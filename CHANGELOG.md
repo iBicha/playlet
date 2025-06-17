@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- [perf] Added a job system to control background tasks.
+
 ### Fixed
 
 - Issue with deep linking not working due to session data race condition
@@ -18,10 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Few changes preparing for app store submission
 
 ## [0.40.3] - 2025-06-16
-
-### Added
-
-- [perf] Added a job system to control background tasks.
 
 ### Fixed
 
