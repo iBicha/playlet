@@ -5,15 +5,17 @@ namespace Http
 
     class CacheRouter extends HttpRouter
 
-        function new()
+        function new(server as object)
             super()
+
+            m.jobQueue = server.task.jobQueue
         end function
 
         @delete("/api/cache")
         function ClearCache(context as object) as boolean
             response = context.response
 
-            CacheUtils.Clear()
+            CacheUtils.Clear(m.jobQueue)
             response.Default(204, "OK")
             return true
         end function

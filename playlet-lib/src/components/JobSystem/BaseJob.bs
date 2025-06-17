@@ -32,12 +32,14 @@ function JobSuccess() as void
     m.jobStateSet = true
 end function
 
-function JobError(errorMessage as string) as void
+function JobError(error as dynamic) as void
+    error = ErrorUtils.Format(error)
+    LogError(error)
     callbackNode = JobGetCallbackNode()
     if callbackNode = invalid
         return
     end if
-    callbackNode.error = errorMessage
+    callbackNode.error = error
     callbackNode.success = false
     callbackNode.done = true
     m.jobStateSet = true
@@ -77,9 +79,7 @@ function Execute(_unused as dynamic) as void
     try
         ExecuteJob()
     catch error
-        errorStr = ErrorUtils.Format(error)
-        LogError(errorStr)
-        JobError(errorStr)
+        JobError(error)
     end try
     if not m.jobStateSet = true
         JobSuccess()
