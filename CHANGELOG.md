@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.40.4] - 2025-06-17
+
+### Fixed
+
+- Few changes preparing for app store submission
+
+## [0.40.3] - 2025-06-16
 
 ### Added
 
@@ -14,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Added a "hint" in the error message when playing a video and login is required.
+- Various performance improvements
 
 ## [0.40.2] - 2025-06-12
 

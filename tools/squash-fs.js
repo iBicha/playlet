@@ -30,6 +30,11 @@ const { execSync } = require('child_process');
 // Create a temporary directory
 const tempDir = fs.mkdtempSync('squash-fs-');
 
+// delete existing out file
+if (fs.existsSync(outFile)) {
+    fs.unlinkSync(outFile);
+}
+
 // Unzip the file
 execSync(`unzip ${inFile} -d ${tempDir}`);
 
