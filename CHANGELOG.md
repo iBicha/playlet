@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Issue with deep linking not working due to session data race condition
+- A bug where playlists will not load the second page when not logged in
 
 ### Changed
 

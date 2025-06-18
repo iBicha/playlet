@@ -22,6 +22,7 @@ function LoadPlaylist(invidiousNode as object, jobQueue as object, singlePage as
 
     if m.playlistContentJob <> invalid
         m.playlistContentJob.cancel = true
+        m.top.isLoading = false
     end if
 
     m.top.loadState = FeedLoadState.Loading
@@ -35,12 +36,14 @@ function LoadPlaylist(invidiousNode as object, jobQueue as object, singlePage as
     callback = JobSystem.CreateCallback(OnPlaylistContentJobDone)
     JobSystem.QueueJob(jobQueue, Jobs.PlaylistContentJob, input, callback)
     m.playlistContentJob = callback
+    m.top.isLoading = true
 end function
 
 function OnPlaylistContentJobDone(event as object) as void
     callback = event.getRoSGNode()
     JobSystem.UnobserveCallback(callback)
     m.playlistContentJob = invalid
+    m.top.isLoading = false
 
     if callback.cancel or callback.success
         return

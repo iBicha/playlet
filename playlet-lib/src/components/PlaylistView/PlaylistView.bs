@@ -13,6 +13,11 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
+    m.busySpinner = m.top.findNode("busySpinner")
+    m.busyspinner.poster.width = 100
+    m.busyspinner.poster.height = 100
+    m.busySpinner.poster.uri = "pkg:/images/spinner.png"
+
     m.background = m.top.findNode("background")
     m.backgroundSmall = m.top.findNode("backgroundSmall")
     m.titleLabel = m.top.findNode("titleLabel")
@@ -69,6 +74,7 @@ function OnContentSet() as void
     if itemFocused > -1 and content.getChildCount() > itemFocused
         m.list.jumpToItem = itemFocused
     end if
+    m.top.isLoading = content.isLoading or content.loadState = FeedLoadState.Loading
     LoadPlaylistIfNeeded()
 end function
 
@@ -247,4 +253,16 @@ function LoadPlaylistIfNeeded() as void
     end if
 
     m.top.content@.LoadPlaylistPage(m.top.invidious, m.top.jobQueue)
+end function
+
+function OnLoadingChanged(event as object)
+    isLoading = event.GetData()
+    if isLoading
+        m.busyspinner.poster.rotation = 0
+        m.busySpinner.visible = true
+        m.busySpinner.control = "start"
+    else
+        m.busySpinner.visible = false
+        m.busySpinner.control = "stop"
+    end if
 end function
