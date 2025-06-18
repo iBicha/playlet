@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Session data duration: increased to 14 days, to avoid Innertube errors
+- Use iOS user agent in player
 
 ## [0.40.4] - 2025-06-17
 
