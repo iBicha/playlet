@@ -22,7 +22,8 @@ function InitializeBindings()
                 "invidious": "../Invidious", 
                 "notifications": "../Notifications", 
                 "preferences": "../Preferences", 
-                "loungeService": "../LoungeService"
+                "loungeService": "../LoungeService", 
+                "jobQueue": "/JobQueue"
             }, 
             "SearchHistory": {
                 "preferences": "../Preferences"

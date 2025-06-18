@@ -1,59 +1,55 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/VideoFeed/FeedLoadState.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 
-function LoadPlaylistPage(invidiousNode as object) as void
-    LoadPlaylist(invidiousNode, true)
+function LoadPlaylistPage(invidiousNode as object, jobQueue as object) as void
+    LoadPlaylist(invidiousNode, jobQueue, true)
 end function
 
-function LoadPlaylistAll(invidiousNode as object) as void
-    LoadPlaylist(invidiousNode, false)
+function LoadPlaylistAll(invidiousNode as object, jobQueue as object) as void
+    LoadPlaylist(invidiousNode, jobQueue, false)
 end function
 
-function LoadPlaylist(invidiousNode as object, singlePage as boolean) as void
-    if m.contentTask <> invalid
-        m.contentTask.cancel = true
-    end if
-
+function LoadPlaylist(invidiousNode as object, jobQueue as object, singlePage as boolean) as void
     loadState = m.top.loadState
     if loadState = FeedLoadState.Loading or loadState = FeedLoadState.Loaded
         return
     end if
 
+    if m.playlistContentJob <> invalid
+        m.playlistContentJob.cancel = true
+    end if
+
     m.top.loadState = FeedLoadState.Loading
-    m.contentTask = AsyncTask.Start(Tasks.PlaylistContentTask, {
+
+    input = {
         content: m.top
         invidious: invidiousNode
         singlePage: singlePage
-    }, OnPlaylistContentTaskResult)
+    }
+
+    callback = JobSystem.CreateCallback(OnPlaylistContentJobDone)
+    JobSystem.QueueJob(jobQueue, Jobs.PlaylistContentJob, input, callback)
+    m.playlistContentJob = callback
 end function
 
-function OnPlaylistContentTaskResult(output as object) as void
-    m.contentTask = invalid
+function OnPlaylistContentJobDone(event as object) as void
+    callback = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callback)
+    m.playlistContentJob = invalid
 
-    if output.cancelled
+    if callback.cancel or callback.success
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-        playlistId = output.task.input.content.playlistId
-        message = Tr(Locale.Dialogs.FailedToLoadPlaylist).Replace("%1", playlistId) + `\n${error}`
-        DialogUtils.ShowDialogEx({
-            message: message
-            title: Tr(Locale.Dialogs.PlaylistLoadError)
-            large: true
-        })
-    end if
+    message = Tr(Locale.Dialogs.FailedToLoadPlaylist).Replace("%1", m.top.playlistId) + `\n${callback.error}`
+    DialogUtils.ShowDialogEx({
+        message: message
+        title: Tr(Locale.Dialogs.PlaylistLoadError)
+        large: true
+    })
 end function
