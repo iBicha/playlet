@@ -16,11 +16,11 @@ function ExecuteJob() as void
         return
     end if
 
-    cancallation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
     isInnertubeProfile = authToken.profileNode.type = "youtube"
     if isInnertubeProfile
         subscriptionStatus = InnertubeService.GetSubscriptionStatusForChannel(ucid, {
-            cancellation: cancallation
+            cancellation: cancellation
             accessToken: authToken.token
             onBehalfOfUser: authToken.activeIdentifyToken
         })
@@ -32,7 +32,7 @@ function ExecuteJob() as void
         channelView.isSubscribed = subscriptionStatus.isSubscribed
     else
         service = new Invidious.InvidiousService(invidiousNode)
-        subscriptionsRequest = service.GetSubscriptions(cancallation)
+        subscriptionsRequest = service.GetSubscriptions(cancellation)
         if not subscriptionsRequest.IsSuccess()
             JobError("Failed to fetch subscriptions: " + subscriptionsRequest.ErrorMessage())
             return
