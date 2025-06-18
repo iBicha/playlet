@@ -7,6 +7,7 @@
 - [@oninit](#oninit)
 - [Bindings](#bindings)
 - [Async Task Generator](#async-task-generator)
+- [Job System Generator](#job-system-generator)
 - [Tracking transpilied files](#tracking-transpilied-files)
 - [Logger](#logger)
 - [Type Gen](#type-gen)
@@ -396,7 +397,7 @@ Notice how the function has `@oninit`, which means it will be called in the `Ini
 
 When the `bindings` field is set, the node registers itself to a global array of nodes that need binding.
 
-Next, once all nodes are registered, we need to call a function called `AutoBindSceneGraph()`. This need to be called once from the root node's `Init()` (concretely, [here](https://github.com/iBicha/playlet/blob/bea7fb209b2bd42aff620d06b416cf1e45988190/playlet-lib/src/components/MainScene.bs#L17))
+Next, once all nodes are registered, we need to call a function called `AutoBindSceneGraph()`. This need to be called once from the root node's `Init()` (concretely, [here in MainScene.bs](https://github.com/iBicha/playlet/blob/bea7fb209b2bd42aff620d06b416cf1e45988190/playlet-lib/src/components/MainScene.bs#L17))
 
 `AutoBindSceneGraph()` will loop through all the nodes that require binding, and use the information we assigned to `m.top.bindings` of each node to populate all the needed references.
 
@@ -470,6 +471,13 @@ end function)
 The rest will be taken care of by the plugin, which will generate an `xml` file containing the task component, and a script that handles calling the function.
 
 Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `AsyncTask.Start` create a new instance of the task every time.
+
+## Job System Generator
+
+**[Source](/tools/bs-plugins/jobsystem-plugin.ts)**
+
+This plugin is very similar to the `Async Task Generator` and aims to be a replacement for it.
+A work in progress for now.
 
 ## Tracking transpilied files
 

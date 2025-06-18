@@ -1,4 +1,3 @@
-import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/BookmarksRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/CacheRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/DashRouter.bs"
@@ -23,8 +22,21 @@ import "pkg:/components/Web/WebServer/Middleware/HttpStaticFilesRouter.bs"
 import "pkg:/components/Web/WebServer/WebSockets/WebSocketMiddleware.bs"
 
 function Init()
-    m.top.packageName = "Playlet"
-    m.top.serverName = "Playlet Web Server"
+end function
+
+function OnNodeReady()
+    m.sceneNodes = {
+        "appController": m.top.appController
+        "preferences": m.top.preferences
+        "innertube": m.top.innertube
+        "invidious": m.top.invidious
+        "profilesService": m.top.profilesService
+        "applicationInfo": m.top.applicationInfo
+        "videoQueue": m.top.videoQueue
+        "bookmarksService": m.top.bookmarksService
+        "loungeService": m.top.loungeService
+        "jobQueue": m.top.jobQueue
+    }
 end function
 
 function GetServerAddress(_unused as dynamic) as dynamic
@@ -37,6 +49,7 @@ function GetServerAddress(_unused as dynamic) as dynamic
 end function
 
 function SetupRoutes(server as object)
+    server.sceneNodes = m.sceneNodes
     #if DEBUG
         'CORS is mostly for developing the web app
         server.UseRouter(new Http.CorsMiddleware())
@@ -60,7 +73,7 @@ function SetupRoutes(server as object)
     server.UseRouter(new Http.SearchHistoryRouter(server))
     server.UseRouter(new Http.PlayletLibUrlsRouter(server))
     server.UseRouter(new Http.DialRouter(server))
-    server.UseRouter(new Http.CacheRouter())
+    server.UseRouter(new Http.CacheRouter(server))
     server.UseRouter(new Http.RegistryRouter(server))
     server.UseRouter(new Http.PlayletInvidiousBackendRouter(server))
     server.UseRouter(new Http.InnertubeRouter(server))

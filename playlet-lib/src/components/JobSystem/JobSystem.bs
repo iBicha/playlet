@@ -1,0 +1,34 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace JobSystem
+
+    function CreateCallback(func = invalid as dynamic) as object
+        node = CreateObject("roSGNode", "JobCallback")
+        node.id = "JobCallback-" + StringUtils.RandomId()
+        if IsFunction(func)
+            node.observeFieldScoped("done", FuncName(func), ["success", "cancel", "error"])
+        end if
+        return node
+    end function
+
+    function UnobserveCallback(callbackNode as object) as void
+        if callbackNode <> invalid
+            callbackNode.UnobserveFieldScoped("done")
+        end if
+    end function
+
+    function QueueJob(jobQueue as object, jobName as string, input = invalid as dynamic, callbackNode = invalid as dynamic) as void
+        if callbackNode <> invalid
+            if input = invalid
+                input = {}
+            end if
+            input._callback = callbackNode
+        end if
+
+        jobQueue.request = {
+            "jobName": jobName
+            "input": input
+        }
+    end function
+
+end namespace

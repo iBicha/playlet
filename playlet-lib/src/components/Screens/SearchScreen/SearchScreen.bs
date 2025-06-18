@@ -1,8 +1,8 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/SearchHistory/SearchHistoryUtils.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
@@ -100,36 +100,36 @@ function OnTextChange() as void
         return
     end if
 
-    if m.searchSuggestionsTask <> invalid
-        m.searchSuggestionsTask.cancel = true
+    if m.searchSuggestionsJob <> invalid
+        m.searchSuggestionsJob.cancel = true
     end if
 
-    m.searchSuggestionsTask = AsyncTask.Start(Tasks.SearchSuggestionsTask, {
-        q: m.keyboard.text
-        invidious: m.invidious
-        preferences: m.preferences
-    }, OnSearchSuggestionsTaskResults)
+    input = {
+        "q": m.keyboard.text
+        "invidious": m.invidious
+        "preferences": m.preferences
+        "searchScreen": m.top
+    }
+
+    callback = JobSystem.CreateCallback()
+    JobSystem.QueueJob(m.jobQueue, Jobs.SearchSuggestionsJob, input, callback)
+    m.searchSuggestionsJob = callback
 end function
 
-function OnSearchSuggestionsTaskResults(output as object) as void
-    if m.searchSuggestionsTask <> invalid and m.searchSuggestionsTask.id = output.task.id
-        m.searchSuggestionsTask = invalid
-    end if
+function OnSearchSuggestions(event as object) as void
+    m.searchSuggestionsJob = invalid
+    result = event.GetData()
 
-    if output.cancelled
+    if not IsAssociativeArray(result)
         return
     end if
 
-    if not output.success
-        LogError(ErrorUtils.Format(output.error))
-        return
-    end if
     ' In case this is an old request, discard suggestions
-    q = output.result.q
+    q = result.q
     if q <> m.keyboard.text
         return
     end if
-    suggestions = output.result.response
+    suggestions = result.response
     if suggestions = invalid
         return
     end if
@@ -263,7 +263,7 @@ function OnSearchContentReady() as void
 end function
 
 function OnSearchError()
-    ' Note: we don't display an error dialog, VideoRowListRowContentTask will do that.
+    ' Note: we don't display an error dialog, VideoRowListRowContentJob will do that.
     m.rowlist.feeds = invalid
     m.rowlist.focusable = false
     HideLoadingScreen()

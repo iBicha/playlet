@@ -1,8 +1,8 @@
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -83,7 +83,7 @@ function OnContentSet() as void
         end if
     end if
 
-    content@.LoadChannel(m.invidious)
+    content@.LoadChannel(m.invidious, m.jobQueue)
 
     authorId = ValidString(content.authorId)
     author = ValidString(content._author)
@@ -162,30 +162,34 @@ end function
 function OnDispose()
     m.rowList.dispose = true
     DisposeObservers()
-    if m.subscribeTask <> invalid
-        m.subscribeTask.cancel = true
-        m.subscribeTask = invalid
+    if m.subscribeJob <> invalid
+        m.subscribeJob.cancel = true
+        m.subscribeJob = invalid
     end if
-    if m.fetchSubscriptionStatusTask <> invalid
-        m.fetchSubscriptionStatusTask.cancel = true
-        m.fetchSubscriptionStatusTask = invalid
+    if m.fetchSubscriptionStatusJob <> invalid
+        m.fetchSubscriptionStatusJob.cancel = true
+        m.fetchSubscriptionStatusJob = invalid
     end if
 end function
 
 function OnSubscribeButtonSelected()
-    if m.subscribeTask <> invalid
-        m.subscribeTask.cancel = true
+    if m.subscribeJob <> invalid
+        m.subscribeJob.cancel = true
     end if
-    if m.fetchSubscriptionStatusTask <> invalid
-        m.fetchSubscriptionStatusTask.cancel = true
+    if m.fetchSubscriptionStatusJob <> invalid
+        m.fetchSubscriptionStatusJob.cancel = true
     end if
 
-    m.subscribeTask = AsyncTask.Start(Tasks.SubscribeTask, {
+    input = {
         channelView: m.top
         invidious: m.invidious
         ucid: m.authorId
         subscribe: not m.top.isSubscribed
-    })
+    }
+
+    callback = JobSystem.CreateCallback()
+    JobSystem.QueueJob(m.jobQueue, Jobs.SubscribeJob, input, callback)
+    m.subscribeJob = callback
 end function
 
 function OnBannerLoadStatus() as void
@@ -392,20 +396,25 @@ function FetchSubscriptionStatus() as void
         return
     end if
 
-    if m.fetchSubscriptionStatusTask <> invalid
+    if m.fetchSubscriptionStatusJob <> invalid
         return
     end if
 
-    m.fetchSubscriptionStatusTask = AsyncTask.Start(Tasks.FetchSubscriptionStatusTask, {
+    input = {
         channelView: m.top
         ucid: authorId
         authToken: m.invidious.authToken
         invidious: m.invidious
-    })
+    }
+
+    callback = JobSystem.CreateCallback(OnFetchSubscriptionStatusDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.FetchSubscriptionStatusJob, input, callback)
+    m.fetchSubscriptionStatusJob = callback
 end function
 
-function OnFetchSubscriptionStatusResult(_output as object) as void
-    m.fetchSubscriptionStatusTask = invalid
+function OnFetchSubscriptionStatusDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.fetchSubscriptionStatusJob = invalid
 end function
 
 function OnSubscriptionChanged()

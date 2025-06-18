@@ -3,6 +3,11 @@ import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
+const FOLDER = "cachefs:/logs"
+const FILENAME = "app_logs.txt"
+const FILENAME_PREVIOUS = "app_logs_previous.txt"
+const FILENAME_STARTUP = "cachefs:/playlet_startup_logs.txt"
+
 function Init()
     m.top.functionName = "LoggerLoop"
 
@@ -44,19 +49,17 @@ function LoggerLoop()
     port = m.port
 
     buffer = CreateObject("roByteArray")
-    logsFile = m.top.folder + "/" + m.top.filename
-    previousLogsFile = m.top.folder + "/" + m.top.filenamePrevious
-    filenameStartup = m.top.filenameStartup
+    logsFile = FOLDER + "/" + FILENAME
+    previousLogsFile = FOLDER + "/" + FILENAME_PREVIOUS
     dateTime = CreateObject("roDateTime")
 
-    CreateDirectory(m.top.folder)
+    CreateDirectory(FOLDER)
     DeleteFile(previousLogsFile)
     MoveFile(logsFile, previousLogsFile)
 
-    startUpLogs = ReadAsciiFile(filenameStartup)
+    startUpLogs = ReadAsciiFile(FILENAME_STARTUP)
     if not StringUtils.IsNullOrEmpty(startUpLogs)
         line = `************* Startup Logs *************\n${startUpLogs}*********** End Startup Logs ***********\n`
-        ' bs:disable-next-line LINT3012
         print line
         buffer.FromAsciiString(line)
         buffer.AppendFile(logsFile)
@@ -93,9 +96,7 @@ end function
 
 function OnLineLog(event as object, dateTime as object, logsFile as string, buffer as object)
     line = FormatTime(dateTime) + event.getData()
-    ' bs:disable-next-line LINT3012
     print line
-
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 end function
@@ -106,9 +107,7 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
         return
     end if
     line = FormatTime(dateTime) + "[ERROR][SysLog] " + ToString(info)
-    ' bs:disable-next-line LINT3012
     print line
-
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 end function
@@ -116,10 +115,7 @@ end function
 function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
     info = event.getInfo()
     line = FormatTime(dateTime) + "[WARN][AppMonitorMemory] " + ToString(info)
-
-    ' bs:disable-next-line LINT3012
     print line
-
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 end function
@@ -137,10 +133,7 @@ function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, l
     m.lastDeviceInfoMemoryLevel = info.generalMemoryLevel
 
     line = FormatTime(dateTime) + "[WARN][DeviceInfoMemory] " + ToString(info)
-
-    ' bs:disable-next-line LINT3012
     print line
-
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 end function

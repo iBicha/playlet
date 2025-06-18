@@ -1,0 +1,106 @@
+import "pkg:/source/utils/AssertUtils.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
+
+function JobGetInput() as dynamic
+    if m._input = invalid
+        m._input = m.top.input
+    end if
+    return m._input
+end function
+
+function JobGetCallbackNode() as dynamic
+    if m._callback = invalid
+        input = JobGetInput()
+        if input = invalid
+            return invalid
+        end if
+        m._callback = input._callback
+    end if
+
+    return m._callback
+end function
+
+function JobSuccess() as void
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.success = true
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobError(error as dynamic) as void
+    error = ErrorUtils.Format(error)
+    LogError(error)
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+    callbackNode.error = error
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobCancel() as void
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return
+    end if
+
+    callbackNode.cancel = true
+    callbackNode.success = false
+    callbackNode.done = true
+    m.jobStateSet = true
+end function
+
+function JobIsCancelled() as boolean
+    callbackNode = JobGetCallbackNode()
+    if callbackNode = invalid
+        return false
+    end if
+
+    return callbackNode.cancel = true
+end function
+
+function Execute(_unused as dynamic) as void
+    #if DEBUG
+        AssertNodeThreadInfo()
+    #end if
+
+    callback = JobGetCallbackNode()
+    if callback <> invalid
+        callback.queueFields(true)
+    end if
+
+    try
+        ExecuteJob()
+    catch error
+        JobError(error)
+    end try
+    if not m.jobStateSet = true
+        JobSuccess()
+    end if
+
+    if callback <> invalid
+        callback.queueFields(false)
+    end if
+
+    m._input = invalid
+    m._callback = invalid
+end function
+
+function ExecuteJob() as void
+    throw "ExecuteJob abstract method must be implemented in derived class"
+end function
+
+function AssertNodeThreadInfo() as void
+    threadInfo = m.top.threadInfo()
+
+    Assert.AreEqual(threadInfo.currentThread.type, "Task", "threadInfo.currentThread.type must be 'Task' for this job. This is a bug.")
+    Assert.AreEqual(threadInfo.node.owningThread.id, threadInfo.currentThread.id, "This job must be executed on the same thread that created it. This is a bug.")
+    Assert.AreEqual(threadInfo.node.willRendezvousFromCurrentThread, "No", "threadInfo.node.willRendezvousFromCurrentThread must be 'No' for this job. This is a bug.")
+end function

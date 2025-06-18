@@ -1,7 +1,7 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/SponsorBlock/Notifications/SponsorBlockNotificationUtils.bs"
 import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "SponsorBlockSegmentAction.bs"
 import "VideoPlayer.bs"
 
@@ -213,11 +213,13 @@ namespace SponsorBlock
     end function
 
     function SendSkippedSectionEvent(segmentId as string)
-        if m.sponsorSkipEventTask <> invalid
-            m.sponsorSkipEventTask.cancel = true
+        if m.sponsorSkipEventJob <> invalid
+            m.sponsorSkipEventJob.cancel = true
         end if
 
-        m.sponsorSkipEventTask = AsyncTask.Start(Tasks.SponsorBlockSegmentViewedTask, { segmentId: segmentId })
+        callback = JobSystem.CreateCallback()
+        JobSystem.QueueJob(m.jobQueue, Jobs.SponsorBlockSegmentViewedJob, { segmentId: segmentId }, callback)
+        m.sponsorSkipEventJob = callback
     end function
 
 end namespace

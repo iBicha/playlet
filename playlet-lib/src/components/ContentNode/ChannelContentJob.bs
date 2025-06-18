@@ -1,39 +1,36 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
-@asynctask
-function ChannelContentTask(input as object) as object
+@job("ChannelContentJob")
+function ExecuteJob() as void
+    input = JobGetInput()
     contentNode = input.content
     invidiousNode = input.invidious
 
-    if m.top.cancel
+    if JobIsCancelled()
         contentNode.loadState = FeedLoadState.None
-        return invalid
+        JobCancel()
+        return
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
-    response = service.GetChannel(contentNode.authorId, m.top.cancellation)
+    cancallation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    response = service.GetChannel(contentNode.authorId, cancallation)
 
-    if m.top.cancel
+    if JobIsCancelled()
         contentNode.loadState = FeedLoadState.None
-        return invalid
+        JobCancel()
+        return
     end if
 
     metadata = response.Json()
 
     if not response.IsSuccess() or metadata = invalid
         contentNode.loadState = FeedLoadState.Error
-        return {
-            success: false
-            error: response.ErrorMessage()
-        }
+        JobError(response.ErrorMessage())
+        return
     end if
 
     InvidiousContent.ToChannelContentNode(contentNode, metadata)
-
     contentNode.loadState = FeedLoadState.Loaded
-
-    return {
-        success: true
-    }
 end function

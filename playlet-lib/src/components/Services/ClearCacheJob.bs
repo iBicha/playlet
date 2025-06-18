@@ -1,17 +1,15 @@
 import "pkg:/source/utils/Logging.bs"
 
-@asynctask
-function ClearCacheTask() as object
+@job("ClearCacheJob")
+function ExecuteJob() as void
     fs = CreateObject("roFileSystem")
     if fs = invalid
-        LogError("Failed to create roFileSystem object")
-        return invalid
+        JobError("Failed to create roFileSystem object")
+        return
     end if
 
     ClearVolume(fs, "tmp:/")
     ClearVolume(fs, "cachefs:/")
-
-    return invalid
 end function
 
 function ClearVolume(fs as object, volume as string)

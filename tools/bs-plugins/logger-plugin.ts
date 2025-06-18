@@ -1,4 +1,5 @@
 // This plugin generates logging functions based on the usage of the LogError, LogWarn, LogInfo, and LogDebug functions.
+// Also strips out print statements and comments when not in debug mode.
 
 import {
     AstEditor,
@@ -102,10 +103,25 @@ export class LoggerPlugin implements CompilerPlugin {
         const isDebug = !!event.program.options.debug;
 
         const visitor = createVisitor({
+            PrintStatement: (statement) => {
+                if (!isDebug) {
+                    event.editor.overrideTranspileResult(statement, '');
+                }
+            },
+            CommentStatement: (statement) => {
+                if (!isDebug) {
+                    event.editor.overrideTranspileResult(statement, '');
+                }
+            },
             ExpressionStatement: (statement) => {
                 // @ts-ignore
                 const funcName = statement.expression.callee?.name?.text;
                 if (funcName && logFunctionKeys.includes(funcName)) {
+                    if (!isDebug && funcName === 'LogDebug') {
+                        event.editor.overrideTranspileResult(statement, '');
+                        return;
+                    }
+
                     // @ts-ignore
                     const args = statement.expression.args;
                     if (isDebug) {
