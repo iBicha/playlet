@@ -88,6 +88,8 @@ namespace Innertube
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
+            ' When you mispell something in the search bar, this renderer shows
+            "didYouMeanRenderer": ParseNotImplemented
             ' A list of subscribers in a channel with a CTA to subscribe.
             "recognitionShelfRenderer": ParseNotImplemented
             ' A playlist at the end of a video. We don't need that for now.
@@ -1275,14 +1277,39 @@ namespace Innertube
     end function
 
     function ParseContinuationItemRenderer(nodeData as object, context as object) as object
-        continuation = ObjectUtils.Dig(nodeData, ["continuationEndpoint", "continuationCommand", "token"])
-        if IsString(continuation)
-            ' In Playlists there are 2 continuation items, and one of them is useless...
-            ' TODO:P1 figure this out
-            if StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
-                context.currentFeed.continuation = continuation
-            end if
+        ' In Playlists there are 2 continuation items:
+        ' - The first one (innermost) we encounter is the continuation for the next page of videos
+        ' - The second one (outermost) is the continuation for recommended playlists
+        ' Because of that, we probably want to keep the first one.
+        ' We probably want to manage feeds properly and parse both at some point.
+        if not StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
+            return invalid
         end if
+
+        continuationEndpoint = nodeData["continuationEndpoint"]
+        if not IsAssociativeArray(continuationEndpoint)
+            return invalid
+        end if
+
+        continuation = ObjectUtils.Dig(continuationEndpoint, ["continuationCommand", "token"])
+        if IsString(continuation)
+            context.currentFeed.continuation = continuation
+            return invalid
+        end if
+
+        commands = ObjectUtils.Dig(continuationEndpoint, ["commandExecutorCommand", "commands"])
+        if not IsArray(commands)
+            return invalid
+        end if
+
+        for each command in commands
+            continuation = ObjectUtils.Dig(command, ["continuationCommand", "token"])
+            if IsString(continuation)
+                context.currentFeed.continuation = continuation
+                return invalid
+            end if
+        end for
+
         return invalid
     end function
 
