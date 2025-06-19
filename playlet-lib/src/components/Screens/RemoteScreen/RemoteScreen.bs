@@ -1,7 +1,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -164,48 +164,48 @@ function OnLinkWithTvPanelVisibleChanged()
     if m.linkWithTvPanel.visible
         GeneratePairingCode()
     else
-        if m.linkCodeTask <> invalid
-            m.linkCodeTask.cancel = true
-            m.linkCodeTask = invalid
+        if m.loungeGenerateManualPairingCodeJob <> invalid
+            m.loungeGenerateManualPairingCodeJob.cancel = true
+            m.loungeGenerateManualPairingCodeJob = invalid
         end if
         m.linkCodeLabel.text = ""
     end if
 end function
 
 function GeneratePairingCode()
-    if m.linkCodeTask <> invalid
-        m.linkCodeTask.cancel = true
+    if m.loungeGenerateManualPairingCodeJob <> invalid
+        m.loungeGenerateManualPairingCodeJob.cancel = true
     end if
 
     m.linkCodeLabel.text = Tr(Locale.RemoteScreen.Loading)
-    m.linkCodeTask = AsyncTask.Start(Tasks.LoungeGenerateManualPairingCodeTask, {
+
+    input = {
         loungeService: m.loungeService
         loungeToken: m.loungeService.loungeToken
         screenId: m.loungeService.screenId
         ' Use deviceName as screenName
         screenName: m.loungeService.deviceName
         deviceId: m.loungeService.deviceId
-    }, OnLoungeGenerateManualPairingCodeTaskResult)
+    }
+
+    callback = JobSystem.CreateCallback(OnLoungeGenerateManualPairingCodeJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.LoungeGenerateManualPairingCodeJob, input, callback)
+    m.loungeGenerateManualPairingCodeJob = callback
 end function
 
-function OnLoungeGenerateManualPairingCodeTaskResult(output as object) as void
-    m.linkCodeTask = invalid
+function OnLoungeGenerateManualPairingCodeJobDone(event as object) as void
+    callback = event.getRoSGNode()
+    JobSystem.UnobserveCallback(callback)
+    m.loungeGenerateManualPairingCodeJob = invalid
 
-    if output.cancelled
+    info = event.GetInfo()
+
+    if info.cancel
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-
-        message = Tr(Locale.RemoteScreen.FailedToGeneratePairingCode) + `\n${error}`
+    if not info.success
+        message = Tr(Locale.RemoteScreen.FailedToGeneratePairingCode) + `\n${info.error}`
         DialogUtils.ShowDialogEx({
             message: message
             title: Tr(Locale.RemoteScreen.TvCodeError)
@@ -214,18 +214,5 @@ function OnLoungeGenerateManualPairingCodeTaskResult(output as object) as void
         return
     end if
 
-    manualLinkCode = output.result.code
-    if StringUtils.IsNullOrEmpty(manualLinkCode)
-        m.linkCodeLabel.text = ""
-        return
-    end if
-
-    ' insert a space every 3 characters.
-    parts = []
-    for i = 0 to manualLinkCode.Len() - 1 step 3
-        parts.Push(manualLinkCode.Mid(i, 3))
-    end for
-    linkCode = parts.Join(" ")
-
-    m.linkCodeLabel.text = linkCode
+    m.linkCodeLabel.text = info.data.code
 end function

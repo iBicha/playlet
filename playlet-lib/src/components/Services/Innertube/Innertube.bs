@@ -1,14 +1,17 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
+end function
+
+function OnNodeReady()
     OnRequestVisitorData()
 end function
 
 function OnRequestVisitorData() as void
-    if m.innertubeInitTask <> invalid
+    if m.innertubeSessionDataJob <> invalid
         return
     end if
 
@@ -17,11 +20,16 @@ function OnRequestVisitorData() as void
         return
     end if
 
-    m.innertubeInitTask = AsyncTask.Start(Tasks.InnertubeInitTask, {
+    input = {
         innertube: m.top
-    }, OnInnertubeInitTaskResult)
+    }
+
+    callback = JobSystem.CreateCallback(OnInnertubeSessionDataJobDone)
+    JobSystem.QueueJob(m.top.jobQueue, Jobs.InnertubeSessionDataJob, input, callback)
+    m.innertubeSessionDataJob = callback
 end function
 
-function OnInnertubeInitTaskResult(output as object) as void
-    m.innertubeInitTask = invalid
+function OnInnertubeSessionDataJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.innertubeSessionDataJob = invalid
 end function

@@ -1,5 +1,5 @@
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
@@ -31,16 +31,23 @@ function HasValidAccessToken(_unused as dynamic) as boolean
 end function
 
 function RefreshAccessToken() as void
-    if m.refreshTokenTask <> invalid
+    if m.profileRefreshTokenJob <> invalid
         return
     end if
 
+    if m.scene = invalid
+        m.scene = m.top.getScene()
+    end if
     if m.profilesService = invalid
-        m.profilesService = m.top.getScene().findNode("ProfilesService")
+        m.profilesService = m.scene.findNode("ProfilesService")
+    end if
+    if m.jobQueue = invalid
+        m.jobQueue = m.scene.findNode("JobQueue")
     end if
 
     LogInfo("Refreshing access token for profile:", m.top.username)
-    m.refreshTokenTask = AsyncTask.Start(Tasks.ProfileRefreshTokenTask, {
+
+    input = {
         profile: m.top
         profilesService: m.profilesService
         accessTokenObject: {
@@ -48,9 +55,14 @@ function RefreshAccessToken() as void
             clientSecret: m.top.clientSecret
             refreshToken: m.top.refreshToken
         }
-    }, OnProfileRefreshTokenTaskResult)
+    }
+
+    callback = JobSystem.CreateCallback(OnProfileRefreshTokenJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.ProfileRefreshTokenJob, input, callback)
+    m.profileRefreshTokenJob = callback
 end function
 
-function OnProfileRefreshTokenTaskResult(_output as object) as void
-    m.refreshTokenTask = invalid
+function OnProfileRefreshTokenJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.profileRefreshTokenJob = invalid
 end function

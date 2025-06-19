@@ -1,14 +1,19 @@
 import "pkg:/components/Services/Innertube/SessionData.bs"
 
-@asynctask
-function InnertubeInitTask(input as object) as object
+@job("InnertubeSessionDataJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     innertubeNode = input.innertube
 
-    sessionData = Innertube.GetSessionData()
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    sessionData = Innertube.GetSessionData(cancellation)
     if sessionData = invalid
-        return invalid
+        JobError("Failed to fetch session data")
+        return
     end if
 
+    innertubeNode.queueFields(true)
     if IsInt(sessionData.timestamp)
         innertubeNode.timestamp = sessionData.timestamp
     end if
@@ -20,6 +25,5 @@ function InnertubeInitTask(input as object) as object
     if not StringUtils.IsNullOrEmpty(sessionData.poToken)
         innertubeNode.poToken = sessionData.poToken
     end if
-
-    return invalid
+    innertubeNode.queueFields(false)
 end function

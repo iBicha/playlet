@@ -31,6 +31,9 @@ function InitializeBindings()
             "ProfilesService": {
                 "invidious": "../Invidious"
             }, 
+            "Innertube": {
+                "jobQueue": "/JobQueue"
+            }, 
             "Invidious": {
                 "webServer": "../WebServer", 
                 "applicationInfo": "../ApplicationInfo", 

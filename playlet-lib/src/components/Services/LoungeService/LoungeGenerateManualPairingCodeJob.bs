@@ -3,8 +3,10 @@ import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
-@asynctask
-function LoungeGenerateManualPairingCodeTask(input as object) as object
+@job("LoungeGenerateManualPairingCodeJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     loungeService = input.loungeService
 
     if StringUtils.IsNullOrEmpty(input.loungeToken)
@@ -14,10 +16,8 @@ function LoungeGenerateManualPairingCodeTask(input as object) as object
         message = wait(30000, messagePort)
         loungeService.unobserveFieldScoped("loungeToken")
         if message = invalid or StringUtils.IsNullOrEmpty(message.GetData())
-            return {
-                "success": false
-                "error": "Couldn't join lounge"
-            }
+            JobError("Couldn't join lounge")
+            return
         end if
 
         input.screenId = loungeService.screenId
@@ -33,30 +33,35 @@ function LoungeGenerateManualPairingCodeTask(input as object) as object
 
     for each key in form
         if StringUtils.IsNullOrEmpty(form[key])
-            return {
-                "success": false
-                "error": key + " is empty"
-            }
+            JobError("Required field " + key + " is empty")
+            return
         end if
     end for
 
     form["access_type"] = "permanent"
     form["app"] = "Playlet"
 
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
     request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_pairing_code?ctx=pair", "")
     request.UrlEncodedForm(form)
+    request.Cancellation(cancellation)
 
     response = request.Await()
     if not response.IsSuccess()
-        return {
-            "success": false
-            "error": response.ErrorMessage()
-        }
+        JobError(response.ErrorMessage())
+        return
     end if
 
     code = response.Text()
-    return {
-        "success": true
-        "code": code
-    }
+
+    if not StringUtils.IsNullOrEmpty(code)
+        ' insert a space every 3 characters.
+        parts = []
+        for i = 0 to code.Len() - 1 step 3
+            parts.Push(code.Mid(i, 3))
+        end for
+        code = parts.Join(" ")
+    end if
+
+    JobSuccessData({ code: code })
 end function

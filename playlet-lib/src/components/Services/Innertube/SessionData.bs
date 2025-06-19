@@ -11,18 +11,18 @@ namespace Innertube
     const SESSION_DATA_VERSION = 1
     const INNERTUBE_VISITOR_DATA_LIFESPAN_SECONDS = 60 * 60 * 24 * 14 ' 14 days
 
-    function GetSessionData() as object
+    function GetSessionData(cancellation = invalid as object) as object
         sessionData = ReadSessionDataFromRegistry()
         if sessionData <> invalid
             return sessionData
         end if
 
-        sessionData = RequestSessionData()
+        sessionData = RequestSessionData(cancellation)
         SaveSessionDataToRegistry(sessionData)
         return sessionData
     end function
 
-    function RequestSessionData() as object
+    function RequestSessionData(cancellation = invalid as object) as object
         request = HttpClient.Get("https://www.youtube.com/sw.js_data")
         request.Headers({
             "Accept-Language": "en-US,en;q=0.9"
@@ -30,6 +30,7 @@ namespace Innertube
             "Accept": "*/*"
             "Referer": "https://www.youtube.com/sw.js"
         })
+        request.Cancellation(cancellation)
 
         response = request.Await()
         if not response.IsSuccess()
@@ -37,13 +38,9 @@ namespace Innertube
             return invalid
         end if
 
-        text = ValidString(response.Text())
-        if not text.StartsWith(")]}'")
-            LogError("Invalid session data response", text)
-            return invalid
-        end if
+        text = response.Text()
+        text = text.Replace(`)]}'`, "")
 
-        text = text.Replace(")]}'", "")
         json = ParseJson(text)
         if json = invalid
             LogError("Failed to parse session data", text)

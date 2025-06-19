@@ -1,25 +1,25 @@
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 
-@asynctask
-function ProfileRefreshTokenTask(input as object) as object
+@job("ProfileRefreshTokenJob")
+function ExecuteJob() as void
+    input = JobGetInput()
     profileNode = input.profile
     accessTokenObject = input.accessTokenObject
     profilesService = input.profilesService
     try
-        if InnertubeService.AuthRefreshAccessToken(accessTokenObject)
+        cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+        if InnertubeService.AuthRefreshAccessToken(accessTokenObject, cancellation)
             profileNode.expiresIn = accessTokenObject.expiresIn
             profileNode.expiresTimestamp = accessTokenObject.expiresTimestamp
             profileNode.accessToken = accessTokenObject.accessToken
             profilesService@.SaveUserProfilesToRegistry()
         else
-            LogError("Failed to refresh access token")
+            JobError("Failed to refresh access token")
             profileNode.accessToken = invalid
         end if
     catch error
-        LogError("Failed to refresh access token:", ErrorUtils.Format(error))
+        JobError("Failed to refresh access token: " + ErrorUtils.Format(error))
         profileNode.accessToken = invalid
     end try
-
-    return invalid
 end function
