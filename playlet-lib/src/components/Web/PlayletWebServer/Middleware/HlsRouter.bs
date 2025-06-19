@@ -25,8 +25,9 @@ namespace Http
 
             hlsRequest = HttpClient.Get(url)
             headers = request.headers
-            ' Host is probably 127.0.0.1 so we should remove it before hitting the server
-            headers.Delete("Host")
+            ' Host is probably 127.0.0.1:8888 so we should change it before hitting the server
+            parsedUrl = UrlUtils.ParseUrl(url)
+            headers["Host"] = parsedUrl.host + ":" + parsedUrl.port
             hlsRequest.Headers(headers)
 
             hlsResponse = hlsRequest.Await()
@@ -46,9 +47,12 @@ namespace Http
 
             response.http_code = hlsResponse.StatusCode()
             headers = hlsResponse.Headers()
-            ' We responding with uncompressed data
-            headers.Delete("Content-Encoding")
-            response.headers = headers
+
+            response.headers["Cache-Control"] = headers["no-cache, must-revalidate"]
+            response.headers["Content-Type"] = headers["Content-Type"]
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+            response.headers["Date"] = headers["Date"]
+            response.headers["Server"] = "HTTP server (unknown)"
             response.SetBodyDataString(ValidString(hlsManifest))
 
             return true
