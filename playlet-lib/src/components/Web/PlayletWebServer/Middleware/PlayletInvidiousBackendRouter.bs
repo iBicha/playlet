@@ -572,17 +572,38 @@ namespace Http
                 videoId = videoId.Left(videoId.InStr("?"))
             end if
             raw = request.query.raw <> invalid
+            videoInfoBatched = request.query.video_info_batched <> invalid
 
             options = {
                 "raw": raw
                 "visitorData": m.innertube.visitorData
             }
 
-            metadata = InnertubeService.GetVideoMetadata(videoId, options)
+            if videoInfoBatched
+                options["retry"] = false
+                metadata = InnertubeService.GetVideoInfoBatched([videoId], options)
+                if IsArray(metadata.videos) and metadata.videos.Count() > 0
+                    metadata = metadata.videos[0]
+                else
+                    metadata = {
+                        "error": "Failed to get video info with video_info_batched=true"
+                    }
+                end if
+            else
+                metadata = InnertubeService.GetVideoMetadata(videoId, options)
+            end if
+
             response.Json(metadata)
 
             if metadata.error <> invalid
                 response.http_code = 500
+                return true
+            end if
+
+            ' If we're only interested in video info and not streaming data,
+            ' we can return longer cache time.
+            if videoInfoBatched
+                response.headers["cache-control"] = "public, max-age=259200" ' 3 days
             end if
 
             return true

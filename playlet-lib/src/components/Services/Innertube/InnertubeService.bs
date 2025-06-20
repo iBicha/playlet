@@ -113,33 +113,50 @@ namespace InnertubeService
             }
         end if
 
-        responseData = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
-        if responseData = invalid
-            ' Sometimes the response doesn't contain a playlist.
-            ' The theory here is that when a private video is in the list, the created playlist
-            ' is no longer publicly available. That's why it is not returned. Also happens with
-            ' a deleted video.
-            ' A retry after a short sleep SOMETIMES fixes this (but not always).
-            ' TODO:P1: Figure out why this happens and if there's a better way to handle it.
-            if retry
-                LogWarn("Response data missing playlist. Retrying in a bit...")
-                newOptions = {}
-                if options <> invalid
-                    newOptions.Append(options)
+        ' If we're fetching more than one video, we want to search for the playlist
+        if videoIds.Count() > 1
+            responseData = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
+            if responseData = invalid
+                ' Sometimes the response doesn't contain a playlist.
+                ' The theory here is that when a private video is in the list, the created playlist
+                ' is no longer publicly available. That's why it is not returned. Also happens with
+                ' a deleted video.
+                ' A retry after a short sleep SOMETIMES fixes this (but not always).
+                ' TODO:P1: Figure out why this happens and if there's a better way to handle it.
+                if retry
+                    LogWarn("Response data missing playlist. Retrying in a bit...")
+                    newOptions = {}
+                    if options <> invalid
+                        newOptions.Append(options)
+                    end if
+                    newOptions["retry"] = false
+                    sleep(200 + Rnd(500))
+                    return GetVideoInfoBatched(videoIds, newOptions)
+                else
+                    LogWarn("Response data missing playlist. Not retrying.")
                 end if
-                newOptions["retry"] = false
-                sleep(200 + Rnd(500))
-                return GetVideoInfoBatched(videoIds, newOptions)
-            else
-                LogWarn("Response data missing playlist. Not retrying.")
             end if
         end if
 
         feeds = Innertube.ParseResponseDataForFeeds(responseData)
-        if feeds.Count() > 0
-            return {
-                videos: ValidArray(feeds[0].items)
-            }
+
+        if videoIds.Count() > 1
+            if feeds.Count() > 0
+                return {
+                    videos: ValidArray(feeds[0].items)
+                }
+            end if
+        else
+            if feeds.Count() > 0
+                foundVideos = feeds[0].items
+                for each video in foundVideos
+                    if video.videoId = videoIds[0]
+                        return {
+                            videos: [video]
+                        }
+                    end if
+                end for
+            end if
         end if
 
         return {

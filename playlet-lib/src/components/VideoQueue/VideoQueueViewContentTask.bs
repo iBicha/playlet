@@ -26,10 +26,11 @@ function VideoQueueViewContentTask(input as object) as object
         visitorData: innertubeNode.visitorData
     }
 
-    ' TODO:P1: Use InnertubeService.GetVideoInfoBatched instead of loading each video individually
+    ' TODO:P1: Use InnertubeService.GetVideoInfoBatched with an array instead of loading each video individually
     ' TODO:P1: It turns out this might be too much. With a large number of videos
     ' YouTube starts to rate limit us.
     ' Need to change it to load on demand using render tracking
+    ' Or maybe not load this stuff at all.
     for i = index to videoNodes.Count() - 1
         videoNode = videoNodes[i]
         if not LoadVideoDetail(videoNode, service, instance, requestOptions, backend)
@@ -57,12 +58,19 @@ function VideoQueueViewContentTask(input as object) as object
     return invalid
 end function
 
-' Returns true if the video was loaded from cache.
 function LoadVideoDetail(videoNode as object, service as object, instance as string, requestOptions as object, backend as string) as boolean
     videoId = videoNode.videoId
 
     if backend = "playlet"
-        metadata = InnertubeService.GetVideoMetadata(videoId, requestOptions)
+        requestOptions["retry"] = false
+        metadata = InnertubeService.GetVideoInfoBatched([videoId], requestOptions)
+        if IsArray(metadata.videos) and metadata.videos.Count() > 0
+            metadata = metadata.videos[0]
+        else
+            metadata = {
+                "error": "Failed to get video info with video_info_batched=true"
+            }
+        end if
     else
         metadata = service.GetVideoMetadata(videoId, requestOptions)
     end if

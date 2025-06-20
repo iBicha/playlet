@@ -4,7 +4,7 @@ export class PlayletApi {
     static host = () => `http://${getHost()}`
 
     static async getVideoInfo(videoId) {
-        const response = await fetch(`${PlayletApi.host()}/playlet-invidious-backend/api/v1/videos/${videoId}`);
+        const response = await fetch(`${PlayletApi.host()}/playlet-invidious-backend/api/v1/videos/${videoId}?video_info_batched=true`);
         return await response.json();
     }
 

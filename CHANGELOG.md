@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Improve performance of video bookmarks, by avoiding `/player` endpoint and caching results
 
 ## [0.40.5] - 2025-06-19
 
