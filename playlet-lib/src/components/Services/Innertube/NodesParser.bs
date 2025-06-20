@@ -44,6 +44,7 @@ namespace Innertube
             "twoColumnSearchResultsRenderer": ParseTwoColumnSearchResultsRenderer
             "singleColumnBrowseResultsRenderer": ParseSingleColumnBrowseResultsRenderer
             "twoColumnBrowseResultsRenderer": ParseTwoColumnBrowseResultsRenderer
+            "twoColumnWatchNextResults": ParseTwoColumnWatchNextResults
             "watchNextEndScreenRenderer": ParseWatchNextEndScreenRenderer
             "tabRenderer": ParseTabRenderer
             "sectionListRenderer": ParseSectionListRenderer
@@ -61,6 +62,8 @@ namespace Innertube
             "playlistVideoListContinuation": ParsePlaylistVideoListContinuation
             "videoRenderer": ParseVideoRenderer
             "gridVideoRenderer": ParseGridVideoRenderer
+            "compactVideoRenderer": ParseCompactVideoRenderer
+            "videoPrimaryInfoRenderer": ParseVideoPrimaryInfoRenderer
             "channelVideoPlayerRenderer": ParseChannelVideoPlayerRenderer
             "playlistVideoRenderer": ParsePlaylistVideoRenderer
             "playlistPanelVideoRenderer": ParsePlaylistPanelVideoRenderer
@@ -88,6 +91,14 @@ namespace Innertube
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
+            ' Contains comments "teaser".
+            "commentsEntryPointHeaderRenderer": ParseNotImplemented
+            ' Contains the owner of the video from "videoPrimaryInfoRenderer"
+            "videoSecondaryInfoRenderer": ParseNotImplemented
+            ' Empty node? Perhaps used in some cases
+            "compositeVideoPrimaryInfoRenderer": ParseNotImplemented
+            ' An information panel, could contain a link to some website, or a message.
+            "infoPanelContainerRenderer": ParseNotImplemented
             ' When you mispell something in the search bar, this renderer shows
             "didYouMeanRenderer": ParseNotImplemented
             ' A list of subscribers in a channel with a CTA to subscribe.
@@ -134,6 +145,32 @@ namespace Innertube
 
     function ParseTwoColumnBrowseResultsRenderer(nodeData as object, _context as object) as object
         return nodeData["tabs"]
+    end function
+
+    function ParseTwoColumnWatchNextResults(nodeData as object, _context as object) as object
+        subItems = []
+
+        results = ObjectUtils.Dig(nodeData, ["results", "results", "contents"])
+        if results <> invalid
+            subItems.Push(results)
+        end if
+
+        secondaryResults = ObjectUtils.Dig(nodeData, ["secondaryResults", "secondaryResults", "results"])
+        if secondaryResults <> invalid
+            subItems.Push(secondaryResults)
+        end if
+        ' Technically, this playlist would have its own title, and should count as a separate feed.
+        ' For now, we just add it to the current feed.
+        playlist = ObjectUtils.Dig(nodeData, ["playlist", "playlist", "contents"])
+        if playlist <> invalid
+            subItems.Push(playlist)
+        end if
+
+        if subItems.Count() = 0
+            LogWarn("No results found in TwoColumnWatchNextResults", nodeData)
+            return invalid
+        end if
+        return subItems
     end function
 
     function ParseWatchNextEndScreenRenderer(nodeData as object, _context as object) as object
@@ -446,6 +483,145 @@ namespace Innertube
             video["isUpcoming"] = true
             video["premiereTimestamp"] = premiereTimestamp
         end if
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseCompactVideoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        author = invalid
+        authorId = invalid
+        authorPossibleNodes = ["ownerText", "shortBylineText", "longBylineText"]
+        for each authorPossibleNode in authorPossibleNodes
+            node = nodeData[authorPossibleNode]
+            author = ParseText(node)
+            authorId = ObjectUtils.Dig(node, ["runs", 0, "navigationEndpoint", "browseEndpoint", "browseId"])
+            if author <> "" and authorId <> invalid
+                exit for
+            end if
+        end for
+
+        ' not doing this
+        if StringUtils.IsNullOrEmpty(author) and StringUtils.IsNullOrEmpty(authorId)
+            if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+                author = context.currentAuthor
+                authorId = context.currentAuthorId
+            end if
+        end if
+
+        viewCountText = ParseText(nodeData["shortViewCountText"])
+        if viewCountText = ""
+            viewCountText = ParseText(nodeData["viewCountText"])
+        end if
+
+        publishedText = ParseText(nodeData["publishedTimeText"])
+        lengthText = ParseText(nodeData["lengthText"])
+        if lengthText = ""
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                    if parsedTimeStatusRenderer <> invalid
+                        lengthText = parsedTimeStatusRenderer.text
+                        if lengthText <> ""
+                            exit for
+                        end if
+                    end if
+                end for
+            end if
+        end if
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        isUpcoming = false
+        liveNow = ValidString(ObjectUtils.Dig(nodeData, ["badges", 0, "metadataBadgeRenderer", "icon", "iconType"])) = "LIVE"
+        thumbnailOverlays = nodeData["thumbnailOverlays"]
+        if IsArray(thumbnailOverlays)
+            for each overlay in thumbnailOverlays
+                parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                if parsedTimeStatusRenderer <> invalid
+                    if parsedTimeStatusRenderer.isShort
+                        if context.disableShorts = true
+                            LogInfo("Skipping Short based on user settings")
+                            return invalid
+                        end if
+                    end if
+
+                    liveNow = liveNow or parsedTimeStatusRenderer.isLive
+                    isUpcoming = isUpcoming or parsedTimeStatusRenderer.isUpcoming
+                end if
+            end for
+        end if
+
+        premiereTimestamp = ObjectUtils.Dig(nodeData, ["upcomingEventData", "startTime"])
+        if IsString(premiereTimestamp)
+            premiereTimestamp = premiereTimestamp.ToInt()
+            isUpcoming = true
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "author": author
+            "authorId": authorId
+            "title": ParseText(nodeData["title"])
+            "videoThumbnails": videoThumbnails
+            "viewCountText": viewCountText
+            "publishedText": publishedText
+            "lengthText": lengthText
+            "liveNow": liveNow
+        }
+
+        if isUpcoming
+            video["isUpcoming"] = true
+            video["premiereTimestamp"] = premiereTimestamp
+        end if
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseVideoPrimaryInfoRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            videoId = ObjectUtils.Dig(nodeData, ["updatedMetadataEndpoint", "updatedMetadataEndpoint", "videoId"])
+            if not IsString(videoId)
+                LogWarn("Invalid video ID", nodeData)
+                return invalid
+            end if
+        end if
+
+        title = ParseText(nodeData["title"])
+        videoThumbnails = GenerateVideoThumbnails(videoId)
+
+        publishedText = ParseText(nodeData["relativeDateText"])
+        if publishedText = ""
+            publishedText = ParseText(nodeData["dateText"])
+        end if
+
+        viewCountText = ParseText(ObjectUtils.Dig(nodeData, ["viewCount", "videoViewCountRenderer", "viewCount"]))
+
+        ' TODO:P2 the owner of the video is under videoSecondaryInfoRenderer in a neibouring node.
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "videoThumbnails": videoThumbnails
+            "viewCountText": viewCountText
+            "publishedText": publishedText
+        }
 
         PushFeedItem(video, context)
         return invalid
