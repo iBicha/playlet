@@ -66,19 +66,12 @@ function VideoContentTask(input as object) as object
     contentNode.live = metadata.liveNow
 
     if metadata.error <> invalid
-        errorMessage = metadata.error
-        knownIssue = `{"error":"This helps protect our community. Learn more"}`
-
-        if metadata.error.InStr(knownIssue) <> -1
-            errorMessage = `NOTE: Please see the following link for more information about the error\nhttps://github.com/iBicha/playlet/issues/400\n` + errorMessage
-        end if
-
         ' Adding metadata allows us to play next recommended video after displaying the error
         contentNode.addFields({ metadata: metadata })
 
         return {
             success: false
-            error: errorMessage
+            error: metadata.error
         }
     end if
 
@@ -86,6 +79,7 @@ function VideoContentTask(input as object) as object
     ' Forwarding query params to HLS playlists is not needed. In fact, it can cause issues
     ' because the playlist is limited to 4MB, and on large playlists the query params
     ' significantly increase the size of the playlist, making it cropped.
+    ' https://github.com/iBicha/playlet/issues/500
     contentNode.ForwardQueryStringParams = false
     contentNode.addFields({
         metadata: metadata
