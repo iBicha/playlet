@@ -1,0 +1,28 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
+
+@job("LatestLibVersionJob")
+function ExecuteJob() as void
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    latest = GetLatestPlayletLibVersionFromGithubReleases(cancellation)
+    JobSuccessData({
+        latest: latest
+    })
+end function
+
+function GetLatestPlayletLibVersionFromGithubReleases(cancellation as dynamic) as string
+    response = HttpClient.Head("https://github.com/iBicha/playlet/releases/latest").Cancellation(cancellation).Await()
+
+    if response.StatusCode() = 200
+        headers = response.Headers()
+        if headers.location <> invalid
+            ' bs:disable-next-line NO_OPTIONAL_CHAINING
+            regex = /\/v?(\d+\.\d+\.\d+)/
+            match = regex.match(headers.location)
+            if match.Count() = 2
+                return match[1]
+            end if
+        end if
+    end if
+    return "N/A"
+end function

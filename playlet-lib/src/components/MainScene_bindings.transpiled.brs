@@ -25,6 +25,9 @@ function InitializeBindings()
                 "loungeService": "../LoungeService", 
                 "jobQueue": "/JobQueue"
             }, 
+            "ApplicationInfo": {
+                "jobQueue": "/JobQueue"
+            }, 
             "SearchHistory": {
                 "preferences": "../Preferences"
             }, 

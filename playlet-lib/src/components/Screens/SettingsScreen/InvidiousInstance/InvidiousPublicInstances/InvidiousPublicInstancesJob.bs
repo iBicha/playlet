@@ -1,28 +1,31 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/ObjectUtils.bs"
 
-@asynctask
-function InvidiousPublicInstancesTask(input as object) as object
+@job("InvidiousPublicInstancesJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     listNode = input.listNode
     fieldWidths = input.fieldWidths
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
-    response = HttpClient.Get(Invidious.INSTANCES_API).Await()
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    response = HttpClient.Get(Invidious.INSTANCES_API).Cancellation(cancellation).Await()
+    if response.IsCancelled()
+        JobCancel()
+        return
+    end if
+
     instances = response.Json()
-
     if not response.IsSuccess() or instances = invalid
-        return {
-            success: false
-            error: response.ErrorMessage()
-        }
-    end if
-
-    if m.top.cancel
-        return invalid
+        JobError(response.ErrorMessage())
+        return
     end if
 
     instances = FilterInstances(instances)
@@ -38,10 +41,6 @@ function InvidiousPublicInstancesTask(input as object) as object
     end for
 
     listNode.content = content
-
-    return {
-        success: true
-    }
 end function
 
 function FilterInstances(instances as object) as object
@@ -70,34 +69,19 @@ function CreateListItemContent(instance as object, fieldWidths as object) as obj
 
     item = CreateObject("roSGNode", "InvidiousPublicInstancesListItemContent")
     item.setFields({
-        name: instance[0]
-        version: DrillIntoObject(instance[1], ["stats", "software", "version"], "N/A")
-        users: DrillIntoObject(instance[1], ["stats", "usage", "users", "total"], "N/A")
-        signup: Tr(DrillIntoObject(instance[1], ["stats", "openRegistrations"], false) ? "Yes" : "No")
+        name: ObjectUtils.DigWithDefault(instance, [0], "")
+        version: ObjectUtils.DigWithDefault(instance, [1, "stats", "software", "version"], "N/A")
+        users: ObjectUtils.DigWithDefault(instance, [1, "stats", "usage", "users", "total"], "N/A")
+        signup: Tr(ValidBool(ObjectUtils.DigWithDefault(instance, [1, "stats", "openRegistrations"], false)) ? "Yes" : "No")
         ' Leave 5 spaces for the flag, just to simplify the layout
-        location: `     ${DrillIntoObject(instance[1], ["region"], "N/A")}`
-        flag: GetFlagUrl(DrillIntoObject(instance[1], ["flag"], ""))
-        health: DrillIntoObject(instance[1], ["monitor", "uptime"], "N/A")
-        uri: instance[1].uri
+        location: `     ${ObjectUtils.DigWithDefault(instance, [1, "region"], "N/A")}`
+        flag: GetFlagUrl(ValidString(ObjectUtils.DigWithDefault(instance, [1, "flag"], "")))
+        health: ObjectUtils.DigWithDefault(instance, [1, "monitor", "uptime"], "N/A")
+        uri: ObjectUtils.DigWithDefault(instance, [1, "uri"], "N/A")
         fieldWidths: fieldWidths
     })
 
     return item
-end function
-
-function DrillIntoObject(obj as object, path as object, defaultValue as dynamic) as dynamic
-    if obj = invalid
-        return defaultValue
-    end if
-
-    for each key in path
-        if obj[key] = invalid
-            return defaultValue
-        end if
-        obj = obj[key]
-    end for
-
-    return obj
 end function
 
 function GetFlagUrl(flag as string) as string

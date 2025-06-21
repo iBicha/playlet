@@ -1,6 +1,6 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -88,41 +88,41 @@ function Refresh()
     m.instancesHeader.visible = false
     m.failedLabel.visible = false
     m.refreshButton.visible = false
-    if m.invidiousPublicInstancesTask <> invalid
-        m.invidiousPublicInstancesTask.cancel = true
+    if m.invidiousPublicInstancesJob <> invalid
+        m.invidiousPublicInstancesJob.cancel = true
     end if
-
-    m.invidiousPublicInstancesTask = AsyncTask.Start(Tasks.InvidiousPublicInstancesTask, {
-        listNode: m.instances
-        fieldWidths: m.fieldWidths
-    }, OnInvidiousPublicInstancesTaskResults)
 
     m.busySpinner.visible = true
     m.busySpinner.control = "start"
+
+    if m.jobQueue = invalid
+        m.jobQueue = m.top.getScene().findNode("JobQueue")
+    end if
+
+    input = {
+        "listNode": m.instances
+        "fieldWidths": m.fieldWidths
+    }
+
+    m.invidiousPublicInstancesJob = JobSystem.CreateCallback(OnInvidiousPublicInstancesJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.InvidiousPublicInstancesJob, input, m.invidiousPublicInstancesJob)
 end function
 
-function OnInvidiousPublicInstancesTaskResults(output as object) as void
+function OnInvidiousPublicInstancesJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.invidiousPublicInstancesJob = invalid
+
     m.busySpinner.visible = false
     m.busySpinner.control = "stop"
 
-    m.invidiousPublicInstancesTask = invalid
-    if output.cancelled
+    info = event.getInfo()
+    if info.cancel
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(output.error)
-
-        message = Tr(Locale.Dialogs.FailedToLoadInvidiousPublicInstances) + `\n${error}`
+    if not info.success
         DialogUtils.ShowDialogEx({
-            message: message
+            message: Tr(Locale.Dialogs.FailedToLoadInvidiousPublicInstances) + `\n${info.error}`
             title: Tr(Locale.Dialogs.InvidiousPublicInstancesLoadError)
             large: true
         })

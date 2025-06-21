@@ -1,5 +1,5 @@
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/services/ApplicationInfo.bs"
 
 function Init()
@@ -23,20 +23,32 @@ function GetLocalIpAddress(_unused as dynamic) as dynamic
 end function
 
 function GetLatestPlayletLibVersion(_unused as dynamic) as dynamic
-    if not StringUtils.IsNullOrEmpty(m.top.lib_version_latest)
-        return m.top.lib_version_latest
+    lib_version_latest = m.top.lib_version_latest
+    if not StringUtils.IsNullOrEmpty(lib_version_latest)
+        return lib_version_latest
     end if
 
-    if m.latestLibVersionTask <> invalid and m.latestLibVersionTask.state = "run"
+    if m.latestLibVersionJob <> invalid
         return invalid
     end if
 
-    m.latestLibVersionTask = AsyncTask.Start(Tasks.LatestLibVersionTask, {}, function(output as object) as void
-        m.latestLibVersionTask = invalid
-        if output.success and output.result.latest <> invalid
-            m.top.lib_version_latest = output.result.latest
-        end if
-    end function)
+    m.latestLibVersionJob = JobSystem.CreateCallback(OnLatestLibVersionJobDone)
+    JobSystem.QueueJob(m.top.jobQueue, Jobs.LatestLibVersionJob, {}, m.latestLibVersionJob)
 
     return invalid
+end function
+
+function OnLatestLibVersionJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.latestLibVersionJob = invalid
+
+    info = event.getInfo()
+    if not info.success
+        return
+    end if
+
+    data = info.data
+    if data.latest <> invalid
+        m.top.lib_version_latest = data.latest
+    end if
 end function
