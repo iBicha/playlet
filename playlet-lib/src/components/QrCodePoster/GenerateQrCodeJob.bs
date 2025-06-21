@@ -1,8 +1,10 @@
 import "pkg:/source/QrCode/QrImage.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
-@asynctask
-function GenerateQrCodeTask(input as object) as object
+@job("GenerateQrCodeJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     poster = input.poster
     mode = input.mode
     text = input.text
@@ -24,13 +26,12 @@ function GenerateQrCodeTask(input as object) as object
     qr = new QrCode.QRImage()
     imagePath = qr.Generate(text, size, padding, mode)
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     if not StringUtils.IsNullOrEmpty(imagePath)
         poster.uri = imagePath
     end if
-
-    return invalid
 end function

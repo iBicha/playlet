@@ -1,7 +1,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Screens/ProfileScreen/YouTubeAccountSelectionView/YouTubeAccountSelectionViewUtils.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -29,49 +29,45 @@ function Init()
 end function
 
 function OnNodeReady()
-    m.task = AsyncTask.Start(Tasks.YouTubeLoginTask, {
+    input = {
         dialog: m.top
         profilesService: m.top.profilesService
-    }, OnYouTubeLoginTaskResult)
+    }
+
+    m.youTubeLoginJob = JobSystem.CreateCallback(OnYouTubeLoginJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.YouTubeLoginJob, input, m.youTubeLoginJob)
 end function
 
-function OnYouTubeLoginTaskResult(output as object) as void
-    m.task = invalid
+function OnYouTubeLoginJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.youTubeLoginJob = invalid
 
-    if output.cancelled
+    info = event.getInfo()
+    if info.cancel
         Close()
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
+    if not info.success
         DialogUtils.ShowDialogEx({
-            message: error
+            message: info.error
             title: Tr(Locale.Generic.Error)
             large: true
         })
         return
     end if
 
-    accounts = output.result.accounts
-    accessToken = output.result.accessToken
+    data = info.data
     ' if accounts is invalid, we're going to assume a profile is already created.
-    if accounts = invalid or accessToken = invalid
+    if data = invalid or data.accounts = invalid or data.accessToken = invalid
         Close()
         return
     end if
 
     ' The accountSelectionView will take over the creation of the profile.
     accountSelectionView = YouTubeAccountSelectionViewUtils.Open(m.top.appController)
-    accountSelectionView.accessToken = accessToken
-    accountSelectionView.accounts = accounts
+    accountSelectionView.accessToken = data.accessToken
+    accountSelectionView.accounts = data.accounts
     Close()
 end function
 
@@ -85,9 +81,9 @@ function Close()
 end function
 
 function OnWasClosed()
-    if m.task <> invalid
-        m.task.cancel = true
-        m.task = invalid
+    if m.youTubeLoginJob <> invalid
+        m.youTubeLoginJob.cancel = true
+        m.youTubeLoginJob = invalid
     end if
 end function
 

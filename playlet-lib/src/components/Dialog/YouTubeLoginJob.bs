@@ -4,24 +4,25 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 
-@asynctask
-function YouTubeLoginTask(input as object) as object
+@job("YouTubeLoginJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     profilesNode = input.profilesService
     dialogNode = input.dialog
 
-    cancellation = m.top.cancellation
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
     ' TODO:P2 cache client identity
     authCode = InnertubeService.AuthGetCode(cancellation)
 
     if CancellationUtils.IsCancelled(cancellation)
-        return invalid
+        JobCancel()
+        return
     end if
 
     if authCode.error <> invalid
-        return {
-            success: false
-            error: authCode.error
-        }
+        JobError(authCode.error)
+        return
     end if
 
     url = InnertubeService.AuthGetActivationUrl(authCode)
@@ -34,34 +35,30 @@ function YouTubeLoginTask(input as object) as object
     accessToken = InnertubeService.AuthPollForAccessToken(authCode, cancellation)
 
     if CancellationUtils.IsCancelled(cancellation)
-        return invalid
+        JobCancel()
+        return
     end if
 
     if accessToken.error <> invalid
-        return {
-            success: false
-            error: accessToken.error
-        }
+        JobError(accessToken.error)
+        return
     end if
 
     accounts = InnertubeService.AuthListAccounts(accessToken.accessToken, cancellation)
 
     if CancellationUtils.IsCancelled(cancellation)
-        return invalid
+        JobCancel()
+        return
     end if
 
     if IsAssociativeArray(accounts) and accounts.error <> invalid
-        return {
-            success: false
-            error: accounts.error
-        }
+        JobError(accounts.error)
+        return
     end if
 
     if not IsArray(accounts) or accounts.Count() = 0
-        return {
-            success: false
-            error: Tr(Locale.Dialogs.NoValidAccountsFound)
-        }
+        JobError(Tr(Locale.Dialogs.NoValidAccountsFound))
+        return
     end if
 
     ' If there is only one account, we can skip the selection screen
@@ -69,15 +66,11 @@ function YouTubeLoginTask(input as object) as object
     if accounts.Count() = 1
         profile = YouTubeLoginAccountItemUtils.CreateProfileContentNode(accounts[0], accessToken)
         profilesNode@.LoginWithProfile(profile)
-
-        return {
-            success: true
-        }
+        return
     end if
 
-    return {
-        success: true
+    JobSuccessData({
         accounts: accounts
         accessToken: accessToken
-    }
+    })
 end function

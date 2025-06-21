@@ -1,5 +1,5 @@
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -44,8 +44,8 @@ function OnLoadStatusChange() as void
 end function
 
 function GenerateQrCode() as void
-    if m.qrCodeGenTask <> invalid
-        m.qrCodeGenTask.cancel = true
+    if m.generateQrCodeJob <> invalid
+        m.generateQrCodeJob.cancel = true
     end if
 
     text = m.top.text
@@ -64,16 +64,27 @@ function GenerateQrCode() as void
 
     m.top.isBusy = true
 
-    m.qrCodeGenTask = AsyncTask.Start(Tasks.GenerateQrCodeTask, {
+    if m.jobQueue = invalid
+        m.jobQueue = m.top.getScene().findNode("JobQueue")
+    end if
+
+    input = {
         poster: m.top
         text: text
         size: width
         padding: m.top.padding
-    }, OnGenerateQrCodeTaskResult)
+    }
+
+    m.generateQrCodeJob = JobSystem.CreateCallback(OnGenerateQrCodeJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.GenerateQrCodeJob, input, m.generateQrCodeJob)
 end function
 
-function OnGenerateQrCodeTaskResult(output as object) as void
-    if output.cancelled
+function OnGenerateQrCodeJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.generateQrCodeJob = invalid
+
+    info = event.getInfo()
+    if info.cancel
         return
     end if
 
