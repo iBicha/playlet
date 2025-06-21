@@ -5,21 +5,23 @@ import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
-@asynctask
-function InvidiousInstanceTestingTask(input as object) as object
+@job("InvidiousInstanceTestingJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     instance = input.instance
     listNode = input.listNode
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     content = PrepareTests()
     listNode.content = content
 
-    RunTests(instance, content, m.top.cancellation)
-
-    return invalid
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    RunTests(instance, content, cancellation)
 end function
 
 function PrepareTests() as object
@@ -63,7 +65,8 @@ function RunTests(instance as string, content as object, cancellation as object)
             LogError(testNode.details)
         end if
 
-        if m.top.cancel
+        if CancellationUtils.IsCancelled(cancellation)
+            JobCancel()
             return
         end if
     end for
@@ -139,7 +142,8 @@ end function
 
 function CanFetchVideoDetails(instance as string, testNode as object, cancellation as object) as void
     try
-        videoId = "jNQXAC9IVRw"
+        ' videoId = "jNQXAC9IVRw"
+        videoId = "k85mRPqvMbE"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
         response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
@@ -173,7 +177,8 @@ end function
 
 function CanFetchVideoComments(instance as string, testNode as object, cancellation as object) as void
     try
-        videoId = "jNQXAC9IVRw"
+        ' videoId = "jNQXAC9IVRw"
+        videoId = "k85mRPqvMbE"
         url = `${instance}/api/v1/comments/${videoId}`
         response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 
@@ -260,7 +265,8 @@ end function
 
 function CanFetchVideoThumbails(instance as string, testNode as object, cancellation as object) as void
     try
-        videoId = "jNQXAC9IVRw"
+        ' videoId = "jNQXAC9IVRw"
+        videoId = "k85mRPqvMbE"
         url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
         response = HttpClient.Get(url).NoCache().Cancellation(cancellation).Await()
 

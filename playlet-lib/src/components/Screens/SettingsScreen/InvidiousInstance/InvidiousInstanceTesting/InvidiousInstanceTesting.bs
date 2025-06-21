@@ -1,8 +1,8 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -46,25 +46,29 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 end function
 
 function Close()
-    if m.testingTask <> invalid
-        m.testingTask.cancel = true
+    if m.invidiousInstanceTestingJob <> invalid
+        m.invidiousInstanceTestingJob.cancel = true
+        m.invidiousInstanceTestingJob = invalid
     end if
 
     m.appController@.PopScreen()
 end function
 
-function RunTestsTask()
+function RunTestsJob()
     instance = m.top.instance
     m.titleLabel.text = Tr(Locale.InvidiousTesting.TestingInstance).Replace("%1", instance)
 
-    if m.testingTask <> invalid
-        m.testingTask.cancel = true
+    if m.invidiousInstanceTestingJob <> invalid
+        m.invidiousInstanceTestingJob.cancel = true
     end if
 
-    m.testingTask = AsyncTask.Start(Tasks.InvidiousInstanceTestingTask, {
+    input = {
         instance: instance
         listNode: m.testList
-    })
+    }
+
+    m.invidiousInstanceTestingJob = JobSystem.CreateCallback()
+    JobSystem.QueueJob(m.jobQueue, Jobs.InvidiousInstanceTestingJob, input, m.invidiousInstanceTestingJob)
 end function
 
 function ShowTestDetails() as void
