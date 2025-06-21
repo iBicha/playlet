@@ -7,6 +7,7 @@ const { existsSync, writeFileSync, readFileSync } = require('fs');
 const json5 = require('json5');
 const md5 = require('crypto-js/md5');
 const path = require('path');
+const { executablePath } = require('puppeteer');
 
 const META_EXT = '.meta.json5';
 
@@ -116,7 +117,10 @@ function checkFileHash(file, hash) {
 }
 
 async function generateImage(inputImage, options, rootDir) {
-    const opts = { ...options };
+    const opts = {
+        launch: { executablePath },
+        ...options
+    };
     opts.outputFilePath = path.join(rootDir, opts.outputFilePath);
     await convertFile(inputImage, opts);
 }
