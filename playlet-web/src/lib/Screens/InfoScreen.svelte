@@ -138,8 +138,23 @@ ${JSON.stringify(profilesInfo, null, 2)}
   }
 
   function createGithubIssueUrl() {
-    const body = encodeURIComponent(createFeedbackBody());
-    return `https://github.com/iBicha/playlet/issues/new?title=${feedbackTitle}&body=${body}`;
+    const body = createFeedbackBody();
+    let bodyEncoded = encodeURIComponent(body);
+
+    // Github url known limit is 8192
+    // Limit body, otherwise URL might be too long
+    // This is an body arbitrary limit, that should keep us under the 8192 limit
+    const encodedBodyLimit = 8000;
+    const bodyLimit = 4200;
+    if (bodyEncoded.length > encodedBodyLimit) {
+      bodyEncoded = encodeURIComponent(
+        body.substring(0, bodyLimit) + "\n\n[...truncated]"
+      );
+    }
+
+    const url = `https://github.com/iBicha/playlet/issues/new?title=${feedbackTitle}&body=${bodyEncoded}`;
+    console.log("Github URL length:", url.length);
+    return url;
   }
 
   function createMailToUrl() {

@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Improve performance of video bookmarks, by avoiding `/player` endpoint and caching results
+- Github link to create new issue not working in web app due to url being too long
+
+### Changed
+
+- Added instructions to use web app as a workaround to current errors
 
 ## [0.40.5] - 2025-06-19
 

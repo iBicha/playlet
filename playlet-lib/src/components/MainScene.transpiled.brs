@@ -38,7 +38,7 @@ function MainSceneContainerChanged()
     StartWebServer()
     HideLoadingScreen()
     InitEcpArgs()
-    if false
+    if true
         if not ShowAnnouncement()
             m.scene.signalBeacon("AppLaunchComplete")
         end if
@@ -58,18 +58,25 @@ function StartWebServer()
 end function
 
 function ShowAnnouncement() as boolean
+    deviceInfo = CreateObject("roDeviceInfo")
+    deviceName = deviceInfo.GetFriendlyName()
     dialog = DialogUtils_ShowDialogOnce({
-        messageId: "1747362859"
-        title: "Announcement - YouTube account support"
+        messageId: "1750501488"
+        title: "Web app workaround"
         message: [
-            "YouTube account support is now available in Playlet!"
-            "Subscriptions, playlists, watch history and " + chr(34) + "Recommended" + chr(34) + " are now available in the app."
-            "If you encounter any issues, please report them on GitHub."
-            "https://github.com/iBicha/playlet/issues"
-            "Thank you."
+            "If you're experiencing issues playing videos, please consider this workaround while we work on a fix:"
+        ]
+        bulletText: [
+            "Go to the " + chr(34) + "Remote" + chr(34) + " screen, and scan the QR code to open the web app in your browser."
+            "Tap the video you want to play."
+            ("Select the " + chr(34) + "Play on " + bslib_toString(deviceName) + " (ytjs)" + chr(34) + " button.")
+        ]
+        bottomMessage: [
+            "Apologies for the inconvenience, and thank you for your patience!"
+            "Issue link: https://github.com/iBicha/playlet/issues/626"
         ]
         alwaysOnTop: true
-        marginWidth: 180
+        large: true
     })
     if dialog = invalid
         return false
