@@ -2,15 +2,18 @@ import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
 import "pkg:/source/utils/Types.bs"
 
-@asynctask
-function SponsorBlockTask(input as object) as object
-    videoId = input.metadata.videoId
-    lengthSeconds = input.metadata.lengthSeconds
+@job("SponsorBlockSegmentsJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
+    videoId = input.videoId
+    lengthSeconds = input.lengthSeconds
     showNotifications = input.showNotifications
     categories = input.categories
 
     service = new SponsorBlock.SponsorBlockService()
-    skipSegments = service.GetSkipSegmentsForVideo(videoId)
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
+    skipSegments = service.GetSkipSegmentsForVideo(videoId, cancellation)
 
     skipSegments = ProcessSkipSegments(skipSegments, showNotifications, categories, service)
 
@@ -32,11 +35,11 @@ function SponsorBlockTask(input as object) as object
         skipSegments.SortBy("start")
     end if
 
-    return {
+    JobSuccessData({
         videoId: videoId
         skipSegments: skipSegments
         barPath: barPath
-    }
+    })
 end function
 
 function ProcessSkipSegments(skipSegments as object, showNotifications as boolean, categories as object, service as SponsorBlock.SponsorBlockService) as object

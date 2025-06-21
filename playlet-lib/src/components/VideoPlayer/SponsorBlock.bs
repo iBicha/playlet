@@ -21,30 +21,31 @@ namespace SponsorBlock
             return
         end if
 
-        if m.sponsorBlockTask <> invalid
-            m.sponsorBlockTask.cancel = true
+        if m.sponsorBlockSegmentsJob <> invalid
+            m.sponsorBlockSegmentsJob.cancel = true
         end if
 
-        m.sponsorBlockTask = AsyncTask.Start(Tasks.SponsorBlockTask, {
-            metadata: metadata
+        input = {
+            videoId: metadata.videoId
+            lengthSeconds: metadata.lengthSeconds
             showNotifications: m.preferences["sponsorblock.show_notifications"]
             categories: m.preferences["sponsorblock.categories"]
-        }, OnSponsorBlockTaskResults)
+        }
+
+        m.sponsorBlockSegmentsJob = JobSystem.CreateCallback(OnSponsorBlockSegmentsJobDone)
+        JobSystem.QueueJob(m.jobQueue, Jobs.SponsorBlockSegmentsJob, input, m.sponsorBlockSegmentsJob)
     end function
 
-    function OnSponsorBlockTaskResults(output as object) as void
-        m.sponsorBlockTask = invalid
-        if output.cancelled or m.onCloseCalled = true
+    function OnSponsorBlockSegmentsJobDone(event as object) as void
+        JobSystem.UnobserveCallback(event.getRoSGNode())
+        m.sponsorBlockSegmentsJob = invalid
+
+        info = event.getInfo()
+        if not info.success
             return
         end if
 
-        if not output.success
-            error = ErrorUtils.Format(output.error)
-            LogError(error)
-            return
-        end if
-
-        skipSegments = output.result.skipSegments
+        skipSegments = info.data.skipSegments
         if skipSegments = invalid or skipSegments.Count() = 0
             return
         end if
@@ -52,7 +53,7 @@ namespace SponsorBlock
         m.skipSegments = skipSegments
         m.top.seekMode = "accurate"
 
-        barPath = output.result.barPath
+        barPath = info.data.barPath
         if barPath <> invalid
             m.top.trickPlayBar.trackImageUri = barPath
             m.top.trickPlayBar.filledBarBlendColor = "#FF000080"
