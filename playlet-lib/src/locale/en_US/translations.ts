@@ -953,14 +953,6 @@
         <translation>Developer preferences</translation>
     </message>
     <message>
-        <source>Use dev video player</source>
-        <translation>Use dev video player</translation>
-    </message>
-    <message>
-        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
-        <translation>Enable the dev video player. This is an unfinished video player for testing purposes.</translation>
-    </message>
-    <message>
         <source>Playlet Library version</source>
         <translation>Playlet Library version</translation>
     </message>

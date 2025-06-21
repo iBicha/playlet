@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix Invidious tests - `Me at the zoo` video was getting blocked
 
+### Removed
+
+- "Use dev video player" option from the settings
+
 ## [0.40.7] - 2025-06-21
 
 ### Fixed

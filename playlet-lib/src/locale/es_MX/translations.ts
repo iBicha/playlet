@@ -1093,14 +1093,6 @@
         <translation>Preferencias de desarrollador</translation>
     </message>
     <message>
-        <source>Use dev video player</source>
-        <translation>Usar reproductor de video de desarrollador</translation>
-    </message>
-    <message>
-        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
-        <translation>Habilita el reproductor de video para desarrollador. Este es un reproductor de video sin terminar con el fin de probar nuevas funciones.</translation>
-    </message>
-    <message>
         <source>Playlet Library version</source>
         <translation>Versión de Playlet Library</translation>
     </message>

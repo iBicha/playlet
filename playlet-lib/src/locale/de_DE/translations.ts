@@ -181,10 +181,6 @@
         <translation>Abschnitte auf der Startseite aktivieren/deaktivieren und verschieben</translation>
     </message>
     <message>
-        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
-        <translation>Den Entwickler-Videoplayer aktivieren. Dieser ist ein unfertiger Videoplayer zum Testen.</translation>
-    </message>
-    <message>
         <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
         <translation>Die Version der Playlet Library, die genutzt werden soll. Die Versionen entsprechen den markierten Releases auf GitHub. Releases, die die Datei playlet-lib.zip nicht enthalten, sind deaktiviert.</translation>
     </message>
@@ -1083,10 +1079,6 @@
     <message>
         <source>Developer preferences</source>
         <translation>Entwicklereinstellungen</translation>
-    </message>
-    <message>
-        <source>Use dev video player</source>
-        <translation>Entwickler-Videoplayer nutzen</translation>
     </message>
     <message>
         <source>Playlet Library version</source>

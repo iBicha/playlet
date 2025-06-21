@@ -1053,14 +1053,6 @@
         <translation>Borrar el historial de búsqueda de Playlet. Esto afectará a las sugerencias. Esto no afectará al historial de reproducción de Invidious.</translation>
     </message>
     <message>
-        <source>Use dev video player</source>
-        <translation>Utilizar reproductor de video de desarrollo</translation>
-    </message>
-    <message>
-        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
-        <translation>Activar el reproductor de video de desarrollo. Este es un reproductor de video no completado para realizar pruebas.</translation>
-    </message>
-    <message>
         <source>Error closing video</source>
         <translation>Error al cerrar el vídeo</translation>
     </message>

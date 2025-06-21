@@ -501,10 +501,6 @@
         <translation>Desenvolvedor</translation>
     </message>
     <message>
-        <source>Use dev video player</source>
-        <translation>Usar o dev player de vídeo</translation>
-    </message>
-    <message>
         <source>Developer preferences</source>
         <translation>Preferências do desenvolvedor</translation>
     </message>
@@ -719,10 +715,6 @@
     <message>
         <source>Show a notification when a video is added to the queue</source>
         <translation>Mostrar uma notificação quando um vídeo é adicionado à fila</translation>
-    </message>
-    <message>
-        <source>Enable the dev video player. This is an unfinished video player for testing purposes.</source>
-        <translation>Ativar o player de vídeo dev. Este é um player de vídeo inacabado para fins de teste.</translation>
     </message>
     <message>
         <source>The version of Playlet Lib to use. These correspond to tagged releases on Github. Releases that do not have a playlet-lib.zip file are disabled.</source>
