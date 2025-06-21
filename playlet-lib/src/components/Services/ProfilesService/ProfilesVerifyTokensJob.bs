@@ -1,8 +1,10 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
-@asynctask
-function ProfilesVerifyTokensTask(input as object) as object
+@job("ProfilesVerifyTokensJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     profilesNode = input.profilesService
     invidiousNode = input.invidious
     profileContentNodes = input.profileNodes
@@ -20,7 +22,7 @@ function ProfilesVerifyTokensTask(input as object) as object
     end for
 
     if invalidProfiles.Count() = 0
-        return invalid
+        return
     end if
 
     profilesNode@.LogoutWithProfiles(invalidProfiles)
@@ -36,6 +38,4 @@ function ProfilesVerifyTokensTask(input as object) as object
         message: message
         title: Tr(Locale.Dialogs.UserLoggedOut)
     })
-
-    return invalid
 end function

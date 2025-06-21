@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix Invidious tests - `Me at the zoo` video was getting blocked
+- Invidious tests - `Me at the zoo` video was getting blocked
+- Bug where logging out from inactive profile is not properly persisted
 
 ### Removed
 

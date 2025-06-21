@@ -1,7 +1,9 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
-@asynctask
-function ProfilesInvidiousUnregisterTokenTask(input as object) as object
+@job("ProfilesInvidiousUnregisterTokenJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     profileContentNodes = input.profileNodes
     invidiousNode = input.invidious
 
@@ -16,7 +18,14 @@ function ProfilesInvidiousUnregisterTokenTask(input as object) as object
         if not response.IsSuccess()
             LogWarn(`Failed to unregister token: ${response.ErrorMessage()}`)
         end if
-    end for
 
-    return invalid
+        refreshToken = profileNode.refreshToken
+        if not StringUtils.IsNullOrEmpty(refreshToken)
+            authToken.token = refreshToken
+            response = service.UnregisterToken(authToken)
+            if not response.IsSuccess()
+                LogWarn(`Failed to unregister refresh token: ${response.ErrorMessage()}`)
+            end if
+        end if
+    end for
 end function

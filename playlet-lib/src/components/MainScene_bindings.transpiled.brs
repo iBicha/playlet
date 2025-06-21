@@ -32,7 +32,8 @@ function InitializeBindings()
                 "preferences": "../Preferences"
             }, 
             "ProfilesService": {
-                "invidious": "../Invidious"
+                "invidious": "../Invidious", 
+                "jobQueue": "/JobQueue"
             }, 
             "Innertube": {
                 "jobQueue": "/JobQueue"

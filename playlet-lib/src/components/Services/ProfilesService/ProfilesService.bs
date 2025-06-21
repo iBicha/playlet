@@ -1,5 +1,5 @@
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
 import "pkg:/source/utils/ColorUtils.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
@@ -83,11 +83,12 @@ function LoadProfilesFromRegistry()
     end if
 
     if profileNodes.Count() > 0
-        AsyncTask.Start(Tasks.ProfilesVerifyTokensTask, {
+        input = {
             profilesService: m.top
             invidious: m.invidious
             profileNodes: profileNodes
-        })
+        }
+        JobSystem.QueueJob(m.jobQueue, Jobs.ProfilesVerifyTokensJob, input)
     end if
 end function
 
@@ -245,14 +246,16 @@ function LogoutWithProfile(profile as object) as void
         SetCurrentProfile(invalid)
     else
         RefreshActiveProfileState(currentProfile)
+        SaveUserProfilesToRegistry(invalid)
     end if
 
     m.top.onProfileLogout = true
 
-    AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
+    input = {
         invidious: m.invidious
         profileNodes: [profile]
-    })
+    }
+    JobSystem.QueueJob(m.jobQueue, Jobs.ProfilesInvidiousUnregisterTokenJob, input)
 end function
 
 function LogoutWithProfiles(profiles as object) as void
@@ -280,17 +283,18 @@ function LogoutWithProfiles(profiles as object) as void
         SetCurrentProfile(invalid)
     else
         RefreshActiveProfileState(currentProfile)
+        SaveUserProfilesToRegistry(invalid)
     end if
 
     if onProfileLogout
         m.top.onProfileLogout = true
     end if
 
-    AsyncTask.Start(Tasks.ProfilesInvidiousUnregisterTokenTask, {
-        profiles: m.top
+    input = {
         invidious: m.invidious
         profileNodes: profiles
-    })
+    }
+    JobSystem.QueueJob(m.jobQueue, Jobs.ProfilesInvidiousUnregisterTokenJob, input)
 end function
 
 function LogoutWithAccessToken(accessToken as dynamic) as void
@@ -312,6 +316,7 @@ function LogoutWithAccessToken(accessToken as dynamic) as void
                 SetCurrentProfile(invalid)
             else
                 RefreshActiveProfileState(currentProfile)
+                SaveUserProfilesToRegistry(invalid)
             end if
             m.top.onProfileLogout = true
             exit for
