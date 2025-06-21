@@ -19,7 +19,7 @@ These are mostly the steps when releasing a new version:
 - Wait for the PR to be created
 - Inspect PR, wait for CI and merge
 - Wait for CI on main branch to create the `canary` release
-- Edit `canary` release
+- Edit [`canary`](https://github.com/iBicha/playlet/releases/tag/canary) release
   - Tag: `v$VERSION`
   - Title: `v$VERSION`
   - Body: the content from CHANGELOG.md for this version
