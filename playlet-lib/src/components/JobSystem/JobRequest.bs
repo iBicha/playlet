@@ -1,0 +1,42 @@
+import "pkg:/source/utils/AssertUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace JobRequest
+    function Execute(request as object) as void
+        #if DEBUG
+            Assert.NotNullOrEmpty(request, "JobRequest.Execute: request cannot be null or empty")
+            Assert.NotNullOrEmpty(request.jobName, "JobRequest.Execute: request cannot be null or empty")
+        #end if
+
+        job = CreateObject("roSGNode", request.jobName)
+        if job = invalid
+            error = "Failed to create job node: " + request.jobName
+            LogError(error)
+            ' Usually callback is fired by the job itself, but if it fails to create, we can call it here
+            if request.input <> invalid and request.input._callback <> invalid
+                request.input._callback.error = error
+                request.input._callback.success = false
+                request.input._callback.done = true
+            end if
+            return
+        end if
+        job.id = request.jobName + "-" + StringUtils.RandomId()
+
+        if request.input <> invalid
+            job.input = request.input
+        end if
+
+        #if DEBUG
+            LogDebug("Executing job:", request.jobName)
+            time = CreateObject("roTimespan")
+        #end if
+
+        job@.Execute()
+
+        #if DEBUG
+            LogDebug("Job executed:", request.jobName, "in", time.TotalMilliseconds(), "ms")
+        #end if
+
+        job.input = invalid
+    end function
+end namespace

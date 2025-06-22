@@ -8,6 +8,7 @@ namespace Tests
 
         protected override function setup()
             m.logger = CreateObject("roSGNode", "Logger")
+            m.logger.logLevel = -1
         end function
 
         protected override function beforeEach()
@@ -28,7 +29,7 @@ namespace Tests
             messagePort = CreateObject("roMessagePort")
 
             for i = 1 to 100
-                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode = JobSystem.CreateCallback()
                 callbackNode.observeField("done", messagePort, ["success"])
                 JobSystem.QueueJob(m.jobQueue, Jobs.SimpleTestJob, { sleep: 50, success: i mod 2 = 0 }, callbackNode)
             end for
@@ -66,7 +67,7 @@ namespace Tests
 
             callbacks = []
             for i = 1 to 10
-                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode = JobSystem.CreateCallback()
                 callbackNode.observeField("done", messagePort, ["success", "cancel"])
                 callbacks.push(callbackNode)
                 JobSystem.QueueJob(m.jobQueue, Jobs.SimpleTestJob, { sleep: 5000, success: true }, callbackNode)
@@ -114,7 +115,7 @@ namespace Tests
 
             callbacks = []
             for i = 1 to 10
-                callbackNode = CreateObject("roSGNode", "JobCallback")
+                callbackNode = JobSystem.CreateCallback()
                 callbackNode.observeField("done", messagePort, ["success", "cancel"])
                 callbacks.push(callbackNode)
                 JobSystem.QueueJob(m.jobQueue, Jobs.SimpleTestJob, { sleep: 5000, success: true }, callbackNode)
@@ -145,6 +146,34 @@ namespace Tests
                     exit while
                 end if
             end while
+        end function
+
+        @it("Handles invalid job names gracefully")
+        function _()
+            messagePort = CreateObject("roMessagePort")
+            callbackNode = JobSystem.CreateCallback()
+            callbackNode.observeField("done", messagePort, ["success", "error"])
+
+            ' Attempt to queue a job with an invalid name
+            JobSystem.QueueJob(m.jobQueue, "InvalidJobName", {}, callbackNode)
+
+            ' Wait for the error message
+            msg = wait(1000, messagePort)
+
+            if msg = invalid
+                m.testSuite.fail("Waiting for job error message timed out after 1000ms")
+            end if
+
+            if type(msg) <> "roSGNodeEvent" or msg.getField() <> "done"
+                m.testSuite.fail("Expected a done event for the job error")
+            end if
+
+            done = msg.getData()
+            info = msg.getInfo()
+
+            m.assertTrue(done, "Job should be done")
+            m.assertFalse(info.success, "Job should not succeed with an invalid job name")
+            m.assertNotEmpty(info.error, "Error message should not be empty")
         end function
 
     end class

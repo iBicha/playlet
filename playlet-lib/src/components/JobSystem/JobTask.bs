@@ -1,3 +1,4 @@
+import "pkg:/components/JobSystem/JobRequest.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
@@ -25,35 +26,9 @@ function JobTaskLoop() as void
             end if
             if field = "request"
                 request = msg.getData()
-                ExecuteJobRequest(request)
+                JobRequest.Execute(request)
                 m.top.ready = true
             end if
         end if
     end while
-end function
-
-function ExecuteJobRequest(request as object) as void
-    job = CreateObject("roSGNode", request.jobName)
-    job.id = request.jobName + "-" + StringUtils.RandomId()
-    if job = invalid
-        LogError("Failed to create job node:", request.jobName)
-        return
-    end if
-
-    if request.input <> invalid
-        job.input = request.input
-    end if
-
-    #if DEBUG
-        LogDebug("Executing job:", request.jobName)
-        time = CreateObject("roTimespan")
-    #end if
-
-    job@.Execute()
-
-    #if DEBUG
-        LogDebug("Job executed:", request.jobName, "in", time.TotalMilliseconds(), "ms")
-    #end if
-
-    job.input = invalid
 end function

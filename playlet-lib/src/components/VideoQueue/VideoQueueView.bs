@@ -1,6 +1,6 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -37,9 +37,9 @@ end function
 function OnContentSet() as void
     content = m.top.content
     if content = invalid
-        if m.loadDetailsTask <> invalid
-            m.loadDetailsTask.cancel = true
-            m.loadDetailsTask = invalid
+        if m.videoQueueViewContentJob <> invalid
+            m.videoQueueViewContentJob.cancel = true
+            m.videoQueueViewContentJob = invalid
         end if
         return
     end if
@@ -141,17 +141,20 @@ function LoadVideoDetailsIfNeeded() as void
 
     LogInfo("Loading video details for", m.videosDetailsToLoad.Count(), "videos")
 
-    if m.loadDetailsTask <> invalid
-        m.loadDetailsTask.cancel = true
+    if m.videoQueueViewContentJob <> invalid
+        m.videoQueueViewContentJob.cancel = true
     end if
 
-    m.loadDetailsTask = AsyncTask.Start(Tasks.VideoQueueViewContentTask, {
+    input = {
         videoNodes: m.videosDetailsToLoad
         innertube: m.top.innertube
         invidious: m.top.invidious
         preferences: m.top.preferences
         index: indexInLoadingArray
-    })
+    }
+
+    m.videoQueueViewContentJob = JobSystem.CreateCallback()
+    JobSystem.QueueJob(m.jobQueue, Jobs.VideoQueueViewContentJob, input, m.videoQueueViewContentJob)
 end function
 
 function AdjustFocus(videoCount as integer)

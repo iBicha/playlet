@@ -6,7 +6,6 @@
 - [Includes](#includes)
 - [@oninit](#oninit)
 - [Bindings](#bindings)
-- [Async Task Generator](#async-task-generator)
 - [Job System Generator](#job-system-generator)
 - [Tracking transpilied files](#tracking-transpilied-files)
 - [Logger](#logger)
@@ -422,62 +421,53 @@ myNode@.BindNode()
 
 calling `BindNode` will trigger all the binding steps just for this node. But it is expected that all its dependencies are already in the scene and can be found.
 
-## Async Task Generator
-
-**[Source](/tools/bs-plugins/asynctask-plugin.ts)**
-
-This plugin generates `Task` components a scripts that makes it simpler to call a function in a background thread, and get the result in a callback function.
-
-### Why
-
-To implement functionality that runs in background threads, [Task](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md)s must be used.
-
-Setting up a task involves lots of boilerplate: setting up the task in an xml file, defining inputs and outputs, code to listen for a task to finish, and so on.
-
-Additionally, there's no standard way to do error handling, cancellation, and so on.
-
-### How
-
-Use a function with the attribute `@asynctask`.
-
-In a separate file, define the task function:
-
-```brighterscript
-@asynctask
-function MyBackgroundTask(input as object) as object
-    myVar = input.myVar
-
-    value = DoWork(myVar)
-
-    return {
-        value: value
-    }
-end function
-```
-
-And use the function like so
-
-```brighterscript
-import "pkg:/source/AsyncTask/Tasks.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-
-AsyncTask.Start(Tasks.MyBackgroundTask, {myVar: "some input"}, function(output as object) as void
-    if output.success
-      print(output.result.value)
-    end if
-end function)
-```
-
-The rest will be taken care of by the plugin, which will generate an `xml` file containing the task component, and a script that handles calling the function.
-
-Although very useful, this pattern might not be the best for long running tasks (like the Web Server) or other tasks that require task reuse. This is because `AsyncTask.Start` create a new instance of the task every time.
-
 ## Job System Generator
 
 **[Source](/tools/bs-plugins/jobsystem-plugin.ts)**
 
-This plugin is very similar to the `Async Task Generator` and aims to be a replacement for it.
-A work in progress for now.
+The Job System simplifies the creation of background jobs without the risk of creating too many threads.
+It manages a number of Tasks which are capable of executing jobs from a queue.
+
+### Why
+
+To implement functionality that runs in background threads, [Tasks](https://developer.roku.com/en-ca/docs/references/scenegraph/control-nodes/task.md) must be used.
+
+Setting up a task involves lots of boilerplate: setting up the task in an xml file, defining inputs and outputs, code to listen for a task to finish, and so on.
+
+Additionally, there's no standard way to do error handling and cancellation.
+
+Another concern is managing too many threads across the application, and managing rendezvous(s).
+
+### How
+
+Define a function in its own file called `ExecuteJob` annotated with `@job("JobName")`:
+
+```brighterscript
+@job("MyJob")
+function ExecuteJob() as void
+    ' input is an associative array set when the job is queued.
+    input = JobGetInput()
+
+    value = DoWork(myVar)
+
+    JobSuccessData({result: value})
+end function
+```
+
+by doing this, the generator will generate a component named "MyJob" and will inherit from "BaseJob".
+
+The job can now queued for execution:
+
+```brighterscript
+callback = JobSystem.CreateCallback()
+JobSystem.QueueJob(m.jobQueue, Jobs.MyJob, input, callback)
+```
+
+And the job system will take care of queueing, scheduling, and scaling up the available tasks in order to execute jobs.
+The job system creates job nodes inside task threads, which reduces the amount of rendezvous necessary. Some rendezvous are still necessary, such as when a task node is signaling that it is ready to take on a new job, or when the job is returning results to render thread.
+The job system will auto scale up to a maximum number of tasks, in order to avoid `Too many threads` errors. Once the job system activity settles down, the job system will release task nodes that has been idle for a certain amount of time.
+
+Although very useful, this pattern might not be the best for long running tasks (like the Web Server) and it is simpler to create dedicated tasks for those.
 
 ## Tracking transpilied files
 
