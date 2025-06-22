@@ -24,6 +24,11 @@ export class ImportValidationPlugin implements CompilerPlugin {
             return;
         }
 
+        // Skip job files
+        if (file.srcPath.endsWith('Job.bs')) {
+            return;
+        }
+
         this.generateXmlComponent(file);
     }
 
