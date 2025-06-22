@@ -3,7 +3,7 @@ import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 ' Maximum number of JobTasks that can be created
-const MAX_JOB_TASK_COUNT = 20
+const MAX_JOB_TASK_COUNT = 25
 ' Minimum number of JobTasks that will be kept alive
 const MIN_JOB_TASK_COUNT = 2
 ' Time in milliseconds to wait before scaling down JobTasks
@@ -45,6 +45,10 @@ function JobQueueTaskLoop() as void
                 m.busyJobTasks[jobTaskId] = jobTaskObject
                 MessagePortUtils.ObserveFieldScopedExSafe(jobTask, "ready", messagePort)
                 jobTask.control = "run"
+            else
+                #if DEBUG
+                    LogWarn("Cannot create new JobTask. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
+                #end if
             end if
 
             exit while

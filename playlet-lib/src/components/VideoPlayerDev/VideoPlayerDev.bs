@@ -1,10 +1,10 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/VideoPlayerDev/PictureInPicture.bs"
 import "pkg:/components/VideoPlayerDev/PlayerUi.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
@@ -76,12 +76,12 @@ function PlayWithContent(contentNode as object)
         m.backgroundPosterSmall.uri = thumbnail
     end if
 
-    StartVideoContentTask(videoContentNode)
+    StartVideoContentDevJob(videoContentNode)
 end function
 
-function StartVideoContentTask(videoContentNode as object)
-    if m.videoContentTask <> invalid
-        m.videoContentTask.cancel = true
+function StartVideoContentDevJob(videoContentNode as object)
+    if m.videoContentDevJob <> invalid
+        m.videoContentDevJob.cancel = true
     end if
 
     m.top.content = videoContentNode
@@ -91,31 +91,29 @@ function StartVideoContentTask(videoContentNode as object)
     m.loadingUi.visible = true
     m.loadingSpinner.control = "start"
 
-    m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTaskDev, {
+    input = {
         titleLabel: m.titleLabel
         secondaryTitleLabel: m.secondaryTitleLabel
         content: videoContentNode
         invidious: m.top.invidious
         preferences: m.top.preferences
         backgroundPoster: m.backgroundPoster
-    }, OnVideoContentTaskResults)
+    }
+
+    m.videoContentDevJob = JobSystem.CreateCallback(OnVideoContentDevJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.VideoContentDevJob, input, m.videoContentDevJob)
 end function
 
-function OnVideoContentTaskResults(output as object) as void
-    m.videoContentTask = invalid
-    if output.cancelled
+function OnVideoContentDevJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.videoContentDevJob = invalid
+
+    info = event.getInfo()
+    if info.cancel
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
-        end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
+    if not info.success
         m.top.close = true
         return
     end if
@@ -126,9 +124,9 @@ end function
 function OnClose()
     m.top.previousPlayer = invalid
 
-    if m.videoContentTask <> invalid
-        m.videoContentTask.cancel = true
-        m.videoContentTask = invalid
+    if m.videoContentDevJob <> invalid
+        m.videoContentDevJob.cancel = true
+        m.videoContentDevJob = invalid
     end if
 
     parent = m.top.getParent()

@@ -2,8 +2,10 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 
-@asynctask
-function VideoContentTaskDev(input as object) as object
+@job("VideoContentDevJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     titleLabel = input.titleLabel
     secondaryTitleLabel = input.secondaryTitleLabel
     backgroundPoster = input.backgroundPoster
@@ -17,7 +19,8 @@ function VideoContentTaskDev(input as object) as object
     videoId = contentNode.videoId
 
     if StringUtils.IsNullOrEmpty(videoId)
-        throw "Can't load video information: videoId is missing"
+        JobError("Can't load video information: videoId is missing")
+        return
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
@@ -25,22 +28,22 @@ function VideoContentTaskDev(input as object) as object
 
     backgroundPoster.uri = `${instance}/vi/${videoId}/maxresdefault.jpg`
 
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
     backend = preferencesNode["backend.selected"]
     if backend = "playlet"
-        metadata = InnertubeService.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+        metadata = InnertubeService.GetVideoMetadata(videoId, { cancellation: cancellation })
     else
-        metadata = service.GetVideoMetadata(videoId, { cancellation: m.top.cancellation })
+        metadata = service.GetVideoMetadata(videoId, { cancellation: cancellation })
     end if
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     if metadata.error <> invalid
-        return {
-            success: false
-            error: metadata.error
-        }
+        JobError(metadata.error)
+        return
     end if
 
     contentNode.title = metadata.title
@@ -69,10 +72,6 @@ function VideoContentTaskDev(input as object) as object
         playletStreamUrls: streamUrls
         playletStreamUrlIndex: 0
     })
-
-    return {
-        success: true
-    }
 end function
 
 function CreateStreamUrls(metadata as object) as object

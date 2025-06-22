@@ -2,17 +2,20 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/MathUtils.bs"
 
-@asynctask
-function VideoQueueViewContentTask(input as object) as object
+@job("VideoQueueViewContentJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     videoNodes = input.videoNodes
     innertubeNode = input.innertube
     invidiousNode = input.invidious
     preferencesNode = input.preferences
     service = new Invidious.InvidiousService(invidiousNode)
     instance = service.GetInstance()
-    cancellation = m.top.cancellation
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
 
     index = MathUtils.Clamp(input.index - 2, 0, videoNodes.Count() - 1)
 
@@ -38,8 +41,9 @@ function VideoQueueViewContentTask(input as object) as object
             sleep(500)
         end if
 
-        if m.top.cancel = true
-            return invalid
+        if JobIsCancelled()
+            JobCancel()
+            return
         end if
     end for
 
@@ -50,12 +54,13 @@ function VideoQueueViewContentTask(input as object) as object
             sleep(1000)
         end if
 
-        if m.top.cancel = true
-            return invalid
+        if JobIsCancelled()
+            JobCancel()
+            return
         end if
     end for
 
-    return invalid
+    return
 end function
 
 function LoadVideoDetail(videoNode as object, service as object, instance as string, requestOptions as object, backend as string) as boolean

@@ -1,14 +1,14 @@
 #const DEBUG_LOG_VIDEO_QUALITY = false
 
 import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
 import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
-import "pkg:/source/AsyncTask/AsyncTask.bs"
-import "pkg:/source/AsyncTask/Tasks.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
@@ -46,7 +46,7 @@ function Init()
     ' It is set to true because stopping synchronously causes timeout and crash
     ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
     ' before considering the video node closed, and creating a new one.
-    ' However, since we have a task to load video details, there should be enough time for the
+    ' However, since we have a job to load video details, there should be enough time for the
     ' video node to close before we create a new one.
     if m.top.hasField("asyncStopSemantics")
         m.top.asyncStopSemantics = true
@@ -144,60 +144,63 @@ function PlayWithContent(contentNode as object)
         videoContentNode.AddFields({ metadata: metadata })
     end if
 
-    StartVideoContentTask(videoContentNode)
+    StartVideoContentJob(videoContentNode)
     Lounge.SendNowPlayingLoading(contentNode.videoId)
 end function
 
-function StartVideoContentTask(videoContentNode as object)
-    if m.videoContentTask <> invalid
-        m.videoContentTask.cancel = true
+function StartVideoContentJob(videoContentNode as object)
+    if m.videoContentJob <> invalid
+        m.videoContentJob.cancel = true
     end if
 
     m.top.content = videoContentNode
 
-    m.videoContentTask = AsyncTask.Start(Tasks.VideoContentTask, {
+
+    input = {
         content: videoContentNode
         invidious: m.top.invidious
         innertube: m.top.innertube
         preferences: m.top.preferences
         loungeService: m.top.loungeService
         playletServerPort: m.top.webServer.port
-    }, OnVideoContentTaskResults)
+    }
+
+    m.videoContentJob = JobSystem.CreateCallback(OnVideoContentJobDone)
+    JobSystem.QueueJob(m.jobQueue, Jobs.VideoContentJob, input, m.videoContentJob)
 end function
 
-function OnVideoContentTaskResults(output as object) as void
-    m.videoContentTask = invalid
-    if output.cancelled or m.onCloseCalled = true
+function OnVideoContentJobDone(event as object) as void
+    JobSystem.UnobserveCallback(event.getRoSGNode())
+    m.videoContentJob = invalid
+
+    info = event.getInfo()
+    if info.cancel or m.onCloseCalled = true
         return
     end if
 
-    if not output.success or not output.result.success
-        ' output.error for unhandled exception
-        error = output.error
-        if error = invalid
-            ' output.result.error for network errors
-            error = output.result.error
+    content = m.top.content
+
+    if not info.success
+        videoId = ""
+        if content <> invalid
+            videoId = content.videoId
         end if
-        error = ErrorUtils.Format(error)
-        LogError(error)
-        videoId = `${output.task.input.content.videoId}`
 
         title = Tr(Locale.VideoPlayer.VideoLoadError)
-        message = Tr(Locale.VideoPlayer.VideoLoadErrorMessage).Replace("%1", videoId) + `\n${error}`
+        message = Tr(Locale.VideoPlayer.VideoLoadErrorMessage).Replace("%1", videoId) + `\n${info.error}`
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
         dialog = DialogUtils.ShowTimedDialogButtons(message, title, buttons, 0, 10, true)
         if dialog <> invalid
-            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentJobErrorDialogResponse))
         else
-            OnVideoContentTaskErrorDialogResponse(invalid)
+            OnVideoContentJobErrorDialogResponse(invalid)
         end if
 
         Lounge.SendOnStateChange()
         return
     end if
 
-    content = m.top.content
     SponsorBlock.FetchSponsorBlock(content.metadata)
 
     SeekToInitialPosition(content)
@@ -302,7 +305,7 @@ function OnPreviousPlayerState(event as object) as void
     end if
 end function
 
-function OnVideoContentTaskErrorDialogResponse(event as object)
+function OnVideoContentJobErrorDialogResponse(event as object)
     shouldPlayNext = false
     if event <> invalid
         dialog = event.getRoSGNode()
@@ -380,9 +383,9 @@ function OnClose()
         m.markVideoWatchedJob.cancel = true
         m.markVideoWatchedJob = invalid
     end if
-    if m.videoContentTask <> invalid
-        m.videoContentTask.cancel = true
-        m.videoContentTask = invalid
+    if m.videoContentJob <> invalid
+        m.videoContentJob.cancel = true
+        m.videoContentJob = invalid
     end if
     if m.sponsorBlockSegmentsJob <> invalid
         m.sponsorBlockSegmentsJob.cancel = true
@@ -495,9 +498,9 @@ function OnVideoPlayerStateChange() as void
 
         dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, buttons, 0, 10, true)
         if dialog <> invalid
-            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentTaskErrorDialogResponse))
+            dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentJobErrorDialogResponse))
         else
-            OnVideoContentTaskErrorDialogResponse(invalid)
+            OnVideoContentJobErrorDialogResponse(invalid)
         end if
         m.ignoreNextFinishedState = true
     end if

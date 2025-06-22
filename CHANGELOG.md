@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - "Use dev video player" option from the settings
+- `@asynctask` in favor of newer job system
 
 ## [0.40.7] - 2025-06-21
 

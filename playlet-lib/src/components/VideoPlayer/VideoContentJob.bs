@@ -1,8 +1,10 @@
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
-@asynctask
-function VideoContentTask(input as object) as object
+@job("VideoContentJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     contentNode = input.content
     invidiousNode = input.invidious
     innertubeNode = input.innertube
@@ -10,12 +12,14 @@ function VideoContentTask(input as object) as object
     loungeServiceNode = input.loungeService
     playletServerPort = input.playletServerPort
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     if StringUtils.IsNullOrEmpty(contentNode.videoId)
-        throw "Can't load video information: videoId is missing"
+        JobError("Can't load video information: videoId is missing")
+        return
     end if
 
     service = new Invidious.InvidiousService(invidiousNode)
@@ -23,6 +27,7 @@ function VideoContentTask(input as object) as object
 
     metadata = contentNode.metadata
     if not IsAssociativeArray(metadata)
+        cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
         if backend = "playlet"
             visitorData = innertubeNode.visitorData
             if StringUtils.IsNullOrEmpty(visitorData)
@@ -32,16 +37,14 @@ function VideoContentTask(input as object) as object
                 message = wait(20000, messagePort)
                 innertubeNode.unobserveFieldScoped("visitorData")
                 if message = invalid
-                    return {
-                        success: false
-                        error: "Failed to get visitor data. Please try again later."
-                    }
+                    JobError("Failed to get visitor data. Please try again later.")
+                    return
                 end if
                 visitorData = message.getData()
             end if
 
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
-                "cancellation": m.top.cancellation
+                "cancellation": cancellation
                 "credentialTransferToken": loungeServiceNode.credentialTransferToken
                 "visitorData": visitorData
             })
@@ -51,14 +54,12 @@ function VideoContentTask(input as object) as object
     end if
 
     if metadata = invalid
-        return {
-            success: false
-            error: "Failed to get video metadata"
-        }
+        JobError("Failed to get video metadata")
     end if
 
-    if m.top.cancel
-        return invalid
+    if JobIsCancelled()
+        JobCancel()
+        return
     end if
 
     contentNode.title = metadata.title
@@ -68,11 +69,8 @@ function VideoContentTask(input as object) as object
     if metadata.error <> invalid
         ' Adding metadata allows us to play next recommended video after displaying the error
         contentNode.addFields({ metadata: metadata })
-
-        return {
-            success: false
-            error: metadata.error
-        }
+        JobError(metadata.error)
+        return
     end if
 
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
@@ -95,10 +93,6 @@ function VideoContentTask(input as object) as object
     if metadata.liveNow = true
         contentNode.Live = true
     end if
-
-    return {
-        success: true
-    }
 end function
 
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
