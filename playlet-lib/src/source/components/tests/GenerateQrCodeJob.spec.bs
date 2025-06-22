@@ -1,0 +1,41 @@
+import "pkg:/components/JobSystem/JobRequest.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+
+namespace Tests
+
+    @suite
+    class GenerateQrCodeJobTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.logger = CreateObject("roSGNode", "Logger")
+        end function
+
+        @describe("GenerateQrCodeJob")
+        @it("Generates QR codes correctly")
+        function _()
+            poster = CreateObject("roSGNode", "Node")
+            poster.addField("uri", "uri", false)
+
+            JobRequest.Execute({
+                jobName: "GenerateQrCodeJob"
+                input: {
+                    poster: poster
+                    text: "http://127.0.0.1:1234/some/path/to/resource?query=string"
+                    size: 300
+                    padding: 10
+                }
+            })
+
+            m.assertNotEmpty(poster.uri, "Poster URI should not be empty after generating QR code")
+
+            buffer = CreateObject("roByteArray")
+            buffer.ReadFile(poster.uri)
+            digest = CreateObject("roEVPDigest")
+            digest.Setup("md5")
+            md5 = digest.Process(buffer)
+
+            m.assertEqual(md5, "45ad1dbc361f47d267ab89e23d45a1d5")
+        end function
+    end class
+
+end namespace

@@ -1,0 +1,27 @@
+namespace JobRequest
+    function Execute(request as object) as void
+        job = CreateObject("roSGNode", request.jobName)
+        job.id = request.jobName + "-" + StringUtils.RandomId()
+        if job = invalid
+            LogError("Failed to create job node:", request.jobName)
+            return
+        end if
+
+        if request.input <> invalid
+            job.input = request.input
+        end if
+
+        #if DEBUG
+            LogDebug("Executing job:", request.jobName)
+            time = CreateObject("roTimespan")
+        #end if
+
+        job@.Execute()
+
+        #if DEBUG
+            LogDebug("Job executed:", request.jobName, "in", time.TotalMilliseconds(), "ms")
+        #end if
+
+        job.input = invalid
+    end function
+end namespace
