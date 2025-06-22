@@ -330,19 +330,22 @@ function MarkVideoWatched(videoId as dynamic) as void
         return
     end if
 
-    if m.markVideoWatchedTask <> invalid
-        m.markVideoWatchedTask.cancel = true
+    if m.markVideoWatchedJob <> invalid
+        m.markVideoWatchedJob.cancel = true
     end if
 
     profileType = authToken.profileNode.type
-    m.markVideoWatchedTask = AsyncTask.Create(Tasks.MarkVideoWatchedTask, {
+
+    input = {
         videoId: videoId
         invidious: invidious
         authToken: authToken
         profileType: profileType
-    })
-    m.markVideoWatchedTask.addField("watchTime", "float", false)
-    m.markVideoWatchedTask.control = "RUN"
+    }
+
+    m.markVideoWatchedJob = JobSystem.CreateCallback()
+    m.markVideoWatchedJob.addField("watchTime", "float", false)
+    JobSystem.QueueJob(m.jobQueue, Jobs.MarkVideoWatchedJob, input, m.markVideoWatchedJob)
 
     if profileType <> "youtube"
         return
@@ -355,7 +358,7 @@ function MarkVideoWatched(videoId as dynamic) as void
 end function
 
 function OnPositionChangeMarkWatchTime(event as object) as void
-    if m.markVideoWatchedTask = invalid
+    if m.markVideoWatchedJob = invalid
         return
     end if
 
@@ -365,7 +368,7 @@ function OnPositionChangeMarkWatchTime(event as object) as void
     if currentWatchTimeMarker = currentPosition
         return
     end if
-    m.markVideoWatchedTask.watchTime = m.watchTimeMarker
+    m.markVideoWatchedJob.watchTime = m.watchTimeMarker
 end function
 
 function OnClose()
@@ -373,9 +376,9 @@ function OnClose()
 
     m.top.previousPlayer = invalid
 
-    if m.markVideoWatchedTask <> invalid
-        m.markVideoWatchedTask.cancel = true
-        m.markVideoWatchedTask = invalid
+    if m.markVideoWatchedJob <> invalid
+        m.markVideoWatchedJob.cancel = true
+        m.markVideoWatchedJob = invalid
     end if
     if m.videoContentTask <> invalid
         m.videoContentTask.cancel = true

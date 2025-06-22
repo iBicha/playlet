@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Invidious tests - `Me at the zoo` video was getting blocked
 - Bug where logging out from inactive profile is not properly persisted
+- Memory leak in MarkVideoWatchedTask
 
 ### Removed
 

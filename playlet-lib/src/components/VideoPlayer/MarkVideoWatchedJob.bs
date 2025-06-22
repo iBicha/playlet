@@ -2,23 +2,26 @@ import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 
-@asynctask
-function MarkVideoWatchedTask(input as object) as object
+@job("MarkVideoWatchedJob")
+function ExecuteJob() as void
+    input = JobGetInput()
+
     videoId = input.videoId
     invidiousNode = input.invidious
     authToken = input.authToken
     profileType = input.profileType
-    cancellation = m.top.cancellation
+
+    cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
 
     if profileType = "invidious"
         service = new Invidious.InvidiousService(invidiousNode)
         service.MarkVideoWatched(videoId, cancellation)
-        return invalid
+        return
     end if
 
     if profileType <> "youtube"
-        LogError("MarkVideoWatchedTask: Unsupported profile type:", profileType)
-        return invalid
+        JobError(`Unsupported profile type: ${profileType}`)
+        return
     end if
 
     playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
@@ -28,13 +31,13 @@ function MarkVideoWatchedTask(input as object) as object
     })
 
     if playbackTrackingUrls.error <> invalid
-        LogError("MarkVideoWatchedTask: Failed to get playback tracking URLs:", playbackTrackingUrls.error)
-        return invalid
+        JobError(`Failed to get playback tracking URLs: ${playbackTrackingUrls.error}`)
+        return
     end if
 
     if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl)
-        LogError("MarkVideoWatchedTask: videostatsPlaybackUrl is empty")
-        return invalid
+        JobError("videostatsPlaybackUrl is empty")
+        return
     end if
 
     markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
@@ -43,25 +46,29 @@ function MarkVideoWatchedTask(input as object) as object
         cancellation: cancellation
     })
     if not markedAsWatched
-        return invalid
+        JobError("Failed to mark video as watched")
+        return
     end if
 
     if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
-        LogError("MarkVideoWatchedTask: videostatsWatchtimeUrl is empty")
-        return invalid
+        JobError("videostatsWatchtimeUrl is empty")
+        return
     end if
 
     if CancellationUtils.IsCancelled(cancellation)
-        return invalid
+        JobCancel()
+        return
     end if
 
     port = CreateObject("roMessagePort")
-    MessagePortUtils.ObserveFieldScopedExSafe(m.top, "watchTime", port)
+    callbackNode = JobGetCallbackNode()
+    MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
     while true
         message = wait(60000, port)
         if CancellationUtils.IsCancellationEvent(cancellation, message)
-            return invalid
+            JobCancel()
+            return
         end if
         if message = invalid
             continue while
@@ -70,8 +77,10 @@ function MarkVideoWatchedTask(input as object) as object
         InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
             accessToken: authToken.token
             onBehalfOfUser: authToken.activeIdentifyToken
-            cancellation: cancellation
+            ' TODO:P1 if we pass cancellation here, http client will remove scoped
+            ' observer, which is stored on the current node.
+            ' This requires an extra observer node to be independent.
+            cancellation: invalid
         })
     end while
-    return invalid
 end function
