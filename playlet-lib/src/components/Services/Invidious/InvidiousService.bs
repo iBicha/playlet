@@ -417,23 +417,27 @@ namespace Invidious
         function DefaultHandler(context as object) as object
             response = context.response
 
-            if response.StatusCode() = 200
-                json = response.Json()
-                if IsArray(json)
-                    json = {
-                        items: json
-                    }
-                end if
-                return json
+            if not response.IsSuccess()
+                return invalid
             end if
-            return invalid
+
+            json = response.Json()
+            if json = invalid
+                return invalid
+            end if
+
+            if IsArray(json)
+                json = {
+                    items: json
+                }
+            end if
+            return json
         end function
 
         function PlaylistHandler(context as object) as object
             response = context.response
 
-            statusCode = response.StatusCode()
-            if statusCode = 404
+            if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted playlist.
                 response.OverrideStatusCode(200)
@@ -447,24 +451,24 @@ namespace Invidious
                 }
             end if
 
-            if statusCode = 200
-                json = response.Json()
-                result = {
-                    items: json.videos
-                }
-                if json.continuation <> invalid
-                    result.continuation = json.continuation
-                end if
-                return result
+            json = response.Json()
+            if json = invalid
+                return invalid
             end if
-            return invalid
+
+            result = {
+                items: json.videos
+            }
+            if json.continuation <> invalid
+                result.continuation = json.continuation
+            end if
+            return result
         end function
 
         function ChannelVideosHandler(context as object) as object
             response = context.response
 
-            statusCode = response.StatusCode()
-            if statusCode = 404 or statusCode = 500
+            if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted channel.
                 response.OverrideStatusCode(200)
@@ -478,46 +482,43 @@ namespace Invidious
                 }
             end if
 
-            if response.StatusCode() = 200
-                json = response.Json()
-                return {
-                    items: json.videos
-                    continuation: json.continuation
-                    sortOptions: json.sortOptions
-                }
+            json = response.Json()
+            if json = invalid
+                return invalid
             end if
-            return invalid
+
+            return {
+                items: json.videos
+                continuation: json.continuation
+                sortOptions: json.sortOptions
+            }
         end function
 
         function ChannelPlaylistsHandler(context as object) as object
             response = context.response
 
-            if response.StatusCode() = 200
-                json = response.Json()
-                ' Courses are not yet implemented in Invidious.
-                ' In this case, Invidious returns 200, but the response is empty.
-                ' https://github.com/iv-org/invidious/issues/5088
-                ' https://github.com/iv-org/invidious/issues/5144
-                if json = invalid
-                    json = {
-                        playlists: []
-                    }
-                end if
+            if not response.IsSuccess()
+                return invalid
+            end if
 
-                return {
-                    items: json.playlists
-                    continuation: json.continuation
-                    sortOptions: json.sortOptions
+            json = response.Json()
+            if json = invalid
+                json = {
+                    playlists: []
                 }
             end if
-            return invalid
+
+            return {
+                items: json.playlists
+                continuation: json.continuation
+                sortOptions: json.sortOptions
+            }
         end function
 
         function VideoInfoHandler(context as object) as object
             response = context.response
 
-            statusCode = response.StatusCode()
-            if statusCode >= 500 or statusCode = 404
+            if not response.IsSuccess()
                 ' In some cases, such as a video became private, or a live stream ended,
                 ' Invidious returns a 500 error. We can in this case return a valid response
                 ' with just a video id, which will allow us to show a valid thumbnail if possible.
@@ -533,22 +534,21 @@ namespace Invidious
                 }
             end if
 
-            if statusCode = 200
-                json = response.Json()
-                json.type = "video"
-                return {
-                    items: [json]
-                }
+            json = response.Json()
+            if json = invalid
+                return invalid
             end if
 
-            return invalid
+            json.type = "video"
+            return {
+                items: [json]
+            }
         end function
 
         function PlaylistInfoHandler(context as object) as object
             response = context.response
 
-            statusCode = response.StatusCode()
-            if statusCode = 404
+            if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted playlist.
                 response.OverrideStatusCode(200)
@@ -561,21 +561,21 @@ namespace Invidious
                 }
             end if
 
-            if statusCode = 200
-                json = response.Json()
-                json.type = "playlist"
-                return {
-                    items: [json]
-                }
+            json = response.Json()
+            if json = invalid
+                return invalid
             end if
-            return invalid
+
+            json.type = "playlist"
+            return {
+                items: [json]
+            }
         end function
 
         function ChannelInfoHandler(context as object) as object
             response = context.response
 
-            statusCode = response.StatusCode()
-            if statusCode = 404 or statusCode = 500
+            if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted channel.
                 response.OverrideStatusCode(200)
@@ -588,14 +588,15 @@ namespace Invidious
                 }
             end if
 
-            if statusCode = 200
-                json = response.Json()
-                json.type = "channel"
-                return {
-                    items: [json]
-                }
+            json = response.Json()
+            if json = invalid
+                return invalid
             end if
-            return invalid
+
+            json.type = "channel"
+            return {
+                items: [json]
+            }
         end function
 
         function AuthFeedHandler(context as object) as object
@@ -604,7 +605,7 @@ namespace Invidious
 
             m.DeleteExpiredToken(response, authToken)
 
-            if response.StatusCode() <> 200
+            if not response.IsSuccess()
                 return invalid
             end if
 
@@ -640,7 +641,7 @@ namespace Invidious
 
             m.DeleteExpiredToken(response, authToken)
 
-            if response.StatusCode() <> 200
+            if not response.IsSuccess()
                 return invalid
             end if
 
