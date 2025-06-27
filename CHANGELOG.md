@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- A bug preventing the removal of bookmarked private playlists
 
 ## [0.40.8] - 2025-06-22
 
