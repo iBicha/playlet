@@ -959,7 +959,9 @@ namespace Innertube
 
     function ParseLockupViewModel(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
-        if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
+        if contentType = "LOCKUP_CONTENT_TYPE_VIDEO"
+            return LockupViewModelTypeVideo(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
             return LockupViewModelTypePlaylist(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
             return LockupViewModelTypePodcast(nodeData, context)
@@ -973,6 +975,65 @@ namespace Innertube
                 throw "Unknown content type: " + contentType
             #end if
         #end if
+        return invalid
+    end function
+
+    function LockupViewModelTypeVideo(nodeData as object, context as object) as object
+        videoId = nodeData["contentId"]
+        if not IsString(videoId)
+            LogWarn("Invalid video ID", nodeData)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "thumbnailViewModel"])
+
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
+        lengthText = ValidString(ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"]))
+
+        authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+
+        lines = invalid
+        contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
+        metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
+        if IsArray(metadataRows) and metadataRows.Count() > 0
+            delimiter = ValidString(contentMetadataViewModel["delimiter"])
+            lines = []
+            for each metadataRow in metadataRows
+                metadataParts = ObjectUtils.Dig(metadataRow, ["metadataParts"])
+                if IsArray(metadataParts) and metadataParts.Count() > 0
+                    parts = []
+                    for each metadataPart in metadataParts
+                        parts.Push(ValidString(ObjectUtils.Dig(metadataPart, ["text", "content"])))
+                    end for
+                    if parts.Count() > 0
+                        lines.Push(parts.Join(delimiter))
+                    end if
+                end if
+            end for
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "authorId": authorId
+            "lines": lines
+            "videoThumbnails": videoThumbnails
+            "videoCountText": lengthText
+        }
+
+        PushFeedItem(video, context)
         return invalid
     end function
 
@@ -993,7 +1054,7 @@ namespace Innertube
         author = invalid
         authorId = invalid
 
-        maybeAuthorNode = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel", "metadata", "contentMetadataViewModel", "metadataRows", 0, "metadataParts", 0, "text"])
+        maybeAuthorNode = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel", "metadataRows", 0, "metadataParts", 0, "text"])
         maybeAuthorId = ObjectUtils.Dig(maybeAuthorNode, ["commandRuns", 0, "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
         if IsString(maybeAuthorId) and maybeAuthorId.StartsWith("UC")
             authorId = maybeAuthorId
