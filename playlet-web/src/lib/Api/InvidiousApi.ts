@@ -1,12 +1,15 @@
 import { PlayletApi } from "lib/Api/PlayletApi";
+import { getHost } from "./Host";
 
 const DISABLE_CACHE = true;
 
 export class InvidiousApi {
-    public instance: string;
+    static host = () => `http://${getHost()}`
+
     public endpoints: any;
     public isLoggedIn: boolean = false;
     public userCountryCode: string = 'US';
+    private instance: string;
 
     responseHandlers: any;
 
@@ -21,6 +24,18 @@ export class InvidiousApi {
             "ChannelVideosHandler": (requestData, response) => this.ChannelVideosHandler(requestData, response),
             "ChannelPlaylistsHandler": (requestData, response) => this.ChannelPlaylistsHandler(requestData, response),
         }
+    }
+
+    public setInstance(instance: string) {
+        if (!instance) {
+            return;
+        }
+
+        if (instance.startsWith("http://127.0.0.1:8888")) {
+            instance = instance.replace("http://127.0.0.1:8888", InvidiousApi.host());
+        }
+
+        this.instance = instance;
     }
 
     public async searchSuggestions(query: string) {

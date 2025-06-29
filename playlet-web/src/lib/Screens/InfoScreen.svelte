@@ -153,7 +153,6 @@ ${JSON.stringify(profilesInfo, null, 2)}
     }
 
     const url = `https://github.com/iBicha/playlet/issues/new?title=${feedbackTitle}&body=${bodyEncoded}`;
-    console.log("Github URL length:", url.length);
     return url;
   }
 

@@ -2,9 +2,6 @@
   import { playletStateStore, translate } from "lib/Stores";
   import { PlayletApi } from "./Api/PlayletApi";
   import { get } from "svelte/store";
-  import { getHost } from "./Api/Host";
-
-  const host = () => `http://${getHost()}`;
 
   export function show() {
     modal.showModal();
@@ -32,9 +29,8 @@
 
   playletStateStore.subscribe((value) => {
     authUrl = value?.invidious?.auth_url;
-    currentInstance =
-      value?.invidious?.invidious_instance || value?.invidious?.instance || "";
-    if (currentInstance === `${host()}/playlet-invidious-backend`) {
+    currentInstance = value?.invidious?.invidious_instance || "";
+    if (!currentInstance) {
       const trFn = get(translate);
       currentInstanceName = trFn("Playlet built-in backend");
     } else {
@@ -69,10 +65,16 @@
   }
 
   function loginToInvidious() {
+    if (!currentInstance) {
+      alert("No Invidious instance configured. Please set one in settings.");
+      return;
+    }
+
     if (!authUrl) {
       alert("Error with login, please refresh the page.");
       return;
     }
+
     window.location = authUrl;
   }
 

@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A bug preventing the removal of bookmarked private playlists
+- [perf] Reduce number of rendezvous when reading invidious instance name
+  - Also fixes an edge case error when device loses connectivity
 
 ## [0.40.8] - 2025-06-22
 
