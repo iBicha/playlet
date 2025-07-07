@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
 - Experiment: use web safari for `/player` endpoint
 
 ## [0.40.9] - 2025-07-06
