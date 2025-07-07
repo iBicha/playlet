@@ -8,6 +8,7 @@ namespace Innertube
         Web = "WEB"
         IOS = "IOS"
         Tv = "TV"
+        WebSafari = "WEB_SAFARI"
     end enum
 
     function CreateHeaders(clienType as Innertube.ClientType) as object
@@ -35,6 +36,14 @@ namespace Innertube
                 "x-youtube-client-name": INNERTUBE_TV_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_TV_CLIENT_VERSION
             }
+        else if clienType = ClientType.WebSafari
+            return {
+                "accept": "*/*"
+                "accept-language": "*"
+                "user-agent": INNERTUBE_WEB_SAFARI_USER_AGENT
+                "x-youtube-client-name": INNERTUBE_WEB_SAFARI_CLIENT_NAME
+                "x-youtube-client-version": INNERTUBE_WEB_SAFARI_CLIENT_VERSION
+            }
         else
             throw "Invalid client type"
         end if
@@ -48,6 +57,8 @@ namespace Innertube
             client = CreateContextClientIOS(deviceInfo)
         else if clienType = ClientType.Tv
             client = CreateContextClientTv(deviceInfo)
+        else if clienType = ClientType.WebSafari
+            client = CreateContextClientWebSafari(deviceInfo)
         else
             throw "Invalid client type"
         end if
@@ -174,6 +185,32 @@ namespace Innertube
             "screenWidthPoints": 2560
             "screenPixelDensity": 2
             "utcOffsetMinutes": -300
+        }
+    end function
+
+    function CreateContextClientWebSafari(deviceInfo as object) as object
+        return {
+            "hl": GetCurrentLocale(deviceInfo)
+            "gl": GetContentRegion(deviceInfo)
+            "remoteHost": ""
+            "screenDensityFloat": 1
+            "screenHeightPoints": 1440
+            "screenPixelDensity": 1
+            "screenWidthPoints": 2560
+            "clientName": INNERTUBE_WEB_SAFARI_CLIENT_NAME
+            "clientVersion": INNERTUBE_WEB_SAFARI_CLIENT_VERSION
+            "osName": INNERTUBE_WEB_SAFARI_OS_NAME
+            "osVersion": INNERTUBE_WEB_SAFARI_OS_VERSION
+            "platform": "DESKTOP"
+            "clientFormFactor": "UNKNOWN_FORM_FACTOR"
+            "userInterfaceTheme": "USER_INTERFACE_THEME_LIGHT"
+            "timeZone": deviceInfo.GetTimeZone()
+            "originalUrl": "https://www.youtube.com"
+            "deviceMake": INNERTUBE_WEB_SAFARI_DEVICE_MAKE
+            "deviceModel": INNERTUBE_WEB_SAFARI_DEVICE_MODEL
+            "browserName": INNERTUBE_WEB_SAFARI_BROWSER_NAME
+            "browserVersion": INNERTUBE_WEB_SAFARI_BROWSER_VERSION
+            "utcOffsetMinutes": -240
         }
     end function
 
