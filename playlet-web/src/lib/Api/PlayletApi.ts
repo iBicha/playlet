@@ -187,20 +187,8 @@ export class PlayletApi {
             }
         }
 
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        try {
-            a.href = url;
-            a.download = filename;
-            a.click();
-        } catch (error) {
-            throw error;
-        } finally {
-            a.remove();
-            URL.revokeObjectURL(url);
-        }
+        const content = await response.text();
+        return { filename, content };
     }
 
     static async setPlayletLibVersion(tag) {

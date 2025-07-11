@@ -1,4 +1,5 @@
 <script lang="ts">
+  import JSZip from "jszip";
   import { getHost } from "lib/Api/Host";
   import { PlayletApi } from "lib/Api/PlayletApi";
   import { playletStateStore, translate } from "lib/Stores";
@@ -168,10 +169,73 @@ ${JSON.stringify(profilesInfo, null, 2)}
       if (!code) {
         return;
       }
-      await PlayletApi.exportRegistry(code);
+
+      const { filename, content } = await PlayletApi.exportRegistry(code);
+      triggerDownload(filename, content, "application/json");
     } catch (error) {
       console.error(error);
-      alert("Failed to export registry. Please try again.");
+      alert(
+        "Failed to export registry. Please try again. See console for details."
+      );
+    }
+  }
+
+  async function exportFullState() {
+    // creates a zip using JSzip that contains:
+    // - app_state.json
+    // - app_logs.txt
+    // - app_logs_previous.txt
+    // - playlet-registry.json
+
+    try {
+      var zip = new JSZip();
+
+      const appState = (await fetch(`${host}/api/state`)).text();
+      zip.file("app_state.json", appState);
+
+      const appLogs = (await fetch(`${host}/logs/app_logs.txt`)).text();
+      zip.file("app_logs.txt", appLogs);
+
+      const appLogsPrevious = (
+        await fetch(`${host}/logs/app_logs_previous.txt`)
+      ).text();
+      zip.file("app_logs_previous.txt", appLogsPrevious);
+
+      await PlayletApi.showExportRegistryCode();
+      const code = prompt("Enter the code you see on your Roku device");
+      if (!code) {
+        return;
+      }
+      const { filename, content } = await PlayletApi.exportRegistry(code);
+      zip.file(filename, content);
+
+      const zipContent = await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+      });
+      triggerDownload("playlet_full_state.zip", zipContent, "application/zip");
+    } catch (error) {
+      console.error(error);
+      alert(
+        "Failed to export full state. Please try again. See console for details."
+      );
+    }
+  }
+
+  function triggerDownload(filename, content, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
+    let url;
+    const a = document.createElement("a");
+    try {
+      url = URL.createObjectURL(blob);
+      a.href = url;
+      a.download = filename;
+      a.click();
+    } finally {
+      a.remove();
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
     }
   }
 </script>
@@ -231,6 +295,15 @@ ${JSON.stringify(profilesInfo, null, 2)}
           <td
             ><button class="btn btn-outline btn-sm" on:click={exportRegistry}
               >Export registry</button
+            ></td
+          >
+        </tr>
+
+        <tr>
+          <td>{"Full state"}</td>
+          <td
+            ><button class="btn btn-outline btn-sm" on:click={exportFullState}
+              >Export full state</button
             ></td
           >
         </tr>

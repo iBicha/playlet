@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Added
+
+- An option to export Playlet's state from the web app for easier debugging.
+  - This is a zip file that contains logs, the app state, and the registry (local storage)
 
 ## [0.40.9] - 2025-07-06
 
