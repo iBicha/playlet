@@ -1,6 +1,6 @@
 import { Innertube, UniversalCache } from 'youtubei.js/web';
 import { getHost } from "lib/Api/Host";
-import { BG } from "bgutils-js";
+import { BG, buildURL, GOOG_API_KEY, type WebPoSignalOutput } from "bgutils-js";
 import { type BgConfig } from "bgutils-js";
 import type { VideoInfo } from 'node_modules/youtubei.js/dist/src/parser/youtube';
 import type { StoryboardData } from 'node_modules/youtubei.js/dist/src/parser/classes/PlayerStoryboardSpec';
@@ -105,7 +105,9 @@ export class YoutubeJs {
     static innerTube: Innertube;
     static innerTubePromise: Promise<void>;
 
-    static poToken?: string = undefined;
+    static webPoMinter: BG.WebPoMinter;
+    static webPoMinterPromise: Promise<void>;
+
     static visitorData?: string = undefined;
 
     static async fetch(input: RequestInfo | URL, init?: RequestInit) {
@@ -159,29 +161,21 @@ export class YoutubeJs {
         });
     }
 
-    static async initSessionData() {
-        if (YoutubeJs.visitorData && YoutubeJs.poToken) {
+    static async initVisitorData() {
+        if (YoutubeJs.visitorData) {
             return Promise.resolve();
         }
 
         const sessionData = await YoutubeJs.getSessionData();
         if (sessionData.visitorData) {
             YoutubeJs.visitorData = sessionData.visitorData;
-            if (sessionData.poToken) {
-                YoutubeJs.poToken = sessionData.poToken;
-                return;
-            }
+            return;
         }
 
-        if (!YoutubeJs.visitorData) {
-            YoutubeJs.visitorData = await YoutubeJs.generateVisitorData();
-        }
-
-        YoutubeJs.poToken = await YoutubeJs.generatePoToken(YoutubeJs.visitorData);
+        YoutubeJs.visitorData = await YoutubeJs.generateVisitorData();
 
         await YoutubeJs.setSessionData({
             visitorData: YoutubeJs.visitorData,
-            poToken: YoutubeJs.poToken,
             timestamp: Math.floor(Date.now() / 1000)
         });
     }
@@ -217,12 +211,10 @@ export class YoutubeJs {
 
         YoutubeJs.innerTubePromise = new Promise(async (resolve, reject) => {
             try {
-                await YoutubeJs.initSessionData()
+                await YoutubeJs.initVisitorData()
                 YoutubeJs.innerTube = await Innertube.create({
                     fetch: YoutubeJs.fetch,
                     cache: new UniversalCache(true),
-                    // TODO:P0 with ytjs 15, poTokens should be regenerated per video
-                    po_token: YoutubeJs.poToken,
                     visitor_data: YoutubeJs.visitorData,
                 });
                 YoutubeJs.innerTubePromise = null;
@@ -230,6 +222,7 @@ export class YoutubeJs {
             } catch (error) {
                 console.error(error);
                 YoutubeJs.innerTube = null;
+                YoutubeJs.innerTubePromise = null;
                 reject(error);
             }
         })
@@ -246,45 +239,94 @@ export class YoutubeJs {
         return visitorData;
     }
 
-    static async generatePoToken(visitorData: string) {
-        const requestKey = 'O43z0dpjhgX20SCx4KAo';
-
-        const bgConfig: BgConfig = {
-            fetch: (input: string | URL | globalThis.Request, init?: RequestInit) => YoutubeJs.fetch(input, init),
-            globalObj: globalThis,
-            identifier: visitorData,
-            requestKey
-        };
-
-        const bgChallenge = await BG.Challenge.create(bgConfig);
-        if (!bgChallenge) {
-            throw new Error('Could not get challenge');
+    static async initWebPoMinter() {
+        if (YoutubeJs.webPoMinter) {
+            return Promise.resolve();
         }
 
-        const interpreterJavascript = bgChallenge.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue;
-        if (interpreterJavascript) {
-            new Function(interpreterJavascript)();
-        } else {
-            throw new Error('Could not load VM');
+        if (YoutubeJs.webPoMinterPromise) {
+            return YoutubeJs.webPoMinterPromise;
         }
 
-        const poTokenResult = await BG.PoToken.generate({
-            program: bgChallenge.program,
-            globalName: bgChallenge.globalName,
-            bgConfig
+        YoutubeJs.webPoMinterPromise = new Promise(async (resolve, reject) => {
+            try {
+                const requestKey = 'O43z0dpjhgX20SCx4KAo';
+
+                const bgConfig: BgConfig = {
+                    fetch: (input: string | URL | globalThis.Request, init?: RequestInit) => YoutubeJs.fetch(input, init),
+                    globalObj: globalThis,
+                    requestKey,
+                    identifier: ''
+                };
+
+                const bgChallenge = await BG.Challenge.create(bgConfig);
+                if (!bgChallenge) {
+                    throw new Error('Could not get challenge');
+                }
+
+                const interpreterJavascript = bgChallenge.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue;
+                if (interpreterJavascript) {
+                    new Function(interpreterJavascript)();
+                } else {
+                    throw new Error('Could not load VM');
+                }
+
+                const botguard = await BG.BotGuardClient.create({
+                    globalName: bgChallenge.globalName,
+                    globalObj: globalThis,
+                    program: bgChallenge.program
+                });
+
+                const webPoSignalOutput: WebPoSignalOutput = [];
+                const botguardResponse = await botguard.snapshot({ webPoSignalOutput });
+
+                const integrityTokenResponse = await bgConfig.fetch(buildURL('GenerateIT', true), {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json+protobuf',
+                        'x-goog-api-key': GOOG_API_KEY,
+                        'x-user-agent': 'grpc-web-javascript/0.1'
+                    },
+                    body: JSON.stringify([requestKey, botguardResponse])
+                });
+
+                const response = await integrityTokenResponse.json() as unknown[];
+
+                if (typeof response[0] !== 'string')
+                    throw new Error('Could not get integrity token');
+
+                YoutubeJs.webPoMinter = await BG.WebPoMinter.create({ integrityToken: response[0] }, webPoSignalOutput);
+                YoutubeJs.webPoMinterPromise = null;
+                resolve();
+            } catch (error) {
+                console.error(error);
+                YoutubeJs.webPoMinter = null;
+                YoutubeJs.webPoMinterPromise = null;
+                reject(error);
+                return;
+            }
         });
 
-        if (!poTokenResult || !poTokenResult.poToken) {
-            throw new Error('Could not generate poToken');
+        return YoutubeJs.webPoMinterPromise;
+    }
+
+    static async generatePoToken(videoId: string) {
+        await YoutubeJs.initWebPoMinter();
+
+        if (!YoutubeJs.webPoMinter) {
+            throw new Error('WebPoMinter is not initialized');
         }
 
-        return poTokenResult.poToken;
+        return await YoutubeJs.webPoMinter.mintAsWebsafeString(videoId);
     }
 
     static async getVideoInfo(videoId: string) {
         await YoutubeJs.initInnertube();
 
-        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, { client: 'TV' });
+        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, {
+            client: 'TV',
+            po_token: await YoutubeJs.generatePoToken(videoId),
+        });
 
         // We can't generate a proper dash from live videos.
         // By returning null, we're telling Playlet to fetch video info itself.

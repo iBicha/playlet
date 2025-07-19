@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - An option to export Playlet's state from the web app for easier debugging.
   - This is a zip file that contains logs, the app state, and the registry (local storage)
 
+### Fixed
+
+- Generate a PoToken per video in the web app when using ytjs
+
 ## [0.40.9] - 2025-07-06
 
 ### Fixed
