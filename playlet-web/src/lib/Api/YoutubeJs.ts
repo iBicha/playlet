@@ -221,6 +221,7 @@ export class YoutubeJs {
                 YoutubeJs.innerTube = await Innertube.create({
                     fetch: YoutubeJs.fetch,
                     cache: new UniversalCache(true),
+                    // TODO:P0 with ytjs 15, poTokens should be regenerated per video
                     po_token: YoutubeJs.poToken,
                     visitor_data: YoutubeJs.visitorData,
                 });
@@ -283,7 +284,7 @@ export class YoutubeJs {
     static async getVideoInfo(videoId: string) {
         await YoutubeJs.initInnertube();
 
-        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, 'TV');
+        const info = await YoutubeJs.innerTube.getBasicInfo(videoId, { client: 'TV' });
 
         // We can't generate a proper dash from live videos.
         // By returning null, we're telling Playlet to fetch video info itself.
