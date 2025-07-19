@@ -1,3 +1,4 @@
+import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Innertube/SessionData.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/services/HttpClient.bs"
@@ -65,6 +66,13 @@ namespace Http
             if requestArgs = invalid
                 response.Default(400, "Invalid request body")
                 return true
+            end if
+
+            requestHeaders = requestArgs.Headers
+            ' Ytjs can send requests without specifying a User-Agent.
+            ' In this case, Roku would use its default User-Agent.
+            if StringUtils.IsNullOrEmpty(requestHeaders["User-Agent"])
+                requestHeaders["User-Agent"] = VIDEO_PLAYER_USER_AGENT
             end if
 
             httpReq = HttpClient.FromObject(requestArgs)
