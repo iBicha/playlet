@@ -1,3 +1,4 @@
+import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import viteCompression from 'vite-plugin-compression';
@@ -17,6 +18,7 @@ const config: UserConfig = {
     legacy({
       targets: ['defaults', 'not IE 11'],
     }),
+    visualizer(),
     viteCompression({
       deleteOriginFile: true
     })
