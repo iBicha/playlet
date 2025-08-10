@@ -355,7 +355,12 @@ namespace Innertube
     end function
 
     function GetSts() as dynamic
-        ' TODO: cache this
+        cache = ReadAsciiFile("tmp:/sts_cache.json")
+        if not StringUtils.IsNullOrEmpty(cache)
+            json = ParseJson(cache)
+            return json["sts"]
+        end if
+
         request = HttpClient.Get(`${DECHIPHER_SERVER}/v1/sts`)
         response = request.Await()
         if not response.IsSuccess()
@@ -363,6 +368,8 @@ namespace Innertube
             return invalid
         end if
 
+        text = response.Text()
+        WriteAsciiFile("tmp:/sts_cache.json", text)
         json = response.Json()
         return json["sts"]
     end function
@@ -388,9 +395,16 @@ namespace Innertube
             "formats": formats
         })
 
+        request.LogCurlCommand(false)
+
         response = request.Await()
-        ' TODO: handle sts change
         if not response.IsSuccess()
+            if response.StatusCode() = 400
+                json = response.Json()
+                if IsAssociativeArray(json) and json["code"] = "STS_MISMATCH"
+                    DeleteFile("tmp:/sts_cache.json")
+                end if
+            end if
             LogError(response.ErrorMessage())
             return adaptiveFormats
         end if
