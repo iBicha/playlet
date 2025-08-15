@@ -10,7 +10,8 @@ namespace Innertube
 
     function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
         visitorData = OptionUtils.Get(options, "visitorData")
-        signatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
+        doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
+        doPoToken = ValidBool(OptionUtils.Get(options, "poToken"))
 
         deviceInfo = CreateObject("roDeviceInfo")
 
@@ -40,13 +41,15 @@ namespace Innertube
         }
 
         sts = invalid
-        poToken = invalid
-        if signatureTimestamp
+        if doSignatureTimestamp
             sts = GetSts()
             if sts <> invalid
                 payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = sts
             end if
+        end if
 
+        poToken = invalid
+        if doPoToken
             poToken = Innertube.GetPoToken(visitorData, videoId)
             payload["serviceIntegrityDimensions"] = {
                 "poToken": poToken
