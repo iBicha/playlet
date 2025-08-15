@@ -1,5 +1,5 @@
 namespace Innertube
-    function GetPoToken(visitorData as string, bindingIdentifier as string) as dynamic
+    function GetPoToken(visitorData as string, bindingIdentifier as string) as string
         requestCount = 1
         payload = {
             "visitorData": visitorData
@@ -7,7 +7,7 @@ namespace Innertube
         }
         request = HttpClient.PostJson(`${DECHIPHER_SERVER}/v1/botguard`, payload)
 
-        while requestCount <= 5
+        while requestCount < 5
             response = request.Await()
             if not response.IsSuccess()
                 throw "Failed to get PoToken: " + response.ErrorMessage()
@@ -44,6 +44,6 @@ namespace Innertube
             requestCount = requestCount + 1
         end while
 
-        return invalid
+        throw "Failed to get PoToken after multiple attempts"
     end function
 end namespace
