@@ -245,7 +245,6 @@ export class YoutubeJs {
         // Mostly populate only fields we care about, enough to make it work.
         return {
             type: "video",
-            ytjs: true,
             title: info.basic_info.title,
             videoId: info.basic_info.id,
             videoThumbnails: [],
@@ -279,6 +278,7 @@ export class YoutubeJs {
             dashUrl: info.streaming_data.dash_manifest_url || "",
             hlsUrl: info.streaming_data.hls_manifest_url,
             adaptiveFormats: YoutubeJs.getAdaptiveFormats(info),
+            hasDecodedDashUrls: true,
             formatStreams: [],
             captions: YoutubeJs.getCaptions(info),
             recommendedVideos: [],
