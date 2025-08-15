@@ -21,6 +21,7 @@ namespace InnertubeService
         fetchNext = OptionUtils.GetOrDefault(options, "fetchNext", true)
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
+        ' TODO:P0 add auth token if available
         playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
         playerRequest.Cancellation(cancellation)
         if raw
@@ -66,7 +67,8 @@ namespace InnertubeService
             return rawResponse
         end if
 
-        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.sts)
+        ' TODO:P0 parse tracking urls if authenticated
+        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.sts, playerRequest.poToken)
         if parsedResponse.error <> invalid
             return parsedResponse
         end if
@@ -283,6 +285,7 @@ namespace InnertubeService
             cancellation = options.cancellation
         end if
 
+        ' TODO:P0 skip request if we already parsed the urls
         playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
         playerRequest.Cancellation(cancellation)
         playerRequest.Header("Authorization", "Bearer " + accessToken)

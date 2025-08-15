@@ -1,11 +1,10 @@
 import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/components/Services/Innertube/PoToken.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/UrlUtils.bs"
-
-const DECHIPHER_SERVER = "https://playlet-v8556.ondigitalocean.app"
 
 namespace Innertube
 
@@ -41,9 +40,19 @@ namespace Innertube
         }
 
         sts = invalid
+        poToken = invalid
         if signatureTimestamp
             sts = GetSts()
-            payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = sts
+            if sts <> invalid
+                payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = sts
+            end if
+
+            poToken = Innertube.GetPoToken(visitorData, videoId)
+            if poToken <> invalid
+                payload["serviceIntegrityDimensions"] = {
+                    "poToken": poToken
+                }
+            end if
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
@@ -53,11 +62,12 @@ namespace Innertube
         end if
 
         request.sts = sts
+        request.poToken = poToken
 
         return request
     end function
 
-    function ParseInnertubePlayerResponse(payload as object, sts as dynamic) as object
+    function ParseInnertubePlayerResponse(payload as object, sts as dynamic, poToken as dynamic) as object
         error = ParsePlayerResponseForError(payload)
         if error <> ""
             return {
@@ -93,7 +103,7 @@ namespace Innertube
             "liveNow": ValidBool(videoDetails["isLive"])
             "hlsUrl": streamingData["hlsManifestUrl"]
             "dashUrl": streamingData["dashManifestUrl"]
-            "adaptiveFormats": ParseAdaptiveFormats(payload, sts)
+            "adaptiveFormats": ParseAdaptiveFormats(payload, sts, poToken)
             "formatStreams": []
             "captions": ParseCaptions(payload)
             "recommendedVideos": []
@@ -281,13 +291,13 @@ namespace Innertube
         return captions
     end function
 
-    function ParseAdaptiveFormats(payload as object, sts as dynamic) as object
+    function ParseAdaptiveFormats(payload as object, sts as dynamic, poToken as dynamic) as object
         adaptiveFormats = ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"])
         if not IsArray(adaptiveFormats)
             return []
         end if
 
-        adaptiveFormats = DecipherUrls(adaptiveFormats, sts)
+        adaptiveFormats = DecipherUrls(adaptiveFormats, sts, poToken)
 
         formatInfos = AdaptiveFormatInfos()
         formats = []
@@ -313,6 +323,11 @@ namespace Innertube
 
         if IsAssociativeArray(formatInfo)
             result["container"] = formatInfo["ext"]
+        else
+            LogWarn("Unknown itag:", itag)
+            ' #if DEBUG
+            '     throw "Unknown itag: " + itag
+            ' #end if
         end if
 
         if IsAssociativeArray(fmt["initRange"])
@@ -373,7 +388,7 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(adaptiveFormats as object, sts as dynamic) as object
+    function DecipherUrls(adaptiveFormats as object, sts as dynamic, poToken as dynamic) as object
         if sts = invalid
             ' No need to decipher if sts is not available
             return adaptiveFormats
@@ -382,7 +397,6 @@ namespace Innertube
         formats = []
         for each fmt in adaptiveFormats
             formats.push({
-                "itag": fmt["itag"]
                 "url": fmt["url"]
                 "cipher": fmt["cipher"]
                 "signatureCipher": fmt["signatureCipher"]
@@ -392,6 +406,7 @@ namespace Innertube
         request = HttpClient.PostJson(`${DECHIPHER_SERVER}/v1/decipher`, {
             "sts": sts
             "formats": formats
+            "poToken": poToken
         })
 
         request.LogCurlCommand(false)
