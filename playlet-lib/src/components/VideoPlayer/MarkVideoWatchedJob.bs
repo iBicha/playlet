@@ -10,6 +10,7 @@ function ExecuteJob() as void
     invidiousNode = input.invidious
     authToken = input.authToken
     profileType = input.profileType
+    playbackTrackingUrls = input.playbackTrackingUrls
 
     cancellation = CancellationUtils.CreateCancellation(JobGetCallbackNode(), "cancel", true)
 
@@ -24,11 +25,13 @@ function ExecuteJob() as void
         return
     end if
 
-    playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
-        accessToken: authToken.token
-        onBehalfOfUser: authToken.activeIdentifyToken
-        cancellation: cancellation
-    })
+    if playbackTrackingUrls = invalid or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl) or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
+        playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
+            accessToken: authToken.token
+            onBehalfOfUser: authToken.activeIdentifyToken
+            cancellation: cancellation
+        })
+    end if
 
     if playbackTrackingUrls.error <> invalid
         JobError(`Failed to get playback tracking URLs: ${playbackTrackingUrls.error}`)

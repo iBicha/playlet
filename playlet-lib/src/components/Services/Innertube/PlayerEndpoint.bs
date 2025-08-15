@@ -116,6 +116,14 @@ namespace Innertube
             videoInfo["viewCount"] = videoDetails["viewCount"].ToInt()
         end if
 
+        videoInfo["isLoggedIn"] = ParseIsLoggedIn(payload)
+        if videoInfo.isLoggedIn
+            videoInfo["playbackTrackingUrls"] = {
+                "videostatsPlaybackUrl": ObjectUtils.Dig(payload, ["playbackTracking", "videostatsPlaybackUrl", "baseUrl"])
+                "videostatsWatchtimeUrl": ObjectUtils.Dig(payload, ["playbackTracking", "videostatsWatchtimeUrl", "baseUrl"])
+            }
+        end if
+
         return videoInfo
     end function
 
@@ -443,6 +451,38 @@ namespace Innertube
         end for
 
         return adaptiveFormats
+    end function
+
+    function ParseIsLoggedIn(payload as object) as boolean
+        trackingParams = ObjectUtils.Dig(payload, ["responseContext", "serviceTrackingParams"])
+        if not IsArray(trackingParams)
+            return false
+        end if
+        for each trackingParam in trackingParams
+            if not IsAssociativeArray(trackingParam)
+                continue for
+            end if
+
+            if trackingParam["service"] <> "GFEEDBACK"
+                continue for
+            end if
+
+            params = trackingParam["params"]
+            if not IsArray(params)
+                continue for
+            end if
+
+            for each param in params
+                if not IsAssociativeArray(param)
+                    continue for
+                end if
+
+                if param["key"] = "logged_in" and param["value"] = "1"
+                    return true
+                end if
+            end for
+        end for
+        return false
     end function
 
     function AdaptiveFormatInfos() as object
