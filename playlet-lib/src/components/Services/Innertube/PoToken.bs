@@ -1,11 +1,12 @@
 namespace Innertube
-    function GetPoToken(visitorData as string, bindingIdentifier as string) as string
+    function GetPoToken(visitorData as string, bindingIdentifier as string, cancellation as object) as string
         requestCount = 1
         payload = {
             "visitorData": visitorData
             "bindingIdentifier": bindingIdentifier
         }
         request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/botguard`, payload)
+        request.Cancellation(cancellation)
 
         while requestCount < 5
             response = request.Await()
@@ -29,6 +30,7 @@ namespace Innertube
                 request.Method(fetchData.method)
                 request.Headers(fetchData.headers)
                 request.Body(fetchData.body)
+                request.Cancellation(cancellation)
 
                 response = request.Await()
                 if not response.IsSuccess()
@@ -37,6 +39,7 @@ namespace Innertube
 
                 payload["fetchResponse"] = response.Text()
                 request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/botguard`, payload)
+                request.Cancellation(cancellation)
             else
                 throw "Failed to get PoToken: " + response.Text()
             end if
