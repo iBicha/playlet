@@ -201,12 +201,13 @@ function OnVideoContentJobDone(event as object) as void
         return
     end if
 
-    SponsorBlock.FetchSponsorBlock(content.metadata)
+    metadata = content.metadata
+    SponsorBlock.FetchSponsorBlock(metadata)
 
     SeekToInitialPosition(content)
 
     PlayAfterPreviousPlayerHasStopped()
-    MarkVideoWatched(content.videoId)
+    MarkVideoWatched(content.videoId, metadata.playbackTrackingUrls)
 end function
 
 function SeekToInitialPosition(content as object) as void
@@ -322,7 +323,7 @@ function OnVideoContentJobErrorDialogResponse(event as object)
     Lounge.SendOnStateChange()
 end function
 
-function MarkVideoWatched(videoId as dynamic) as void
+function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic) as void
     if StringUtils.IsNullOrEmpty(videoId)
         return
     end if
@@ -344,6 +345,7 @@ function MarkVideoWatched(videoId as dynamic) as void
         invidious: invidious
         authToken: authToken
         profileType: profileType
+        playbackTrackingUrls: playbackTrackingUrls
     }
 
     m.markVideoWatchedJob = JobSystem.CreateCallback()

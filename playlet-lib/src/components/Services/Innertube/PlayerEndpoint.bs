@@ -1,13 +1,21 @@
 import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/components/Services/Innertube/PoToken.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Innertube
 
     function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
+        cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
+        accessToken = OptionUtils.Get(options, "accessToken")
+        doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
+        doPoToken = ValidBool(OptionUtils.Get(options, "poToken"))
+
+        useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
 
         deviceInfo = CreateObject("roDeviceInfo")
 
@@ -36,16 +44,36 @@ namespace Innertube
             "contentCheckOk": true
         }
 
+        signatureTimestamp = invalid
+        if doSignatureTimestamp
+            signatureTimestamp = GetSignatureTimestamp(cancellation)
+            if signatureTimestamp <> invalid
+                payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = signatureTimestamp
+            end if
+        end if
+
+        poToken = invalid
+        if doPoToken
+            poToken = Innertube.GetPoToken(visitorData, videoId, cancellation)
+            payload["serviceIntegrityDimensions"] = {
+                "poToken": poToken
+            }
+        end if
+
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
         request.Headers(Innertube.CreateHeaders(client))
-        if not StringUtils.IsNullOrEmpty(visitorData)
+
+        if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             request.Header("x-goog-visitor-id", visitorData)
         end if
+
+        request.signatureTimestamp = signatureTimestamp
+        request.poToken = poToken
 
         return request
     end function
 
-    function ParseInnertubePlayerResponse(payload as object) as object
+    function ParseInnertubePlayerResponse(payload as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
         error = ParsePlayerResponseForError(payload)
         if error <> ""
             return {
@@ -80,7 +108,9 @@ namespace Innertube
             "lengthSeconds": lengthSeconds
             "liveNow": ValidBool(videoDetails["isLive"])
             "hlsUrl": streamingData["hlsManifestUrl"]
-            "adaptiveFormats": []
+            "dashUrl": streamingData["dashManifestUrl"]
+            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, poToken, cancellation)
+            "hasDecodedDashUrls": true
             "formatStreams": []
             "captions": ParseCaptions(payload)
             "recommendedVideos": []
@@ -89,6 +119,9 @@ namespace Innertube
         if videoDetails.DoesExist("viewCount")
             videoInfo["viewCount"] = videoDetails["viewCount"].ToInt()
         end if
+
+        videoInfo["isLoggedIn"] = ParseIsLoggedIn(payload)
+        videoInfo["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, videoInfo.isLoggedIn)
 
         return videoInfo
     end function
@@ -266,4 +299,199 @@ namespace Innertube
         return captions
     end function
 
+    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
+        adaptiveFormats = ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"])
+        if not IsArray(adaptiveFormats)
+            return []
+        end if
+
+        adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, poToken, cancellation)
+
+        formats = []
+        for each fmt in adaptiveFormats
+            formats.Push(GetAdaptiveFormat(fmt))
+        end for
+
+        return formats
+    end function
+
+    function GetAdaptiveFormat(fmt as object) as object
+        itag = `${fmt["itag"]}`
+        result = {
+            "bitrate": `${fmt["bitrate"]}`
+            "url": fmt["url"]
+            "itag": itag
+            "type": fmt["mimeType"]
+            "clen": `${fmt["approxDurationMs"]}`
+            "lmt": `${fmt["lastModified"]}`
+        }
+
+        if IsAssociativeArray(fmt["initRange"])
+            result["init"] = `${fmt["initRange"]["start"]}-${fmt["initRange"]["end"]}`
+        else
+            result["init"] = ""
+        end if
+        if IsAssociativeArray(fmt["indexRange"])
+            result["index"] = `${fmt["indexRange"]["start"]}-${fmt["indexRange"]["end"]}`
+        else
+            result["index"] = ""
+        end if
+
+        if IsString(fmt["audioQuality"])
+            result["audioQuality"] = fmt["audioQuality"]
+        end if
+        if IsString(fmt["audioSampleRate"])
+            result["audioSampleRate"] = fmt["audioSampleRate"]
+        end if
+        if IsString(fmt["audioChannels"])
+            result["audioChannels"] = fmt["audioChannels"]
+        end if
+
+        if IsString(fmt["qualityLabel"])
+            result["qualityLabel"] = fmt["qualityLabel"]
+        end if
+        if IsString(fmt["fps"])
+            result["fps"] = fmt["fps"]
+        end if
+
+        result["width"] = fmt["width"]
+        result["height"] = fmt["height"]
+
+        if fmt["width"] <> invalid and fmt["height"] <> invalid
+            result["size"] = `${fmt["width"]}x${fmt["height"]}`
+            result["resolution"] = `${fmt["height"]}p`
+        else
+            #if DEBUG
+                if result["type"].StartsWith("video/")
+                    throw "Missing width/height for itag " + itag
+                end if
+            #end if
+        end if
+
+        return result
+    end function
+
+    function GetSignatureTimestamp(cancellation as object) as dynamic
+        cache = ReadAsciiFile("tmp:/sts_cache.json")
+        if not StringUtils.IsNullOrEmpty(cache)
+            json = ParseJson(cache)
+            return json["sts"]
+        end if
+
+        request = HttpClient.Get(`${PLAYLET_SUPPORT_SERVER}/v1/sts`)
+        request.Cancellation(cancellation)
+        request.NoCache()
+        response = request.Await()
+        if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+            return invalid
+        end if
+
+        text = response.Text()
+        WriteAsciiFile("tmp:/sts_cache.json", text)
+        json = response.Json()
+        return json["sts"]
+    end function
+
+    function DecipherUrls(adaptiveFormats as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
+        if signatureTimestamp = invalid
+            ' No need to decipher if signatureTimestamp is not available
+            return adaptiveFormats
+        end if
+
+        formats = []
+        for each fmt in adaptiveFormats
+            formats.push({
+                "url": fmt["url"]
+                "cipher": fmt["cipher"]
+                "signatureCipher": fmt["signatureCipher"]
+            })
+        end for
+
+        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/decipher`, {
+            "sts": signatureTimestamp
+            "formats": formats
+            "poToken": poToken
+        })
+        request.Cancellation(cancellation)
+
+        request.LogCurlCommand(false)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            if response.StatusCode() = 400
+                json = response.Json()
+                if IsAssociativeArray(json) and json["code"] = "STS_MISMATCH"
+                    DeleteFile("tmp:/sts_cache.json")
+                end if
+            end if
+            LogError(response.ErrorMessage())
+            return adaptiveFormats
+        end if
+
+        json = response.Json()
+        if not IsAssociativeArray(json) or not json.DoesExist("formats")
+            LogError("Invalid response from decipher service")
+            return adaptiveFormats
+        end if
+
+        decipheredFormats = json["formats"]
+        if not IsArray(decipheredFormats) or decipheredFormats.Count() <> adaptiveFormats.Count()
+            LogError("Invalid formats in deciphered response")
+            return adaptiveFormats
+        end if
+
+        for i = 0 to decipheredFormats.Count() - 1
+            fmt = adaptiveFormats[i]
+            decipheredFmt = decipheredFormats[i]
+
+            fmt["url"] = decipheredFmt["url"]
+        end for
+
+        return adaptiveFormats
+    end function
+
+    function ParseIsLoggedIn(payload as object) as boolean
+        trackingParams = ObjectUtils.Dig(payload, ["responseContext", "serviceTrackingParams"])
+        if not IsArray(trackingParams)
+            return false
+        end if
+        for each trackingParam in trackingParams
+            if not IsAssociativeArray(trackingParam)
+                continue for
+            end if
+
+            params = trackingParam["params"]
+            if not IsArray(params)
+                continue for
+            end if
+
+            for each param in params
+                if not IsAssociativeArray(param)
+                    continue for
+                end if
+
+                if param["key"] = "logged_in" and param["value"] = "1"
+                    return true
+                end if
+            end for
+        end for
+        return false
+    end function
+
+    function ParsePlaybackTrackingUrls(payload as object, isLoggedIn as boolean) as object
+        if not isLoggedIn
+            return invalid
+        end if
+
+        playbackTracking = payload["playbackTracking"]
+        if not IsAssociativeArray(playbackTracking)
+            return invalid
+        end if
+
+        return {
+            "videostatsPlaybackUrl": ObjectUtils.Dig(playbackTracking, ["videostatsPlaybackUrl", "baseUrl"])
+            "videostatsWatchtimeUrl": ObjectUtils.Dig(playbackTracking, ["videostatsWatchtimeUrl", "baseUrl"])
+        }
+    end function
 end namespace

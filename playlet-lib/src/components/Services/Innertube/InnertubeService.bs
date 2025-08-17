@@ -19,12 +19,16 @@ namespace InnertubeService
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
         fetchNext = OptionUtils.GetOrDefault(options, "fetchNext", true)
+        accessToken = OptionUtils.Get(options, "accessToken")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.IOS, options)
+        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
+        if not StringUtils.IsNullOrEmpty(accessToken)
+            playerRequest.Header("Authorization", "Bearer " + accessToken)
+        end if
         playerRequest.Cancellation(cancellation)
         if raw
-            playerRequest.LogCurlCommand()
+            playerRequest.LogCurlCommand(true)
         end if
         playerRequest.Send()
 
@@ -34,7 +38,7 @@ namespace InnertubeService
             nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
             nextRequest.Cancellation(cancellation)
             if raw
-                nextRequest.LogCurlCommand()
+                nextRequest.LogCurlCommand(true)
             end if
             nextRequest.Send()
         end if
@@ -52,6 +56,39 @@ namespace InnertubeService
             }
         end if
 
+        ' For LIVE videos, we will need to fallback to iOS for HLS streams for now.
+        ' Also, since we might have tracking urls in the player response (if logged in),
+        ' we can keep them to avoid an extra request later.
+        ' TODO:P0 figure out how to get DASH to work for live videos.
+        '
+        ' # Start of iOS fallback
+        playbackTrackingUrls = invalid
+        responseJson = playerResponse.Json()
+        if ValidBool(ObjectUtils.Dig(responseJson, ["videoDetails", "isLive"]))
+            LogDebug("Live video detected, falling back to iOS for HLS streams.")
+            isLoggedIn = Innertube.ParseIsLoggedIn(responseJson)
+            playbackTrackingUrls = Innertube.ParsePlaybackTrackingUrls(responseJson, isLoggedIn)
+
+            playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.IOS, options)
+            playerRequest.Cancellation(cancellation)
+            if raw
+                playerRequest.LogCurlCommand(true)
+            end if
+            playerResponse = playerRequest.Await()
+            if not playerResponse.IsSuccess()
+                return {
+                    error: playerResponse.ErrorMessage()
+                }
+            end if
+
+            if CancellationUtils.IsCancelled(cancellation)
+                return {
+                    error: "Cancelled"
+                }
+            end if
+        end if
+        ' # End of iOS fallback
+
         if fetchNext
             nextResponse = nextRequest.Await()
         end if
@@ -66,7 +103,7 @@ namespace InnertubeService
             return rawResponse
         end if
 
-        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json())
+        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.signatureTimestamp, playerRequest.poToken, cancellation)
         if parsedResponse.error <> invalid
             return parsedResponse
         end if
@@ -79,6 +116,13 @@ namespace InnertubeService
         if parsedResponse.error = invalid and StringUtils.IsNullOrEmpty(parsedResponse.videoId)
             parsedResponse["videoId"] = videoId
         end if
+
+        ' # Start of iOS fallback
+        if playbackTrackingUrls <> invalid and parsedResponse.playbackTrackingUrls = invalid
+            LogDebug("Adding playback tracking URLs from TV player response.")
+            parsedResponse["playbackTrackingUrls"] = playbackTrackingUrls
+        end if
+        ' # End of iOS fallback
 
         return parsedResponse
     end function
@@ -194,7 +238,7 @@ namespace InnertubeService
         request.Cancellation(cancellation)
 
         if raw
-            request.LogCurlCommand()
+            request.LogCurlCommand(true)
             request.NoCache()
         end if
 
@@ -406,7 +450,7 @@ namespace InnertubeService
         request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, options)
         request.Cancellation(cancellation)
         if raw
-            request.LogCurlCommand()
+            request.LogCurlCommand(true)
             request.NoCache()
         end if
 
@@ -548,7 +592,7 @@ namespace InnertubeService
             request.Header("Authorization", "Bearer " + accessToken)
         end if
         if raw
-            request.LogCurlCommand()
+            request.LogCurlCommand(true)
             request.NoCache()
         end if
 
@@ -589,7 +633,7 @@ namespace InnertubeService
         request = Innertube.CreateNextRequest(args)
         request.Cancellation(cancellation)
         if raw
-            request.LogCurlCommand()
+            request.LogCurlCommand(true)
             request.NoCache()
         end if
 

@@ -2,8 +2,7 @@
 
 ## Playlet
 
-Playlet, the Roku app, does not collect any user information whatsoever.
-In fact, it does not have any servers capable of collecting any form of data.
+Playlet, the Roku app, does not collect any user personal information whatsoever.
 
 Playlet does not show advertising, whether personalized or non personalized.
 
@@ -16,7 +15,7 @@ is sent, which is used to enable the viewing of content.
 
 Please note that some of the [Invidious](https://invidious.io/) servers used
 could be public instances hosted by volenteers. These instances are available
-[here](https://api.invidious.io/).
+at [api.invidious.io](https://api.invidious.io/).
 
 While invidious does no data collection by default, and it is in fact built to
 be privacy driven, but in theory, from a Playlet request it is possible to

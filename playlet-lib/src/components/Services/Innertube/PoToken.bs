@@ -1,0 +1,52 @@
+namespace Innertube
+    function GetPoToken(visitorData as string, bindingIdentifier as string, cancellation as object) as string
+        requestCount = 1
+        payload = {
+            "visitorData": visitorData
+            "bindingIdentifier": bindingIdentifier
+        }
+        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/botguard`, payload)
+        request.Cancellation(cancellation)
+
+        while requestCount < 5
+            response = request.Await()
+            if not response.IsSuccess()
+                throw "Failed to get PoToken: " + response.ErrorMessage()
+            end if
+
+            json = response.Json()
+            if not IsAssociativeArray(json)
+                throw "Invalid response format for PoToken: " + response.Text()
+            end if
+
+            if not StringUtils.IsNullOrEmpty(json["poToken"])
+                return json["poToken"]
+            end if
+
+            if json["action"] = "FETCH"
+                fetchData = json["fetch"]
+                request = new HttpClient.HttpRequest()
+                request.Url(fetchData.url)
+                request.Method(fetchData.method)
+                request.Headers(fetchData.headers)
+                request.Body(fetchData.body)
+                request.Cancellation(cancellation)
+
+                response = request.Await()
+                if not response.IsSuccess()
+                    throw "Failed to fetch PoToken: " + response.ErrorMessage()
+                end if
+
+                payload["fetchResponse"] = response.Text()
+                request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/botguard`, payload)
+                request.Cancellation(cancellation)
+            else
+                throw "Failed to get PoToken: " + response.Text()
+            end if
+
+            requestCount = requestCount + 1
+        end while
+
+        throw "Failed to get PoToken after multiple attempts"
+    end function
+end namespace

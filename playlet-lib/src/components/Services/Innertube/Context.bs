@@ -10,8 +10,8 @@ namespace Innertube
         Tv = "TV"
     end enum
 
-    function CreateHeaders(clienType as Innertube.ClientType) as object
-        if clienType = ClientType.Web
+    function CreateHeaders(client as Innertube.ClientType) as object
+        if client = ClientType.Web
             return {
                 "accept": "*/*"
                 "accept-language": "*"
@@ -19,7 +19,7 @@ namespace Innertube
                 "x-youtube-client-name": INNERTUBE_WEB_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_WEB_CLIENT_VERSION
             }
-        else if clienType = ClientType.IOS
+        else if client = ClientType.IOS
             return {
                 "accept": "*/*"
                 "accept-language": "*"
@@ -27,7 +27,7 @@ namespace Innertube
                 "x-youtube-client-name": INNERTUBE_IOS_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_IOS_CLIENT_VERSION
             }
-        else if clienType = ClientType.Tv
+        else if client = ClientType.Tv
             return {
                 "accept": "*/*"
                 "accept-language": "*"
@@ -40,14 +40,14 @@ namespace Innertube
         end if
     end function
 
-    function CreateContext(clienType as Innertube.ClientType, deviceInfo as object, options = invalid as object) as object
-        client = invalid
-        if clienType = ClientType.Web
-            client = CreateContextClientWeb(deviceInfo)
-        else if clienType = ClientType.IOS
-            client = CreateContextClientIOS(deviceInfo)
-        else if clienType = ClientType.Tv
-            client = CreateContextClientTv(deviceInfo)
+    function CreateContext(client as Innertube.ClientType, deviceInfo as object, options = invalid as object) as object
+        contextClient = invalid
+        if client = ClientType.Web
+            contextClient = CreateContextClientWeb(deviceInfo)
+        else if client = ClientType.IOS
+            contextClient = CreateContextClientIOS(deviceInfo)
+        else if client = ClientType.Tv
+            contextClient = CreateContextClientTv(deviceInfo)
         else
             throw "Invalid client type"
         end if
@@ -55,9 +55,12 @@ namespace Innertube
         credentialTransferToken = OptionUtils.Get(options, "credentialTransferToken")
         visitorData = OptionUtils.Get(options, "visitorData")
         onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
+        accessToken = OptionUtils.Get(options, "accessToken")
+
+        useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
 
         context = {
-            "client": client
+            "client": contextClient
             "user": {
                 "enableSafetyMode": false
                 "lockedSafetyMode": false
@@ -75,11 +78,11 @@ namespace Innertube
             }]
         end if
 
-        if not StringUtils.IsNullOrEmpty(visitorData)
+        if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             context["client"]["visitorData"] = visitorData
         end if
 
-        if not StringUtils.IsNullOrEmpty(onBehalfOfUser)
+        if not StringUtils.IsNullOrEmpty(onBehalfOfUser) and useAccessToken
             context["user"]["onBehalfOfUser"] = onBehalfOfUser
         end if
 
