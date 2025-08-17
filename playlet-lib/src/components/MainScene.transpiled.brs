@@ -58,22 +58,13 @@ function StartWebServer()
 end function
 
 function ShowAnnouncement() as boolean
-    deviceInfo = CreateObject("roDeviceInfo")
-    deviceName = deviceInfo.GetFriendlyName()
     dialog = DialogUtils_ShowDialogOnce({
-        messageId: "1750501488"
-        title: "Web app workaround"
+        messageId: "1755469284"
+        title: "Playback fixes - Canary build"
         message: [
-            "If you're experiencing issues playing videos, please consider this workaround while we work on a fix:"
-        ]
-        bulletText: [
-            "Go to the " + chr(34) + "Remote" + chr(34) + " screen, and scan the QR code to open the web app in your browser."
-            "Tap the video you want to play."
-            ("Select the " + chr(34) + "Play on " + bslib_toString(deviceName) + " (ytjs)" + chr(34) + " button.")
-        ]
-        bottomMessage: [
-            "Apologies for the inconvenience, and thank you for your patience!"
-            "Issue link: https://github.com/iBicha/playlet/issues/626"
+            "Thank you for helping test the latest changes by using the Canary build of Playlet!"
+            "If you encounter any issues with playback, please report them on the GitHub issue tracker."
+            "https://github.com/iBicha/playlet/issues"
         ]
         alwaysOnTop: true
         large: true
