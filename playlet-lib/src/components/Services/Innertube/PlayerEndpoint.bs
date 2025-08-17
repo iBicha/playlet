@@ -11,6 +11,7 @@ namespace Innertube
     function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
+        accessToken = OptionUtils.Get(options, "accessToken")
         doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
         doPoToken = ValidBool(OptionUtils.Get(options, "poToken"))
 
@@ -59,7 +60,7 @@ namespace Innertube
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
         request.Headers(Innertube.CreateHeaders(client))
-        if not StringUtils.IsNullOrEmpty(visitorData)
+        if not StringUtils.IsNullOrEmpty(visitorData) and StringUtils.IsNullOrEmpty(accessToken)
             request.Header("x-goog-visitor-id", visitorData)
         end if
 
