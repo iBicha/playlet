@@ -121,12 +121,7 @@ namespace Innertube
         end if
 
         videoInfo["isLoggedIn"] = ParseIsLoggedIn(payload)
-        if videoInfo.isLoggedIn
-            videoInfo["playbackTrackingUrls"] = {
-                "videostatsPlaybackUrl": ObjectUtils.Dig(payload, ["playbackTracking", "videostatsPlaybackUrl", "baseUrl"])
-                "videostatsWatchtimeUrl": ObjectUtils.Dig(payload, ["playbackTracking", "videostatsWatchtimeUrl", "baseUrl"])
-            }
-        end if
+        videoInfo["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, videoInfo.isLoggedIn)
 
         return videoInfo
     end function
@@ -482,5 +477,21 @@ namespace Innertube
             end for
         end for
         return false
+    end function
+
+    function ParsePlaybackTrackingUrls(payload as object, isLoggedIn as boolean) as object
+        if not isLoggedIn
+            return invalid
+        end if
+
+        playbackTracking = payload["playbackTracking"]
+        if not IsAssociativeArray(playbackTracking)
+            return invalid
+        end if
+
+        return {
+            "videostatsPlaybackUrl": ObjectUtils.Dig(playbackTracking, ["videostatsPlaybackUrl", "baseUrl"])
+            "videostatsWatchtimeUrl": ObjectUtils.Dig(playbackTracking, ["videostatsWatchtimeUrl", "baseUrl"])
+        }
     end function
 end namespace
