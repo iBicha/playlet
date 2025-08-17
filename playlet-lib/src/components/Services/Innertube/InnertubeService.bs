@@ -56,6 +56,44 @@ namespace InnertubeService
             }
         end if
 
+        ' For LIVE videos, we will need to fallback to iOS for HLS streams for now.
+        ' Also, since we might have tracking urls in the player response (if logged in),
+        ' we can keep them to avoid an extra request later.
+        ' TODO:P0 figure out how to get DASH to work for live videos.
+        '
+        ' # Start of iOS fallback
+        playbackTrackingUrls = invalid
+        responseJson = playerResponse.Json()
+        if ValidBool(ObjectUtils.Dig(responseJson, ["videoDetails", "isLive"]))
+            LogDebug("Live video detected, falling back to iOS for HLS streams.")
+            isLoggedIn = Innertube.ParseIsLoggedIn(responseJson)
+            if isLoggedIn
+                playbackTrackingUrls = {
+                    "videostatsPlaybackUrl": ObjectUtils.Dig(responseJson, ["playbackTracking", "videostatsPlaybackUrl", "baseUrl"])
+                    "videostatsWatchtimeUrl": ObjectUtils.Dig(responseJson, ["playbackTracking", "videostatsWatchtimeUrl", "baseUrl"])
+                }
+            end if
+
+            playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.IOS, options)
+            playerRequest.Cancellation(cancellation)
+            if raw
+                playerRequest.LogCurlCommand(true)
+            end if
+            playerResponse = playerRequest.Await()
+            if not playerResponse.IsSuccess()
+                return {
+                    error: playerResponse.ErrorMessage()
+                }
+            end if
+
+            if CancellationUtils.IsCancelled(cancellation)
+                return {
+                    error: "Cancelled"
+                }
+            end if
+        end if
+        ' # End of iOS fallback
+
         if fetchNext
             nextResponse = nextRequest.Await()
         end if
@@ -83,6 +121,13 @@ namespace InnertubeService
         if parsedResponse.error = invalid and StringUtils.IsNullOrEmpty(parsedResponse.videoId)
             parsedResponse["videoId"] = videoId
         end if
+
+        ' # Start of iOS fallback
+        if playbackTrackingUrls <> invalid and parsedResponse.playbackTrackingUrls = invalid
+            LogDebug("Adding playback tracking URLs from TV player response.")
+            parsedResponse["playbackTrackingUrls"] = playbackTrackingUrls
+        end if
+        ' # End of iOS fallback
 
         return parsedResponse
     end function

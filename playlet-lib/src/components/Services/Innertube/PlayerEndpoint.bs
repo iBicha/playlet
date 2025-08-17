@@ -15,6 +15,8 @@ namespace Innertube
         doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
         doPoToken = ValidBool(OptionUtils.Get(options, "poToken"))
 
+        useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
+
         deviceInfo = CreateObject("roDeviceInfo")
 
         context = Innertube.CreateContext(client, deviceInfo, options)
@@ -60,7 +62,8 @@ namespace Innertube
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
         request.Headers(Innertube.CreateHeaders(client))
-        if not StringUtils.IsNullOrEmpty(visitorData) and StringUtils.IsNullOrEmpty(accessToken)
+
+        if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             request.Header("x-goog-visitor-id", visitorData)
         end if
 
