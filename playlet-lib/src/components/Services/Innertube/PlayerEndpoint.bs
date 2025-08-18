@@ -85,6 +85,7 @@ namespace Innertube
         end if
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
+        isLive = ValidBool(videoDetails["isLive"])
 
         videoInfo = {
             "type": "video"
@@ -95,10 +96,10 @@ namespace Innertube
             "author": videoDetails["author"]
             "authorId": videoDetails["channelId"]
             "lengthSeconds": lengthSeconds
-            "liveNow": ValidBool(videoDetails["isLive"])
+            "liveNow": isLive
             "hlsUrl": streamingData["hlsManifestUrl"]
             "dashUrl": streamingData["dashManifestUrl"]
-            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, cancellation)
+            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, isLive, cancellation)
             "hasDecodedDashUrls": true
             "formatStreams": []
             "captions": ParseCaptions(payload)
@@ -288,13 +289,15 @@ namespace Innertube
         return captions
     end function
 
-    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, cancellation as object) as object
+    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, isLive as boolean, cancellation as object) as object
         adaptiveFormats = ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"])
         if not IsArray(adaptiveFormats)
             return []
         end if
 
-        adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, cancellation)
+        if not isLive
+            adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, cancellation)
+        end if
 
         formats = []
         for each fmt in adaptiveFormats
