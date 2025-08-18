@@ -38,7 +38,7 @@ function MainSceneContainerChanged()
     StartWebServer()
     HideLoadingScreen()
     InitEcpArgs()
-    if true
+    if false
         if not ShowAnnouncement()
             m.scene.signalBeacon("AppLaunchComplete")
         end if
