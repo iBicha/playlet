@@ -1,6 +1,5 @@
 import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
-import "pkg:/components/Services/Innertube/PoToken.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -13,7 +12,6 @@ namespace Innertube
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
         doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
-        doPoToken = ValidBool(OptionUtils.Get(options, "poToken"))
 
         useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
 
@@ -52,14 +50,6 @@ namespace Innertube
             end if
         end if
 
-        poToken = invalid
-        if doPoToken
-            poToken = Innertube.GetPoToken(visitorData, videoId, cancellation)
-            payload["serviceIntegrityDimensions"] = {
-                "poToken": poToken
-            }
-        end if
-
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
         request.Headers(Innertube.CreateHeaders(client))
 
@@ -68,12 +58,11 @@ namespace Innertube
         end if
 
         request.signatureTimestamp = signatureTimestamp
-        request.poToken = poToken
 
         return request
     end function
 
-    function ParseInnertubePlayerResponse(payload as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
+    function ParseInnertubePlayerResponse(payload as object, signatureTimestamp as dynamic, cancellation as object) as object
         error = ParsePlayerResponseForError(payload)
         if error <> ""
             return {
@@ -109,7 +98,7 @@ namespace Innertube
             "liveNow": ValidBool(videoDetails["isLive"])
             "hlsUrl": streamingData["hlsManifestUrl"]
             "dashUrl": streamingData["dashManifestUrl"]
-            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, poToken, cancellation)
+            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, cancellation)
             "hasDecodedDashUrls": true
             "formatStreams": []
             "captions": ParseCaptions(payload)
@@ -299,13 +288,13 @@ namespace Innertube
         return captions
     end function
 
-    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
+    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, cancellation as object) as object
         adaptiveFormats = ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"])
         if not IsArray(adaptiveFormats)
             return []
         end if
 
-        adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, poToken, cancellation)
+        adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, cancellation)
 
         formats = []
         for each fmt in adaptiveFormats
@@ -393,7 +382,7 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(adaptiveFormats as object, signatureTimestamp as dynamic, poToken as dynamic, cancellation as object) as object
+    function DecipherUrls(adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as object
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
             return adaptiveFormats
@@ -411,7 +400,6 @@ namespace Innertube
         request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/decipher`, {
             "sts": signatureTimestamp
             "formats": formats
-            "poToken": poToken
         })
         request.Cancellation(cancellation)
 
