@@ -26,39 +26,20 @@ namespace Http
             v = request.query.v
             local = request.query.local
             quality = request.query.quality
-            hasDecodedDashUrls = request.query.hasDecodedDashUrls
 
             if StringUtils.IsNullOrEmpty(v)
                 response.Default(400, "Missing video id")
                 return true
             end if
 
-            if ValidString(hasDecodedDashUrls) = "true"
-                player = m.videoQueueNode.player
-                if player = invalid
-                    response.Default(500, "videoQueue.player is invalid")
-                    return true
-                end if
-                content = player.content
-                if content = invalid
-                    response.Default(500, "videoQueue.player.content is invalid")
-                    return true
-                end if
-                metadata = content.metadata
-                if not IsAssociativeArray(metadata)
-                    response.Default(500, "videoQueue.player.content.metadata is invalid")
-                    return true
-                end if
-                if metadata.videoId <> v
-                    response.Default(400, "videoQueue.playVideo.metadata.videoId does not match the requested video id")
-                    return true
-                end if
-            else
-                metadata = m.invidiousService.GetVideoMetadata(v)
-                if metadata.error <> invalid
-                    response.Default(500, metadata.error)
-                    return true
-                end if
+            metadata = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content", "metadata"])
+            if not IsAssociativeArray(metadata)
+                response.Default(500, "videoQueue.player.content.metadata is invalid")
+                return true
+            end if
+            if metadata.videoId <> v
+                response.Default(400, "videoQueue.player.content.metadata.videoId does not match the requested video id")
+                return true
             end if
 
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()

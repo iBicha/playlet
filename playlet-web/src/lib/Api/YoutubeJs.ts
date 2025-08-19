@@ -278,7 +278,6 @@ export class YoutubeJs {
             dashUrl: info.streaming_data.dash_manifest_url || "",
             hlsUrl: info.streaming_data.hls_manifest_url,
             adaptiveFormats: YoutubeJs.getAdaptiveFormats(info),
-            hasDecodedDashUrls: true,
             formatStreams: [],
             captions: YoutubeJs.getCaptions(info),
             recommendedVideos: [],
