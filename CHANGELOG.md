@@ -19,15 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Removed PoToken usage
-
-## [0.40.11] - 2025-08-18
-
-### Fixed
-
 - Attempt to fix `no valid bitrates` and `Sign in to confirm you're not a bot` errors.
-  - Introduced a "Playlet support server" to allow handling sig/nsig decoding, as well as potoken generation. These are not possible to do without a Javascript execution environment, so this was necessary.
-  - Video starts will be 5~8 seconds slower, unfortunately.
+  - Introduced a "Playlet support server" to allow handling sig/nsig decoding. These are not possible to do without a Javascript execution environment, so this was necessary.
   - Live videos are not affected by this fix yet, but hopefully it reduce the amount of errors.
 - Videos longer than 5 hours now work [https://github.com/iBicha/playlet/issues/500](https://github.com/iBicha/playlet/issues/500)
 - Age restricted videos should play normally if logged in using a YouTube account.
