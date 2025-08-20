@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Video starts will be 5~8 seconds slower, unfortunately.
   - Live videos are not affected by this fix yet, but hopefully it reduce the amount of errors.
 - Videos longer than 5 hours now work [https://github.com/iBicha/playlet/issues/500](https://github.com/iBicha/playlet/issues/500)
+- Age restricted videos should play normally if logged in using a YouTube account.
 
 ## [0.40.10] - 2025-07-19
 
