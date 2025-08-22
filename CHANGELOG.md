@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet
+### Fixed
+
+- Error loading feed when device language is Australian English (`en_AU`)
 
 ## [0.40.13] - 2025-08-19
 
