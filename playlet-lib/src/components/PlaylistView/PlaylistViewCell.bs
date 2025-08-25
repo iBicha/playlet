@@ -4,9 +4,18 @@ import "pkg:/source/utils/TimeUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    m.durationRect = m.top.FindNode("durationRect")
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
     m.durationLabel = m.top.FindNode("durationLabel")
+    m.durationRect = m.top.FindNode("durationRect")
     m.progressRect = m.top.FindNode("progressRect")
+
+    m.titleLabel.font = m.global.CellTitle1Font
+    m.authorLabel.font = m.global.CellTitle2Font
+    m.durationLabel.font = m.global.CellBadgeFont
+
+    m.top.ObserveField("itemContent", FuncName(OnContentSet))
+    m.top.ObserveField("percentDurationWatched", FuncName(OnPercentDurationWatched))
 end function
 
 function OnContentSet() as void
@@ -51,25 +60,14 @@ function SetDurationText(text as string) as void
 
     m.top.duration = text
 
-    label = m.durationLabel
-    rect = m.durationRect
+    rectParent = m.durationRect.getParent()
+    size = m.durationLabel.localBoundingRect()
 
-    if label = invalid or rect = invalid
-        return
-    end if
-
-    rectParent = rect.getParent()
-    size = label.localBoundingRect()
-
-    rect.width = size.width + 16
-    rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+    m.durationRect.width = size.width + 16
+    m.durationRect.translation = [rectParent.width - m.durationRect.width, m.durationRect.translation[1]]
 end function
 
 function OnPercentDurationWatched() as void
-    if m.progressRect = invalid
-        return
-    end if
-
     percent = MathUtils.Clamp(m.top.percentDurationWatched, 0, 100) / 100.0
     m.progressRect.scale = [percent, 1]
 end function

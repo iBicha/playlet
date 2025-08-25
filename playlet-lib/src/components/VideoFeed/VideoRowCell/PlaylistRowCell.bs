@@ -2,8 +2,18 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
+    m.titleLabel = m.top.FindNode("titleLabel")
+    m.authorLabel = m.top.FindNode("authorLabel")
+    m.updatedLabel = m.top.FindNode("updatedLabel")
     m.videoCountRect = m.top.FindNode("videoCountRect")
     m.videoCountLabel = m.top.FindNode("videoCountLabel")
+
+    m.titleLabel.font = m.global.CellTitle1Font
+    m.authorLabel.font = m.global.CellTitle2Font
+    m.updatedLabel.font = m.global.CellTitle2Font
+    m.updatedLabel.font = m.global.CellBadgeFont
+
+    m.top.ObserveField("itemContent", FuncName(OnContentSet))
 end function
 
 function OnContentSet() as void
@@ -32,7 +42,6 @@ function OnContentSet() as void
     end if
     m.top.updated = updatedText
 
-
     m.top.thumbnailUri = content.thumbnail
 
     SetVideoCount(content.videoCountText)
@@ -47,17 +56,10 @@ function SetVideoCount(videoCountText as string) as void
 
     m.top.videoCount = videoCountText
 
-    label = m.videoCountLabel
-    rect = m.videoCountRect
+    rectParent = m.videoCountRect.getParent()
 
-    if label = invalid or rect = invalid
-        return
-    end if
+    size = m.videoCountLabel.localBoundingRect()
 
-    rectParent = rect.getParent()
-
-    size = label.localBoundingRect()
-
-    rect.width = size.width + 16
-    rect.translation = [rectParent.width - rect.width, rect.translation[1]]
+    m.videoCountRect.width = size.width + 16
+    m.videoCountRect.translation = [rectParent.width - m.videoCountRect.width, m.videoCountRect.translation[1]]
 end function
