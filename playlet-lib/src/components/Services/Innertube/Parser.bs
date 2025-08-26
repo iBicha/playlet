@@ -1,3 +1,4 @@
+import "ArabScriptSupport.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -38,6 +39,17 @@ namespace Innertube
             context.feeds.Push(context.currentFeed)
             context.currentFeed = invalid
         end if
+
+        for each feed in context.feeds
+            if feed.DoesExist("items") and IsArray(feed.items)
+                for each item in feed.items
+                    if item.DoesExist("title")
+                        item["title"] = ArabScript.Shape(ValidString(item["title"]))
+                    end if
+                end for
+            end if
+        end for
+
         return context.feeds
     end function
 
