@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Shorts being merged with subscription videos, regardless of "Disable Shorts" preference.
 
 ## [0.40.14] - 2025-08-22
 
