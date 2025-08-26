@@ -1,4 +1,4 @@
-import "ArabScriptSupport.bs"
+import "pkg:/components/Fonts/ArabScriptSupport.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -40,15 +40,21 @@ namespace Innertube
             context.currentFeed = invalid
         end if
 
+        timer = CreateObject("roTimespan")
+        itemCount = 0
         for each feed in context.feeds
             if feed.DoesExist("items") and IsArray(feed.items)
                 for each item in feed.items
                     if item.DoesExist("title")
-                        item["title"] = ArabScript.Shape(ValidString(item["title"]))
+                        item["title"] = ArabScript.ShapeText(ValidString(item["title"]))
+                        itemCount = itemCount + 1
                     end if
                 end for
             end if
         end for
+
+        duration = timer.TotalMilliseconds()
+        print "ARABIC SHAPING TIME: " + duration.ToStr() + " ms for " + itemCount.ToStr() + " items"
 
         return context.feeds
     end function

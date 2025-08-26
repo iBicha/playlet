@@ -1,0 +1,194 @@
+namespace ArabScript
+
+    function GetArabicCharMap() as object
+        if m._arabicCharMap <> invalid
+            return m._arabicCharMap
+        end if
+        m._arabicCharMap = {
+            "ا": { isolated: Chr(&hFE8D), final: Chr(&hFE8E) }
+            "ب": { isolated: Chr(&hFE8F), final: Chr(&hFE90), initial: Chr(&hFE91), medial: Chr(&hFE92) }
+            "ت": { isolated: Chr(&hFE95), final: Chr(&hFE96), initial: Chr(&hFE97), medial: Chr(&hFE98) }
+            "ث": { isolated: Chr(&hFE99), final: Chr(&hFE9A), initial: Chr(&hFE9B), medial: Chr(&hFE9C) }
+            "ج": { isolated: Chr(&hFE9D), final: Chr(&hFE9E), initial: Chr(&hFE9F), medial: Chr(&hFEA0) }
+            "ح": { isolated: Chr(&hFEA1), final: Chr(&hFEA2), initial: Chr(&hFEA3), medial: Chr(&hFEA4) }
+            "خ": { isolated: Chr(&hFEA5), final: Chr(&hFEA6), initial: Chr(&hFEA7), medial: Chr(&hFEA8) }
+            "د": { isolated: Chr(&hFEA9), final: Chr(&hFEAA) }
+            "ذ": { isolated: Chr(&hFEAB), final: Chr(&hFEAC) }
+            "ر": { isolated: Chr(&hFEAD), final: Chr(&hFEAE) }
+            "ز": { isolated: Chr(&hFEAF), final: Chr(&hFEB0) }
+            "س": { isolated: Chr(&hFEB1), final: Chr(&hFEB2), initial: Chr(&hFEB3), medial: Chr(&hFEB4) }
+            "ش": { isolated: Chr(&hFEB5), final: Chr(&hFEB6), initial: Chr(&hFEB7), medial: Chr(&hFEB8) }
+            "ص": { isolated: Chr(&hFEB9), final: Chr(&hFEBA), initial: Chr(&hFEBB), medial: Chr(&hFEBC) }
+            "ض": { isolated: Chr(&hFEBD), final: Chr(&hFEBE), initial: Chr(&hFEBF), medial: Chr(&hFEC0) }
+            "ط": { isolated: Chr(&hFEC1), final: Chr(&hFEC2), initial: Chr(&hFEC3), medial: Chr(&hFEC4) }
+            "ظ": { isolated: Chr(&hFEC5), final: Chr(&hFEC6), initial: Chr(&hFEC7), medial: Chr(&hFEC8) }
+            "ع": { isolated: Chr(&hFEC9), final: Chr(&hFECA), initial: Chr(&hFECB), medial: Chr(&hFECC) }
+            "غ": { isolated: Chr(&hFECD), final: Chr(&hFECE), initial: Chr(&hFECF), medial: Chr(&hFED0) }
+            "ف": { isolated: Chr(&hFED1), final: Chr(&hFED2), initial: Chr(&hFED3), medial: Chr(&hFED4) }
+            "ق": { isolated: Chr(&hFED5), final: Chr(&hFED6), initial: Chr(&hFED7), medial: Chr(&hFED8) }
+            "ك": { isolated: Chr(&hFED9), final: Chr(&hFEDA), initial: Chr(&hFEDB), medial: Chr(&hFEDC) }
+            "ل": { isolated: Chr(&hFEDD), final: Chr(&hFEDE), initial: Chr(&hFEDF), medial: Chr(&hFEE0) }
+            "م": { isolated: Chr(&hFEE1), final: Chr(&hFEE2), initial: Chr(&hFEE3), medial: Chr(&hFEE4) }
+            "ن": { isolated: Chr(&hFEE5), final: Chr(&hFEE6), initial: Chr(&hFEE7), medial: Chr(&hFEE8) }
+            "ه": { isolated: Chr(&hFEE9), final: Chr(&hFEEA), initial: Chr(&hFEEB), medial: Chr(&hFEEC) }
+            "و": { isolated: Chr(&hFEED), final: Chr(&hFEEE) }
+            "ي": { isolated: Chr(&hFEF1), final: Chr(&hFEF2), initial: Chr(&hFEF3), medial: Chr(&hFEF4) }
+            "ى": { isolated: Chr(&hFEEF), final: Chr(&hFEF0) }
+            "ء": { isolated: Chr(&hFE80) }
+            "ئ": { isolated: Chr(&hFE89), final: Chr(&hFE8A), initial: Chr(&hFE8B), medial: Chr(&hFE8C) }
+            "ؤ": { isolated: Chr(&hFE85), final: Chr(&hFE86) }
+        }
+        return m._arabicCharMap
+    end function
+
+    function GetNonConnectingChars() as object
+        if m._nonConnectingChars <> invalid
+            return m._nonConnectingChars
+        end if
+        m._nonConnectingChars = {
+            "ا": true
+            "د": true
+            "ذ": true
+            "ر": true
+            "ز": true
+            "و": true
+            "ء": true
+            "ؤ": true
+            "ى": true
+        }
+        return m._nonConnectingChars
+    end function
+
+    function IsArabic(char as string) as boolean
+        arabicRegex = m._arabicRegex
+        if arabicRegex = invalid
+            arabicRegex = CreateObject("roRegex", "[؀-ۿ]", "i")
+            m._arabicRegex = arabicRegex
+        end if
+        return arabicRegex.IsMatch(char)
+    end function
+
+    function GetPresentationForm(char as string, prevChar as string, nextChar as string) as string
+        charMap = GetArabicCharMap()
+        forms = charMap[char]
+        if forms = invalid
+            return char
+        end if
+
+        nonConnectingChars = GetNonConnectingChars()
+
+        prevConnect = prevChar <> "" and not (nonConnectingChars[prevChar] = true)
+        nextConnect = nextChar <> "" and not (nonConnectingChars[char] = true)
+
+        if not prevConnect and not nextConnect and forms.isolated <> invalid
+            return forms.isolated
+        end if
+
+        if not prevConnect and nextConnect and forms.initial <> invalid
+            return forms.initial
+        end if
+
+        if prevConnect and nextConnect and forms.medial <> invalid
+            return forms.medial
+        end if
+
+        return forms.isolated
+    end function
+
+    function ShapeWord(word as string) as string
+        letters = word.Split("")
+        for i = 0 to letters.Count() - 1
+            prevChar = ""
+            nextChar = ""
+            if i > 0
+                prevChar = letters[i - 1]
+            end if
+            if i < letters.Count() - 1
+                nextChar = letters[i + 1]
+            end if
+            letters[i] = GetPresentationForm(letters[i], prevChar, nextChar)
+        end for
+        ReverseInPlace(letters)
+        return letters.Join("")
+    end function
+
+    function ShapeText(text as string) as string
+        if text = ""
+            return text
+        end if
+
+        segments = []
+        segmentsIsArabic = []
+        currentSegment = []
+        inArabicSegment = false
+
+        chars = text.Split("")
+        for each c in chars
+            isCharArabic = IsArabic(c)
+            isCharSpace = c = " "
+
+            if not inArabicSegment
+                if isCharArabic
+                    if currentSegment.Count() > 0
+                        segments.Push(currentSegment)
+                        segmentsIsArabic.Push(false)
+                        currentSegment = [c]
+                    end if
+                    inArabicSegment = true
+                else
+                    currentSegment.Push(c)
+                end if
+            else
+                if isCharArabic or isCharSpace
+                    currentSegment.Push(c)
+                else
+                    if currentSegment.Count() > 0
+                        segments.Push(currentSegment)
+                        segmentsIsArabic.Push(true)
+                        currentSegment = [c]
+                    end if
+                    inArabicSegment = false
+                end if
+            end if
+        end for
+        if currentSegment.Count() > 0
+            segments.Push(currentSegment)
+            segmentsIsArabic.Push(inArabicSegment)
+        end if
+
+        wordSplitRegex = m._wordSplitRegex
+        if wordSplitRegex = invalid
+            wordSplitRegex = CreateObject("roRegex", "(\s+)", "i")
+            m._wordSplitRegex = wordSplitRegex
+        end if
+
+        for i = 0 to segments.Count() - 1
+            if segmentsIsArabic[i]
+                segment = segments[i].Join("")
+                words = wordSplitRegex.Split(segment).ToArray()
+                for j = 0 to words.Count() - 1
+                    words[j] = ShapeWord(words[j])
+                end for
+                ReverseInPlace(words)
+                segments[i] = "<Arabic>" + words.Join(" ") + "</Arabic>"
+            else
+                segments[i] = segments[i].Join("")
+            end if
+        end for
+
+        return segments.Join("")
+    end function
+
+    function ReverseInPlace(array as object) as void
+        l = 0
+        r = array.Count() - 1
+        while l < r
+            temp = array[l]
+            array[l] = array[r]
+            array[r] = temp
+            l = l + 1
+            r = r - 1
+        end while
+    end function
+
+end namespace
