@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Shorts being merged with subscription videos, regardless of "Disable Shorts" preference.
+- Gracefully handle STS_MISMATCH errors
 
 ## [0.40.14] - 2025-08-22
 

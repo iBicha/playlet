@@ -409,26 +409,37 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
+            LogError(response.ErrorMessage())
+            code = ""
             if response.StatusCode() = 400
                 json = response.Json()
-                if IsAssociativeArray(json) and json["code"] = "STS_MISMATCH"
-                    DeleteFile("tmp:/sts_cache.json")
+                if IsAssociativeArray(json)
+                    code = ValidString(json["code"])
+                    if code = "STS_MISMATCH"
+                        DeleteFile("tmp:/sts_cache.json")
+                    end if
                 end if
             end if
-            LogError(response.ErrorMessage())
-            return adaptiveFormats
+
+            exception = { message: response.ErrorMessage() }
+            if code <> ""
+                exception.code = code
+            end if
+            throw exception
         end if
 
         json = response.Json()
         if not IsAssociativeArray(json) or not json.DoesExist("formats")
-            LogError("Invalid response from decipher service")
-            return adaptiveFormats
+            error = "Invalid response from decipher service"
+            LogError(error)
+            throw error
         end if
 
         decipheredFormats = json["formats"]
         if not IsArray(decipheredFormats) or decipheredFormats.Count() <> adaptiveFormats.Count()
-            LogError("Invalid formats in deciphered response")
-            return adaptiveFormats
+            error = "Invalid formats in deciphered response"
+            LogError(error)
+            throw error
         end if
 
         for i = 0 to decipheredFormats.Count() - 1

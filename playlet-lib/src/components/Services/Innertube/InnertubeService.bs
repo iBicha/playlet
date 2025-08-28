@@ -103,7 +103,15 @@ namespace InnertubeService
             return rawResponse
         end if
 
-        parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.signatureTimestamp, cancellation)
+        parsedResponse = invalid
+        try
+            parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.signatureTimestamp, cancellation)
+        catch exception
+            if ValidString(exception.code) = "STS_MISMATCH"
+                return GetVideoMetadata(videoId, options)
+            end if
+            throw exception
+        end try
         if parsedResponse.error <> invalid
             return parsedResponse
         end if
