@@ -180,6 +180,8 @@ export class LoggerPlugin implements CompilerPlugin {
 
         let logLine = '';
 
+        const telemetryEnabled = level === 'LogError' || level === 'LogWarn';
+
         if (isDebug) {
             const RED = '[31m';
             const YELLOW = '[33m';
@@ -217,7 +219,9 @@ function ${newFunctionName}(${args.join(', ')}) as void
     if logger.logLevel < ${func.level}
         return
     end if
-    logger.logLine = ${logLine}
+    line = ${logLine}
+    logger.logLine = line
+    ${(telemetryEnabled ? `m.global.telemetry.${level} = line` : '')}
 end function
 `;
     }

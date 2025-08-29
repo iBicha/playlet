@@ -6,6 +6,8 @@ Playlet, the Roku app, does not collect any user personal information whatsoever
 
 Playlet does not show advertising, whether personalized or non personalized.
 
+Playlet may integrate with 3rd party telemetry services in order to capture anonymous diagnostics data. The only purpose of this data is to diagnose issues and improve the app.
+
 ## Invidious
 
 Playlet may request information from one or more [Invidious](https://invidious.io/)

@@ -1,0 +1,62 @@
+import "pkg:/source/services/HttpClient.bs"
+
+const SENTRY_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4509923579265024/envelope/"
+const SENTRY_KEY = "0bda23ffe3634745f57a0edbffdd18be"
+
+namespace Sentry
+
+    function SendLogEvent(level as string, message as string, tags as object) as void
+        eventId = GenerateEventId()
+        timestamp = CreateObject("roDateTime").ToISOString()
+
+        header = FormatJson({
+            event_id: eventId
+            sent_at: timestamp
+            sdk: {
+                name: "sentry.roku.playlet"
+                version: "1.0.0"
+            }
+        })
+        event = `{"type":"event"}`
+        eventPayload = FormatJson({
+            event_id: eventId
+            timestamp: timestamp
+            platform: "roku"
+            #if DEBUG
+                environment: "development"
+            #else
+                environment: "production"
+            #end if
+            tags: tags
+            level: level
+            logentry: {
+                formatted: message
+            }
+        })
+
+        payload = header + `\n` + event + `\n` + eventPayload
+
+        request = HttpClient.Post(SENTRY_ENVELOPE_URL, payload)
+        request.QueryParam("sentry_key", SENTRY_KEY)
+        request.Header("Content-Type", "text/plain;charset=UTF-8")
+        response = request.Await()
+        if not response.IsSuccess()
+            #if DEBUG
+                LogError("Failed to send event to Sentry:", response.ErrorMessage())
+            #end if
+            return
+        end if
+
+        LogDebug("Sent event to Sentry with ID:", eventId, "Response:", response.Text())
+    end function
+
+    function GenerateEventId() as string
+        hexChars = "0123456789abcdef"
+        eventId = ""
+        for i = 0 to 31
+            eventId = eventId + hexChars.Mid(rnd(16) - 1, 1)
+        end for
+        return eventId
+    end function
+
+end namespace
