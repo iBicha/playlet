@@ -1,0 +1,75 @@
+import "pkg:/components/Telemetry/Sentry.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init() as void
+    if m.global.telemetry <> invalid
+        return
+    end if
+    m.global.addFields({ telemetry: m.top })
+    m.top.functionName = "TelemetryLoop"
+end function
+
+function OnNodeReady() as void
+    m.tags = GetTags()
+    m.top.ObserveField("enabled", FuncName(OnEnabledChanged))
+    m.preferences.ObserveFieldScoped("dev.diagnostics.enabled", FuncName(OnPreferencesChanged))
+    enabled = m.preferences["dev.diagnostics.enabled"]
+    OnPreferencesChanged({
+        enabled: enabled
+        getData: function() as boolean
+            return m.enabled
+        end function
+    })
+end function
+
+function OnPreferencesChanged(event as object) as void
+    m.top.enabled = event.getData()
+end function
+
+function OnEnabledChanged(event as object) as void
+    enabled = event.getData()
+    LogInfo("Telemetry enabled:", enabled)
+    if enabled
+        m.top.control = "run"
+    else
+        m.top.control = "stop"
+    end if
+end function
+
+function TelemetryLoop() as void
+    msgPort = CreateObject("roMessagePort")
+    m.top.observeField("LogInfo", msgPort)
+    m.top.observeField("LogWarn", msgPort)
+    m.top.observeField("LogError", msgPort)
+
+    levelMap = {
+        "LogInfo": "info"
+        "LogWarn": "warning"
+        "LogError": "error"
+    }
+
+    while true
+        msg = wait(0, msgPort)
+        msgType = type(msg)
+
+        if msgType = "roSGNodeEvent"
+            level = levelMap[msg.getField()]
+            if level <> invalid
+                Sentry.SendLogEvent(level, msg.getData(), m.tags)
+            end if
+        end if
+    end while
+end function
+
+function GetTags() as object
+    appInfo = m.applicationInfo
+    tags = appInfo@.GetAppInfo()
+    tags.Append(appInfo@.GetDeviceInfo())
+    for each key in tags
+        if not IsString(tags[key])
+            tags[key] = ToString(tags[key])
+        end if
+    end for
+    return tags
+end function

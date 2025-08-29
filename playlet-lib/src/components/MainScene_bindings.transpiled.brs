@@ -64,6 +64,10 @@ function InitializeBindings()
                 "videoQueue": "../VideoQueue", 
                 "notifications": "../Notifications", 
                 "invidious": "../Invidious"
+            }, 
+            "Telemetry": {
+                "preferences": "../Preferences", 
+                "applicationInfo": "../ApplicationInfo"
             }
         }
     }

@@ -107,8 +107,12 @@ namespace InnertubeService
         try
             parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.signatureTimestamp, cancellation)
         catch exception
-            if ValidString(exception.code) = "STS_MISMATCH"
+            code = ValidString(exception.code)
+            if code = "STS_MISMATCH"
                 return GetVideoMetadata(videoId, options)
+            end if
+            if code = "MISSING_FORMAT_FIELD"
+                m.global.telemetry.LogError = code + `\n` + playerRequest.ToCurlCommand() + `\n` + playerResponse.Text()
             end if
             throw exception
         end try
