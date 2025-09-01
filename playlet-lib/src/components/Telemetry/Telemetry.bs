@@ -12,6 +12,7 @@ end function
 
 function OnNodeReady() as void
     m.tags = GetTags()
+    m.release = GetRelease(m.tags)
     m.top.ObserveField("enabled", FuncName(OnEnabledChanged))
     m.preferences.ObserveFieldScoped("dev.diagnostics.enabled", FuncName(OnPreferencesChanged))
     enabled = m.preferences["dev.diagnostics.enabled"]
@@ -56,7 +57,7 @@ function TelemetryLoop() as void
         if msgType = "roSGNodeEvent"
             level = levelMap[msg.getField()]
             if level <> invalid
-                Sentry.SendLogEvent(level, msg.getData(), m.tags)
+                Sentry.SendLogEvent(level, msg.getData(), m.release, m.tags)
             end if
         end if
     end while
@@ -72,4 +73,12 @@ function GetTags() as object
         end if
     end for
     return tags
+end function
+
+function GetRelease(tags as object) as string
+    release = `${tags["app_version"]}-${tags["app_git_commit_hash"]}-${tags["lib_version"]}-${tags["lib_git_commit_hash"]}`
+    if tags["id"] = "dev"
+        release = release + "-dev"
+    end if
+    return release
 end function
