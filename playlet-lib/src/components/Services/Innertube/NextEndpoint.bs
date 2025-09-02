@@ -40,17 +40,37 @@ namespace Innertube
             return parsedResponse
         end if
 
-        if not IsArray(parsedResponse.recommendedVideos)
-            LogWarn("Invalid recommended videos", parsedResponse.recommendedVideos)
-            return parsedResponse
-        end if
-
         if not IsAssociativeArray(payload)
             LogWarn("Invalid payload", payload)
             return parsedResponse
         end if
 
-        endscreen = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer", "endScreen"])
+        playerOverlayRenderer = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer"])
+        if not IsAssociativeArray(playerOverlayRenderer)
+            LogWarn("Invalid playerOverlayRenderer", playerOverlayRenderer)
+            return parsedResponse
+        end if
+
+        if StringUtils.IsNullOrEmpty(parsedResponse.title)
+            title = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "title"]))
+            if not StringUtils.IsNullOrEmpty(title)
+                parsedResponse.title = title
+            end if
+        end if
+
+        if StringUtils.IsNullOrEmpty(parsedResponse.author)
+            subtitle = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "subtitle"]))
+            if not StringUtils.IsNullOrEmpty(subtitle)
+                parsedResponse.author = subtitle
+            end if
+        end if
+
+        if not IsArray(parsedResponse.recommendedVideos)
+            LogWarn("Invalid recommended videos", parsedResponse.recommendedVideos)
+            return parsedResponse
+        end if
+
+        endscreen = playerOverlayRenderer["endScreen"]
 
         feeds = Innertube.ParseResponseDataForFeeds(endscreen, { noContainers: true })
         if feeds.Count() > 0
