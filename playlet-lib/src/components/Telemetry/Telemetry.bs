@@ -13,6 +13,8 @@ end function
 function OnNodeReady() as void
     m.tags = GetTags()
     m.release = GetRelease(m.tags)
+    m.userId = GetUserId()
+
     m.top.ObserveField("enabled", FuncName(OnEnabledChanged))
     m.preferences.ObserveFieldScoped("dev.diagnostics.enabled", FuncName(OnPreferencesChanged))
     enabled = m.preferences["dev.diagnostics.enabled"]
@@ -58,10 +60,10 @@ function TelemetryLoop() as void
         if msgType = "roSGNodeEvent"
             field = msg.getField()
             if levelMap.DoesExist(field)
-                Sentry.SendLogEvent(levelMap[field], msg.getData(), m.release, m.tags, invalid)
+                Sentry.SendLogEvent(levelMap[field], msg.getData(), m.release, m.tags, m.userId, invalid)
             else if field = "LogFingerprinted"
                 data = msg.getData()
-                Sentry.SendLogEvent(data.level, data.message, m.release, m.tags, data.fingerprint)
+                Sentry.SendLogEvent(data.level, data.message, m.release, m.tags, m.userId, data.fingerprint)
             end if
         end if
     end while
@@ -88,4 +90,8 @@ function GetRelease(tags as object) as string
         release = release + "-dev"
     end if
     return release
+end function
+
+function GetUserId() as string
+    return CreateObject("roDeviceInfo").GetChannelClientId()
 end function
