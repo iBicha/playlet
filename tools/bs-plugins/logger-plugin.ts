@@ -213,7 +213,7 @@ export class LoggerPlugin implements CompilerPlugin {
             logLine = `"[${func.stringLevel}]" + ${msg}`
         }
 
-        return `
+        let result = `
 function ${newFunctionName}(${args.join(', ')}) as void
     logger = m.global.logger
     if logger.logLevel < ${func.level}
@@ -221,9 +221,16 @@ function ${newFunctionName}(${args.join(', ')}) as void
     end if
     line = ${logLine}
     logger.logLine = line
-    ${(telemetryEnabled ? `m.global.telemetry.${level} = line` : '')}
-end function
 `;
+        if (telemetryEnabled) {
+            result += `    if not (m.noTelemetry = true)
+        m.global.telemetry.${level} = line
+    end if
+`;
+        }
+        result += `end function
+`;
+        return result;
     }
 }
 

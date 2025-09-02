@@ -48,7 +48,9 @@ class DashManifest
         audioStreams = m.getAudioStreams(adaptiveFormats)
         videoStreams = m.getVideoStreams(adaptiveFormats, qualityFilter)
         if videoStreams.Count() = 0
+            m.noTelemetry = true
             LogWarn("No video streams found using quality filter:", qualityFilter, "Falling back to all video streams")
+            m.noTelemetry = false
             videoStreams = m.getVideoStreams(adaptiveFormats, {})
         end if
 
@@ -192,18 +194,19 @@ class DashManifest
                     id += 1
                 end for
 
-                storyboardsAdded = false
                 ' https://developer.roku.com/en-ca/docs/developer-program/media-playback/trick-mode/hls-and-dash.md#dash-standard-thumbnail-tiles
                 for each storyboard in storyboards
                     interval = ValidInt(storyboard.interval)
                     if interval = 0
-                        LogInfo("Invalid storyboard interval:", storyboard.interval)
+                        LogWarn("Invalid storyboard interval:", storyboard.interval)
                         continue for
                     end if
 
                     templateUrl = storyboard.templateUrl
                     if templateUrl.Instr("$M") = -1
+                        m.noTelemetry = true
                         LogInfo("Invalid storyboard url: url does not contain $M:", templateUrl)
+                        m.noTelemetry = false
                         continue for
                     end if
 
@@ -268,12 +271,7 @@ class DashManifest
                     end if
 
                     id += 1
-                    storyboardsAdded = true
                 end for
-
-                if storyboards.Count() > 0 and not storyboardsAdded
-                    LogWarn("No valid storyboards found")
-                end if
 
                 xml.End()
             end if
