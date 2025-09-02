@@ -112,7 +112,20 @@ namespace InnertubeService
                 return GetVideoMetadata(videoId, options)
             end if
             if code = "MISSING_FORMAT_FIELD"
-                m.global.telemetry.LogError = code + `\n` + playerRequest.ToCurlCommand() + `\n` + playerResponse.Text()
+                m.global.telemetry.LogEvent = {
+                    level: "error"
+                    message: code
+                    fingerprint: code
+                    attachments: [{
+                        filename: "request.txt"
+                        content_type: "text/plain"
+                        data: playerRequest.ToCurlCommand()
+                    }, {
+                        filename: "response.json"
+                        content_type: "application/json"
+                        data: playerResponse.Text()
+                    }]
+                }
             end if
             throw exception
         end try

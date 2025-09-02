@@ -5,49 +5,97 @@ const SENTRY_KEY = "0bda23ffe3634745f57a0edbffdd18be"
 
 namespace Sentry
 
-    function SendLogEvent(level as string, message as string, tags as object) as void
-        eventId = GenerateEventId()
+    function SendEvents(events as object) as integer
         timestamp = CreateObject("roDateTime").ToISOString()
 
-        header = FormatJson({
-            event_id: eventId
+        payload = FormatJson({
             sent_at: timestamp
             sdk: {
                 name: "sentry.roku.playlet"
                 version: "1.0.0"
             }
-        })
-        event = `{"type":"event"}`
-        eventPayload = FormatJson({
-            event_id: eventId
-            timestamp: timestamp
-            platform: "roku"
-            #if DEBUG
-                environment: "development"
-            #else
-                environment: "production"
-            #end if
-            tags: tags
-            level: level
-            logentry: {
-                formatted: message
-            }
-        })
+        }) + `\n`
 
-        payload = header + `\n` + event + `\n` + eventPayload
+        for each event in events
+            payload += `{"type":"event"}` + `\n`
+
+            if StringUtils.IsNullOrEmpty(event.event_id)
+                event.event_id = GenerateEventId()
+            end if
+
+            if StringUtils.IsNullOrEmpty(event.timestamp)
+                event.timestamp = timestamp
+            end if
+
+            eventPayload = {
+                event_id: event.event_id
+                timestamp: event.timestamp
+                platform: "roku"
+                #if DEBUG
+                    environment: "development"
+                #else
+                    environment: "production"
+                #end if
+                release: event.release
+                tags: event.tags
+                level: event.level
+                logentry: {
+                    formatted: event.message
+                }
+                user: {
+                    id: event.userId
+                }
+            }
+
+            if event.fingerprint <> invalid
+                if IsString(event.fingerprint)
+                    eventPayload.fingerprint = [event.fingerprint]
+                else if IsArray(event.fingerprint)
+                    eventPayload.fingerprint = event.fingerprint
+                end if
+            end if
+
+            payload += FormatJson(eventPayload) + `\n`
+
+            if IsArray(event.attachments)
+                tmpBuffer = CreateObject("roByteArray")
+                for each attachment in event.attachments
+                    data = attachment.data
+                    attachment.Delete("data")
+                    attachment["type"] = "attachment"
+                    tmpBuffer.FromAsciiString(data)
+                    attachment["length"] = tmpBuffer.Count()
+
+                    payload += FormatJson(attachment) + `\n`
+                    payload += data + `\n`
+                end for
+            end if
+        end for
 
         request = HttpClient.Post(SENTRY_ENVELOPE_URL, payload)
         request.QueryParam("sentry_key", SENTRY_KEY)
-        request.Header("Content-Type", "text/plain;charset=UTF-8")
+        request.Header("Content-Type", "application/x-sentry-envelope")
         response = request.Await()
         if not response.IsSuccess()
             #if DEBUG
-                LogInfo("Failed to send event to Sentry:", response.ErrorMessage())
+                m.noTelemetry = true
+                LogError("Failed to send event to Sentry:", response.ErrorMessage())
+                m.noTelemetry = false
             #end if
-            return
+
+            statusCode = response.StatusCode()
+            if statusCode = 429
+                retryAfter = ValidInt(response.Headers()["Retry-After"])
+                if retryAfter = 0
+                    retryAfter = 60
+                end if
+                return retryAfter
+            end if
+            return 0
         end if
 
-        LogDebug("Sent event to Sentry with ID:", eventId, "Response:", response.Text())
+        LogDebug("Sent events to Sentry. Response:", response.Text())
+        return 0
     end function
 
     function GenerateEventId() as string

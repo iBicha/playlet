@@ -25,7 +25,7 @@ namespace Innertube
         for each key in nodeData
             directive = directives[key]
             if directive = invalid
-                LogWarn("Unknown node", key, `\n`, FormatJson(nodeData[key]))
+                Warning(`Unknown node ${key}`, nodeData[key])
                 #if DEBUG_THROW_ON_UNKNOWN_NODES
                     #if DEBUG
                         throw "Unknown node: " + key
@@ -91,6 +91,11 @@ namespace Innertube
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
+            ' Movies are not supported.
+            "movieRenderer": ParseNotImplemented
+            "compactMovieRenderer": ParseNotImplemented
+            "horizontalMovieListRenderer": ParseNotImplemented
+            "gridMovieRenderer": ParseNotImplemented
             ' Contains comments "teaser".
             "commentsEntryPointHeaderRenderer": ParseNotImplemented
             ' Contains the owner of the video from "videoPrimaryInfoRenderer"
@@ -125,6 +130,15 @@ namespace Innertube
             "feedNudgeRenderer": ParseNotImplemented
             ' "No results found, Try different keywords or remove search filters"
             "backgroundPromoRenderer": ParseNotImplemented
+            ' Autocorrect for search terms
+            "showingResultsForRenderer": ParseNotImplemented
+            ' "This channel has no podcasts."
+            "channelOwnerEmptyStateRenderer": ParseNotImplemented
+            ' Live chat replay ("See what others said about this video while it was live.")
+            "videoMetadataCarouselViewModel": ParseNotImplemented
+            ' A link to some content, like a wikipedia article.
+            "infoPanelContentRenderer": ParseNotImplemented
+            "ticketShelfRenderer": ParseNotImplemented
             "videoSurveyShelfRenderer": ParseNotImplemented
             "searchBarRenderer": ParseNotImplemented
             "clickTrackingParams": ParseNotImplemented
@@ -168,7 +182,7 @@ namespace Innertube
         end if
 
         if subItems.Count() = 0
-            LogWarn("No results found in TwoColumnWatchNextResults", nodeData)
+            Warning("No results found in twoColumnWatchNextResults", nodeData)
             return invalid
         end if
         return subItems
@@ -305,7 +319,7 @@ namespace Innertube
     function ParseVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in videoRenderer", nodeData)
             return invalid
         end if
 
@@ -407,7 +421,7 @@ namespace Innertube
     function ParseGridVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in gridVideoRenderer", nodeData)
             return invalid
         end if
 
@@ -492,7 +506,7 @@ namespace Innertube
     function ParseCompactVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in compactVideoRenderer", nodeData)
             return invalid
         end if
 
@@ -592,11 +606,13 @@ namespace Innertube
             videoId = ObjectUtils.Dig(nodeData, ["updatedMetadataEndpoint", "updatedMetadataEndpoint", "videoId"])
             if not IsString(videoId)
                 ' TODO:P1 confirm that videoPrimaryInfoRenderer has the requested video
+                m.noTelemetry = true
                 #if DEBUG
                     LogWarn("Invalid video ID in videoPrimaryInfoRenderer", `\n`, FormatJson(nodeData))
                 #else
                     LogWarn("Invalid video ID in videoPrimaryInfoRenderer")
                 #end if
+                m.noTelemetry = false
                 return invalid
             end if
         end if
@@ -628,7 +644,7 @@ namespace Innertube
     function ParseChannelVideoPlayerRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in channelVideoPlayerRenderer", nodeData)
             return invalid
         end if
 
@@ -657,7 +673,7 @@ namespace Innertube
     function ParsePlaylistVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID playlistVideoRenderer", nodeData)
             return invalid
         end if
 
@@ -706,7 +722,7 @@ namespace Innertube
     function ParsePlaylistPanelVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in playlistPanelVideoRenderer", nodeData)
             return invalid
         end if
 
@@ -772,7 +788,7 @@ namespace Innertube
     function ParseEndScreenVideoRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in endScreenVideoRenderer", nodeData)
             return invalid
         end if
 
@@ -804,7 +820,7 @@ namespace Innertube
     function ParseChannelRenderer(nodeData as object, context as object) as object
         channelId = nodeData["channelId"]
         if not IsString(channelId)
-            LogWarn("Invalid channel ID", nodeData)
+            Warning("Invalid channel ID in channelRenderer", nodeData)
             return invalid
         end if
 
@@ -824,7 +840,7 @@ namespace Innertube
     function ParseGridChannelRenderer(nodeData as object, context as object) as object
         channelId = nodeData["channelId"]
         if not IsString(channelId)
-            LogWarn("Invalid channel ID", nodeData)
+            Warning("Invalid channel ID gridChannelRenderer", nodeData)
             return invalid
         end if
 
@@ -844,7 +860,7 @@ namespace Innertube
     function ParsePlaylistRenderer(nodeData as object, context as object) as object
         playlistId = nodeData["playlistId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID in playlistRenderer", nodeData)
             return invalid
         end if
 
@@ -894,7 +910,7 @@ namespace Innertube
     function ParseGridPlaylistRenderer(nodeData as object, context as object) as object
         playlistId = nodeData["playlistId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID gridPlaylistRenderer", nodeData)
             return invalid
         end if
 
@@ -970,7 +986,7 @@ namespace Innertube
             return LockupViewModelTypeAlbum(nodeData, context)
         end if
 
-        LogWarn("Unknown content type:", contentType, `\n`, FormatJson(nodeData))
+        Warning(`Unknown content type: ${contentType}`, nodeData)
         #if DEBUG_THROW_ON_UNKNOWN_NODES
             #if DEBUG
                 throw "Unknown content type: " + contentType
@@ -982,7 +998,7 @@ namespace Innertube
     function LockupViewModelTypeVideo(nodeData as object, context as object) as object
         videoId = nodeData["contentId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in lockupViewModelTypeVideo", nodeData)
             return invalid
         end if
 
@@ -1041,7 +1057,7 @@ namespace Innertube
     function LockupViewModelTypePlaylist(nodeData as object, context as object) as object
         playlistId = nodeData["contentId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID in lockupViewModelTypePlaylist", nodeData)
             return invalid
         end if
 
@@ -1090,7 +1106,7 @@ namespace Innertube
     function LockupViewModelTypePodcast(nodeData as object, context as object) as object
         playlistId = nodeData["contentId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID in lockupViewModelTypePodcast", nodeData)
             return invalid
         end if
 
@@ -1125,7 +1141,7 @@ namespace Innertube
     function LockupViewModelTypeAlbum(nodeData as object, context as object) as object
         playlistId = nodeData["contentId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID in lockupViewModelTypeAlbum", nodeData)
             return invalid
         end if
 
@@ -1165,7 +1181,7 @@ namespace Innertube
 
         videoId = ObjectUtils.Dig(nodeData, ["onTap", "innertubeCommand", "reelWatchEndpoint", "videoId"])
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in shortsLockupViewModel", nodeData)
             return invalid
         end if
 
@@ -1228,7 +1244,7 @@ namespace Innertube
         ' A tileRenderer can be without a contentType, such as a
         ' button that says "Open YouTube Kids" or similar CTAs
         if contentType = ""
-            LogWarn(`TileRenderer without contentType:\n`, nodeData)
+            Warning("TileRenderer without contentType", nodeData)
             return invalid
         end if
 
@@ -1240,7 +1256,7 @@ namespace Innertube
             return TileRendererTypePlaylist(nodeData, context)
         end if
 
-        LogWarn("Unknown content type:", contentType, `\n`, FormatJson(nodeData))
+        Warning(`Unknown content type: ${contentType}`, nodeData)
         #if DEBUG_THROW_ON_UNKNOWN_NODES
             #if DEBUG
                 throw "Unknown content type: " + contentType
@@ -1252,7 +1268,7 @@ namespace Innertube
     function TileRendererTypeVideo(nodeData as object, context as object) as object
         videoId = nodeData["contentId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in tileRendererTypeVideo", nodeData)
             return invalid
         end if
 
@@ -1341,7 +1357,7 @@ namespace Innertube
 
         videoId = nodeData["contentId"]
         if not IsString(videoId)
-            LogWarn("Invalid video ID", `\n`, FormatJson(nodeData))
+            Warning("Invalid video ID in tileRendererTypeShorts", nodeData)
             return invalid
         end if
 
@@ -1384,7 +1400,7 @@ namespace Innertube
     function TileRendererTypePlaylist(nodeData as object, context as object) as object
         playlistId = nodeData["contentId"]
         if not IsString(playlistId)
-            LogWarn("Invalid playlist ID", nodeData)
+            Warning("Invalid playlist ID in tileRendererTypePlaylist", nodeData)
             return invalid
         end if
 
@@ -1710,5 +1726,20 @@ namespace Innertube
                 "height": 180
             }
         ]
+    end function
+
+    function Warning(message as string, nodeData as object) as void
+        nodeDataString = FormatJson(nodeData)
+        fullMessage = message + `\n` + nodeDataString
+
+        m.noTelemetry = true
+        LogWarn(fullMessage)
+        m.noTelemetry = false
+
+        m.global.telemetry.LogEvent = {
+            level: "error"
+            message: fullMessage
+            fingerprint: message
+        }
     end function
 end namespace

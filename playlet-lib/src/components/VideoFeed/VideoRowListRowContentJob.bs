@@ -241,11 +241,15 @@ end function
 
 function HandleFeedLoadErrorDialog(error as object, isCancelled as boolean, rowList as object) as void
     error = ErrorUtils.Format(error)
+
     if isCancelled
-        LogInfo(error)
-    else
-        LogError(error)
+        m.noTelemetry = true
     end if
+    LogError(error)
+    if isCancelled
+        m.noTelemetry = false
+    end if
+
     rowList.onError = error
     if rowList.hasField("dispose") and rowList.dispose
         return

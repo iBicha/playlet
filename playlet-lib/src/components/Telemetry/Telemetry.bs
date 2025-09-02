@@ -12,6 +12,9 @@ end function
 
 function OnNodeReady() as void
     m.tags = GetTags()
+    m.release = GetRelease(m.tags)
+    m.userId = GetUserId()
+
     m.top.ObserveField("enabled", FuncName(OnEnabledChanged))
     m.preferences.ObserveFieldScoped("dev.diagnostics.enabled", FuncName(OnPreferencesChanged))
     enabled = m.preferences["dev.diagnostics.enabled"]
@@ -42,6 +45,15 @@ function TelemetryLoop() as void
     m.top.observeField("LogInfo", msgPort)
     m.top.observeField("LogWarn", msgPort)
     m.top.observeField("LogError", msgPort)
+    m.top.observeField("LogEvent", msgPort)
+
+    ' debouceMs = 2000
+    ' debounceCountLimit = 20
+    ' debounceTimeLimit = 5000
+    ' debounceTimer = CreateObject("roTimeSpan")
+
+    retryAfter = 0
+    retryAfterTimer = CreateObject("roTimeSpan")
 
     levelMap = {
         "LogInfo": "info"
@@ -49,15 +61,81 @@ function TelemetryLoop() as void
         "LogError": "error"
     }
 
+    messages = []
+    events = []
+
     while true
         msg = wait(0, msgPort)
-        msgType = type(msg)
 
-        if msgType = "roSGNodeEvent"
-            level = levelMap[msg.getField()]
-            if level <> invalid
-                Sentry.SendLogEvent(level, msg.getData(), m.tags)
+        if retryAfter > 0
+            if retryAfterTimer.TotalMilliseconds() < retryAfter * 1000
+                continue while
+            else
+                retryAfter = 0
             end if
+        end if
+
+        messages.Push(msg)
+
+        ' Sentry might not support batching yet for errors, but maybe for logs
+        ' debounceTimer.Mark()
+        ' while true
+        '     LogDebug("Waiting for more messages...")
+        '     msg = wait(debouceMs, msgPort)
+        '     if msg = invalid
+        '         LogDebug("No more messages")
+        '         exit while
+        '     end if
+        '     messages.Push(msg)
+        '     if messages.Count() >= debounceCountLimit
+        '         LogDebug("Reached debounce count limit")
+        '         exit while
+        '     end if
+        '     if debounceTimer.TotalMilliseconds() >= debounceTimeLimit
+        '         LogDebug("Reached debounce time limit")
+        '         exit while
+        '     end if
+        ' end while
+
+        events.Clear()
+        for each msg in messages
+            msgType = type(msg)
+            if msgType <> "roSGNodeEvent"
+                continue for
+            end if
+
+            field = msg.getField()
+
+            if levelMap.DoesExist(field)
+                events.Push({
+                    level: levelMap[field]
+                    message: msg.getData()
+                    release: m.release
+                    tags: m.tags
+                    userId: m.userId
+                })
+            else if field = "LogEvent"
+                data = msg.getData()
+                events.Push({
+                    level: data.level
+                    message: data.message
+                    release: m.release
+                    tags: m.tags
+                    userId: m.userId
+                    fingerprint: data.fingerprint
+                    attachments: data.attachments
+                })
+            end if
+        end for
+        messages.Clear()
+
+        if events.Count() = 0
+            continue while
+        end if
+
+        retryAfter = Sentry.SendEvents(events)
+        if retryAfter > 0
+            retryAfterTimer.Mark()
         end if
     end while
 end function
@@ -66,10 +144,25 @@ function GetTags() as object
     appInfo = m.applicationInfo
     tags = appInfo@.GetAppInfo()
     tags.Append(appInfo@.GetDeviceInfo())
+
+    tags.Delete("friendly_name")
+
     for each key in tags
         if not IsString(tags[key])
             tags[key] = ToString(tags[key])
         end if
     end for
     return tags
+end function
+
+function GetRelease(tags as object) as string
+    release = `${tags["app_version"]}-${tags["app_git_commit_hash"]}-${tags["lib_version"]}-${tags["lib_git_commit_hash"]}`
+    if tags["id"] = "dev"
+        release = release + "-dev"
+    end if
+    return release
+end function
+
+function GetUserId() as string
+    return CreateObject("roDeviceInfo").GetChannelClientId()
 end function
