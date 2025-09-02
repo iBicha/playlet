@@ -47,11 +47,29 @@ namespace Sentry
                 }
             }
 
-            if IsArray(event.fingerprint)
-                eventPayload.fingerprint = event.fingerprint
+            if event.fingerprint <> invalid
+                if IsString(event.fingerprint)
+                    eventPayload.fingerprint = [event.fingerprint]
+                else if IsArray(event.fingerprint)
+                    eventPayload.fingerprint = event.fingerprint
+                end if
             end if
 
             payload += FormatJson(eventPayload) + `\n`
+
+            if IsArray(event.attachments)
+                tmpBuffer = CreateObject("roByteArray")
+                for each attachment in event.attachments
+                    data = attachment.data
+                    attachment.Delete("data")
+                    attachment["type"] = "attachment"
+                    tmpBuffer.FromAsciiString(data)
+                    attachment["length"] = tmpBuffer.Count()
+
+                    payload += FormatJson(attachment) + `\n`
+                    payload += data + `\n`
+                end for
+            end if
         end for
 
         request = HttpClient.Post(SENTRY_ENVELOPE_URL, payload)
