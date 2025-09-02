@@ -436,7 +436,17 @@ function OnVideoPlayerStateChange() as void
 
     if state = "error"
         errorInfo = m.top.errorInfo
-        LogError(Tr(Locale.VideoPlayer.ErrorPlayingVideo).Replace("%1", content.videoId), errorInfo)
+        errorData = GetPlayerErrorData(content.videoId, errorInfo)
+
+        m.noTelemetry = true
+        LogError(errorData.title, errorData.body)
+        m.noTelemetry = false
+        m.global.telemetry.LogFingerprinted = {
+            level: "error"
+            message: errorData.title + `\n` + errorData.body
+            fingerprint: errorData.fingerprint
+        }
+
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
@@ -481,24 +491,21 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "error"
-        messageLines = []
-        messageLines.push(`errorMsg: ${m.top.errorMsg}`)
-        messageLines.push(`errorCode: ${m.top.errorCode}`)
-        messageLines.push(`errorStr: ${m.top.errorStr}`)
-
         errorInfo = m.top.errorInfo
-        if errorInfo <> invalid
-            for each info in errorInfo
-                messageLines.push(`${info}: ${errorInfo[info]}`)
-            end for
-        end if
+        errorData = GetPlayerErrorData(content.videoId, errorInfo)
 
-        title = Tr(Locale.VideoPlayer.ErrorPlayingVideo).Replace("%1", content.videoId)
-        LogError(title, messageLines)
+        m.noTelemetry = true
+        LogError(errorData.title, errorData.body)
+        m.noTelemetry = false
+        m.global.telemetry.LogFingerprinted = {
+            level: "error"
+            message: errorData.title + `\n` + errorData.body
+            fingerprint: errorData.fingerprint
+        }
 
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
-        dialog = DialogUtils.ShowTimedDialogButtons(messageLines, title, buttons, 0, 10, true)
+        dialog = DialogUtils.ShowTimedDialogButtons(errorData.body, errorData.title, buttons, 0, 10, true)
         if dialog <> invalid
             dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentJobErrorDialogResponse))
         else
@@ -506,6 +513,39 @@ function OnVideoPlayerStateChange() as void
         end if
         m.ignoreNextFinishedState = true
     end if
+end function
+
+function GetPlayerErrorData(videoId as string, errorInfo as object) as object
+    if errorInfo = invalid
+        return invalid
+    end if
+
+    errorMsg = m.top.errorMsg
+    errorCode = m.top.errorCode
+    errorStr = m.top.errorStr
+
+    title = Tr(Locale.VideoPlayer.ErrorPlayingVideo).Replace("%1", videoId)
+    body = `errorMsg: ${errorMsg}\nerrorCode: ${errorCode}\nerrorStr: ${errorStr}`
+    for each key in errorInfo
+        body += `\n${key}: ${errorInfo[key]}`
+    end for
+
+    fingerprint = [
+        Locale.VideoPlayer.ErrorPlayingVideo
+        errorMsg
+        errorCode
+        errorInfo.source
+        errorInfo.ignored
+        errorInfo.category
+        errorInfo.errcode
+        errorInfo.drmerrcode
+    ]
+
+    return {
+        title: title
+        body: body
+        fingerprint: fingerprint
+    }
 end function
 
 function OnVideoFinished() as void

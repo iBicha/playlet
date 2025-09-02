@@ -5,7 +5,7 @@ const SENTRY_KEY = "0bda23ffe3634745f57a0edbffdd18be"
 
 namespace Sentry
 
-    function SendLogEvent(level as string, message as string, release as string, tags as object) as void
+    function SendLogEvent(level as string, message as string, release as string, tags as object, fingerprint as object) as void
         eventId = GenerateEventId()
         timestamp = CreateObject("roDateTime").ToISOString()
 
@@ -18,7 +18,7 @@ namespace Sentry
             }
         })
         event = `{"type":"event"}`
-        eventPayload = FormatJson({
+        eventPayload = {
             event_id: eventId
             timestamp: timestamp
             platform: "roku"
@@ -33,7 +33,13 @@ namespace Sentry
             logentry: {
                 formatted: message
             }
-        })
+        }
+
+        if IsArray(fingerprint)
+            eventPayload.fingerprint = fingerprint
+        end if
+
+        eventPayload = FormatJson(eventPayload)
 
         payload = header + `\n` + event + `\n` + eventPayload
 

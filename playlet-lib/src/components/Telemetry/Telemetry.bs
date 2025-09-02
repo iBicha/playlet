@@ -43,6 +43,7 @@ function TelemetryLoop() as void
     m.top.observeField("LogInfo", msgPort)
     m.top.observeField("LogWarn", msgPort)
     m.top.observeField("LogError", msgPort)
+    m.top.observeField("LogFingerprinted", msgPort)
 
     levelMap = {
         "LogInfo": "info"
@@ -55,9 +56,12 @@ function TelemetryLoop() as void
         msgType = type(msg)
 
         if msgType = "roSGNodeEvent"
-            level = levelMap[msg.getField()]
-            if level <> invalid
-                Sentry.SendLogEvent(level, msg.getData(), m.release, m.tags)
+            field = msg.getField()
+            if levelMap.DoesExist(field)
+                Sentry.SendLogEvent(levelMap[field], msg.getData(), m.release, m.tags, invalid)
+            else if field = "LogFingerprinted"
+                data = msg.getData()
+                Sentry.SendLogEvent(data.level, data.message, m.release, m.tags, data.fingerprint)
             end if
         end if
     end while
