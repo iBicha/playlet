@@ -47,24 +47,94 @@ function TelemetryLoop() as void
     m.top.observeField("LogError", msgPort)
     m.top.observeField("LogFingerprinted", msgPort)
 
+    ' debouceMs = 2000
+    ' debounceCountLimit = 20
+    ' debounceTimeLimit = 5000
+    ' debounceTimer = CreateObject("roTimeSpan")
+
+    retryAfter = 0
+    retryAfterTimer = CreateObject("roTimeSpan")
+
     levelMap = {
         "LogInfo": "info"
         "LogWarn": "warning"
         "LogError": "error"
     }
 
+    messages = []
+    events = []
+
     while true
         msg = wait(0, msgPort)
-        msgType = type(msg)
 
-        if msgType = "roSGNodeEvent"
+        if retryAfter > 0
+            if retryAfterTimer.TotalMilliseconds() < retryAfter * 1000
+                continue while
+            else
+                retryAfter = 0
+            end if
+        end if
+
+        messages.Push(msg)
+
+        ' Sentry might not support batching yet for errors, but maybe for logs
+        ' debounceTimer.Mark()
+        ' while true
+        '     LogDebug("Waiting for more messages...")
+        '     msg = wait(debouceMs, msgPort)
+        '     if msg = invalid
+        '         LogDebug("No more messages")
+        '         exit while
+        '     end if
+        '     messages.Push(msg)
+        '     if messages.Count() >= debounceCountLimit
+        '         LogDebug("Reached debounce count limit")
+        '         exit while
+        '     end if
+        '     if debounceTimer.TotalMilliseconds() >= debounceTimeLimit
+        '         LogDebug("Reached debounce time limit")
+        '         exit while
+        '     end if
+        ' end while
+
+        events.Clear()
+        for each msg in messages
+            msgType = type(msg)
+            if msgType <> "roSGNodeEvent"
+                continue for
+            end if
+
             field = msg.getField()
+
             if levelMap.DoesExist(field)
-                Sentry.SendLogEvent(levelMap[field], msg.getData(), m.release, m.tags, m.userId, invalid)
+                events.Push({
+                    level: levelMap[field]
+                    message: msg.getData()
+                    release: m.release
+                    tags: m.tags
+                    userId: m.userId
+                })
             else if field = "LogFingerprinted"
                 data = msg.getData()
-                Sentry.SendLogEvent(data.level, data.message, m.release, m.tags, m.userId, data.fingerprint)
+                events.Push({
+                    level: data.level
+                    message: data.message
+                    release: m.release
+                    tags: m.tags
+                    userId: m.userId
+                    fingerprint: data.fingerprint
+                })
             end if
+        end for
+        messages.Clear()
+
+        if events.Count() = 0
+            continue while
+        end if
+
+        retryAfter = Sentry.SendEvents(events)
+        if retryAfter > 0
+            retryAfterTimer.Mark()
         end if
     end while
 end function
