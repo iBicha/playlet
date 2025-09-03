@@ -21,14 +21,16 @@
   let modal;
   let tvName = "Roku TV";
   let invidiousInstance;
+  let invidiousInstanceForRedirect;
 
   playletStateStore.subscribe((value) => {
     tvName = value?.device?.friendly_name ?? "Roku TV";
     let instance = value?.invidious?.invidious_instance || "";
+    invidiousInstance = instance;
     if (!instance) {
       instance = "https://redirect.invidious.io";
     }
-    invidiousInstance = instance;
+    invidiousInstanceForRedirect = instance;
   });
 
   async function playOnTv() {
@@ -44,7 +46,7 @@
   }
 
   function openInvidious() {
-    let url = `${invidiousInstance}/playlist?list=${playlistId}`;
+    let url = `${invidiousInstanceForRedirect}/playlist?list=${playlistId}`;
     window.open(url);
   }
 

@@ -17,7 +17,7 @@
 
   let modal;
   let tvName = "Roku TV";
-  let invidiousInstance;
+  let invidiousInstanceForRedirect;
 
   playletStateStore.subscribe((value) => {
     tvName = value?.device?.friendly_name ?? "Roku TV";
@@ -25,7 +25,7 @@
     if (!instance) {
       instance = "https://redirect.invidious.io";
     }
-    invidiousInstance = instance;
+    invidiousInstanceForRedirect = instance;
   });
 
   async function openOnTv() {
@@ -33,7 +33,7 @@
   }
 
   function openInvidious() {
-    let url = `${invidiousInstance}/channel/${authorId}`;
+    let url = `${invidiousInstanceForRedirect}/channel/${authorId}`;
     window.open(url);
   }
 </script>
