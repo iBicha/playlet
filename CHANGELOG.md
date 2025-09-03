@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ignore certain nodes in parser (such as movies, since they are not supported)
 - A bug where video title is missing while loading
 - A bug where loading a bookmarked playlist would fail
+- Error playing videos when Invidious backend is selected, always proxy, but no instance provided
 
 ## [0.41.1] - 2025-08-29
 
