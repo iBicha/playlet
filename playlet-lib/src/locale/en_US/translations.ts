@@ -1380,5 +1380,13 @@
         <source>Cache cleared.</source>
         <translation>Cache cleared.</translation>
     </message>
+    <message>
+        <source>Enable Diagnostics</source>
+        <translation>Enable Diagnostics</translation>
+    </message>
+    <message>
+        <source>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</source>
+        <translation>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</translation>
+    </message>
 </context>
 </TS>
