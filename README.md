@@ -83,13 +83,12 @@ Can't install from the store? See [How to install Playlet as a sideloaded/dev ap
 
 For everything related to Playlet app development, please see the [documentation](./docs/README.md)
 
-## Analytics and reporting
+## Analytics and telemetry
 
-We do not collect any usage data, anonymous or not. But Roku does, and you can find the data made available to Playlet in the [Wiki](https://github.com/iBicha/playlet/wiki).
-Most software in the wild collect some data to make sure things work, and to prioritize features.
-Because we don't do that, we wouldn't know if people using Playlet are facing issues, unless these issues get reported.
-Playlet could run on variaty of devices, with different capabilities and screen sizes, and different Invidious instances.
-That's why it's important to report any issues you encouter using Playlet, otherwise it's unlikely that they get addressed.
+Roku collects usage data, and you can find the data made available to Playlet in the [Wiki](https://github.com/iBicha/playlet/wiki).
+Playlet could run on variaty of devices, with different capabilities and screen sizes, and different Invidious instances, in addition to the experimentation YouTube does based on account and/or ip.
+This is why it was necessary to collect telemetry/diagnostics data, in order to capture issues and fix them. However, you can disable this feature in the settings.
+But it's not enough, it's important to report any issues you encouter using Playlet, so they can be addressed.
 
 ## Why Playlet
 
