@@ -138,6 +138,10 @@ namespace Innertube
             "videoMetadataCarouselViewModel": ParseNotImplemented
             ' A link to some content, like a wikipedia article.
             "infoPanelContentRenderer": ParseNotImplemented
+            ' {"blockCurrentSession":true,"error":"SUPEX_ONBOARDING_ERROR_KIDS_ONLY"}
+            "supexOnboardingErrorCommand": ParseNotImplemented
+            ' Suicide & crisis lifeline, shown on sensitive content
+            "emergencyOneboxRenderer": ParseNotImplemented
             "ticketShelfRenderer": ParseNotImplemented
             "videoSurveyShelfRenderer": ParseNotImplemented
             "searchBarRenderer": ParseNotImplemented
@@ -1730,16 +1734,20 @@ namespace Innertube
 
     function Warning(message as string, nodeData as object) as void
         nodeDataString = FormatJson(nodeData)
-        fullMessage = message + `\n` + nodeDataString
 
         m.noTelemetry = true
-        LogWarn(fullMessage)
+        LogWarn(message + `\n` + nodeDataString)
         m.noTelemetry = false
 
         m.global.telemetry.LogEvent = {
             level: "error"
-            message: fullMessage
+            message: message
             fingerprint: message
+            attachments: [{
+                filename: "node_data.json"
+                content_type: "application/json"
+                data: nodeDataString
+            }]
         }
     end function
 end namespace
