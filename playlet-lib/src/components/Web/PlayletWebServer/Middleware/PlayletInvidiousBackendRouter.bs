@@ -628,6 +628,7 @@ namespace Http
             end if
             continuation = request.query.continuation
             raw = request.query.raw <> invalid
+            infoOnly = request.query.info_only <> invalid
 
             options = {
                 raw: raw
@@ -680,6 +681,16 @@ namespace Http
                     LogError("Playlet backend does not use playlist pagination (use continuation instead)")
                     playlist.videos = []
                 end if
+            end if
+
+            ' info_only is Playlet specific. If set, we only care about the playlist info,
+            ' not the videos. This usually means we're loading info for a bookmark.
+            ' When that's the case, we want to get rid of the continuation, because a
+            ' continuation from an unauthenticated innertube request is not compatible
+            ' with an authenticated innertube request.
+            if infoOnly
+                playlist.videos = []
+                playlist.Delete("continuation")
             end if
 
             response.Json(playlist)
