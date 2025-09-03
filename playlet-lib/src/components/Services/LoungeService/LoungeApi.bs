@@ -555,7 +555,11 @@ class LoungeApi
                 })
 
                 if not response.IsSuccess()
-                    LogError(response.ErrorMessage())
+                    if response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
+                        LogErrorNoTelemetry(response.ErrorMessage())
+                    else
+                        LogError(response.ErrorMessage())
+                    end if
                 end if
 
                 m.outgoingMessagesRequests.Delete(key)

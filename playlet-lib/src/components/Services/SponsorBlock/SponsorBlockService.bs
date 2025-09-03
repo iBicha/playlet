@@ -87,7 +87,11 @@ namespace SponsorBlock
             url = `${m.sponsorBlockConfig.serverAddress}${SponsorBlock.SKIP_SEGMENT_ENDPOINT}/${hashPrefix}?categories=${categoriesJson}&actionTypes=${actionTypesJson}`
             response = HttpClient.Get(url).Cancellation(cancellation).Await()
             if not response.IsSuccess()
-                LogError("GetSkipSegmentsForVideo failed:", response.ErrorMessage())
+                if response.IsCancelled()
+                    LogErrorNoTelemetry(response.ErrorMessage())
+                else
+                    LogError(response.ErrorMessage())
+                end if
                 return invalid
             end if
 

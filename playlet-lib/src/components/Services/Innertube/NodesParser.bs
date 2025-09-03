@@ -610,13 +610,11 @@ namespace Innertube
             videoId = ObjectUtils.Dig(nodeData, ["updatedMetadataEndpoint", "updatedMetadataEndpoint", "videoId"])
             if not IsString(videoId)
                 ' TODO:P1 confirm that videoPrimaryInfoRenderer has the requested video
-                m.noTelemetry = true
                 #if DEBUG
-                    LogWarn("Invalid video ID in videoPrimaryInfoRenderer", `\n`, FormatJson(nodeData))
+                    LogWarnNoTelemetry("Invalid video ID in videoPrimaryInfoRenderer", `\n`, FormatJson(nodeData))
                 #else
-                    LogWarn("Invalid video ID in videoPrimaryInfoRenderer")
+                    LogWarnNoTelemetry("Invalid video ID in videoPrimaryInfoRenderer")
                 #end if
-                m.noTelemetry = false
                 return invalid
             end if
         end if
@@ -1735,9 +1733,7 @@ namespace Innertube
     function Warning(message as string, nodeData as object) as void
         nodeDataString = FormatJson(nodeData)
 
-        m.noTelemetry = true
-        LogWarn(message + `\n` + nodeDataString)
-        m.noTelemetry = false
+        LogWarnNoTelemetry(message + `\n` + nodeDataString)
 
         m.global.telemetry.LogEvent = {
             level: "error"

@@ -22,18 +22,32 @@ const logFunctions = {
     LogError: {
         stringLevel: 'ERROR',
         level: 0,
+        telemetry: true
+    },
+    LogErrorNoTelemetry: {
+        stringLevel: 'ERROR',
+        level: 0,
+        telemetry: false
     },
     LogWarn: {
         stringLevel: 'WARN',
         level: 1,
+        telemetry: true
+    },
+    LogWarnNoTelemetry: {
+        stringLevel: 'WARN',
+        level: 1,
+        telemetry: false
     },
     LogInfo: {
         stringLevel: 'INFO',
         level: 2,
+        telemetry: false
     },
     LogDebug: {
         stringLevel: 'DEBUG',
         level: 3,
+        telemetry: false
     }
 }
 
@@ -164,7 +178,7 @@ export class LoggerPlugin implements CompilerPlugin {
         program.setFile(loggingFilePath, content)
     }
 
-    generateLoggingFunction(newFunctionName: string, level: string, argCount: number, isDebug: boolean) {
+    generateLoggingFunction(newFunctionName: string, originalFunctionName: string, argCount: number, isDebug: boolean) {
         const args: string[] = [];
         const argsParams: string[] = [];
         for (let i = 0; i < argCount; i++) {
@@ -176,11 +190,11 @@ export class LoggerPlugin implements CompilerPlugin {
             return `ToString(${arg})`;
         }).join(` + " " + `);
 
-        const func = logFunctions[level as 'LogError' | 'LogWarn' | 'LogInfo' | 'LogDebug'];
+        const func = logFunctions[originalFunctionName as keyof typeof logFunctions];
 
         let logLine = '';
 
-        const telemetryEnabled = level === 'LogError' || level === 'LogWarn';
+        const telemetryEnabled = func.telemetry;
 
         if (isDebug) {
             const RED = '[31m';
@@ -223,10 +237,7 @@ function ${newFunctionName}(${args.join(', ')}) as void
     logger.logLine = line
 `;
         if (telemetryEnabled) {
-            result += `    if not (m.noTelemetry = true)
-        m.global.telemetry.${level} = line
-    end if
-`;
+            result += `    m.global.telemetry.${originalFunctionName} = line\n`;
         }
         result += `end function
 `;

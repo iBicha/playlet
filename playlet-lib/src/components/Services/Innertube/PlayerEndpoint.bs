@@ -374,7 +374,11 @@ namespace Innertube
         request.NoCache()
         response = request.Await()
         if not response.IsSuccess()
-            LogError(response.ErrorMessage())
+            if response.IsCancelled()
+                LogErrorNoTelemetry(response.ErrorMessage())
+            else
+                LogError(response.ErrorMessage())
+            end if
             return invalid
         end if
 
@@ -409,7 +413,11 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            LogError(response.ErrorMessage())
+            if response.IsCancelled()
+                LogErrorNoTelemetry(response.ErrorMessage())
+            else
+                LogError(response.ErrorMessage())
+            end if
             code = ""
             if response.StatusCode() = 400
                 json = response.Json()
