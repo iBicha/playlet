@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- A bug when generating dash manifest with missing stream url
 
 ## [0.41.2] - 2025-09-03
 
