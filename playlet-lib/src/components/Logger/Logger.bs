@@ -25,6 +25,7 @@ function Init()
                 scene.enableSystemLogType = "http.complete"
                 scene.enableSystemLogType = "bandwidth.minute"
             #end if
+            m.sysLogEventDropCounter = 0
         end if
     end if
 
@@ -112,7 +113,14 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
-    m.global.telemetry.logError = line
+
+    ' Only report 1 in 10 system log errors
+    ' They're usually repetitive, one is reported for each stream in a DASH
+    ' when a video is blocked
+    if m.sysLogEventDropCounter = 0
+        m.global.telemetry.logError = line
+    end if
+    m.sysLogEventDropCounter = (m.sysLogEventDropCounter + 1) mod 10
 end function
 
 function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void

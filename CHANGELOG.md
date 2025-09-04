@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Small improvements in parser
+- Try force refresh visitor data when it fails
+- Rate limit syslog errors
 
 ## [0.41.3] - 2025-09-03
 
