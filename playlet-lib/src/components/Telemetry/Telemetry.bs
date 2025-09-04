@@ -13,6 +13,7 @@ end function
 function OnNodeReady() as void
     m.tags = GetTags()
     m.release = GetRelease(m.tags)
+    m.dist = GetDist(m.tags)
     m.userId = GetUserId()
 
     m.top.ObserveField("enabled", FuncName(OnEnabledChanged))
@@ -111,6 +112,7 @@ function TelemetryLoop() as void
                     level: levelMap[field]
                     message: msg.getData()
                     release: m.release
+                    dist: m.dist
                     tags: m.tags
                     userId: m.userId
                 })
@@ -120,6 +122,7 @@ function TelemetryLoop() as void
                     level: data.level
                     message: data.message
                     release: m.release
+                    dist: m.dist
                     tags: m.tags
                     userId: m.userId
                     fingerprint: data.fingerprint
@@ -156,11 +159,15 @@ function GetTags() as object
 end function
 
 function GetRelease(tags as object) as string
-    release = `${tags["app_version"]}-${tags["app_git_commit_hash"]}-${tags["lib_version"]}-${tags["lib_git_commit_hash"]}`
+    return`${tags["lib_version"]}-${tags["lib_git_commit_hash"]}`
+end function
+
+function GetDist(tags as object) as string
+    dist = `${tags["app_version"]}-${tags["app_git_commit_hash"]}-${tags["lib_version"]}-${tags["lib_git_commit_hash"]}`
     if tags["id"] = "dev"
-        release = release + "-dev"
+        dist = dist + "-dev"
     end if
-    return release
+    return dist
 end function
 
 function GetUserId() as string
