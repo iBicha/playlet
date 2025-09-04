@@ -441,6 +441,7 @@ function OnVideoPlayerStateChange() as void
         m.videoPlayingSuccess = true
     end if
 
+    errorReported = false
     if state = "error"
         errorInfo = m.top.errorInfo
         errorData = GetPlayerErrorData(content.videoId, errorInfo)
@@ -448,9 +449,10 @@ function OnVideoPlayerStateChange() as void
         LogErrorNoTelemetry(errorData.title, errorData.body)
         m.global.telemetry.LogEvent = {
             level: "error"
-            message: errorData.title + `\n` + errorData.body
+            message: errorData.title + " " + errorData.body
             fingerprint: errorData.fingerprint
         }
+        errorReported = true
 
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
@@ -500,11 +502,13 @@ function OnVideoPlayerStateChange() as void
         errorData = GetPlayerErrorData(content.videoId, errorInfo)
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
-        m.global.telemetry.LogEvent = {
-            level: "error"
-            message: errorData.title + `\n` + errorData.body
-            fingerprint: errorData.fingerprint
-        }
+        if not errorReported
+            m.global.telemetry.LogEvent = {
+                level: "error"
+                message: errorData.title + " " + errorData.body
+                fingerprint: errorData.fingerprint
+            }
+        end if
 
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
