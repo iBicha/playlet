@@ -118,7 +118,11 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     ' They're usually repetitive, one is reported for each stream in a DASH
     ' when a video is blocked
     if m.sysLogEventDropCounter = 0
-        m.global.telemetry.logError = line
+        m.global.telemetry.LogEvent = {
+            level: "error"
+            message: line
+            fingerprint: ["SysLog", info.Status, info.LogType, info.HttpCode, info.Method]
+        }
     end if
     m.sysLogEventDropCounter = (m.sysLogEventDropCounter + 1) mod 10
 end function
@@ -129,7 +133,7 @@ function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logs
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
-    m.global.telemetry.logWarn = line
+    m.global.telemetry.LogWarn = line
 end function
 
 function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
@@ -148,7 +152,7 @@ function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, l
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
-    m.global.telemetry.logWarn = line
+    m.global.telemetry.LogWarn = line
 end function
 
 ' Note: although the timestamp should be captured in the caller, not the logger,
