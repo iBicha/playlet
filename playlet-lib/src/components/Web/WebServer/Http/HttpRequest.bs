@@ -99,10 +99,12 @@ namespace Http
             operation = m.ReadHeaderLine()
 
             if operation = invalid or operation = ""
-                LogError("empty request", FormatJson({
-                    "m.buffer": m.buffer
-                    "m.buffer_index": m.buffer_index
-                }))
+                LogErrorNoTelemetry("empty request")
+                m.global.telemetry.LogEvent = {
+                    level: "error"
+                    message: "empty request: " + FormatJson({ "m.buffer": m.buffer, "m.buffer_index": m.buffer_index })
+                    fingerprint: ["HttpRequest: empty request"]
+                }
                 m.ready_for_response = true
                 return false
             end if
