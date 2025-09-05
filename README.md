@@ -48,8 +48,8 @@ Can't install from the store? See [How to install Playlet as a sideloaded/dev ap
 
 - 🔥 No Ads (Not now, not ever)
 - 🕵️ No Tracking
-- 🛡️ Privacy driven (uses [Invidious](https://invidious.io/) backend)
-- 🙋 User accounts (YouTube and Invidious accounts)
+- 🛡️ Privacy driven (supports [Invidious](https://invidious.io/) backend)
+- 🙋 User accounts (supports YouTube and Invidious accounts)
 - ⚔️ [SponsorBlock](https://sponsor.ajay.app/) integration (skips undesirable sections in videos)
 - 📱 Browse, search, and cast from phone using the YouTube app or the browser
 - 🔮 Picture-in-picture mode
