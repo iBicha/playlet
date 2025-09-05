@@ -2,13 +2,13 @@ import "pkg:/source/utils/Types.bs"
 
 class XmlObject
     private stack = []
-
     private root = invalid
-
+    private prolog = []
     private INDENT_SIZE = 2
 
     function Node(name as string, attributes = invalid as object) as boolean
         newNode = {
+            type: "node"
             name: name
             attributes: attributes
             children: []
@@ -28,7 +28,10 @@ class XmlObject
 
     function Text(text as string)
         if m.stack.count() > 0
-            m.stack[m.stack.count() - 1].children.push(text)
+            m.stack[m.stack.count() - 1].children.push({
+                type: "text"
+                text: text
+            })
         end if
     end function
 
@@ -47,8 +50,29 @@ class XmlObject
         m.stack.pop()
     end function
 
+    function Comment(comment as string)
+        if m.stack.count() > 0
+            m.stack[m.stack.count() - 1].children.push({
+                type: "comment"
+                comment: comment
+            })
+        else
+            m.prolog.push({
+                type: "comment"
+                comment: comment
+            })
+        end if
+    end function
+
     function ToXmlString() as string
-        return `<?xml version="1.0" encoding="UTF-8"?>\n` + m.NodeToXmlString(m.root, 0)
+        xml = `<?xml version="1.0" encoding="UTF-8"?>\n`
+        for each item in m.prolog
+            if item.type = "comment"
+                xml += `<!-- ${item.comment} -->\n`
+            end if
+        end for
+        xml += m.NodeToXmlString(m.root, 0)
+        return xml
     end function
 
     function NodeToXmlString(node as object, indentLevel as integer) as string
@@ -69,21 +93,23 @@ class XmlObject
 
             for i = 0 to node.children.count() - 1
                 child = node.children[i]
-                childIsString = IsString(child)
                 if i = 0
-                    if not childIsString
+                    if child.type <> "text"
                         xmlString += `\n`
                     end if
                 end if
 
-                if childIsString
-                    xmlString += m.XmlEscape(child)
+                if child.type = "text"
+                    xmlString += m.XmlEscape(child.text)
+                else if child.type = "comment"
+                    commentIndentString = string((indentLevel + 1) * m.INDENT_SIZE, " ")
+                    xmlString += `${commentIndentString}<!-- ${child.comment} -->\n`
                 else
                     xmlString += m.NodeToXmlString(child, indentLevel + 1)
                 end if
 
                 if i = node.children.count() - 1
-                    if not childIsString
+                    if child.type <> "text"
                         xmlString += `${indentString}`
                     end if
                 end if

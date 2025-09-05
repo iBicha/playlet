@@ -135,7 +135,7 @@ namespace InnertubeService
 
         if fetchNext
             if nextResponse.IsSuccess()
-                parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse)
+                parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse, nextResponse)
             else
                 LogWarn(nextResponse.ErrorMessage())
             end if
@@ -211,7 +211,9 @@ namespace InnertubeService
             end if
         end if
 
-        feeds = Innertube.ParseResponseDataForFeeds(responseData)
+        feeds = Innertube.ParseResponseDataForFeeds(responseData, {
+            response: response
+        })
 
         if videoIds.Count() > 1
             if feeds.Count() > 0
@@ -283,6 +285,7 @@ namespace InnertubeService
         end if
 
         feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
+            response: response
             disableCreatorOnTheRise: true
             disableShorts: disableShorts
         })
@@ -334,7 +337,10 @@ namespace InnertubeService
             }
         end if
 
-        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), { disableShorts: disableShorts })
+        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
+            response: response
+            disableShorts: disableShorts
+        })
 
         result = {
             feeds: feeds
@@ -494,7 +500,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParseChannelPageResponseData(response.Json())
+        result = Innertube.ParseChannelPageResponseData(response.Json(), response)
         if result.authorId = invalid and result.error = invalid
             result["authorId"] = channelId
         end if
@@ -636,7 +642,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParsePlaylistPageResponseData(response.Json())
+        result = Innertube.ParsePlaylistPageResponseData(response.Json(), response)
 
         if result.playlistId = invalid and result.error = invalid
             result["playlistId"] = playlistId
@@ -677,7 +683,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParseMixPageResponseData(response.Json())
+        result = Innertube.ParseMixPageResponseData(response.Json(), response)
 
         cacheControl = Innertube.ParseResponseForCacheControl(response)
         if cacheControl <> invalid

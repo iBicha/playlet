@@ -5,12 +5,10 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function ParseResponseDataForFeeds(responseData as object, context = invalid as object) as object
+    function ParseResponseDataForFeeds(responseData as object, context as object) as object
         if responseData = invalid
             return []
         end if
-
-        context = ValidAssociativeArray(context)
 
         if not ValidBool(context.noContainers)
             containers = GetContainers(responseData)
@@ -41,7 +39,7 @@ namespace Innertube
         return context.feeds
     end function
 
-    function ParseChannelPageResponseData(responseData as object) as object
+    function ParseChannelPageResponseData(responseData as object, response as object) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -142,7 +140,11 @@ namespace Innertube
         items = []
         continuation = invalid
         sortOptions = invalid
-        feeds = ParseResponseDataForFeeds(responseData, { "currentAuthor": author, "currentAuthorId": authorId })
+        feeds = ParseResponseDataForFeeds(responseData, {
+            response: response
+            "currentAuthor": author
+            "currentAuthorId": authorId
+        })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
             if feeds[0].DoesExist("continuation")
@@ -176,7 +178,7 @@ namespace Innertube
         return channel
     end function
 
-    function ParsePlaylistPageResponseData(responseData as object) as object
+    function ParsePlaylistPageResponseData(responseData as object, response as object) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -270,7 +272,9 @@ namespace Innertube
             playlist["statsText"] = statsText
         end if
 
-        feeds = ParseResponseDataForFeeds(responseData)
+        feeds = ParseResponseDataForFeeds(responseData, {
+            response: response
+        })
         if feeds.Count() > 0
             playlist["videos"] = ValidArray(feeds[0].items)
             if feeds[0].DoesExist("continuation")
@@ -285,7 +289,7 @@ namespace Innertube
         return playlist
     end function
 
-    function ParseMixPageResponseData(responseData as object) as object
+    function ParseMixPageResponseData(responseData as object, response as object) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -330,7 +334,9 @@ namespace Innertube
             "videoCountText": ""
         }
 
-        feeds = ParseResponseDataForFeeds(playlist)
+        feeds = ParseResponseDataForFeeds(playlist, {
+            response: invalid
+        })
         if feeds.Count() > 0
             result["videos"] = ValidArray(feeds[0].items)
         end if
