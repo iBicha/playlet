@@ -67,6 +67,7 @@ function ExecuteJob() as void
     callbackNode = JobGetCallbackNode()
     MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
+    successiveFailures = 0
     while true
         message = wait(60000, port)
         if CancellationUtils.IsCancellationEvent(cancellation, message)
@@ -76,8 +77,20 @@ function ExecuteJob() as void
         if message = invalid
             continue while
         end if
+
+        ' Drain the port to get the latest watch time
+        newMessage = port.GetMessage()
+        while newMessage <> invalid
+            if CancellationUtils.IsCancellationEvent(cancellation, newMessage)
+                JobCancel()
+                return
+            end if
+            message = newMessage
+            newMessage = port.GetMessage()
+        end while
+
         watchTime = message.getData()
-        InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
+        success = InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
             accessToken: authToken.token
             onBehalfOfUser: authToken.activeIdentifyToken
             ' TODO:P1 if we pass cancellation here, http client will remove scoped
@@ -85,5 +98,15 @@ function ExecuteJob() as void
             ' This requires an extra observer node to be independent.
             cancellation: invalid
         })
+        if success
+            successiveFailures = 0
+        else
+            successiveFailures += 1
+        end if
+
+        ' If we're consistently failing, stop trying
+        if successiveFailures >= 5
+            return
+        end if
     end while
 end function
