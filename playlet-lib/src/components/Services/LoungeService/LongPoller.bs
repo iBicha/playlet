@@ -198,8 +198,11 @@ class LongPoller
             m.status_code = Val(statusCode)
             m.status_text = status.Mid(spaceIndex + 1)
             if m.status_code <> 200
-                LogError("Invalid status code:", m.status_code, m.status_text)
-                LogError("Response data:", m.socket_buffer)
+                if m.status_code = 400 and m.status_text = "Unknown SID"
+                    LogErrorNoTelemetry("Invalid status code:", m.status_code, m.status_text, `\nResponse data:`, m.socket_buffer)
+                else
+                    LogError("Invalid status code:", m.status_code, m.status_text, `\nResponse data:`, m.socket_buffer)
+                end if
                 m.CloseSocket()
                 return false
             end if
