@@ -18,6 +18,7 @@ function ExecuteJob() as void
     end if
 
     DeleteFile("tmp:/last_generated_dash.xml")
+    DeleteFile("tmp:/last_generated_hls.m3u8")
 
     if StringUtils.IsNullOrEmpty(contentNode.videoId)
         JobError("Can't load video information: videoId is missing")
@@ -152,9 +153,9 @@ function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality a
 
     ' Redirect to Playet's local web server, where we will be
     ' dynamically adding storyboards to the HLS manifest, and filter quality
-    hlsUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrl })
+    hlsUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrl, v: metadata.videoId })
     if supportsProxying
-        hlsUrlLocal = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrlLocal })
+        hlsUrlLocal = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrlLocal, v: metadata.videoId })
     end if
 
     if hasQuality
