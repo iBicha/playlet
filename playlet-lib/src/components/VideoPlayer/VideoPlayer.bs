@@ -447,7 +447,7 @@ function OnVideoPlayerStateChange() as void
         errorData = GetPlayerErrorData(content.videoId, errorInfo)
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
-        ReportVideoError(errorData)
+        ReportVideoError(errorData, content.url)
         errorReported = true
 
         if m.videoPlayingSuccess <> true
@@ -499,7 +499,7 @@ function OnVideoPlayerStateChange() as void
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
         if not errorReported
-            ReportVideoError(errorData)
+            ReportVideoError(errorData, content.url)
         end if
 
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
@@ -547,7 +547,7 @@ function GetPlayerErrorData(videoId as string, errorInfo as object) as object
     }
 end function
 
-function ReportVideoError(errorData as object) as void
+function ReportVideoError(errorData as object, url as string) as void
     attachments = invalid
     if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
         lastGeneratedDash = ReadAsciiFile("tmp:/last_generated_dash.xml")
@@ -573,7 +573,7 @@ function ReportVideoError(errorData as object) as void
 
     m.global.telemetry.LogEvent = {
         level: "error"
-        message: errorData.title + " " + errorData.body
+        message: errorData.title + " " + errorData.body + `\n url: ${url}`
         fingerprint: errorData.fingerprint
         attachments: attachments
     }
