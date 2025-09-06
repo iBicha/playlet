@@ -14,7 +14,6 @@ namespace Http
 
     class HttpRequest
         ' members
-        private server as HttpServer
         private method = invalid
         private uri = invalid
         private route = invalid
@@ -30,8 +29,7 @@ namespace Http
         ' copied members
         private ready_for_response = false
 
-        function new(server as HttpServer)
-            m.server = server
+        function new()
             m.id = Http.GetHttpRequestId()
             m.headers = CreateObject("roAssociativeArray")
         end function
@@ -102,7 +100,7 @@ namespace Http
 
             if operation = invalid or operation = ""
                 LogErrorNoTelemetry("empty request")
-                m.server.telemetry.LogEvent = {
+                m.global.telemetry.LogEvent = {
                     level: "error"
                     message: "empty request: " + FormatJson({ "m.buffer": m.buffer, "m.buffer_index": m.buffer_index })
                     fingerprint: ["HttpRequest: empty request"]
