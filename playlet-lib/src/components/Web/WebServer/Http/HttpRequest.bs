@@ -96,15 +96,22 @@ namespace Http
                 return false
             end if
 
-            operation = m.ReadHeaderLine()
+            firstChar = m.buffer.Mid(0, 1)
+            if Asc(firstChar) = &h16
+                LogErrorNoTelemetry("TLS handshake detected. HTTPS is not supported.")
+                m.ready_for_response = true
+                return false
+            end if
 
-            if operation = invalid or operation = ""
-                LogErrorNoTelemetry("empty request")
-                LogTelemetryEvent({
-                    level: "error"
-                    message: "empty request: " + FormatJson({ "m.buffer": m.buffer, "m.buffer_index": m.buffer_index })
-                    fingerprint: ["HttpRequest: empty request"]
-                })
+            operation = m.ReadHeaderLine()
+            ' Sometimes the first line is long enough that it doesn't fit in one read
+            ' (e.g. very long URL). In that case, we just wait for more
+            if operation = invalid
+                return false
+            end if
+
+            if operation = ""
+                LogError("empty request")
                 m.ready_for_response = true
                 return false
             end if
