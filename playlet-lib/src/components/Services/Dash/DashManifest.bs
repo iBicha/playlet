@@ -39,6 +39,9 @@ class DashManifest
         if local and m.invidiousInstance <> Invidious.PLAYLET_BUILT_IN_INSTANCE
             parsedInvidiousUrl = UrlUtils.ParseUrl(m.invidiousInstance)
             for i = 0 to adaptiveFormats.Count() - 1
+                if StringUtils.IsNullOrEmpty(adaptiveFormats[i].url)
+                    continue for
+                end if
                 parsedUrl = UrlUtils.ParseUrl(adaptiveFormats[i].url)
                 parsedInvidiousUrl.path = UrlUtils.AppendQueryParams(parsedUrl.path, { host: parsedUrl.host })
                 adaptiveFormats[i].url = UrlUtils.BuildUrlFromParts(parsedInvidiousUrl)
@@ -113,8 +116,8 @@ class DashManifest
                                     "value": `${stream.audioChannels}`
                                 })
 
-                                if stream.url = invalid
-                                    xml.Comment(`[ERROR] Stream.url is invalid for itag: ${stream.itag}`)
+                                if StringUtils.IsNullOrEmpty(stream.url)
+                                    xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
                                 else if stream.url.InStr("source=yt_live_broadcast") <> -1
                                     xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
                                 end if
