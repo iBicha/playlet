@@ -86,7 +86,8 @@ namespace Innertube
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         isLive = ValidBool(videoDetails["isLive"])
-        isLiveContent = ValidBool(videoDetails["isLiveContent"])
+        adaptiveFormats = ParseAdaptiveFormats(payload, signatureTimestamp, isLive, cancellation)
+        hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats)
 
         videoInfo = {
             "type": "video"
@@ -98,10 +99,10 @@ namespace Innertube
             "authorId": videoDetails["channelId"]
             "lengthSeconds": lengthSeconds
             "liveNow": isLive
-            "isLiveContent": isLiveContent
+            "hasLiveStreamingData": hasLiveStreamingData
             "hlsUrl": streamingData["hlsManifestUrl"]
             "dashUrl": streamingData["dashManifestUrl"]
-            "adaptiveFormats": ParseAdaptiveFormats(payload, signatureTimestamp, isLive or isLiveContent, cancellation)
+            "adaptiveFormats": adaptiveFormats
             "formatStreams": []
             "captions": ParseCaptions(payload)
             "recommendedVideos": []
@@ -509,5 +510,20 @@ namespace Innertube
             "videostatsPlaybackUrl": ObjectUtils.Dig(playbackTracking, ["videostatsPlaybackUrl", "baseUrl"])
             "videostatsWatchtimeUrl": ObjectUtils.Dig(playbackTracking, ["videostatsWatchtimeUrl", "baseUrl"])
         }
+    end function
+
+    function FormatsHaveLiveStreamingData(adaptiveFormats as object) as boolean
+        if not IsArray(adaptiveFormats)
+            return false
+        end if
+
+        for each fmt in adaptiveFormats
+            url = fmt["url"]
+            if IsString(url) and url.InStr("yt_live_broadcast") <> -1
+                return true
+            end if
+        end for
+
+        return false
     end function
 end namespace
