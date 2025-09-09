@@ -448,8 +448,9 @@ function ExecuteJob() as void
     ' input is an associative array set when the job is queued.
     input = JobGetInput()
 
-    value = DoWork(myVar)
+    value = DoWork(input.myVar)
 
+    ' optional
     JobSuccessData({result: value})
 end function
 ```
