@@ -28,18 +28,16 @@
   <div class="text-xs text-gray-500">{@html $translate(description)}</div>
 
   {#each options as option}
-    <div class="form-control">
-      <label class="label cursor-pointer">
-        <span class="label-text">{$translate(option.displayText)}</span>
-        <input
-          type="radio"
-          name={key}
-          value={option.value}
-          class="radio"
-          checked={value === option.value}
-          on:change={handleChange}
-        />
-      </label>
-    </div>
+    <label class="flex justify-between items-center py-2 cursor-pointer w-full">
+      <span class="label-text">{$translate(option.displayText)}</span>
+      <input
+        type="radio"
+        name={key}
+        value={option.value}
+        class="radio"
+        checked={value === option.value}
+        on:change={handleChange}
+      />
+    </label>
   {/each}
 </div>

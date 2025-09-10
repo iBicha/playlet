@@ -67,16 +67,17 @@
   <div class="flex items-center min-w-0">
     <ThemeSelect />
     {#if currentProfile && currentProfile.username}
-      <div
-        class="badge badge-outline min-w-0 max-w-[12rem] overflow-hidden whitespace-nowrap truncate px-0.5"
+      <button
+        class="badge badge-outline min-w-0 max-w-[12rem] overflow-hidden whitespace-nowrap truncate cursor-pointer"
         title={currentProfile.username}
+        on:click={showProfilesDialog}
       >
-        <span class="truncate">{currentProfile.username}</span>
-      </div>
+        <span class="truncate">{currentProfile.username} </span>
+      </button>
     {/if}
     <button
       on:click={showProfilesDialog}
-      class="btn btn-ghost btn-circle avatar overflow-hidden w-12 h-12"
+      class="btn btn-ghost btn-circle overflow-hidden w-12 h-12"
     >
       <ProfileAvatar profile={currentProfile} navbar={true} />
     </button>

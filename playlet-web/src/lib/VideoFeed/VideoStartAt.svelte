@@ -96,16 +96,17 @@
     {/if}
   </div>
   {#if lengthSeconds && checked}
-    <input
-      type="range"
-      min="0"
-      max={lengthSeconds}
-      bind:value={timestampRange}
-      on:input={(e) => {
-        // @ts-ignore
-        timestamp = e.currentTarget.value;
-      }}
-      class="range range-xs range-primary"
-    />
+    <div class="w-full">
+      <input
+        type="range"
+        min="0"
+        max={lengthSeconds}
+        bind:value={timestampRange}
+        on:input={(e) => {
+          timestamp = parseInt(e.currentTarget.value);
+        }}
+        class="range range-xs range-primary w-full"
+      />
+    </div>
   {/if}
 </div>

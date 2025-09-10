@@ -129,7 +129,7 @@
         {#each Object.keys(qualityLabels) as quality}
           <tr>
             <td>
-              <label class="label p-0 cursor-pointer">
+              <div class="flex justify-between items-center w-full">
                 <div class="label-text text-lg">
                   {$translate(qualityLabels[quality])}
                 </div>
@@ -139,7 +139,7 @@
                   on:change={(e) => onChange(e, quality)}
                   class="toggle toggle-primary"
                 />
-              </label>
+              </div>
             </td>
           </tr>
         {/each}

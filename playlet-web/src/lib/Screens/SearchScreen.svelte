@@ -131,37 +131,55 @@
           await searchVideos("");
         }}
       >
-        <div class="join w-full border border-neutral rounded-full">
-          <input
-            type="search"
-            dir="auto"
-            placeholder="{$translate('Search')}..."
-            class="join-item input w-full border border-neutral rounded-full"
-            bind:this={searchBox}
-            bind:value={searchBoxText}
-            on:input={searchSuggestions}
-            on:focus={searchSuggestions}
-            on:blur={() => {
-              // A delay before clearing the suggestions allows the user to click on a suggestion
-              // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
-              setTimeout(() => {
-                suggestions = { suggestions: [] };
-              }, 200);
-            }}
-          />
-          <button
-            type="button"
-            class="join-item btn w-16"
-            on:click={async () => {
-              page = 1;
-              videos = [];
-              await searchVideos("");
-            }}
-          >
-            <div class="h-6">
-              <SearchThinIcon />
-            </div>
-          </button>
+        <div class="relative w-full">
+          <div class="join w-full">
+            <input
+              type="search"
+              dir="auto"
+              placeholder="{$translate('Search')}..."
+              class="join-item input w-full border border-neutral focus:outline-none focus:ring-0 rounded-l-full rounded-r-none"
+              bind:this={searchBox}
+              bind:value={searchBoxText}
+              on:input={searchSuggestions}
+              on:focus={searchSuggestions}
+              on:blur={() => {
+                // A delay before clearing the suggestions allows the user to click on a suggestion
+                // Clicking the suggestion will trigger the blur event immediately, and the search won't happen
+                setTimeout(() => {
+                  suggestions = { suggestions: [] };
+                }, 200);
+              }}
+            />
+            <button
+              type="button"
+              class="join-item btn border border-neutral border-l-0 rounded-l-none rounded-r-full"
+              on:click={async () => {
+                page = 1;
+                videos = [];
+                await searchVideos("");
+              }}
+            >
+              <div class="h-6">
+                <SearchThinIcon />
+              </div>
+            </button>
+          </div>
+          {#if suggestions.suggestions.length > 0}
+            <ul
+              class="absolute left-0 right-0 mt-1 dropdown-content menu z-20 p-2 shadow-xl bg-base-200 rounded-box"
+            >
+              {#each suggestions.suggestions as suggestion}
+                <li class="p-1">
+                  <button
+                    type="button"
+                    on:click={async (e) => {
+                      await suggestionClicked(e.currentTarget.innerText);
+                    }}>{@html suggestion}</button
+                  >
+                </li>
+              {/each}
+            </ul>
+          {/if}
         </div>
         <button
           type="button"
@@ -173,23 +191,6 @@
           </div>
           {searchFiltersLabel}
         </button>
-
-        {#if suggestions.suggestions.length > 0}
-          <ul
-            class="dropdown-content menu z-10 p-2 shadow-xl bg-base-200 rounded-box"
-          >
-            {#each suggestions.suggestions as suggestion}
-              <li class="p-1">
-                <button
-                  type="button"
-                  on:click={async (e) => {
-                    await suggestionClicked(e.currentTarget.innerText);
-                  }}>{@html suggestion}</button
-                >
-              </li>
-            {/each}
-          </ul>
-        {/if}
       </form>
     </search>
   </div>

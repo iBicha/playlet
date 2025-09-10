@@ -113,18 +113,18 @@
                   </button>
                 </div>
               </td>
-              <td>
-                <label class="label p-0 cursor-pointer">
-                  <div class="label-text">
-                    {$translate(homeLayout[item.id].title)}
-                  </div>
-                  <input
-                    type="checkbox"
-                    name={item.id}
-                    bind:checked={item.enabled}
-                    class="toggle toggle-primary"
-                  />
-                </label>
+              <td class="w-full">
+                <div class="label-text m-2">
+                  {$translate(homeLayout[item.id].title)}
+                </div>
+              </td>
+              <td class="text-right">
+                <input
+                  type="checkbox"
+                  name={item.id}
+                  bind:checked={item.enabled}
+                  class="toggle toggle-primary"
+                />
               </td>
               <td class="text-right">
                 <div class="tooltip" data-tip="Move down">

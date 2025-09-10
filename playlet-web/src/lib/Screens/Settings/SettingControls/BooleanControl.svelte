@@ -22,7 +22,7 @@
 </script>
 
 <div class="form-control m-5">
-  <label class="label p-0 cursor-pointer">
+  <label class="flex justify-between items-center p-0 cursor-pointer w-full">
     <div class="label-text {textSizes[level]}">{$translate(displayText)}</div>
     <input
       type="checkbox"
