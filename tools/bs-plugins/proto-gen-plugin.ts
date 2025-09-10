@@ -83,7 +83,7 @@ ${this.generateDecodeFunctions(protoSchema, fullNameSpace)}
 end namespace
 end namespace
 end namespace
-`;
+`.replace(/\n{3,}/g, '\n\n');
 
     return content;
   }
@@ -146,6 +146,17 @@ end function`;
     const enums = this.getAllEnums(protoSchema).map((enumType: any) => enumType.name);
     function generateEncodeFunction(message: any): string {
       const innerTypes = message.messages.map((msg: any) => msg.name);
+      const encodeFieldNames = message.fields.map((field: any) => field.name);
+      const validateFields = `#if DEBUG
+        fieldNames = {
+          ${encodeFieldNames.map((name: string) => `"${name}": true`).join('\n')}
+        }
+        for each key in message
+          if not fieldNames.DoesExist(key)
+            throw "Unknown field: " + key + " in message ${message.name}"
+          end if
+        end for
+      #end if`;
       const encodeFields = message.fields.map((field: any) => {
         let fieldEncode = `if message.DoesExist("${field.name}")\n`;
 
@@ -172,6 +183,7 @@ end function`;
       }).join('\n');
 
       return `function encode${message.name}(message as dynamic, asByteArray = false as boolean) as dynamic
+${validateFields}
 buffer = CreateObject("roByteArray")
 writer = new Protobuf.BinaryWriter()
 writer.SetBuffer(buffer)
