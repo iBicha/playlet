@@ -2,6 +2,7 @@
   import { playletStateStore, translate } from "lib/Stores";
   import { PlayletApi } from "./Api/PlayletApi";
   import { get } from "svelte/store";
+  import ProfileAvatar from "./ProfileAvatar.svelte";
 
   export function show() {
     modal.showModal();
@@ -97,24 +98,10 @@
             bind:group={accordionState}
           />
           <div class="collapse-title flex">
-            <div>
-              <div class="avatar placeholder">
-                <div
-                  class="rounded-full w-12 {profile.id === currentProfile?.id
-                    ? 'ring ring-primary ring-offset-base-100 ring-offset-2'
-                    : ''} "
-                  style="background-color: {profile.color}"
-                >
-                  {#if profile.type === "youtube" && profile.thumbnail}
-                    <img src={profile.thumbnail} alt="Avatar" />
-                  {:else}
-                    <span class="text-xl font-medium text-gray-200"
-                      >{profile.username.substring(0, 1).toUpperCase()}</span
-                    >
-                  {/if}
-                </div>
-              </div>
-            </div>
+            <ProfileAvatar
+              {profile}
+              selected={profile.id === currentProfile?.id}
+            />
             <div class="ml-4">
               <div class="font-medium">
                 {profile.username}

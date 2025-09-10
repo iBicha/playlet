@@ -4,14 +4,12 @@ namespace Http
 
     class CorsMiddleware extends HttpRouter
         private origin
-        private headers
         private methods
 
-        function new(origin = "*" as string, headers = "*" as string, methods = "POST, PUT, GET, DELETE, OPTIONS" as string)
+        function new(origin = "*" as string, methods = "POST, PUT, GET, DELETE, OPTIONS" as string)
             super()
 
             m.origin = origin
-            m.headers = headers
             m.methods = methods
         end function
 
@@ -24,12 +22,13 @@ namespace Http
                 response.headers["Access-Control-Allow-Origin"] = m.origin
             end if
 
-            if not StringUtils.IsNullOrEmpty(m.headers)
-                response.headers["Access-Control-Allow-Headers"] = m.headers
-            end if
-
             if not StringUtils.IsNullOrEmpty(m.methods)
                 response.headers["Access-Control-Allow-Methods"] = m.methods
+            end if
+
+            allowHeaders = request.headers["Access-Control-Request-Headers"]
+            if not StringUtils.IsNullOrEmpty(allowHeaders)
+                response.headers["Access-Control-Allow-Headers"] = allowHeaders
             end if
 
             if request.method = "OPTIONS"

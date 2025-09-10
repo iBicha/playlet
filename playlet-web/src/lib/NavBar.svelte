@@ -52,36 +52,33 @@
   }
 </script>
 
-<div class="navbar bg-base-100 sticky top-0 z-40">
-  <div class="flex-1">
-    <div class="flex flex-col justify-center items-center">
-      <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
-        {#if $appThemeStore === "dark"}
-          <PlayletLogoDark />
-        {:else}
-          <PlayletLogoLight />
-        {/if}
-      </button>
-      <div class="text-xs brightness-75">{version}</div>
-    </div>
+<div class="bg-base-100 sticky top-0 z-40 flex items-center min-w-0 px-2 h-16">
+  <div class="flex flex-col items-center justify-center min-w-0 mr-2">
+    <button on:click={() => ExternalControlProtocol.launchApp(appId)}>
+      {#if $appThemeStore === "dark"}
+        <PlayletLogoDark />
+      {:else}
+        <PlayletLogoLight />
+      {/if}
+    </button>
+    <div class="text-xs brightness-75">{version}</div>
   </div>
-  <div class="flex-none">
+  <div class="flex-1"></div>
+  <div class="flex items-center min-w-0">
     <ThemeSelect />
     {#if currentProfile && currentProfile.username}
-      <div class="badge badge-outline">
-        <span>
-          <!-- TODO:P2 use text-ellipsis -->
-          {currentProfile.username.length > 10
-            ? `${currentProfile.username.slice(0, 10)}…`
-            : currentProfile.username}
-        </span>
+      <div
+        class="badge badge-outline min-w-0 max-w-[12rem] overflow-hidden whitespace-nowrap truncate px-0.5"
+        title={currentProfile.username}
+      >
+        <span class="truncate">{currentProfile.username}</span>
       </div>
     {/if}
     <button
       on:click={showProfilesDialog}
-      class="btn btn-ghost btn-circle avatar"
+      class="btn btn-ghost btn-circle avatar overflow-hidden w-12 h-12"
     >
-      <ProfileAvatar />
+      <ProfileAvatar profile={currentProfile} navbar={true} />
     </button>
   </div>
 </div>
