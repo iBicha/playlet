@@ -12,6 +12,8 @@
   export let videoCountText: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
   export let updated: number | undefined = undefined;
+  // videoId is Mix continuation (playlistId starts with "RD")
+  export let videoId: string | undefined = undefined;
   export let lines: string[] | undefined = undefined;
 
   // svelte-ignore unused-export-let
@@ -112,4 +114,5 @@
   bind:videoCount
   bind:videoCountText
   bind:videos
+  bind:videoId
 />

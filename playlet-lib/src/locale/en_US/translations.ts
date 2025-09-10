@@ -1185,6 +1185,10 @@
         <translation>Open in Invidious</translation>
     </message>
     <message>
+        <source>Open in YouTube</source>
+        <translation>Open in YouTube</translation>
+    </message>
+    <message>
         <source>Start at</source>
         <translation>Start at</translation>
     </message>

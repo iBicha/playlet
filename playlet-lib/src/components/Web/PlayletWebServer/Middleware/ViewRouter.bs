@@ -21,10 +21,16 @@ namespace Http
             response = context.response
 
             playlistId = request.query.playlistId
+            ' Mix continuation (playlistId starts with "RD")
+            videoId = request.query.videoId
             authorId = request.query.authorId
 
             if not StringUtils.IsNullOrEmpty(playlistId)
-                contentNode = InvidiousContent.ToPlaylistContentNode(invalid, { playlistId: playlistId }, invalid)
+                content = { playlistId: playlistId }
+                if playlistId.startsWith("RD") and not StringUtils.IsNullOrEmpty(videoId)
+                    content.videoId = videoId
+                end if
+                contentNode = InvidiousContent.ToPlaylistContentNode(invalid, content, invalid)
                 PlaylistUtils.Open(contentNode, m.appController)
                 if VideoQueueUtils.IsVideoPlayerOpen(m.videoQueue) and VideoQueueUtils.IsVideoPlayerFullScreen(m.videoQueue)
                     VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)

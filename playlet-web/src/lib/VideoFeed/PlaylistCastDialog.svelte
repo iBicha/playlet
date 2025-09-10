@@ -9,6 +9,8 @@
   export let videoCountText: string | undefined = undefined;
   export let playlistThumbnail: string | undefined = undefined;
   export let videos: any[] | undefined = undefined;
+  // videoId is Mix continuation (playlistId starts with "RD")
+  export let videoId: string | undefined = undefined;
 
   export function show() {
     modal.showModal();
@@ -42,11 +44,28 @@
   }
 
   async function openOnTv() {
-    await PlayletApi.openPlaylist(playlistId);
+    const continuationVideoId =
+      playlistId.startsWith("RD") && videoId ? videoId : undefined;
+    await PlayletApi.openPlaylist(playlistId, continuationVideoId);
   }
 
   function openInvidious() {
-    let url = `${invidiousInstanceForRedirect}/playlist?list=${playlistId}`;
+    const continuationVideoId =
+      playlistId.startsWith("RD") && videoId ? videoId : undefined;
+    let url = `${invidiousInstanceForRedirect}/mix?list=${playlistId}`;
+    if (continuationVideoId) {
+      url += `&continuation=${continuationVideoId}`;
+    }
+    window.open(url);
+  }
+
+  function openYouTube() {
+    let url = "https://www.youtube.com";
+    if (videoId && playlistId.startsWith("RD")) {
+      url += `/watch?v=${videoId}&list=${playlistId}`;
+    } else {
+      url += `/playlist?list=${playlistId}`;
+    }
     window.open(url);
   }
 
@@ -59,6 +78,7 @@
       videoCount,
       videoCountText,
       videos,
+      videoId,
     };
   }
 
@@ -118,6 +138,9 @@
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
           {$translate("Open in Invidious")}
+        </button>
+        <button class="btn join-item hover:btn-accent" on:click={openYouTube}>
+          {$translate("Open in YouTube")}
         </button>
         <button class="btn join-item hover:btn-accent"
           >{$translate("Cancel")}</button

@@ -204,10 +204,10 @@
         const newVideos = items;
 
         newVideos.forEach((item) => {
-          if (item.videoId) {
-            item.type = "video";
-          } else if (item.playlistId) {
+          if (item.playlistId) {
             item.type = "playlist";
+          } else if (item.videoId) {
+            item.type = "video";
           }
         });
 

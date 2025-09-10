@@ -128,11 +128,15 @@ export class PlayletApi {
         await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
     }
 
-    static async openPlaylist(playlistId) {
+    static async openPlaylist(playlistId, continuationVideoId) {
         if (!playlistId) {
             return;
         }
-        await fetch(`${PlayletApi.host()}/api/view/open?playlistId=${playlistId}`);
+        let url = `${PlayletApi.host()}/api/view/open?playlistId=${playlistId}`;
+        if (continuationVideoId) {
+            url += `&videoId=${continuationVideoId}`;
+        }
+        await fetch(url);
     }
 
     static async openChannel(authorId) {

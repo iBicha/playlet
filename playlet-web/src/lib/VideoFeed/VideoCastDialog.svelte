@@ -81,6 +81,14 @@
     window.open(url);
   }
 
+  function openYouTube() {
+    let url = `https://www.youtube.com/watch?v=${videoId}`;
+    if (videoStartAtChecked && videoStartAtTimestamp) {
+      url += `&t=${videoStartAtTimestamp}`;
+    }
+    window.open(url);
+  }
+
   function getVideoInfo() {
     const timestamp = videoStartAtChecked ? videoStartAtTimestamp : undefined;
     return {
@@ -153,6 +161,9 @@
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
           {$translate("Open in Invidious")}
+        </button>
+        <button class="btn join-item hover:btn-accent" on:click={openYouTube}>
+          {$translate("Open in YouTube")}
         </button>
         <button class="btn join-item hover:btn-accent"
           >{$translate("Cancel")}</button

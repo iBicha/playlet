@@ -7,12 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- "Open In YouTube" button in web app cast dialog
+
 ### Fixed
 
 - Bug in dash storyboard
 - Adjust live video detection to reduce error rate happening on iOS client
 - Bug when parsing headers in telemetry
 - Web app fixes and dependency updates
+- Bug when casting a mix from web app
 
 ## [0.41.8] - 2025-09-07
 

@@ -36,6 +36,11 @@
     let url = `${invidiousInstanceForRedirect}/channel/${authorId}`;
     window.open(url);
   }
+
+  function openYouTube() {
+    let url = `https://www.youtube.com/channel/${authorId}`;
+    window.open(url);
+  }
 </script>
 
 <dialog bind:this={modal} class="modal">
@@ -55,6 +60,9 @@
         </button>
         <button class="btn join-item hover:btn-accent" on:click={openInvidious}>
           {$translate("Open in Invidious")}
+        </button>
+        <button class="btn join-item hover:btn-accent" on:click={openYouTube}>
+          {$translate("Open in YouTube")}
         </button>
         <button class="btn join-item hover:btn-accent"
           >{$translate("Cancel")}</button
