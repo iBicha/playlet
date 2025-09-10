@@ -39,7 +39,6 @@ namespace Http
             m.request = new HttpRequest()
             m.header = invalid
             m.response = invalid
-            m.header_only = false
             m.close = true
             m.ws_upgrade = false
             m.SetState(Http.HttpConnectionState.INIT)
@@ -122,17 +121,13 @@ namespace Http
             end if
 
             if m.response.DoneHeader()
-                if m.response.header_only
-                    m.SetState(Http.HttpConnectionState.DONE)
-                else
-                    m.SetState(Http.HttpConnectionState.SEND_RESPONSE)
-                    m.PollResponse(server)
-                end if
+                m.SetState(Http.HttpConnectionState.SEND_RESPONSE)
+                m.PollResponse(server)
             end if
         end function
 
         function PollResponse(server as HttpServer)
-            if m.state <> Http.HttpConnectionState.SEND_RESPONSE or m.response.header_only
+            if m.state <> Http.HttpConnectionState.SEND_RESPONSE
                 LogError("illegal response state @" + m.client)
             end if
 
