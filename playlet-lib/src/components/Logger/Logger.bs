@@ -129,11 +129,16 @@ end function
 
 function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
     info = event.getInfo()
-    line = FormatTime(dateTime) + "[WARN][AppMonitorMemory] " + ToString(info)
+    message = "[WARN][AppMonitorMemory] " + ToString(info)
+    line = FormatTime(dateTime) + message
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
-    m.global.telemetry.LogWarn = line
+    LogTelemetryEvent({
+        level: "warning"
+        message: line
+        fingerprint: [message]
+    })
 end function
 
 function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
@@ -148,11 +153,16 @@ function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, l
     end if
     m.lastDeviceInfoMemoryLevel = info.generalMemoryLevel
 
-    line = FormatTime(dateTime) + "[WARN][DeviceInfoMemory] " + ToString(info)
+    message = "[WARN][DeviceInfoMemory] " + ToString(info)
+    line = FormatTime(dateTime) + message
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
-    m.global.telemetry.LogWarn = line
+    LogTelemetryEvent({
+        level: "warning"
+        message: line
+        fingerprint: [message]
+    })
 end function
 
 ' Note: although the timestamp should be captured in the caller, not the logger,
