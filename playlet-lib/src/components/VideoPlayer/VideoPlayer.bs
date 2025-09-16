@@ -460,7 +460,12 @@ function OnVideoPlayerStateChange() as void
                 content.playletStreamUrlIndex = playletStreamUrlIndex
                 if playletStreamUrlIndex < playletStreamUrls.Count()
                     nextUrl = playletStreamUrls[playletStreamUrlIndex]
-                    LogError(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+                    LogErrorNoTelemetry(`Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`)
+                    LogTelemetryEvent({
+                        level: "error"
+                        message: `Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`
+                        fingerprint: ["Stream <URL> failed to play. Trying next stream <URL>"]
+                    })
 
                     if StringUtils.IsNullOrEmpty(nextUrl)
                         LogError("Next stream URL is empty, cannot try next stream")
