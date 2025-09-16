@@ -1,7 +1,8 @@
 import "pkg:/source/services/HttpClient.bs"
 
-const SENTRY_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4509923579265024/envelope/"
-const SENTRY_KEY = "0bda23ffe3634745f57a0edbffdd18be"
+const SENTRY_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/envelope"
+
+const SUPPORTS_ATTACHMENTS = false
 
 namespace Sentry
 
@@ -27,6 +28,17 @@ namespace Sentry
                 event.timestamp = timestamp
             end if
 
+            message = event.message
+
+            hasAttachments = IsArray(event.attachments) and event.attachments.Count() > 0
+
+            if (not SUPPORTS_ATTACHMENTS) and hasAttachments
+                message += `\nAttachments:`
+                for each attachment in event.attachments
+                    message += `\nAttachment: ${attachment.filename} (${attachment.content_type})\n${attachment.data}`
+                end for
+            end if
+
             eventPayload = {
                 event_id: event.event_id
                 timestamp: event.timestamp
@@ -40,7 +52,7 @@ namespace Sentry
                 tags: event.tags
                 level: event.level
                 logentry: {
-                    formatted: event.message
+                    formatted: message
                 }
                 user: {
                     id: event.userId
@@ -57,7 +69,7 @@ namespace Sentry
 
             payload += FormatJson(eventPayload) + `\n`
 
-            if IsArray(event.attachments)
+            if SUPPORTS_ATTACHMENTS and hasAttachments
                 tmpBuffer = CreateObject("roByteArray")
                 for each attachment in event.attachments
                     data = attachment.data
@@ -73,7 +85,6 @@ namespace Sentry
         end for
 
         request = HttpClient.Post(SENTRY_ENVELOPE_URL, payload)
-        request.QueryParam("sentry_key", SENTRY_KEY)
         request.Header("Content-Type", "application/x-sentry-envelope")
         response = request.Await()
         if not response.IsSuccess()
@@ -81,16 +92,12 @@ namespace Sentry
                 LogErrorNoTelemetry("Failed to send event to Sentry:", response.ErrorMessage(), `\nHeaders:`, response.Headers())
             #end if
 
-            statusCode = response.StatusCode()
-            if statusCode = 429
-                retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
-                LogErrorNoTelemetry("Rate limited by Sentry. Retry after", retryAfter, "seconds")
-                if retryAfter = 0
-                    retryAfter = 60
-                end if
-                return retryAfter
+            retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
+            LogErrorNoTelemetry("Rate limited by Sentry. Retry after", retryAfter, "seconds")
+            if retryAfter = 0
+                retryAfter = 60
             end if
-            return 0
+            return retryAfter
         end if
 
         LogDebug("Sent events to Sentry. Response:", response.Text())

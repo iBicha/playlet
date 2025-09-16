@@ -1,3 +1,5 @@
+#const SUPPORTS_BATCHING = true
+
 import "pkg:/components/Telemetry/Sentry.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
@@ -48,10 +50,12 @@ function TelemetryLoop() as void
     m.top.observeField("LogError", msgPort)
     m.top.observeField("LogEvent", msgPort)
 
-    ' debouceMs = 2000
-    ' debounceCountLimit = 20
-    ' debounceTimeLimit = 5000
-    ' debounceTimer = CreateObject("roTimeSpan")
+    #if SUPPORTS_BATCHING
+        debouceMs = 2000
+        debounceCountLimit = 20
+        debounceTimeLimit = 5000
+        debounceTimer = CreateObject("roTimeSpan")
+    #end if
 
     retryAfter = 0
     retryAfterTimer = CreateObject("roTimeSpan")
@@ -78,25 +82,26 @@ function TelemetryLoop() as void
 
         messages.Push(msg)
 
-        ' Sentry might not support batching yet for errors, but maybe for logs
-        ' debounceTimer.Mark()
-        ' while true
-        '     LogDebug("Waiting for more messages...")
-        '     msg = wait(debouceMs, msgPort)
-        '     if msg = invalid
-        '         LogDebug("No more messages")
-        '         exit while
-        '     end if
-        '     messages.Push(msg)
-        '     if messages.Count() >= debounceCountLimit
-        '         LogDebug("Reached debounce count limit")
-        '         exit while
-        '     end if
-        '     if debounceTimer.TotalMilliseconds() >= debounceTimeLimit
-        '         LogDebug("Reached debounce time limit")
-        '         exit while
-        '     end if
-        ' end while
+        #if SUPPORTS_BATCHING
+            debounceTimer.Mark()
+            while true
+                LogDebug("Waiting for more messages...")
+                msg = wait(debouceMs, msgPort)
+                if msg = invalid
+                    LogDebug("No more messages")
+                    exit while
+                end if
+                messages.Push(msg)
+                if messages.Count() >= debounceCountLimit
+                    LogDebug("Reached debounce count limit")
+                    exit while
+                end if
+                if debounceTimer.TotalMilliseconds() >= debounceTimeLimit
+                    LogDebug("Reached debounce time limit")
+                    exit while
+                end if
+            end while
+        #end if
 
         events.Clear()
         for each msg in messages
