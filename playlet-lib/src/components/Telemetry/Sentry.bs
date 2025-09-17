@@ -60,11 +60,16 @@ namespace Sentry
             }
 
             if event.fingerprint <> invalid
-                if IsString(event.fingerprint)
-                    eventPayload.fingerprint = [event.fingerprint]
-                else if IsArray(event.fingerprint)
-                    eventPayload.fingerprint = event.fingerprint
+                fingerprint = event.fingerprint
+                if not IsArray(fingerprint)
+                    fingerprint = [fingerprint]
                 end if
+                for i = 0 to fingerprint.Count() - 1
+                    if not IsString(fingerprint[i])
+                        fingerprint[i] = ToString(fingerprint[i])
+                    end if
+                end for
+                eventPayload.fingerprint = fingerprint
             end if
 
             payload += FormatJson(eventPayload) + `\n`
