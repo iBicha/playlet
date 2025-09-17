@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.41.10] - 2025-09-16
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Disabled event batching
 
 ## [0.41.9] - 2025-09-16
 
