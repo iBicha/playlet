@@ -86,8 +86,18 @@ namespace Innertube
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         isLive = ValidBool(videoDetails["isLive"])
-        adaptiveFormats = ParseAdaptiveFormats(payload, signatureTimestamp, isLive, cancellation)
-        hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats)
+
+        adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
+        formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
+
+        if not isLive
+            DecipherUrls(formats, adaptiveFormats, signatureTimestamp, cancellation)
+        end if
+
+        hasLiveStreamingData = FormatsHaveLiveStreamingData(formats, adaptiveFormats)
+
+        adaptiveFormats = TransformFormats(adaptiveFormats)
+        formats = TransformFormats(formats)
 
         videoInfo = {
             "type": "video"
@@ -103,7 +113,7 @@ namespace Innertube
             "hlsUrl": streamingData["hlsManifestUrl"]
             "dashUrl": streamingData["dashManifestUrl"]
             "adaptiveFormats": adaptiveFormats
-            "formatStreams": []
+            "formatStreams": formats
             "captions": ParseCaptions(payload)
             "recommendedVideos": []
         }
@@ -296,25 +306,14 @@ namespace Innertube
         return captions
     end function
 
-    function ParseAdaptiveFormats(payload as object, signatureTimestamp as dynamic, isLive as boolean, cancellation as object) as object
-        adaptiveFormats = ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"])
-        if not IsArray(adaptiveFormats)
-            return []
-        end if
-
-        if not isLive
-            adaptiveFormats = DecipherUrls(adaptiveFormats, signatureTimestamp, cancellation)
-        end if
-
-        formats = []
-        for each fmt in adaptiveFormats
-            formats.Push(GetAdaptiveFormat(fmt))
+    function TransformFormats(formats as object) as object
+        for i = 0 to formats.Count() - 1
+            formats[i] = TransformFormat(formats[i])
         end for
-
         return formats
     end function
 
-    function GetAdaptiveFormat(fmt as object) as object
+    function TransformFormat(fmt as object) as object
         itag = `${fmt["itag"]}`
         result = {
             "bitrate": `${fmt["bitrate"]}`
@@ -396,24 +395,34 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as object
+    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as void
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
-            return adaptiveFormats
+            return
         end if
 
-        formats = []
-        for each fmt in adaptiveFormats
-            formats.push({
+        reqFormats = []
+        for each fmt in formats
+            reqFormats.push({
                 "url": fmt["url"]
                 "cipher": fmt["cipher"]
                 "signatureCipher": fmt["signatureCipher"]
             })
         end for
 
-        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v1/decipher`, {
+        reqAdaptiveFormats = []
+        for each fmt in adaptiveFormats
+            reqAdaptiveFormats.push({
+                "url": fmt["url"]
+                "cipher": fmt["cipher"]
+                "signatureCipher": fmt["signatureCipher"]
+            })
+        end for
+
+        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, {
             "sts": signatureTimestamp
-            "formats": formats
+            "formats": reqFormats
+            "adaptiveFormats": reqAdaptiveFormats
         })
         request.Cancellation(cancellation)
 
@@ -445,27 +454,36 @@ namespace Innertube
         end if
 
         json = response.Json()
-        if not IsAssociativeArray(json) or not json.DoesExist("formats")
+        if not IsAssociativeArray(json) or not json.DoesExist("formats") or not json.DoesExist("adaptiveFormats")
             error = "Invalid response from decipher service"
             LogError(error)
             throw error
         end if
 
         decipheredFormats = json["formats"]
-        if not IsArray(decipheredFormats) or decipheredFormats.Count() <> adaptiveFormats.Count()
+        if not IsArray(decipheredFormats) or decipheredFormats.Count() <> formats.Count()
             error = "Invalid formats in deciphered response"
             LogError(error)
             throw error
         end if
-
         for i = 0 to decipheredFormats.Count() - 1
-            fmt = adaptiveFormats[i]
+            fmt = formats[i]
             decipheredFmt = decipheredFormats[i]
 
             fmt["url"] = decipheredFmt["url"]
         end for
 
-        return adaptiveFormats
+        decipheredAdaptiveFormats = json["adaptiveFormats"]
+        if not IsArray(decipheredAdaptiveFormats) or decipheredAdaptiveFormats.Count() <> adaptiveFormats.Count()
+            error = "Invalid adaptiveFormats in deciphered response"
+            LogError(error)
+            throw error
+        end if
+        for i = 0 to decipheredAdaptiveFormats.Count() - 1
+            fmt = adaptiveFormats[i]
+            decipheredFmt = decipheredAdaptiveFormats[i]
+            fmt["url"] = decipheredFmt["url"]
+        end for
     end function
 
     function ParseIsLoggedIn(payload as object) as boolean
@@ -512,17 +530,24 @@ namespace Innertube
         }
     end function
 
-    function FormatsHaveLiveStreamingData(adaptiveFormats as object) as boolean
-        if not IsArray(adaptiveFormats)
-            return false
+    function FormatsHaveLiveStreamingData(formats as object, adaptiveFormats as object) as boolean
+        if IsArray(adaptiveFormats)
+            for each fmt in adaptiveFormats
+                url = fmt["url"]
+                if IsString(url) and url.InStr("yt_live_broadcast") <> -1
+                    return true
+                end if
+            end for
         end if
 
-        for each fmt in adaptiveFormats
-            url = fmt["url"]
-            if IsString(url) and url.InStr("yt_live_broadcast") <> -1
-                return true
-            end if
-        end for
+        if IsArray(formats)
+            for each fmt in formats
+                url = fmt["url"]
+                if IsString(url) and url.InStr("yt_live_broadcast") <> -1
+                    return true
+                end if
+            end for
+        end if
 
         return false
     end function

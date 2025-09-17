@@ -97,6 +97,12 @@ function ExecuteJob() as void
     end if
 
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
+    if streamUrls.Count() = 0
+        contentNode.addFields({ metadata: metadata })
+        JobError("No playable streams found for this video.")
+        return
+    end if
+
     ' Forwarding query params to HLS playlists is not needed. In fact, it can cause issues
     ' because the playlist is limited to 4MB, and on large playlists the query params
     ' significantly increase the size of the playlist, making it cropped.
@@ -126,16 +132,44 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
 
     streamUrls = []
 
-    if not StringUtils.IsNullOrEmpty(metadata.hlsUrl)
+    if SupportsHls(metadata)
         metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
         AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
-    else
-        ' Not that we're using dashUrl, but why not, it useful when testing it
-        metadata.dashUrl = AddInstanceToUrlIfNeeded(metadata.dashUrl, instance)
+    else if SupportsDash(metadata)
         AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
+    else if SupportsMuxedFormats(metadata)
+        for each stream in metadata.formatStreams
+            if StringUtils.IsNullOrEmpty(stream.url)
+                continue for
+            end if
+            stream.url = AddInstanceToUrlIfNeeded(stream.url, instance)
+            streamUrls.push(stream.url)
+        end for
     end if
 
     return streamUrls
+end function
+
+function SupportsHls(metadata as object) as boolean
+    return not StringUtils.IsNullOrEmpty(metadata.hlsUrl)
+end function
+
+function SupportsDash(metadata as object) as boolean
+    if not IsArray(metadata.adaptiveFormats) or metadata.adaptiveFormats.Count() = 0
+        return false
+    end if
+
+    for each fmt in metadata.adaptiveFormats
+        if not StringUtils.IsNullOrEmpty(fmt.url)
+            return true
+        end if
+    end for
+
+    return false
+end function
+
+function SupportsMuxedFormats(metadata as object) as boolean
+    return IsArray(metadata.formatStreams) and metadata.formatStreams.Count() > 0
 end function
 
 function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer)
