@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Try fetching multiple pages in the search, in case results are filtered out (e.g. shorts)
 - Regression for `Attempt to play the next video when errors occur`
+- Better handling for lounge lost sessions
 
 ## [0.41.13] - 2025-09-18
 
