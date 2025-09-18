@@ -35,6 +35,10 @@ namespace Innertube
     end function
 
     function ParseInnertubeNextResponse(payload as object, parsedResponse as object, httpResponse as object) as object
+        if not IsArray(parsedResponse["recommendedVideos"])
+            parsedResponse["recommendedVideos"] = []
+        end if
+
         if not IsAssociativeArray(payload)
             LogWarn("Invalid payload", payload)
             return parsedResponse
@@ -58,11 +62,6 @@ namespace Innertube
             if not StringUtils.IsNullOrEmpty(subtitle)
                 parsedResponse.author = subtitle
             end if
-        end if
-
-        if not IsArray(parsedResponse.recommendedVideos)
-            LogWarn("Invalid recommended videos", parsedResponse.recommendedVideos)
-            return parsedResponse
         end if
 
         endscreen = playerOverlayRenderer["endScreen"]
