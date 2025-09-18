@@ -32,9 +32,14 @@ namespace Innertube
 
         Innertube.ParseNode(containers, context)
 
-        if context.currentFeed <> invalid and (context.currentFeed.items.Count() > 0 or context.currentFeed.title <> "")
-            context.feeds.Push(context.currentFeed)
-            context.currentFeed = invalid
+        if context.currentFeed <> invalid
+            hasTitle = context.currentFeed.title <> ""
+            hasItems = context.currentFeed.items.Count() > 0
+            hasContinuation = context.currentFeed.DoesExist("continuation")
+            if hasTitle or hasItems or hasContinuation
+                context.feeds.Push(context.currentFeed)
+                context.currentFeed = invalid
+            end if
         end if
         return context.feeds
     end function

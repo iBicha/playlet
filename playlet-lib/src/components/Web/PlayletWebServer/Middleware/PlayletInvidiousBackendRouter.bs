@@ -420,31 +420,59 @@ namespace Http
                 options.continuation = continuation
             end if
 
-            result = InnertubeService.Search(query, options)
+            fetchedPages = 0
+            while true
+                ' Content can be filtered (for example, shorts removed)
+                ' so we could be fetching multiple pages.
+                if fetchedPages > 3
+                    response.Json({
+                        "error": "Failed to search: no results found"
+                    })
+                    response.http_code = 500
+                    return true
+                end if
+                result = InnertubeService.Search(query, options)
+                fetchedPages += 1
 
-            if raw
-                response.Json(result)
-                return true
-            end if
+                if raw
+                    response.Json(result)
+                    return true
+                end if
 
-            if result.error <> invalid
-                response.Json(result)
-                response.http_code = 500
-                return true
-            end if
+                if result.error <> invalid
+                    response.Json(result)
+                    response.http_code = 500
+                    return true
+                end if
 
-            if not IsArray(result.feeds) or result.feeds.Count() = 0
-                response.Json({
-                    "error": "Failed to search: no results found"
-                })
-                response.http_code = 500
-                return true
-            end if
+                if not IsArray(result.feeds) or result.feeds.Count() = 0
+                    response.Json({
+                        "error": "Failed to search: no results found"
+                    })
+                    response.http_code = 500
+                    return true
+                end if
 
-            response.Json(result.feeds[0])
-            if result.DoesExist("cache-control")
-                response.headers["cache-control"] = result["cache-control"]
-            end if
+                feed = result.feeds[0]
+                if feed.items.Count() > 0
+                    response.Json(feed)
+                    if fetchedPages = 1 and result.DoesExist("cache-control")
+                        response.headers["cache-control"] = result["cache-control"]
+                    end if
+                    return true
+                end if
+
+                if StringUtils.IsNullOrEmpty(feed.continuation)
+                    response.Json({
+                        "error": "Failed to search: no results found"
+                    })
+                    response.http_code = 500
+                    return true
+                end if
+
+                LogDebug("Search returned no results, fetching next page with continuation")
+                options.continuation = feed.continuation
+            end while
 
             return true
         end function
