@@ -7,7 +7,8 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Innertube
 
-    function CreatePlayerRequest(videoId as string, client as Innertube.ClientType, options = invalid as object) as object
+    function CreatePlayerRequest(client as Innertube.ClientType, options = invalid as object) as object
+        videoId = OptionUtils.Get(options, "videoId")
         cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
@@ -62,26 +63,23 @@ namespace Innertube
         return request
     end function
 
-    function ParseInnertubePlayerResponse(payload as object, signatureTimestamp as dynamic, cancellation as object) as object
+    function ParseInnertubePlayerResponse(payload as object, parsedResponse as object, signatureTimestamp as dynamic, cancellation as object) as object
         error = ParsePlayerResponseForError(payload)
         if error <> ""
-            return {
-                error: error
-            }
+            parsedResponse["error"] = error
+            return parsedResponse
         end if
 
         videoDetails = payload["videoDetails"]
         if not IsAssociativeArray(videoDetails)
-            return {
-                error: "Invalid video details"
-            }
+            parsedResponse["error"] = "Invalid videoDetails"
+            return parsedResponse
         end if
 
         streamingData = payload["streamingData"]
         if not IsAssociativeArray(streamingData)
-            return {
-                error: "Invalid streaming data"
-            }
+            parsedResponse["error"] = "Invalid streamingData"
+            return parsedResponse
         end if
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
@@ -91,41 +89,56 @@ namespace Innertube
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
         if not isLive
-            DecipherUrls(formats, adaptiveFormats, signatureTimestamp, cancellation)
+            error = DecipherUrls(formats, adaptiveFormats, signatureTimestamp, cancellation)
+            if error <> invalid
+                parsedResponse["error"] = error.error
+                if error.DoesExist("errorCode")
+                    parsedResponse["errorCode"] = error.errorCode
+                end if
+                return parsedResponse
+            end if
         end if
 
-        hasLiveStreamingData = FormatsHaveLiveStreamingData(formats, adaptiveFormats)
+        hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
 
         adaptiveFormats = TransformFormats(adaptiveFormats)
         formats = TransformFormats(formats)
 
-        videoInfo = {
-            "type": "video"
-            "title": videoDetails["title"]
-            "videoId": videoDetails["videoId"]
-            "videoThumbnails": videoDetails["thumbnail"]["thumbnails"]
-            "storyboards": ParseStoryboards(payload, lengthSeconds)
-            "author": videoDetails["author"]
-            "authorId": videoDetails["channelId"]
-            "lengthSeconds": lengthSeconds
-            "liveNow": isLive
-            "hasLiveStreamingData": hasLiveStreamingData
-            "hlsUrl": streamingData["hlsManifestUrl"]
-            "dashUrl": streamingData["dashManifestUrl"]
-            "adaptiveFormats": adaptiveFormats
-            "formatStreams": formats
-            "captions": ParseCaptions(payload)
-            "recommendedVideos": []
-        }
+        parsedResponse["type"] = "video"
+        parsedResponse["videoId"] = videoDetails["videoId"]
+        parsedResponse["videoThumbnails"] = videoDetails["thumbnail"]["thumbnails"]
+        parsedResponse["storyboards"] = ParseStoryboards(payload, lengthSeconds)
+        parsedResponse["author"] = videoDetails["author"]
+        parsedResponse["authorId"] = videoDetails["channelId"]
+        parsedResponse["lengthSeconds"] = lengthSeconds
+        parsedResponse["liveNow"] = isLive
+        parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
+        parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
+        parsedResponse["dashUrl"] = streamingData["dashManifestUrl"]
+        parsedResponse["adaptiveFormats"] = adaptiveFormats
+        parsedResponse["formatStreams"] = formats
+        parsedResponse["captions"] = ParseCaptions(payload)
 
-        if videoDetails.DoesExist("viewCount")
-            videoInfo["viewCount"] = videoDetails["viewCount"].ToInt()
+        if not IsArray(parsedResponse["recommendedVideos"])
+            parsedResponse["recommendedVideos"] = []
         end if
 
-        videoInfo["isLoggedIn"] = ParseIsLoggedIn(payload)
-        videoInfo["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, videoInfo.isLoggedIn)
+        if not StringUtils.IsNullOrEmpty(videoDetails["title"])
+            parsedResponse["title"] = videoDetails["title"]
+        end if
 
-        return videoInfo
+        if not StringUtils.IsNullOrEmpty(videoDetails["author"])
+            parsedResponse["author"] = videoDetails["author"]
+        end if
+
+        if videoDetails.DoesExist("viewCount")
+            parsedResponse["viewCount"] = videoDetails["viewCount"].ToInt()
+        end if
+
+        parsedResponse["isLoggedIn"] = ParseIsLoggedIn(payload)
+        parsedResponse["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, parsedResponse.isLoggedIn)
+
+        return parsedResponse
     end function
 
     function ParsePlayerResponseForError(payload as object) as string
@@ -164,11 +177,6 @@ namespace Innertube
         if status = "LOGIN_REQUIRED"
             ' TODO:P2 localize
             errorLines.Push("Hint: Log in to the YouTube app on your phone, then cast the video to Playlet.")
-
-            isLoggedIn = Innertube.ParseIsLoggedIn(payload)
-            if isLoggedIn
-                LogError("Video requires login, but user is already logged in!")
-            end if
         end if
 
         return errorLines.Join(`\n`)
@@ -395,10 +403,10 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as void
+    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as object
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
-            return
+            return invalid
         end if
 
         reqFormats = []
@@ -435,36 +443,42 @@ namespace Innertube
             else
                 LogError(response.ErrorMessage())
             end if
-            code = ""
+            errorCode = ""
             if response.StatusCode() = 400
                 json = response.Json()
                 if IsAssociativeArray(json)
-                    code = ValidString(json["code"])
-                    if code = "STS_MISMATCH"
+                    errorCode = ValidString(json["code"])
+                    if errorCode = "STS_MISMATCH"
                         DeleteFile("tmp:/sts_cache.json")
                     end if
                 end if
             end if
 
-            exception = { message: response.ErrorMessage() }
-            if code <> ""
-                exception.code = code
+            exception = {
+                error: response.ErrorMessage()
+            }
+            if errorCode <> ""
+                exception.errorCode = errorCode
             end if
-            throw exception
+            return exception
         end if
 
         json = response.Json()
         if not IsAssociativeArray(json) or not json.DoesExist("formats") or not json.DoesExist("adaptiveFormats")
             error = "Invalid response from decipher service"
             LogError(error)
-            throw error
+            return {
+                error: error
+            }
         end if
 
         decipheredFormats = json["formats"]
         if not IsArray(decipheredFormats) or decipheredFormats.Count() <> formats.Count()
             error = "Invalid formats in deciphered response"
             LogError(error)
-            throw error
+            return {
+                error: error
+            }
         end if
         for i = 0 to decipheredFormats.Count() - 1
             fmt = formats[i]
@@ -477,13 +491,16 @@ namespace Innertube
         if not IsArray(decipheredAdaptiveFormats) or decipheredAdaptiveFormats.Count() <> adaptiveFormats.Count()
             error = "Invalid adaptiveFormats in deciphered response"
             LogError(error)
-            throw error
+            return {
+                error: error
+            }
         end if
         for i = 0 to decipheredAdaptiveFormats.Count() - 1
             fmt = adaptiveFormats[i]
             decipheredFmt = decipheredAdaptiveFormats[i]
             fmt["url"] = decipheredFmt["url"]
         end for
+        return invalid
     end function
 
     function ParseIsLoggedIn(payload as object) as boolean
@@ -530,24 +547,33 @@ namespace Innertube
         }
     end function
 
-    function FormatsHaveLiveStreamingData(formats as object, adaptiveFormats as object) as boolean
-        if IsArray(adaptiveFormats)
-            for each fmt in adaptiveFormats
-                url = fmt["url"]
-                if IsString(url) and url.InStr("yt_live_broadcast") <> -1
-                    return true
-                end if
-            end for
+    function IsLiveStream(payload as object) as boolean
+        if ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isLive"]))
+            return true
         end if
 
-        if IsArray(formats)
-            for each fmt in formats
-                url = fmt["url"]
-                if IsString(url) and url.InStr("yt_live_broadcast") <> -1
-                    return true
-                end if
-            end for
+        adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
+        if FormatsHaveLiveStreamingData(adaptiveFormats)
+            return true
         end if
+
+        formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
+        if FormatsHaveLiveStreamingData(formats)
+            return true
+        end if
+        return false
+    end function
+
+    function FormatsHaveLiveStreamingData(formats as object) as boolean
+        if not IsArray(formats)
+            return false
+        end if
+        for each fmt in formats
+            url = fmt["url"]
+            if IsString(url) and url.InStr("yt_live_broadcast") <> -1
+                return true
+            end if
+        end for
 
         return false
     end function

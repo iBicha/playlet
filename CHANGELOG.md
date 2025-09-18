@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Issue with `credentialTransferToken`s which caused "Login to confirm you're not a bot" even when logged in
+- Adjust live video detection to reduce error rate happening on iOS client (another attempt)
+- Attempt to play the next video when errors occur
+- Remove manual video cache for Invidious to avoid stale streams
+
 ## [0.41.12] - 2025-09-17
 
 ### Fixed

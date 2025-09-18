@@ -59,6 +59,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_SET_SUBTITLES] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_SET_AUDIO_TRACK] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_DPAD_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_VOICE_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_ON_USER_ACTIVITY] = m.HandleIgnoreCommand
@@ -436,8 +437,11 @@ class LoungeApi
         ' Right now we just store only the last ctt, which works ok if we're casting one video at a time.
         ' But if the age restrcited video is added to the queue, we don't capture a token and playing the video would fail.
         ' These tokens need to be managed better, based on the video they belong to.
-        if not StringUtils.IsNullOrEmpty(commandArgs[FIELD_CTT])
-            m.loungeServiceNode.credentialTransferToken = commandArgs[FIELD_CTT]
+        if not StringUtils.IsNullOrEmpty(commandArgs[FIELD_CTT]) and not StringUtils.IsNullOrEmpty(commandArgs[FIELD_VIDEO_ID])
+            m.loungeServiceNode.credentialTransferToken = {
+                "token": commandArgs[FIELD_CTT]
+                "videoId": commandArgs[FIELD_VIDEO_ID]
+            }
         end if
         LoungeVideoQueue.SetPlaylist(m.videoQueueNode, m.invService, commandArgs)
     end function
@@ -560,7 +564,7 @@ class LoungeApi
                 })
 
                 if not response.IsSuccess()
-                    if response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
+                    if response.StatusCode() = 410 or (response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1)
                         LogErrorNoTelemetry(response.ErrorMessage())
                     else
                         LogError(response.ErrorMessage())

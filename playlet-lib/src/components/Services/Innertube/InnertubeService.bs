@@ -17,23 +17,14 @@ import "pkg:/source/utils/TimeUtils.bs"
 namespace InnertubeService
 
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
+        options["videoId"] = videoId
+
         cancellation = OptionUtils.Get(options, "cancellation")
         fetchNext = OptionUtils.GetOrDefault(options, "fetchNext", true)
         accessToken = OptionUtils.Get(options, "accessToken")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
-        if not StringUtils.IsNullOrEmpty(accessToken)
-            playerRequest.Header("Authorization", "Bearer " + accessToken)
-        end if
-        playerRequest.Cancellation(cancellation)
-        if raw
-            playerRequest.LogCurlCommand(true)
-        end if
-        playerRequest.Send()
-
         nextRequest = invalid
-        nextResponse = invalid
         if fetchNext
             nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
             nextRequest.Cancellation(cancellation)
@@ -43,117 +34,140 @@ namespace InnertubeService
             nextRequest.Send()
         end if
 
-        playerResponse = playerRequest.Await()
-        if not playerResponse.IsSuccess()
-            return {
-                error: playerResponse.ErrorMessage()
-            }
-        end if
-
-        if CancellationUtils.IsCancelled(cancellation)
-            return {
-                error: "Cancelled"
-            }
-        end if
-
         ' For LIVE videos, we will need to fallback to iOS for HLS streams for now.
         ' Also, since we might have tracking urls in the player response (if logged in),
         ' we can keep them to avoid an extra request later.
         ' TODO:P0 figure out how to get DASH to work for live videos.
-        '
-        ' # Start of iOS fallback
         playbackTrackingUrls = invalid
-        responseJson = playerResponse.Json()
-        if ValidBool(ObjectUtils.Dig(responseJson, ["videoDetails", "isLive"])) or ValidBool(ObjectUtils.Dig(responseJson, ["videoDetails", "hasLiveStreamingData"]))
-            LogDebug("Live video detected, falling back to iOS for HLS streams.")
-            isLoggedIn = Innertube.ParseIsLoggedIn(responseJson)
-            playbackTrackingUrls = Innertube.ParsePlaybackTrackingUrls(responseJson, isLoggedIn)
-
-            playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.IOS, options)
+        playerResponseJson = invalid
+        client = Innertube.ClientType.Tv
+        totalPlayerRequests = 0
+        while true
+            ' We shouldn't be making more that 3 requests:
+            ' 1. Make request with TV client, but turns out to be live -> fallback to iOS
+            ' 2. Make request, but STS_MISMATCH error -> retry with new STS
+            ' 3. Make request, it either succeeds or fails.
+            if totalPlayerRequests > 3
+                LogError("Too many player requests, aborting.")
+                return {
+                    error: "Too many player requests"
+                }
+            end if
+            totalPlayerRequests += 1
+            playerRequest = Innertube.CreatePlayerRequest(client, options)
+            if not StringUtils.IsNullOrEmpty(accessToken) and client = Innertube.ClientType.Tv
+                playerRequest.Header("Authorization", "Bearer " + accessToken)
+            end if
             playerRequest.Cancellation(cancellation)
             if raw
                 playerRequest.LogCurlCommand(true)
             end if
+
             playerResponse = playerRequest.Await()
-            if not playerResponse.IsSuccess()
-                return {
-                    error: playerResponse.ErrorMessage()
-                }
-            end if
 
             if CancellationUtils.IsCancelled(cancellation)
                 return {
                     error: "Cancelled"
                 }
             end if
-        end if
-        ' # End of iOS fallback
 
-        if fetchNext
-            nextResponse = nextRequest.Await()
-        end if
+            if not playerResponse.IsSuccess()
+                parsedResponse = {
+                    error: playerResponse.ErrorMessage()
+                }
+                parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
+                return parsedResponse
+            end if
+
+            playerResponseJson = playerResponse.Json()
+            isLive = Innertube.IsLiveStream(playerResponseJson)
+            if isLive and client = Innertube.ClientType.Tv
+                LogDebug("Live video detected, falling back to iOS for HLS streams.")
+                isLoggedIn = Innertube.ParseIsLoggedIn(playerResponseJson)
+                playbackTrackingUrls = Innertube.ParsePlaybackTrackingUrls(playerResponseJson, isLoggedIn)
+                client = Innertube.ClientType.IOS
+                continue while
+            end if
+
+            parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponseJson, {}, playerRequest.signatureTimestamp, cancellation)
+
+            if parsedResponse.error = invalid
+                exit while
+            end if
+
+            if parsedResponse.errorCode <> invalid
+                if parsedResponse.errorCode = "STS_MISMATCH"
+                    LogInfo("STS_MISMATCH error, retrying...")
+                    continue while
+                else if parsedResponse.errorCode = "MISSING_FORMAT_FIELD"
+                    LogTelemetryEvent({
+                        level: "error"
+                        message: parsedResponse.errorCode
+                        fingerprint: parsedResponse.errorCode
+                        attachments: [{
+                            filename: "request.txt"
+                            content_type: "text/plain"
+                            data: playerRequest.ToCurlCommand()
+                        }, {
+                            filename: "response.json"
+                            content_type: "application/json"
+                            data: playerResponse.Text()
+                        }]
+                    })
+                end if
+            end if
+
+            parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
+            return parsedResponse
+        end while
 
         if raw
             rawResponse = {
-                "playerResponse": playerResponse.Json()
+                "playerResponse": playerResponseJson
             }
-            if fetchNext
-                rawResponse["nextResponse"] = nextResponse.Json()
-            end if
+            rawResponse = AwaitAndParseNextResponse(fetchNext, raw, rawResponse, nextRequest)
             return rawResponse
         end if
 
-        parsedResponse = invalid
-        try
-            parsedResponse = Innertube.ParseInnertubePlayerResponse(playerResponse.Json(), playerRequest.signatureTimestamp, cancellation)
-        catch exception
-            code = ValidString(exception.code)
-            if code = "STS_MISMATCH"
-                return GetVideoMetadata(videoId, options)
-            end if
-            if code = "MISSING_FORMAT_FIELD"
-                LogTelemetryEvent({
-                    level: "error"
-                    message: code
-                    fingerprint: code
-                    attachments: [{
-                        filename: "request.txt"
-                        content_type: "text/plain"
-                        data: playerRequest.ToCurlCommand()
-                    }, {
-                        filename: "response.json"
-                        content_type: "application/json"
-                        data: playerResponse.Text()
-                    }]
-                })
-            end if
-            throw exception
-        end try
-        if parsedResponse.error <> invalid
-            return parsedResponse
-        end if
+        parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
 
-        if fetchNext
-            if nextResponse.IsSuccess()
-                parsedResponse = Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse, nextResponse)
-            else
-                LogWarn(nextResponse.ErrorMessage())
-            end if
-        end if
-
-        ' If for some reason we missed the videoId, add it back
-        if parsedResponse.error = invalid and StringUtils.IsNullOrEmpty(parsedResponse.videoId)
+        if StringUtils.IsNullOrEmpty(parsedResponse.videoId)
             parsedResponse["videoId"] = videoId
         end if
 
-        ' # Start of iOS fallback
+        ' If we did capture tracking urls when we did the TV request, but now we're
+        ' missing them because we switched to iOS, add them back.
         if playbackTrackingUrls <> invalid and parsedResponse.playbackTrackingUrls = invalid
             LogDebug("Adding playback tracking URLs from TV player response.")
             parsedResponse["playbackTrackingUrls"] = playbackTrackingUrls
         end if
-        ' # End of iOS fallback
 
         return parsedResponse
+    end function
+
+    function AwaitAndParseNextResponse(fetchNext as boolean, raw as boolean, parsedResponse as object, nextRequest as object) as object
+        if not fetchNext
+            return parsedResponse
+        end if
+
+        nextResponse = nextRequest.Await()
+
+        if not nextResponse.IsSuccess()
+            error = nextResponse.ErrorMessage()
+            LogWarn(error)
+
+            if raw
+                parsedResponse["nextError"] = error
+            end if
+
+            return parsedResponse
+        end if
+
+        if raw
+            parsedResponse["nextResponse"] = nextResponse.Json()
+        end if
+
+        return Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse, nextResponse)
     end function
 
     function GetVideoInfoBatched(videoIds as object, options = invalid as object) as object
@@ -362,7 +376,8 @@ namespace InnertubeService
             cancellation = options.cancellation
         end if
 
-        playerRequest = Innertube.CreatePlayerRequest(videoId, Innertube.ClientType.Tv, options)
+        options["videoId"] = videoId
+        playerRequest = Innertube.CreatePlayerRequest(Innertube.ClientType.Tv, options)
         playerRequest.Cancellation(cancellation)
         playerRequest.Header("Authorization", "Bearer " + accessToken)
 

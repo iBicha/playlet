@@ -56,6 +56,7 @@ namespace Innertube
         visitorData = OptionUtils.Get(options, "visitorData")
         onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
         accessToken = OptionUtils.Get(options, "accessToken")
+        videoId = OptionUtils.Get(options, "videoId")
 
         useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
 
@@ -71,11 +72,16 @@ namespace Innertube
             }
         }
 
-        if not StringUtils.IsNullOrEmpty(credentialTransferToken)
-            context["user"]["credentialTransferTokens"] = [{
-                "token": credentialTransferToken
-                "scope": "VIDEO"
-            }]
+        if IsAssociativeArray(credentialTransferToken) and not StringUtils.IsNullOrEmpty(videoId)
+            cttCideoId = credentialTransferToken.videoId
+            cttToken = credentialTransferToken.token
+
+            if not StringUtils.IsNullOrEmpty(cttToken) and videoId = cttCideoId
+                context["user"]["credentialTransferTokens"] = [{
+                    "token": cttToken
+                    "scope": "VIDEO"
+                }]
+            end if
         end if
 
         if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
