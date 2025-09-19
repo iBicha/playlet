@@ -18,6 +18,9 @@ namespace Innertube
         end if
 
         sessionData = RequestSessionData(cancellation)
+        if sessionData.error <> invalid
+            return sessionData
+        end if
         SaveSessionDataToRegistry(sessionData)
         return sessionData
     end function
@@ -35,8 +38,9 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            LogError("Failed to fetch session data", response.ErrorMessage())
-            return invalid
+            return {
+                "error": "Failed to fetch session data: " + response.ErrorMessage()
+            }
         end if
 
         text = response.Text()
@@ -44,14 +48,16 @@ namespace Innertube
 
         json = ParseJson(text)
         if json = invalid
-            LogError("Failed to parse session data", text)
-            return invalid
+            return {
+                "error": "Failed to parse session data: " + text
+            }
         end if
 
         visitorData = ObjectUtils.Dig(json, [0, 2, 0, 0, 13])
         if StringUtils.IsNullOrEmpty(visitorData)
-            LogError("Visitor data not found", text)
-            return invalid
+            return {
+                "error": "Failed to find visitorData in session data: " + text
+            }
         end if
 
         return {
@@ -61,10 +67,6 @@ namespace Innertube
     end function
 
     function SaveSessionDataToRegistry(sessionData as object) as void
-        if sessionData = invalid
-            return
-        end if
-
         sessionData.__version = SESSION_DATA_VERSION
 
         RegistryUtils.Write(RegistryUtils.INNERTUBE_SESSION_DATA, FormatJson(sessionData))
