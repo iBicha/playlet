@@ -28,18 +28,6 @@ namespace Sentry
                 event.timestamp = timestamp
             end if
 
-            message = event.message
-
-            hasAttachments = IsArray(event.attachments) and event.attachments.Count() > 0
-
-            if (not SUPPORTS_ATTACHMENTS) and hasAttachments
-                message += `\nAttachments: (${event.attachments.Count()} files)`
-                for each attachment in event.attachments
-                    message += `\nAttachment: ${attachment.filename} (${attachment.content_type})\n${attachment.data}`
-                end for
-                message += `\nEnd of attachments.`
-            end if
-
             eventPayload = {
                 event_id: event.event_id
                 timestamp: event.timestamp
@@ -52,13 +40,16 @@ namespace Sentry
                 release: event.release
                 tags: event.tags
                 level: event.level
-                logentry: {
-                    formatted: message
-                }
                 user: {
                     id: event.userId
                 }
             }
+
+            message = event.message
+
+            if event.fingerprint = invalid
+                event.fingerprint = GetFingerprint(message)
+            end if
 
             if event.fingerprint <> invalid
                 fingerprint = event.fingerprint
@@ -72,6 +63,20 @@ namespace Sentry
                 end for
                 eventPayload.fingerprint = fingerprint
             end if
+
+            hasAttachments = IsArray(event.attachments) and event.attachments.Count() > 0
+
+            if (not SUPPORTS_ATTACHMENTS) and hasAttachments
+                message += `\nAttachments: (${event.attachments.Count()} files)`
+                for each attachment in event.attachments
+                    message += `\nAttachment: ${attachment.filename} (${attachment.content_type})\n${attachment.data}`
+                end for
+                message += `\nEnd of attachments.`
+            end if
+
+            eventPayload.logentry = {
+                formatted: message
+            }
 
             payload += FormatJson(eventPayload) + `\n`
 
@@ -119,4 +124,37 @@ namespace Sentry
         return eventId
     end function
 
+    function GetFingerprint(message as dynamic) as dynamic
+        if StringUtils.IsNullOrEmpty(message)
+            return invalid
+        end if
+        fingerprint = ReplaceRequestId(message)
+        if fingerprint = invalid
+            return invalid
+        end if
+        return [fingerprint]
+    end function
+
+    function ReplaceRequestId(message as string) as string
+        reqIdStart = `\nRequestId: `
+        requestIdIndex = message.InStr(reqIdStart)
+        if requestIdIndex = -1
+            return invalid
+        end if
+
+        newLineIndex = message.InStr(requestIdIndex + reqIdStart.Len(), `\n`)
+        if newLineIndex = -1
+            return invalid
+        end if
+
+        reqIdStartIndex = requestIdIndex + reqIdStart.Len()
+        reqIdEndIndex = newLineIndex - 1
+        if (reqIdEndIndex <= reqIdStartIndex) or ((reqIdEndIndex - reqIdStartIndex) > 20)
+            return invalid
+        end if
+
+        ' replace request id with <REQUEST_ID>
+        fingerprint = message.Mid(0, reqIdStartIndex) + "<REQUEST_ID>" + message.Mid(reqIdEndIndex + 1)
+        return fingerprint
+    end function
 end namespace
