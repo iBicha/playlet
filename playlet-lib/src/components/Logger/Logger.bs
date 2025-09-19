@@ -25,7 +25,6 @@ function Init()
                 scene.enableSystemLogType = "http.complete"
                 scene.enableSystemLogType = "bandwidth.minute"
             #end if
-            m.sysLogEventDropCounter = 0
         end if
     end if
 
@@ -114,17 +113,31 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 
-    ' Only report 1 in 10 system log errors
-    ' They're usually repetitive, one is reported for each stream in a DASH
-    ' when a video is blocked
-    if m.sysLogEventDropCounter = 0
+    fingerprint = `SysLog${info.Status}${info.LogType}${info.HttpCode}${info.Method}`
+
+    if m.sysLogEventTimer = invalid
+        m.sysLogEventTimer = CreateObject("roTimespan")
+        m.sysLogFingerprint = fingerprint
         LogTelemetryEvent({
             level: "error"
             message: line
-            fingerprint: ["SysLog", info.Status, info.LogType, info.HttpCode, info.Method]
+            fingerprint: [fingerprint]
         })
+        return
     end if
-    m.sysLogEventDropCounter = (m.sysLogEventDropCounter + 1) mod 10
+
+    ' Only log one syslog error per minute (or if the fingerprint changes) to avoid spamming
+    if m.sysLogEventTimer.TotalSeconds() < 60 and m.sysLogFingerprint = fingerprint
+        return
+    end if
+    m.sysLogEventTimer.Mark()
+    m.sysLogFingerprint = fingerprint
+
+    LogTelemetryEvent({
+        level: "error"
+        message: line
+        fingerprint: [fingerprint]
+    })
 end function
 
 function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
