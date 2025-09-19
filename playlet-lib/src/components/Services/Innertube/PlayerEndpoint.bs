@@ -434,11 +434,6 @@ namespace Innertube
 
         response = request.Await()
         if not response.IsSuccess()
-            if response.IsCancelled()
-                LogErrorNoTelemetry(response.ErrorMessage())
-            else
-                LogError(response.ErrorMessage())
-            end if
             errorCode = ""
             if response.StatusCode() = 400
                 json = response.Json()
@@ -456,6 +451,13 @@ namespace Innertube
             if errorCode <> ""
                 exception.errorCode = errorCode
             end if
+
+            if response.IsCancelled() or errorCode = "STS_MISMATCH"
+                LogErrorNoTelemetry(response.ErrorMessage())
+            else
+                LogError(response.ErrorMessage())
+            end if
+
             return exception
         end if
 
