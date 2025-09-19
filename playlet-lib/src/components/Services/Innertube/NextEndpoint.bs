@@ -35,10 +35,6 @@ namespace Innertube
     end function
 
     function ParseInnertubeNextResponse(payload as object, parsedResponse as object, httpResponse as object) as object
-        if not IsArray(parsedResponse["recommendedVideos"])
-            parsedResponse["recommendedVideos"] = []
-        end if
-
         if not IsAssociativeArray(payload)
             LogWarn("Invalid payload", payload)
             return parsedResponse
@@ -47,6 +43,23 @@ namespace Innertube
         playerOverlayRenderer = ObjectUtils.Dig(payload, ["playerOverlays", "playerOverlayRenderer"])
         if not IsAssociativeArray(playerOverlayRenderer)
             LogWarn("Invalid playerOverlayRenderer", playerOverlayRenderer)
+            return parsedResponse
+        end if
+
+        endscreen = playerOverlayRenderer["endScreen"]
+
+        feeds = Innertube.ParseResponseDataForFeeds(endscreen, {
+            response: httpResponse
+            noContainers: true
+        })
+        if feeds.Count() > 0
+            parsedResponse["recommendedVideos"] = ValidArray(feeds[0].items)
+        end if
+
+        ' Sometimes the title and author are missing in /player respnonse, so we get them here.
+        ' But if we have an error, we don't need them, recommendedVideos is enough to play the
+        ' next video, after showing the error dialog.
+        if parsedResponse.error <> invalid
             return parsedResponse
         end if
 
@@ -62,16 +75,6 @@ namespace Innertube
             if not StringUtils.IsNullOrEmpty(subtitle)
                 parsedResponse.author = subtitle
             end if
-        end if
-
-        endscreen = playerOverlayRenderer["endScreen"]
-
-        feeds = Innertube.ParseResponseDataForFeeds(endscreen, {
-            response: httpResponse
-            noContainers: true
-        })
-        if feeds.Count() > 0
-            parsedResponse.recommendedVideos.Append(ValidArray(feeds[0].items))
         end if
 
         return parsedResponse

@@ -280,7 +280,6 @@ export class YoutubeJs {
             adaptiveFormats: YoutubeJs.getAdaptiveFormats(info),
             formatStreams: [],
             captions: YoutubeJs.getCaptions(info),
-            recommendedVideos: [],
         }
     }
 
