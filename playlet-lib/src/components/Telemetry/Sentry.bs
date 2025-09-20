@@ -138,23 +138,36 @@ namespace Sentry
 
     function ReplaceRequestId(message as string) as string
         reqIdStart = `\nRequestId: `
-        requestIdIndex = message.InStr(reqIdStart)
-        if requestIdIndex = -1
+        reqIdPlaceholder = "<REQUEST_ID>"
+        result = message
+        replaced = false
+        searchIndex = 0
+        while true
+            requestIdIndex = result.InStr(searchIndex, reqIdStart)
+            if requestIdIndex = -1
+                exit while
+            end if
+
+            reqIdStartIndex = requestIdIndex + reqIdStart.Len()
+            newLineIndex = result.InStr(reqIdStartIndex, `\n`)
+            if newLineIndex = -1
+                exit while
+            end if
+
+            reqIdEndIndex = newLineIndex - 1
+            if (reqIdEndIndex <= reqIdStartIndex) or ((reqIdEndIndex - reqIdStartIndex) > 20)
+                exit while
+            end if
+
+            result = result.Mid(0, reqIdStartIndex) + reqIdPlaceholder + result.Mid(reqIdEndIndex + 1)
+            replaced = true
+            searchIndex = reqIdStartIndex + reqIdPlaceholder.Len()
+        end while
+
+        if not replaced
             return invalid
         end if
 
-        newLineIndex = message.InStr(requestIdIndex + reqIdStart.Len(), `\n`)
-        if newLineIndex = -1
-            return invalid
-        end if
-
-        reqIdStartIndex = requestIdIndex + reqIdStart.Len()
-        reqIdEndIndex = newLineIndex - 1
-        if (reqIdEndIndex <= reqIdStartIndex) or ((reqIdEndIndex - reqIdStartIndex) > 20)
-            return invalid
-        end if
-
-        fingerprint = message.Mid(0, reqIdStartIndex) + "<REQUEST_ID>" + message.Mid(reqIdEndIndex + 1)
-        return fingerprint
+        return result
     end function
 end namespace
