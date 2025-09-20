@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Various fixes and improvements
+- Crash due to bad type casting
 
 ## [0.41.17] - 2025-09-19
 
