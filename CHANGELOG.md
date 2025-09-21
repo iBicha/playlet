@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Capturing diagnostic events related to playback errors to further investigate
 
 ## [0.41.18] - 2025-09-20
 

@@ -101,8 +101,8 @@ namespace Innertube
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
 
-        adaptiveFormats = TransformFormats(adaptiveFormats)
-        formats = TransformFormats(formats)
+        adaptiveFormats = TransformFormats(adaptiveFormats, true)
+        formats = TransformFormats(formats, false)
 
         parsedResponse["type"] = "video"
         parsedResponse["videoId"] = videoDetails["videoId"]
@@ -310,14 +310,32 @@ namespace Innertube
         return captions
     end function
 
-    function TransformFormats(formats as object) as object
+    function TransformFormats(formats as object, analyze as boolean) as object
+        analysis = invalid
+        if analyze
+            analysis = {
+                "noInitRange": []
+                "noIndexRange": []
+            }
+        end if
+
         for i = 0 to formats.Count() - 1
-            formats[i] = TransformFormat(formats[i])
+            formats[i] = TransformFormat(formats[i], analysis)
         end for
+
+        ' Are these OTF streams?
+        if analyze and (analysis["noInitRange"].Count() > 0 or analysis["noIndexRange"].Count() > 0)
+            LogTelemetryEvent({
+                level: "error"
+                message: `Some formats are missing initRange or indexRange\nAnalysis: ${ToString(analysis)}\nFormats: ${FormatJson(formats)}`
+                fingerprint: ["noInitRange-noIndexRange"]
+            })
+        end if
+
         return formats
     end function
 
-    function TransformFormat(fmt as object) as object
+    function TransformFormat(fmt as object, analysis as object) as object
         itag = `${fmt["itag"]}`
         result = {
             "bitrate": `${fmt["bitrate"]}`
@@ -332,11 +350,17 @@ namespace Innertube
             result["init"] = `${fmt["initRange"]["start"]}-${fmt["initRange"]["end"]}`
         else
             result["init"] = ""
+            if analysis <> invalid
+                analysis["noInitRange"].Push(itag)
+            end if
         end if
         if IsAssociativeArray(fmt["indexRange"])
             result["index"] = `${fmt["indexRange"]["start"]}-${fmt["indexRange"]["end"]}`
         else
             result["index"] = ""
+            if analysis <> invalid
+                analysis["noIndexRange"].Push(itag)
+            end if
         end if
 
         if fmt["audioQuality"] <> invalid
