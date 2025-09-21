@@ -101,7 +101,7 @@ namespace Innertube
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
 
-        adaptiveFormats = TransformFormats(adaptiveFormats, true)
+        adaptiveFormats = TransformFormats(adaptiveFormats, not hasLiveStreamingData)
         formats = TransformFormats(formats, false)
 
         parsedResponse["type"] = "video"
@@ -314,25 +314,25 @@ namespace Innertube
         analysis = invalid
         if analyze
             analysis = {
-                "noInitRange": []
-                "noIndexRange": []
+                "issueDetected": false
             }
         end if
 
+        result = []
         for i = 0 to formats.Count() - 1
-            formats[i] = TransformFormat(formats[i], analysis)
+            result.Push(TransformFormat(formats[i], analysis))
         end for
 
-        ' Are these OTF streams?
-        if analyze and (analysis["noInitRange"].Count() > 0 or analysis["noIndexRange"].Count() > 0)
+        if analyze and analysis.issueDetected
+            ' Are these OTF streams?
             LogTelemetryEvent({
                 level: "error"
-                message: `Some formats are missing initRange or indexRange\nAnalysis: ${ToString(analysis)}\nFormats: ${FormatJson(formats)}`
-                fingerprint: ["noInitRange-noIndexRange"]
+                message: `Some formats are missing initRange or indexRange\nFormats: ${FormatJson(formats)}`
+                fingerprint: ["Some formats are missing initRange or indexRange"]
             })
         end if
 
-        return formats
+        return result
     end function
 
     function TransformFormat(fmt as object, analysis as object) as object
@@ -351,7 +351,7 @@ namespace Innertube
         else
             result["init"] = ""
             if analysis <> invalid
-                analysis["noInitRange"].Push(itag)
+                analysis.issueDetected = true
             end if
         end if
         if IsAssociativeArray(fmt["indexRange"])
@@ -359,7 +359,7 @@ namespace Innertube
         else
             result["index"] = ""
             if analysis <> invalid
-                analysis["noIndexRange"].Push(itag)
+                analysis.issueDetected = true
             end if
         end if
 
