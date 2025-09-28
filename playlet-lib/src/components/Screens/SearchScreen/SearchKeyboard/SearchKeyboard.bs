@@ -1,0 +1,83 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+' TODO:P0
+' - Split languages into files
+' - Add layout sections: first for base characters, second for accents
+' - Add preference, save to disk on change
+' - Localize dialog title
+
+function Init()
+    m.languages = [
+        { code: "en_US", name: "English" }
+        { code: "de_DE", name: "Deutsch" }
+        { code: "es_ES", name: "Español" }
+        { code: "pt_BR", name: "Português" }
+        { code: "ru_RU", name: "Русский" }
+        { code: "fr_FR", name: "Français" }
+    ]
+
+    CopyFile("libpkg:/images/icons/globe-white.png", "tmp:/globe-white.png")
+    CopyFile("libpkg:/images/icons/globe-black.png", "tmp:/globe-black.png")
+    m.top.keyGrid.keyDefinitionUri = "libpkg:/config/search-keyboard-layout.json5"
+    SetCurrentLanguage("en_US")
+
+    ' There's a bug where "function keySelected(key as string) as boolean"
+    ' doesn't fire. For that reason, we're using an inivisible character to
+    ' detect when the language key is pressed.
+    ' https://developer.roku.com/en-ca/docs/references/scenegraph/dynamic-voice-keyboard-nodes/dynamic-custom-keyboard.md#custom-key-selection-handlers
+    m.LanguageSelectStr = Chr(&h200B)
+    m.top.ObserveField("text", FuncName(OnTextChanged))
+end function
+
+function OnTextChanged() as void
+    text = m.top.text
+    if text.Right(1) = m.LanguageSelectStr
+        text = text.Left(text.Len() - 1)
+        OnLanguageKeySelected()
+        m.top.text = text
+    end if
+    m.top.text2 = text
+end function
+
+function OnLanguageKeySelected() as void
+    LogDebug("Language key selected")
+
+    buttons = []
+    for each lang in m.languages
+        buttons.Push(lang.name)
+    end for
+
+    dialog = DialogUtils.ShowDialogEx({
+        message: ""
+        title: "Select keyboard Language"
+        buttons: buttons
+    })
+    if dialog = invalid
+        return
+    end if
+
+    dialog.observeField("buttonSelected", FuncName(OnLanguageSelected), ["buttonSelected"])
+end function
+
+function OnLanguageSelected(event as object) as void
+    buttonIndex = event.GetData()
+
+    if not IsInt(buttonIndex) or buttonIndex < 0 or buttonIndex >= m.languages.Count()
+        return
+    end if
+
+    lang = m.languages[buttonIndex]
+    SetCurrentLanguage(lang.code)
+end function
+
+function SetCurrentLanguage(code as string) as void
+    if code = m.currentLanguage
+        return
+    end if
+
+    LogDebug("Setting keyboard language to", code)
+    m.currentLanguage = code
+    m.top.keyGrid.mode = code
+end function
