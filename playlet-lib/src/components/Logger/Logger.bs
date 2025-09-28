@@ -67,6 +67,8 @@ function LoggerLoop()
         buffer.AppendFile(logsFile)
     end if
 
+    m.eventThrottleTimer = CreateObject("roTimespan")
+
     appMemoryMonitor = CreateObject("roAppMemoryMonitor")
     if appMemoryMonitor <> invalid and FindMemberFunction(appMemoryMonitor, "EnableMemoryWarningEvent") <> invalid
         appMemoryMonitor.SetMessagePort(port)
@@ -115,27 +117,13 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
 
     fingerprint = `SysLog${info.Status}${info.LogType}${info.HttpCode}${info.Method}`
 
-    if m.sysLogEventTimer = invalid
-        m.sysLogEventTimer = CreateObject("roTimespan")
-        m.sysLogFingerprint = fingerprint
-        LogTelemetryEvent({
-            level: "error"
-            message: line
-            fingerprint: [fingerprint]
-        })
+    if ThrottleEvent("SysLogError", fingerprint, 60)
         return
     end if
-
-    ' Only log one syslog error per minute (or if the fingerprint changes) to avoid spamming
-    if m.sysLogEventTimer.TotalSeconds() < 60 and m.sysLogFingerprint = fingerprint
-        return
-    end if
-    m.sysLogEventTimer.Mark()
-    m.sysLogFingerprint = fingerprint
 
     LogTelemetryEvent({
         level: "error"
-        message: line
+        message: line + `\nCurrentTime: ${m.eventThrottleTimer.TotalSeconds()}`
         fingerprint: [fingerprint]
     })
 end function
@@ -147,9 +135,14 @@ function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logs
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
+
+    if ThrottleEvent("AppMonitorMemoryWarning", message, 60)
+        return
+    end if
+
     LogTelemetryEvent({
         level: "warning"
-        message: line
+        message: line + `\nCurrentTime: ${m.eventThrottleTimer.TotalSeconds()}`
         fingerprint: [message]
     })
 end function
@@ -160,22 +153,35 @@ function OnLineLogDeviceInfoMemoryWarning(event as object, dateTime as object, l
         return
     end if
 
-    ' roDeviceInfoEvent can be a bit spammy, so only log if the memory level has changed
-    if info.generalMemoryLevel = m.lastDeviceInfoMemoryLevel
+    if ThrottleEvent("DeviceInfoMemoryWarning", info.generalMemoryLevel, 60)
         return
     end if
-    m.lastDeviceInfoMemoryLevel = info.generalMemoryLevel
 
     message = "[WARN][DeviceInfoMemory] " + ToString(info)
     line = FormatTime(dateTime) + message
     print line
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
+
     LogTelemetryEvent({
         level: "warning"
-        message: line
+        message: line + `\nCurrentTime: ${m.eventThrottleTimer.TotalSeconds()}`
         fingerprint: [message]
     })
+end function
+
+' Returns true if the event should be throttled
+function ThrottleEvent(key as string, fingerprint as string, throttleSeconds as integer) as boolean
+    lastSentTime = ValidInt(m[key])
+    currentTime = m.eventThrottleTimer.TotalSeconds()
+
+    if ((currentTime - lastSentTime) < throttleSeconds) and (m[key + "Fingerprint"] = fingerprint)
+        return true
+    end if
+
+    m[key] = currentTime
+    m[key + "Fingerprint"] = fingerprint
+    return false
 end function
 
 ' Note: although the timestamp should be captured in the caller, not the logger,
