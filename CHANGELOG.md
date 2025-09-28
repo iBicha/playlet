@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Dash generation bug
+- Track login errors and drm errors better
 
 ## [0.41.20] - 2025-09-21
 

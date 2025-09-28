@@ -63,8 +63,8 @@ namespace Innertube
         return request
     end function
 
-    function ParseInnertubePlayerResponse(payload as object, parsedResponse as object, signatureTimestamp as dynamic, cancellation as object) as object
-        error = ParsePlayerResponseForError(payload)
+    function ParseInnertubePlayerResponse(payload as object, parsedResponse as object, playerRequest as dynamic, cancellation as object) as object
+        error = ParsePlayerResponseForError(payload, playerRequest)
         if error <> ""
             parsedResponse["error"] = error
             return parsedResponse
@@ -89,7 +89,7 @@ namespace Innertube
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
         if not isLive
-            error = DecipherUrls(formats, adaptiveFormats, signatureTimestamp, cancellation)
+            error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation)
             if error <> invalid
                 parsedResponse["error"] = error.error
                 if error.DoesExist("errorCode")
@@ -100,8 +100,10 @@ namespace Innertube
         end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
+        hasDrm = (not StringUtils.IsNullOrEmpty(streamingData.drmParams)) or IsArray(streamingData.licenseInfos)
 
-        adaptiveFormats = TransformFormats(adaptiveFormats, not isLive and not hasLiveStreamingData)
+        shouldAnalyze = (not isLive) and (not hasLiveStreamingData) and (not hasDrm)
+        adaptiveFormats = TransformFormats(adaptiveFormats, shouldAnalyze)
         formats = TransformFormats(formats, false)
 
         parsedResponse["type"] = "video"
@@ -137,7 +139,7 @@ namespace Innertube
         return parsedResponse
     end function
 
-    function ParsePlayerResponseForError(payload as object) as string
+    function ParsePlayerResponseForError(payload as object, playerRequest as object) as string
         if not IsAssociativeArray(payload)
             return "Invalid payload"
         end if
@@ -173,6 +175,17 @@ namespace Innertube
         if status = "LOGIN_REQUIRED"
             ' TODO:P2 localize
             errorLines.Push("Hint: Log in to the YouTube app on your phone, then cast the video to Playlet.")
+
+            hasAccessToken = ValidString(playerRequest.GetHeaders()["Authorization"]).Len() > "Bearer ".Len()
+            hasCtt = ValidString(playerRequest.GetBody()).InStr("credentialTransferTokens") <> -1
+
+            if hasAccessToken or hasCtt
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `LOGIN_REQUIRED: hasAccessToken=${hasAccessToken} hasCtt=${hasCtt}\nPlayabilityStatus: ${FormatJson(playabilityStatus)}`
+                    fingerprint: ["LOGIN_REQUIRED hasAccessToken hasCtt"]
+                })
+            end if
         end if
 
         return errorLines.Join(`\n`)
@@ -592,7 +605,7 @@ namespace Innertube
         end if
         for each fmt in formats
             url = fmt["url"]
-            if IsString(url) and (url.InStr("yt_live_broadcast") <> -1 or url.InStr("source=yt_premiere_broadcast") <> -1)
+            if IsString(url) and (url.InStr("yt_live_broadcast") <> -1 or url.InStr("yt_premiere_broadcast") <> -1)
                 return true
             end if
         end for
