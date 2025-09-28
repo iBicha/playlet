@@ -7,9 +7,10 @@ To run:
 
 - Create a `.env` file next to `docker-compose.yml`
 - Generate two random passwords of 16 characters (e.g. using command `pwgen 16 1`)
-- Add the two variables to your `.env` file
+- Add the two variables to your `.env` file, in addition to the port, like so:
 
 ```sh
+INVIDIOUS_PORT=3000
 INVIDIOUS_HMAC_KEY=PASSWORD_1
 INVIDIOUS_COMPANION_KEY=PASSWORD_2
 ```
