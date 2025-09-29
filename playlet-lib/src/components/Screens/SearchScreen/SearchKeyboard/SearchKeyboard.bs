@@ -9,6 +9,9 @@ import "pkg:/source/utils/Types.bs"
 ' - Localize dialog title
 
 function Init()
+    CopyFile("libpkg:/images/icons/globe-white.png", "tmp:/globe-white.png")
+    CopyFile("libpkg:/images/icons/globe-black.png", "tmp:/globe-black.png")
+
     m.languages = [
         { code: "en_US", name: "English" }
         { code: "de_DE", name: "Deutsch" }
@@ -18,27 +21,17 @@ function Init()
         { code: "fr_FR", name: "Français" }
     ]
 
-    CopyFile("libpkg:/images/icons/globe-white.png", "tmp:/globe-white.png")
-    CopyFile("libpkg:/images/icons/globe-black.png", "tmp:/globe-black.png")
-    m.top.keyGrid.keyDefinitionUri = "libpkg:/config/search-keyboard-layout.json5"
     SetCurrentLanguage("en_US")
-
-    ' There's a bug where "function keySelected(key as string) as boolean"
-    ' doesn't fire. For that reason, we're using an inivisible character to
-    ' detect when the language key is pressed.
-    ' https://developer.roku.com/en-ca/docs/references/scenegraph/dynamic-voice-keyboard-nodes/dynamic-custom-keyboard.md#custom-key-selection-handlers
-    m.LanguageSelectStr = Chr(&h200B)
-    m.top.ObserveField("text", FuncName(OnTextChanged))
 end function
 
-function OnTextChanged() as void
-    text = m.top.text
-    if text.Right(1) = m.LanguageSelectStr
-        text = text.Left(text.Len() - 1)
+function keySelected(key as string) as boolean
+    if key = "LanguageSelect"
         OnLanguageKeySelected()
-        m.top.text = text
+        return true
     end if
-    m.top.text2 = text
+
+    LogDebug("Key selected:", key)
+    return false
 end function
 
 function OnLanguageKeySelected() as void
@@ -79,5 +72,5 @@ function SetCurrentLanguage(code as string) as void
 
     LogDebug("Setting keyboard language to", code)
     m.currentLanguage = code
-    m.top.keyGrid.mode = code
+    m.top.keyGrid.keyDefinitionUri = "libpkg:/config/search-kb-layout/" + code + ".json5"
 end function
