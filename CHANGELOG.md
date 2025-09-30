@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for different languages in the search
+- Support for different languages in the search keyboard
+  - Initial list: English, Deutsch, Español, Français, Português and Русский
+  - More can be added later.
 
 ## [0.41.21] - 2025-09-28
 
