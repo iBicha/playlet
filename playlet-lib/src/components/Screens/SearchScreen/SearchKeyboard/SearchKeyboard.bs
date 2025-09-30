@@ -1,0 +1,92 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    CopyFile("libpkg:/images/icons/globe-white.png", "tmp:/globe-white.png")
+    CopyFile("libpkg:/images/icons/globe-black.png", "tmp:/globe-black.png")
+
+    m.languages = [
+        { code: "en_US", name: "English" }
+        { code: "de_DE", name: "Deutsch" }
+        { code: "es_ES", name: "Español" }
+        { code: "fr_FR", name: "Français" }
+        { code: "pt_BR", name: "Português" }
+        { code: "ru_RU", name: "Русский" }
+    ]
+
+    languageKeys = {}
+    for each lang in m.languages
+        languageKeys[lang.code] = true
+    end for
+    m.languageKeys = languageKeys
+end function
+
+function OnNodeReady() as void
+    OnLanguagePreferenceChanged()
+    m.preferences.ObserveFieldScoped("search.keyboard_language", FuncName(OnLanguagePreferenceChanged))
+end function
+
+function keySelected(key as string) as boolean
+    if key = "LanguageSelect"
+        OnLanguageKeySelected()
+        return true
+    end if
+
+    LogDebug("Key selected:", key)
+    return false
+end function
+
+function OnLanguageKeySelected() as void
+    LogDebug("Language key selected")
+
+    buttons = []
+    for each lang in m.languages
+        buttons.Push(lang.name)
+    end for
+
+    dialog = DialogUtils.ShowDialogEx({
+        message: ""
+        title: Locale.Dialogs.SelectKeyboardLanguage
+        buttons: buttons
+    })
+    if dialog = invalid
+        return
+    end if
+
+    dialog.observeField("buttonSelected", FuncName(OnLanguageSelected), ["buttonSelected"])
+end function
+
+function OnLanguageSelected(event as object) as void
+    buttonIndex = event.GetData()
+
+    if not IsInt(buttonIndex) or buttonIndex < 0 or buttonIndex >= m.languages.Count()
+        return
+    end if
+
+    lang = m.languages[buttonIndex]
+    SetCurrentLanguage(lang.code)
+    m.preferences["search.keyboard_language"] = lang.code
+end function
+
+function OnLanguagePreferenceChanged() as void
+    language = m.preferences["search.keyboard_language"]
+    if StringUtils.IsNullOrEmpty(language) or not ValidBool(m.languageKeys[language])
+        LogDebug("Invalid or missing keyboard language:", language, "defaulting to en_US")
+        language = "en_US"
+        m.preferences["search.keyboard_language"] = language
+    end if
+
+    SetCurrentLanguage(language)
+end function
+
+function SetCurrentLanguage(code as string) as void
+    if code = m.currentLanguage
+        return
+    end if
+
+    LogDebug("Setting keyboard language to", code)
+    m.currentLanguage = code
+    m.top.keyGrid.keyDefinitionUri = "libpkg:/config/search-kb-layout/" + code + ".json5"
+end function

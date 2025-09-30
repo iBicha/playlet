@@ -1392,5 +1392,9 @@
         <source>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</source>
         <translation>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</translation>
     </message>
+    <message>
+        <source>Select keyboard language</source>
+        <translation>Select keyboard language</translation>
+    </message>
 </context>
 </TS>

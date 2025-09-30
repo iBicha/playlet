@@ -1256,5 +1256,9 @@
         <source>Cache cleared.</source>
         <translation>Cache effacé.</translation>
     </message>
+    <message>
+        <source>Select keyboard language</source>
+        <translation>Sélectionner la langue du clavier</translation>
+    </message>
 </context>
 </TS>

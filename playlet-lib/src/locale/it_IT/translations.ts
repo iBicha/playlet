@@ -4,5 +4,9 @@
     <defaultcodec>UTF-8</defaultcodec>
     <context>
         <name>default</name>
+        <message>
+            <source>Select keyboard language</source>
+            <translation>Seleziona la lingua della tastiera</translation>
+        </message>
     </context>
 </TS>

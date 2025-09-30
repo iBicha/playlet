@@ -1260,5 +1260,9 @@
         <source>Filler Tangent/Jokes</source>
         <translation>Chistes de relleno</translation>
     </message>
+    <message>
+        <source>Select keyboard language</source>
+        <translation>Seleccionar idioma del teclado</translation>
+    </message>
 </context>
 </TS>

@@ -41,7 +41,7 @@
   };
 </script>
 
-{#if visibility !== "tv"}
+{#if visibility !== "tv" && visibility !== "off"}
   {#if type === "boolean"}
     <BooleanControl {displayText} {key} {description} {level} />
   {:else if type === "radio"}
