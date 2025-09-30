@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for different languages in the search keyboard
   - Initial list: English, Deutsch, Español, Français, Português and Русский
-  - More can be added later.
+  - [More can be added later](https://github.com/iBicha/playlet/issues/362#issuecomment-3352455559).
 
 ## [0.41.21] - 2025-09-28
 
