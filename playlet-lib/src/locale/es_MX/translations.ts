@@ -1272,5 +1272,9 @@
         <source>Do not show again</source>
         <translation>No mostrar de nuevo</translation>
     </message>
+    <message>
+        <source>Select keyboard language</source>
+        <translation>Seleccionar idioma del teclado</translation>
+    </message>
 </context>
 </TS>

@@ -1377,6 +1377,10 @@
         <translation>Option für %1 auswählen</translation>
     </message>
     <message>
+        <source>Select keyboard language</source>
+        <translation>Tastatursprache auswählen</translation>
+    </message>
+    <message>
         <source>Disable</source>
         <translation>Deaktivieren</translation>
     </message>
