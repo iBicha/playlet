@@ -198,10 +198,12 @@ class LongPoller
             m.status_code = Val(statusCode)
             m.status_text = status.Mid(spaceIndex + 1)
             if m.status_code <> 200
-                if m.status_code = 410 or (m.status_code = 400 and m.status_text = "Unknown SID")
-                    LogErrorNoTelemetry("Invalid status code:", m.status_code, m.status_text, `\nResponse data:`, m.socket_buffer)
+                ' TODO:P2 refactor http parsing! headers probably contains a keep-alive, but we
+                ' ignore and close anyway
+                if m.status_code = 410 or (m.status_code = 400 and m.socket_buffer.InStr("Unknown SID") <> -1)
+                    LogErrorNoTelemetry("Invalid status code:", m.status_code, `\nResponse data:`, m.socket_buffer)
                 else
-                    LogError("Invalid status code:", m.status_code, m.status_text, `\nResponse data:`, m.socket_buffer)
+                    LogError("Invalid status code:", m.status_code, `\nResponse data:`, m.socket_buffer)
                 end if
                 m.CloseSocket()
                 return false
