@@ -564,7 +564,13 @@ class LoungeApi
                 })
 
                 if not response.IsSuccess()
-                    if response.StatusCode() = 410 or (response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1)
+                    isGone = response.StatusCode() = 410
+                    unknownSid = response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
+                    ' TODO:P2 handle expired lounge id token
+                    ' expiredLoungeIdToken = response.StatusCode() = 401 and response.ErrorMessage().InStr("Expired lounge id token") <> -1
+                    isKnownError = isGone or unknownSid
+
+                    if isKnownError
                         LogErrorNoTelemetry(response.ErrorMessage())
                     else
                         LogError(response.ErrorMessage())
