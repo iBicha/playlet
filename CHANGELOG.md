@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Bug: credentialTransferTokens should only be used with TV clients
+- [Perf] reduce memory usage by freeing playlist videos when playlist view is closed
 
 ## [0.42.0] - 2025-09-30
 

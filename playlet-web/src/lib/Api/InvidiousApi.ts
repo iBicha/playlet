@@ -241,6 +241,7 @@ export class InvidiousApi {
 
     private async PlaylistInfoHandler(feedSource, responseJson) {
         responseJson.type = "playlist";
+        delete responseJson.videos;
         return { items: [responseJson] };
     }
 
