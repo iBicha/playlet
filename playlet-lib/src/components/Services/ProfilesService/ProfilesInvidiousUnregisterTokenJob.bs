@@ -10,22 +10,19 @@ function ExecuteJob() as void
     service = new Invidious.InvidiousService(invidiousNode)
 
     for each profileNode in profileContentNodes
+        ' Refresh token is for Innertube
+        token = profileNode.refreshToken
+        if StringUtils.IsNullOrEmpty(token)
+            token = profileNode.accessToken
+        end if
+
         authToken = {
             instance: profileNode.serverUrl
-            token: profileNode.accessToken
+            token: token
         }
         response = service.UnregisterToken(authToken)
         if not response.IsSuccess()
             LogWarn(`Failed to unregister token: ${response.ErrorMessage()}`)
-        end if
-
-        refreshToken = profileNode.refreshToken
-        if not StringUtils.IsNullOrEmpty(refreshToken)
-            authToken.token = refreshToken
-            response = service.UnregisterToken(authToken)
-            if not response.IsSuccess()
-                LogWarn(`Failed to unregister refresh token: ${response.ErrorMessage()}`)
-            end if
         end if
     end for
 end function
