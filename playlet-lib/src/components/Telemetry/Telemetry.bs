@@ -13,6 +13,7 @@ function Init() as void
 end function
 
 function OnNodeReady() as void
+    m.deviceInfo = CreateObject("roDeviceInfo")
     m.tags = GetTags()
     m.release = GetRelease(m.tags)
     m.dist = GetDist(m.tags)
@@ -160,6 +161,12 @@ function GetTags() as object
             tags[key] = ToString(tags[key])
         end if
     end for
+
+    ' A session ID in this case acts as single trace ID for all events sent during a single app session
+    ' For example, to understand why a requested hit a 403, it could be explained by a previous
+    ' refresh token failure event that happened earlier in the same session
+    tags["session_id"] = m.deviceInfo.GetRandomUUID()
+
     return tags
 end function
 

@@ -21,7 +21,7 @@ namespace Sentry
             payload += `{"type":"event"}` + `\n`
 
             if StringUtils.IsNullOrEmpty(event.event_id)
-                event.event_id = GenerateEventId()
+                event.event_id = m.deviceInfo.GetRandomUUID().Replace("-", "")
             end if
 
             if StringUtils.IsNullOrEmpty(event.timestamp)
@@ -114,15 +114,6 @@ namespace Sentry
 
         LogDebug("Sent events to Sentry. Response:", response.Text())
         return 0
-    end function
-
-    function GenerateEventId() as string
-        hexChars = "0123456789abcdef"
-        eventId = ""
-        for i = 0 to 31
-            eventId = eventId + hexChars.Mid(rnd(16) - 1, 1)
-        end for
-        return eventId
     end function
 
     function GetFingerprint(message as dynamic) as dynamic
