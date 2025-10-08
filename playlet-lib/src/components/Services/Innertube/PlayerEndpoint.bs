@@ -291,7 +291,11 @@ namespace Innertube
             end if
 
             queryComponents = UrlUtils.ParseQueryComponents(baseUrl)
-            queryComponents["fmt"] = "vtt"
+            ' Can be vtt, ttml or srt
+            ' vtt has "align:start position:0%" on auto-generated captions
+            ' srt has large spacing between lines on auto-generated captions
+            ' ttml has default styling, with smaller font than the default size
+            queryComponents["fmt"] = "ttml"
             baseUrl = UrlUtils.SetQueryParams(baseUrl, queryComponents)
 
             languageCode = track["languageCode"]
@@ -299,19 +303,7 @@ namespace Innertube
                 continue for
             end if
 
-            label = ""
-            name = track["name"]
-            if IsAssociativeArray(name)
-                runs = name["runs"]
-                if IsArray(runs)
-                    for each rn in runs
-                        text = rn["text"]
-                        if IsString(text)
-                            label += text
-                        end if
-                    end for
-                end if
-            end if
+            label = ParseText(track["name"])
 
             captions.Push({
                 "label": label
