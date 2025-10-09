@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A bug when invalidating tokens
 - Issue with auto-generated subtitles aligned to the left by using TTML captions
+- Crash when telemetry thread turned off and then back on
 
 ## [0.42.1] - 2025-10-04
 
