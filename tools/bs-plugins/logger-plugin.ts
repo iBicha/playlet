@@ -237,7 +237,11 @@ function ${newFunctionName}(${args.join(', ')}) as void
     logger.logLine = line
 `;
         if (telemetryEnabled) {
-            result += `    m.global.telemetry.${originalFunctionName} = line\n`;
+            result += `    telemetry = m.global.telemetry
+    if telemetry <> invalid
+        telemetry.${originalFunctionName} = line
+    end if
+`;
         }
         result += `end function
 `;
