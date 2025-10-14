@@ -91,6 +91,8 @@ namespace Innertube
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             ' Ignored nodes:
+            ' TODO:P2 handle navigateAction - which are usually a redirect
+            "navigateAction": ParseNotImplemented
             ' TODO:P2 radioRenderer seems like a Mix https://github.com/iBicha/playlet/issues/709
             "radioRenderer": ParseNotImplemented
             "compactRadioRenderer": ParseNotImplemented
@@ -1363,6 +1365,10 @@ namespace Innertube
             end if
         end if
 
+        if lengthText = ""
+            lengthText = ParseText(ObjectUtils.Dig(nodeData, ["header", "trackTileHeaderRenderer", "duration"]))
+        end if
+
         renderedLines = []
         lines = ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "lines"])
         if IsArray(lines)
@@ -1374,10 +1380,15 @@ namespace Innertube
             end for
         end if
 
+        title = ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+        if title = ""
+            title = ParseText(ObjectUtils.Dig(nodeData, ["header", "trackTileHeaderRenderer", "title"]))
+        end if
+
         video = {
             "type": "video"
             "videoId": videoId
-            "title": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "title": title
             "videoThumbnails": videoThumbnails
             "lengthText": lengthText
             "liveNow": liveNow
