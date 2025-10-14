@@ -1366,11 +1366,11 @@
     </message>
     <message>
         <source>Playlet is a third-party app and is not affiliated with, endorsed by, or sponsored by YouTube or Google. All trademarks and registered trademarks mentioned are the property of their respective owners and are used only for identification purposes.</source>
-        <translation type="unfinished">Playlet ist eine Drittanbieter-App, wird weder von YouTube noch von Google unterstützt oder gesponsert und steht in keiner Verbindung zu diesen. Alle hier erwähnten (eingetragenen) Marken sind geistiges Eigentum ihrer jeweiligen Besitzer und werden nur zu Identifikationszwecken genutzt.</translation>
+        <translation>Playlet ist eine Drittanbieter-App, wird weder von YouTube noch von Google unterstützt, empfohlen oder gesponsert und steht in keiner Verbindung zu diesen. Alle hier erwähnten (eingetragenen) Marken sind geistiges Eigentum ihrer jeweiligen Besitzer und werden nur zu Identifikationszwecken genutzt.</translation>
     </message>
     <message>
         <source>By using Playlet and signing in with your YouTube account, you acknowledge that you do so at your own risk. The developers of Playlet are not liable for any harm, including but not limited to data loss, account suspension or ban, hacking, or loss of content.</source>
-        <translation type="unfinished">Die Benutzung von Playlet und das Anmelden mit einem YouTube-Benutzerkonto erfolgt auf Ihr eigenes Risiko hin. Die Entwickler von Playlet sind für jedwegen Schaden, inklusive, aber nicht ausschließlich dem Verlust von Daten, der Sperrung/ Inaktivierung von Benutzerkonten und Hacking, nicht haftbar oder verantwortlich.</translation>
+        <translation>Die Benutzung von Playlet und das Anmelden mit einem YouTube-Benutzerkonto erfolgt auf Ihr eigenes Risiko hin. Die Entwickler von Playlet sind für jedwegen Schaden, inklusive (aber nicht ausschließlich) dem Verlust von Daten, der Sperrung/ Inaktivierung von Benutzerkonten und Hacking, nicht haftbar oder verantwortlich.</translation>
     </message>
     <message>
         <source>Select option for %1</source>
@@ -1383,6 +1383,18 @@
     <message>
         <source>Disable</source>
         <translation>Deaktivieren</translation>
+    </message>
+    <message>
+        <source>Open in YouTube</source>
+        <translation>Auf YouTube öffnen</translation>
+    </message>
+    <message>
+        <source>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</source>
+        <translation>Helfen Sie mit, Playlet zu verbessern, indem Sie die diagnostische Datenerhebung aktivieren. Diese wird dem Entwickler anonymisierte Nutzungsdaten schicken.</translation>
+    </message>
+    <message>
+        <source>Enable Diagnostics</source>
+        <translation>Diagnostische Datenerhebung aktivieren</translation>
     </message>
 </context>
 </TS>
