@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - German translations
 
-## Fixed
+### Fixed
 
 - A bug where title and duration of songs were missing an an album playlist
 - Error when loading trending videos by retrying to load the feed
