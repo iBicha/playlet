@@ -48,6 +48,7 @@ namespace Innertube
             "watchNextEndScreenRenderer": ParseWatchNextEndScreenRenderer
             "tabRenderer": ParseTabRenderer
             "sectionListRenderer": ParseSectionListRenderer
+            "sectionListContinuation": ParseSectionListRenderer
             "richSectionRenderer": ParseRichSectionRenderer
             "itemSectionRenderer": ParseItemSectionRenderer
             "shelfRenderer": ParseShelfRenderer
@@ -90,6 +91,7 @@ namespace Innertube
             "reloadContinuationItemsCommand": ParseReloadContinuationItemsCommand
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
+            "gridButtonRenderer": ParseGridButtonRenderer
             ' Ignored nodes:
             ' TODO:P2 handle navigateAction - which are usually a redirect
             "navigateAction": ParseNotImplemented
@@ -109,6 +111,7 @@ namespace Innertube
             "horizontalMovieListRenderer": ParseNotImplemented
             "gridMovieRenderer": ParseNotImplemented
             "gridShowRenderer": ParseNotImplemented
+            "playlistShowMetadataRenderer": ParseNotImplemented
             ' Contains comments "teaser".
             "commentsEntryPointHeaderRenderer": ParseNotImplemented
             ' Contains the owner of the video from "videoPrimaryInfoRenderer"
@@ -1640,6 +1643,15 @@ namespace Innertube
     function ParseTvSurfaceContentContinuation(nodeData as object, _context as object) as object
         ' title = ParseText(ObjectUtils.Dig(nodeData, ["header", "tvSurfaceHeaderRenderer", "title"]))
         return nodeData["content"]
+    end function
+
+    function ParseGridButtonRenderer(nodeData as object, context as object) as object
+        signal = ObjectUtils.Dig(nodeData, ["navigationEndpoint", "signalServiceEndpoint", "actions", 0, "signalAction", "signal"])
+        isRefreshButton = signal = "SOFT_RELOAD_PAGE"
+        if not isRefreshButton
+            Warning(`Unknown node gridButtonRenderer`, nodeData, context)
+        end if
+        return invalid
     end function
 
     function ParseText(data as dynamic) as string
