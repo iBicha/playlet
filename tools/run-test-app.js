@@ -7,6 +7,11 @@ const rokuDeploy = require('roku-deploy');
 const path = require('path');
 const fs = require('fs');
 const spawn = require('child_process').spawn;
+const shell = require('shelljs');
+
+if (!shell.which('telnet')) {
+    throw new Error('The telnet command is not available. Please install a telnet client and make sure it is in your PATH.');
+}
 
 function getArgumentParser() {
     const parser = new ArgumentParser({

@@ -3,6 +3,7 @@
 // as well as the package.json files in the playlet-app/playlet-lib/playlet-web folders.
 
 const fs = require('fs');
+const path = require('path');
 const { execSync } = require("child_process");
 
 const semverParse = require('semver/functions/parse');
@@ -13,7 +14,7 @@ const packageJson = JSON.parse(packageJsonContent);
 const version = packageJson.version;
 const parsedVersion = semverParse(version);
 
-["playlet-app/src/manifest", "playlet-lib/src/manifest"].forEach(function (manifestPath) {
+[path.join("playlet-app", "src", "manifest"), path.join("playlet-lib", "src", "manifest")].forEach(function (manifestPath) {
     let appManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' });
 
     const majorPattern = /major_version=(\d+)/;
