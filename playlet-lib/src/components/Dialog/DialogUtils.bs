@@ -5,6 +5,9 @@ import "pkg:/source/utils/Types.bs"
 
 namespace DialogUtils
 
+    ' Very large messages can lead to execution timeout
+    const MESSAGE_LENGTH_LIMIT = 1000
+
     function ShowDialogEx(options as object) as object
         currentDialog = m.top.getScene().dialog
         alwaysOnTop = false
@@ -24,6 +27,9 @@ namespace DialogUtils
         if options.DoesExist("message")
             message = options.message
             if IsString(message)
+                if message.Len() > MESSAGE_LENGTH_LIMIT
+                    message = message.Left(MESSAGE_LENGTH_LIMIT) + "..."
+                end if
                 message = message.Tokenize(`\n`).ToArray()
             end if
             dialog.message = message
@@ -82,7 +88,10 @@ namespace DialogUtils
         end if
 
         dialog = CreateObject("roSGNode", "TimedDialog")
-        if GetInterface(message, "ifArray") = invalid
+        if IsString(message)
+            if message.Len() > MESSAGE_LENGTH_LIMIT
+                message = message.Left(MESSAGE_LENGTH_LIMIT) + "..."
+            end if
             message = message.Tokenize(`\n`).ToArray()
         end if
         dialog.message = message
