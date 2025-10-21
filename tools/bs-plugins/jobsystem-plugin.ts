@@ -10,6 +10,7 @@ import {
     FunctionStatement,
     DiagnosticSeverity,
 } from 'brighterscript';
+import path from 'path';
 
 export class JobSystemPlugin implements CompilerPlugin {
     public name = 'JobSystemPlugin';
@@ -29,7 +30,7 @@ export class JobSystemPlugin implements CompilerPlugin {
                 }
 
                 const xml = this.generateJobXml(jobName, file.pkgPath)
-                const xmlFile = `components/JobSystem/generated/${jobName}.xml`
+                const xmlFile = path.join('components', 'JobSystem', 'generated', `${jobName}.xml`);
 
                 if (program.hasFile(xmlFile)) {
                     const currentContent = program.getFile(xmlFile).fileContents

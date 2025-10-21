@@ -17,7 +17,7 @@ import {
 } from 'brighterscript';
 import path from 'path';
 
-const loggingFilePath = 'source/utils/Logging.bs';
+const loggingFilePath = path.join('source', 'utils', 'Logging.bs');
 const logFunctions = {
     LogError: {
         stringLevel: 'ERROR',
