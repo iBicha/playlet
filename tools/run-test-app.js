@@ -6,7 +6,7 @@ const getEnvVars = require('./get-env-vars');
 const rokuDeploy = require('roku-deploy');
 const path = require('path');
 const fs = require('fs');
-const spawn = require('child_process').spawn;
+const { Telnet } = require('telnet-client');
 
 function getArgumentParser() {
     const parser = new ArgumentParser({
@@ -20,33 +20,19 @@ function getArgumentParser() {
     return parser;
 }
 
-const childProcesses = [];
-
-function processCleanup() {
-    childProcesses.forEach(function (child) {
-        try {
-            child.kill();
-        } catch (error) {
-
-        }
-    });
-}
-
-function exitHandler(options, exitCode) {
-    if (options.cleanup) {
-        processCleanup();
-    }
-    if (options.exit) {
-        process.exit(exitCode);
-    }
-}
-
-process.on('exit', exitHandler.bind(null, { cleanup: true }));
-process.on('SIGINT', exitHandler.bind(null, { exit: true }));
-process.on('SIGUSR1', exitHandler.bind(null, { exit: true }));
-process.on('SIGUSR2', exitHandler.bind(null, { exit: true }));
-process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
-
+process.on('SIGINT', () => {
+    process.exit(1); // Exit on Ctrl+C
+});
+process.on('SIGUSR1', () => {
+    process.exit(1); // Exit on SIGUSR1
+});
+process.on('SIGUSR2', () => {
+    process.exit(1); // Exit on SIGUSR2
+});
+process.on('uncaughtException', (error, origin) => {
+    console.error(error);
+    process.exit(1); // Exit on uncaught exceptions
+});
 
 (async () => {
     let success = false;
@@ -86,14 +72,14 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
             // ignored
         }
 
-        console.log('Starting telnet process');
-        telnet = await startTelnetProcessAsync(options.host, options.telnetPort);
+        console.log('Starting telnet client');
+        telnet = await startTelnetClientAsync(options.host, options.telnetPort);
 
         console.log('Publishing package');
         await rokuDeploy.publish(options);
 
         console.log('Waiting for test to finish');
-        let data = await readFromProcessUntil(telnet, timeout);
+        let data = await readFromTelnetUntil(telnet, timeout);
 
         if (reportOnly) {
             data = parseTestReport(data);
@@ -107,7 +93,7 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
         console.error(error);
     }
     finally {
-        telnet?.kill();
+        telnet?.end();
     }
     if (success) {
         console.log('Tests passed!');
@@ -117,31 +103,36 @@ process.on('uncaughtException', exitHandler.bind(null, { exit: true }));
     process.exit(success ? 0 : 1);
 })();
 
-function startTelnetProcessAsync(host, port, timeoutSeconds = 2) {
-    return new Promise((resolve, reject) => {
-        const telnet = spawn('telnet', [host, port]);
-        childProcesses.push(telnet);
+function startTelnetClientAsync(host, port, timeoutSeconds = 2) {
+    return new Promise(async (resolve, reject) => {
+        const connection = new Telnet();
 
-        let timeoutID;
-        function timeoutReached() {
-            resolve(telnet);
-        }
+        const params = {
+            host: host,
+            port: port,
+            negotiationMandatory: false,
+            timeout: timeoutSeconds * 1000
+        };
 
-        telnet.stdout.on('data', (data) => {
-            clearTimeout(timeoutID);
-            timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
+        connection.on('close', function () {
+            console.log('connection closed');
         });
 
-        telnet.stderr.on('data', (data) => {
-            console.error(`stderr: ${data}`);
-            reject()
-        })
+        connection.on('error', function (error) {
+            console.error('telnet connection error:', error);
+            reject(error);
+        });
 
-        timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
+        try {
+            await connection.connect(params);
+            resolve(connection);
+        } catch (error) {
+            reject(error);
+        }
     });
 }
 
-function readFromProcessUntil(proc, timeoutSeconds = 20, endToken = 'AppExitComplete') {
+function readFromTelnetUntil(connection, timeoutSeconds = 20, endToken = 'AppExitComplete') {
     return new Promise((resolve, reject) => {
         let data = '';
 
@@ -149,27 +140,21 @@ function readFromProcessUntil(proc, timeoutSeconds = 20, endToken = 'AppExitComp
 
         function timeoutReached() {
             reject(`Timeout of ${timeoutSeconds} seconds waiting for ${endToken}`);
-            proc.kill();
+            connection.end();
         }
 
-        proc.stdout.on('data', (chunk) => {
-            process.stdout.write(chunk);
+        connection.on('data', (chunk) => {
+            process.stdout.write(chunk.toString());
             clearTimeout(timeoutID);
 
-            data += chunk;
+            data += chunk.toString();
             if (data.includes(endToken)) {
                 resolve(data);
-                proc.kill();
+                connection.end();
                 return;
             }
             timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
         });
-
-        proc.stderr.on('data', (data) => {
-            clearTimeout(timeoutID);
-            console.error(`stderr: ${data}`);
-            reject()
-        })
 
         timeoutID = setTimeout(timeoutReached, timeoutSeconds * 1000);
     });

@@ -10,6 +10,7 @@ import {
     isBrsFile,
 } from 'brighterscript';
 import { existsSync } from 'fs-extra';
+import path from 'path';
 
 export class ImportValidationPlugin implements CompilerPlugin {
     public name = 'ImportValidationPlugin';
@@ -33,13 +34,13 @@ export class ImportValidationPlugin implements CompilerPlugin {
     }
 
     generateXmlComponent(file: BscFile) {
-        const path = file.pkgPath;
-        const name = path.split('/').pop().replace('.bs', '') + `TestComponent${path.length}`;
+        const pkgPath = file.pkgPath;
+        const name = path.basename(pkgPath, '.bs') + `TestComponent${pkgPath.length}`;
         const content = `<component name="${name}" extends="Node">
-<script type="text/brightscript" uri="pkg:/${file.pkgPath}" />
+<script type="text/brightscript" uri="pkg:/${pkgPath}" />
 </component>`
 
-        file.program.setFile(`${path}.TestComponent.xml`, content);
+        file.program.setFile(`${pkgPath}.TestComponent.xml`, content);
     }
 }
 
