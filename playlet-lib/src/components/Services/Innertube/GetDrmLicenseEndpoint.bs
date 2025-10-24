@@ -1,0 +1,76 @@
+namespace Innertube
+
+    function CreateGetDrmLicenceRequest(options as object) as object
+        videoId = OptionUtils.Get(options, "videoId")
+        licenseRequest = OptionUtils.Get(options, "licenseRequest")
+        drmParams = OptionUtils.Get(options, "drmParams")
+        drmSessionId = OptionUtils.Get(options, "drmSessionId")
+        cpn = OptionUtils.Get(options, "cpn")
+        cancellation = OptionUtils.Get(options, "cancellation")
+        visitorData = OptionUtils.Get(options, "visitorData")
+        accessToken = OptionUtils.Get(options, "accessToken")
+
+        deviceInfo = CreateObject("roDeviceInfo")
+        LogDebug("GetDrmInfoEx():", ToString(deviceInfo.GetDrmInfoEx()))
+
+        context = Innertube.CreateContext(ClientType.Tv, deviceInfo, options)
+
+        payload = {
+            "videoId": videoId
+            "context": context
+            "sessionId": drmSessionId
+            "cpn": cpn
+            "licenseRequest": licenseRequest
+            "drmParams": drmParams
+            "drmSystem": "DRM_SYSTEM_WIDEVINE"
+            "drmVideoFeature": "DRM_VIDEO_FEATURE_SDR"
+        }
+
+        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player/get_drm_license?alt=json", payload)
+        request.Headers(Innertube.CreateHeaders(ClientType.Tv))
+
+        if not StringUtils.IsNullOrEmpty(accessToken)
+            request.Header("Authorization", "Bearer " + accessToken)
+        else if not StringUtils.IsNullOrEmpty(visitorData)
+            request.Header("x-goog-visitor-id", visitorData)
+        end if
+
+        request.Cancellation(cancellation)
+        return request
+    end function
+
+    function ParseGetDrmLicenseResponse(payload as object) as dynamic
+        if not IsAssociativeArray(payload)
+            return {
+                "error": "Invalid JSON response"
+            }
+        end if
+
+        status = ValidString(payload.status)
+        if status <> "LICENSE_STATUS_OK"
+            return {
+                "error": "DRM license request failed with status: " + status
+            }
+        end if
+
+        license = ValidString(payload.license)
+        if StringUtils.IsNullOrEmpty(license)
+            return {
+                "error": "DRM license is missing in the response"
+            }
+        end if
+
+        buffer = createObject("roByteArray")
+        buffer.FromBase64String(license.Replace("-", "+").Replace("_", "/"))
+        return buffer
+    end function
+
+    function GenerateDrmSessionId() as string
+        sessionId = ""
+        for i = 0 to 15
+            sessionId = sessionId + StrI(rnd(16), 16)
+        end for
+        return sessionId
+    end function
+
+end namespace

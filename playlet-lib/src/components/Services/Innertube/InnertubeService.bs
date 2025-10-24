@@ -1,6 +1,7 @@
 import "pkg:/components/Services/Innertube/BrowseEndpoint.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/GetDrmLicenseEndpoint.bs"
 import "pkg:/components/Services/Innertube/NextEndpoint.bs"
 import "pkg:/components/Services/Innertube/OAuth.bs"
 import "pkg:/components/Services/Innertube/PlayerEndpoint.bs"
@@ -779,5 +780,18 @@ namespace InnertubeService
 
     function AuthListAccounts(accessToken as string, cancellation = invalid as object) as object
         return Innertube.ListAccounts(accessToken, cancellation)
+    end function
+
+    function GetDrmLicense(options as object) as dynamic
+        request = Innertube.CreateGetDrmLicenceRequest(options)
+
+        response = request.Await()
+        if not response.IsSuccess()
+            return {
+                error: response.ErrorMessage()
+            }
+        end if
+
+        return Innertube.ParseGetDrmLicenseResponse(response.Json())
     end function
 end namespace

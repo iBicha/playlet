@@ -11,6 +11,7 @@ namespace Http
             super()
 
             m.innertube = server.sceneNodes.innertube
+            m.profilesService = server.sceneNodes.profilesService
         end function
 
         @get("/api/innertube/session")
@@ -31,7 +32,7 @@ namespace Http
             request = context.request
             response = context.response
 
-            payload = request.Json()
+            payload = request.BodyJson()
             if payload = invalid or not IsAssociativeArray(payload)
                 response.Default(400, "Invalid payload")
                 return true
@@ -62,7 +63,7 @@ namespace Http
             request = context.request
             response = context.response
 
-            requestArgs = request.Json()
+            requestArgs = request.BodyJson()
             if requestArgs = invalid
                 response.Default(400, "Invalid request body")
                 return true
@@ -85,6 +86,56 @@ namespace Http
             }
 
             response.Json(result)
+            return true
+        end function
+
+        @post("/api/innertube/get_drm_license")
+        function GetDrmLicense(context as object) as object
+            request = context.request
+            response = context.response
+
+            drmStringQueryParams = ["videoId", "drmParams", "drmSessionId", "cpn"]
+            for each paramName in drmStringQueryParams
+                if StringUtils.IsNullOrEmpty(request.query[paramName])
+                    response.Default(400, "Missing " + paramName)
+                    return true
+                end if
+            end for
+
+            licenseRequest = request.BodyBytes()
+            if not IsByteArray(licenseRequest) or licenseRequest.count() = 0
+                response.Default(400, "Missing licenseRequest")
+                return true
+            end if
+
+            options = {
+                "videoId": request.query.videoId
+                "drmParams": request.query.drmParams
+                "drmSessionId": request.query.drmSessionId
+                "cpn": request.query.cpn
+                "licenseRequest": licenseRequest.ToBase64String()
+            }
+
+            currentProfile = m.profilesService.currentProfile
+            if currentProfile <> invalid and currentProfile.type = "youtube"
+                options["accessToken"] = currentProfile.accessToken
+            else
+                options["visitorData"] = m.innertube.visitorData
+            end if
+
+            drmResponse = InnertubeService.GetDrmLicense(options)
+
+            if IsByteArray(drmResponse)
+                response.http_code = 200
+                response.SetBodyDataBuffer(drmResponse)
+                response.ContentType("text/html; charset=utf-8")
+                response.headers["Cache-Control"] = "no-cache"
+            else if IsAssociativeArray(drmResponse)
+                response.Default(500, FormatJson(drmResponse))
+            else
+                response.Default(500, "Invalid DRM license response")
+            end if
+
             return true
         end function
 

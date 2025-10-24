@@ -14,6 +14,8 @@ namespace Innertube
         accessToken = OptionUtils.Get(options, "accessToken")
         doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
 
+        cpn = InnertubeService.CreateClientPlaybackNonce()
+
         useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
 
         deviceInfo = CreateObject("roDeviceInfo")
@@ -23,6 +25,7 @@ namespace Innertube
         payload = {
             "videoId": videoId
             "context": context
+            "cpn": cpn
             "playbackContext": {
                 "contentPlaybackContext": {
                     "vis": 0
@@ -59,6 +62,7 @@ namespace Innertube
         end if
 
         request.signatureTimestamp = signatureTimestamp
+        request.cpn = cpn
 
         return request
     end function
@@ -131,6 +135,16 @@ namespace Innertube
 
         if videoDetails.DoesExist("viewCount")
             parsedResponse["viewCount"] = videoDetails["viewCount"].ToInt()
+        end if
+
+        if hasDrm
+            parsedResponse["drmParams"] = streamingData["drmParams"]
+            parsedResponse["licenseInfos"] = streamingData["licenseInfos"]
+            parsedResponse["drmSessionId"] = Innertube.GenerateDrmSessionId()
+        end if
+
+        if not StringUtils.IsNullOrEmpty(playerRequest.cpn)
+            parsedResponse["cpn"] = playerRequest.cpn
         end if
 
         parsedResponse["isLoggedIn"] = ParseIsLoggedIn(payload)

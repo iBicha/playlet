@@ -7,7 +7,6 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 namespace Http
-    const BUFSIZE = 65536
 
     class HttpConnection
         private total_received = 0
@@ -68,20 +67,12 @@ namespace Http
                 LogError("illegal request state @" + m.client)
             end if
 
-            rcvStrByteLen = m.socket.GetCountRcvBuf()
-            rcvStr = m.socket.receiveStr(Http.BUFSIZE)
-            received = rcvStr.len()
-            rcvStrByteLen -= m.socket.GetCountRcvBuf()
-
-            maybeUnicode = rcvStrByteLen <> received
+            received = m.request.Receive(m.socket)
 
             if m.CheckResult(received, "receive request")
                 m.total_received = m.total_received + received
                 server.total_in = server.total_in + received
             end if
-
-            ' append to connection request
-            m.request.Add(rcvStr, maybeUnicode)
 
             if m.request.ProcessNext(m)
                 if m.request.state = Http.HttpRequestState.DONE
@@ -94,7 +85,7 @@ namespace Http
                     m.close = true
                     LogErrorNoTelemetry("couldn't process request or response, closing @" + m.client)
                 end if
-            else if m.request.buffer.len() > m.settings.MaxRequestLength ' die if it's too long
+            else if m.request.buffer.Count() > m.settings.MaxRequestLength ' die if it's too long
                 m.response = new HttpResponse(m.request, m.server, m.settings)
                 m.response.Default(413, "Your request was dropped because it was too long.")
                 m.SetState(Http.HttpConnectionState.SEND_HEADER)

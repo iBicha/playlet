@@ -103,6 +103,20 @@ function ExecuteJob() as void
         return
     end if
 
+    isDrmDash = SupportsDrmDashManifest(metadata)
+    if isDrmDash
+        licenseServerURL = UrlUtils.BuildUrl(`http://127.0.0.1:${playletServerPort}/api/innertube/get_drm_license`, invalid, {
+            videoId: metadata.videoId
+            drmParams: metadata.drmParams
+            drmSessionId: metadata.drmSessionId
+            cpn: metadata.cpn
+        })
+        contentNode.drmParams = {
+            keySystem: "Widevine"
+            licenseServerURL: licenseServerURL
+        }
+    end if
+
     ' Forwarding query params to HLS playlists is not needed. In fact, it can cause issues
     ' because the playlist is limited to 4MB, and on large playlists the query params
     ' significantly increase the size of the playlist, making it cropped.
@@ -132,7 +146,9 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
 
     streamUrls = []
 
-    if SupportsHls(metadata)
+    if SupportsDrmDashManifest(metadata)
+        streamUrls.push(metadata.dashUrl)
+    else if SupportsHls(metadata)
         metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
         AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
     else if SupportsDash(metadata)
@@ -170,6 +186,30 @@ end function
 
 function SupportsMuxedFormats(metadata as object) as boolean
     return IsArray(metadata.formatStreams) and metadata.formatStreams.Count() > 0
+end function
+
+function SupportsDrmDashManifest(metadata as object) as boolean
+    if StringUtils.IsNullOrEmpty(metadata.drmParams)
+        return false
+    end if
+
+    if StringUtils.IsNullOrEmpty(metadata.drmSessionId)
+        return false
+    end if
+
+    if StringUtils.IsNullOrEmpty(metadata.cpn)
+        return false
+    end if
+
+    if not IsArray(metadata.licenseInfos) or metadata.licenseInfos.Count() = 0
+        return false
+    end if
+
+    if StringUtils.IsNullOrEmpty(metadata.dashUrl)
+        return false
+    end if
+
+    return true
 end function
 
 function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer)
