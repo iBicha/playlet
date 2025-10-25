@@ -7,7 +7,7 @@ import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Http
-    const BUFFER_READ_LENGTH = 262144
+    const BUFFER_READ_LENGTH = 65536
 
     function GetHttpRequestId() as integer
         m.http_request_id = ValidInt(m.http_request_id) + 1
@@ -57,6 +57,10 @@ namespace Http
             end if
 
             lengthToRead = MathUtils.Min(socket.GetCountRcvBuf(), BUFFER_READ_LENGTH)
+            if lengthToRead <= 0
+                return 0
+            end if
+
             newSize = m.buffer_index + lengthToRead
             if m.buffer.Count() < newSize
                 m.buffer[newSize - 1] = 0
@@ -155,15 +159,15 @@ namespace Http
             end if
 
             parts = startLine.tokenize(" ")
-            if parts.count() = 3
-                m.method = Ucase(parts[0])
-                m.uri = parts[1]
-                m.protocol = Ucase(parts[2])
-                LogInfo(`${m.method} '${m.uri}'`)
-            else
+            if parts.count() <> 3
                 LogError("invalid start line: " + startLine)
-                m.ready_for_response = true
+                return false
             end if
+
+            m.method = Ucase(parts[0])
+            m.uri = parts[1]
+            m.protocol = Ucase(parts[2])
+            LogInfo(`${m.method} '${m.uri}'`)
 
             return true
         end function
@@ -171,6 +175,7 @@ namespace Http
         function ParseHeader(line as string) as boolean
             splitIndex = line.InStr(":")
             if splitIndex <= 0
+                LogError("invalid header line:", line)
                 return false
             end if
             key = line.Left(splitIndex).Trim()

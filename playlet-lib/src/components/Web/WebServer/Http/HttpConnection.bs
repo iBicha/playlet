@@ -8,6 +8,12 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Http
 
+    enum HttpConnectionOperation
+        RECV_REQUEST = "RECV_REQUEST"
+        SEND_HEADER = "SEND_HEADER"
+        SEND_RESPONSE = "SEND_RESPONSE"
+    end enum
+
     class HttpConnection
         private total_received = 0
         private total_sent = 0
@@ -69,7 +75,7 @@ namespace Http
 
             received = m.request.Receive(m.socket)
 
-            if m.CheckResult(received, "receive request")
+            if m.CheckResult(received, HttpConnectionOperation.RECV_REQUEST)
                 m.total_received = m.total_received + received
                 server.total_in = server.total_in + received
             end if
@@ -106,7 +112,7 @@ namespace Http
 
             sent = m.response.SendHeader(m.socket)
 
-            if m.CheckResult(sent, "send header")
+            if m.CheckResult(sent, HttpConnectionOperation.SEND_HEADER)
                 m.total_sent = m.total_sent + sent
                 server.total_out = server.total_out + sent
             end if
@@ -123,7 +129,7 @@ namespace Http
             end if
 
             sent = m.response.Send(m.socket)
-            if m.CheckResult(sent, "send response")
+            if m.CheckResult(sent, HttpConnectionOperation.SEND_RESPONSE)
                 m.total_sent = m.total_sent + sent
                 server.total_out = server.total_out + sent
             end if
@@ -140,18 +146,20 @@ namespace Http
             end if
         end function
 
-        function CheckResult(byteCount as integer, op as string) as boolean
+        function CheckResult(byteCount as integer, op as Http.HttpConnectionOperation) as boolean
             gotSome = false
             if byteCount > 0
                 m.last_active.mark()
                 gotSome = true
+            else if byteCount = 0 and op = Http.HttpConnectionOperation.RECV_REQUEST
+                ' no data available to read right now
             else if m.socket.eOK() and not m.socket.eSuccess()
-                'info(m,op + " would have blocked @"+m.client)
+                ' LogDebug(op, "would have blocked", m.client)
             else
                 if m.socket.eSuccess()
-                    LogDebug(op + " peer closed @" + m.client)
+                    LogDebug(op, "peer closed", m.client)
                 else
-                    LogErrorNoTelemetry(op + " transfer error @" + m.client, m.socket.status())
+                    LogErrorNoTelemetry(op, " transfer error", m.client, m.socket.status())
                 end if
                 m.close = true
                 m.SetState(Http.HttpConnectionState.DONE)
