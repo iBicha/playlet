@@ -1,10 +1,11 @@
-import { Innertube, UniversalCache } from 'youtubei.js/web';
+import { Innertube, Platform, UniversalCache, type Types } from 'youtubei.js/web';
 import { getHost } from "lib/Api/Host";
 import { BG, buildURL, GOOG_API_KEY, type WebPoSignalOutput } from "bgutils-js";
 import { type BgConfig } from "bgutils-js";
 import type { VideoInfo } from 'node_modules/youtubei.js/dist/src/parser/youtube';
 import type { StoryboardData } from 'node_modules/youtubei.js/dist/src/parser/classes/PlayerStoryboardSpec';
 import type { PlayerLiveStoryboardSpec, PlayerStoryboardSpec } from 'node_modules/youtubei.js/dist/src/parser/nodes';
+import type { Format } from 'node_modules/youtubei.js/dist/src/parser/misc';
 
 export class YoutubeJs {
     static host = () => `http://${getHost()}`
@@ -118,6 +119,7 @@ export class YoutubeJs {
 
         YoutubeJs.innerTubePromise = new Promise(async (resolve, reject) => {
             try {
+                this.initJsEvaluator();
                 await YoutubeJs.initVisitorData()
                 YoutubeJs.innerTube = await Innertube.create({
                     fetch: YoutubeJs.fetch,
@@ -135,6 +137,24 @@ export class YoutubeJs {
         })
 
         return YoutubeJs.innerTubePromise;
+    }
+
+    static initJsEvaluator() {
+        Platform.shim.eval = async (data: Types.BuildScriptResult, env: Record<string, Types.VMPrimative>) => {
+            const properties = [];
+
+            if (env.n) {
+                properties.push(`n: exportedVars.nFunction("${env.n}")`)
+            }
+
+            if (env.sig) {
+                properties.push(`sig: exportedVars.sigFunction("${env.sig}")`)
+            }
+
+            const code = `${data.output}\nreturn { ${properties.join(', ')} }`;
+
+            return new Function(code)();
+        }
     }
 
     static async generateVisitorData() {
@@ -241,6 +261,8 @@ export class YoutubeJs {
             return null;
         }
 
+        YoutubeJs.innerTube.session.player.po_token = YoutubeJs.innerTube.session.po_token;
+
         // Populate a video object that is similar to Invidious format.
         // Mostly populate only fields we care about, enough to make it work.
         return {
@@ -277,58 +299,62 @@ export class YoutubeJs {
             isUpcoming: info.basic_info.is_upcoming,
             dashUrl: info.streaming_data.dash_manifest_url || "",
             hlsUrl: info.streaming_data.hls_manifest_url,
-            adaptiveFormats: YoutubeJs.getAdaptiveFormats(info),
-            formatStreams: [],
+            adaptiveFormats: await YoutubeJs.transformFormats(info.streaming_data?.adaptive_formats),
+            formatStreams: await YoutubeJs.transformFormats(info.streaming_data?.formats),
             captions: YoutubeJs.getCaptions(info),
         }
     }
 
-    static getAdaptiveFormats(videoInfo: VideoInfo) {
-        if (!videoInfo.streaming_data.adaptive_formats) {
+    static async transformFormats(formats: Format[]) {
+        if (!formats) {
             return [];
         }
 
-        return videoInfo.streaming_data.adaptive_formats.map(format => {
-            const result: any = {
-                init: format.init_range ? `${format.init_range.start}-${format.init_range.end}` : "",
-                index: format.index_range ? `${format.index_range.start}-${format.index_range.end}` : "",
-                bitrate: `${format.bitrate}`,
-                url: format.decipher(YoutubeJs.innerTube.session.player),
-                itag: `${format.itag}`,
-                type: format.mime_type,
-                clen: `${format.approx_duration_ms}`,
-                lmt: `${format.last_modified}`,
-            };
-            if (format.audio_quality) {
-                result.audioQuality = format.audio_quality;
-            }
-            if (format.audio_sample_rate) {
-                result.audioSampleRate = format.audio_sample_rate;
-            }
-            if (format.audio_channels) {
-                result.audioChannels = format.audio_channels;
-            }
+        return Promise.all(formats.map(format =>
+            YoutubeJs.transformStreamFormat(format)
+        ));
+    }
 
-            if (format.quality_label) {
-                result.qualityLabel = format.quality_label;
-            }
-            if (format.fps) {
-                result.fps = format.fps;
-            }
+    static async transformStreamFormat(format: Format): Promise<any> {
+        const result: any = {
+            init: format.init_range ? `${format.init_range.start}-${format.init_range.end}` : "",
+            index: format.index_range ? `${format.index_range.start}-${format.index_range.end}` : "",
+            bitrate: `${format.bitrate}`,
+            url: await format.decipher(YoutubeJs.innerTube.session.player),
+            itag: `${format.itag}`,
+            type: format.mime_type,
+            clen: `${format.approx_duration_ms}`,
+            lmt: `${format.last_modified}`,
+        };
+        if (format.audio_quality) {
+            result.audioQuality = format.audio_quality;
+        }
+        if (format.audio_sample_rate) {
+            result.audioSampleRate = format.audio_sample_rate;
+        }
+        if (format.audio_channels) {
+            result.audioChannels = format.audio_channels;
+        }
 
-            if (format.width) {
-                result.width = format.width;
-            }
-            if (format.height) {
-                result.height = format.height;
-            }
-            if (format.height && format.width) {
-                result.size = `${format.width}x${format.height}`;
-                result.resolution = `${format.height}p`;
-            }
+        if (format.quality_label) {
+            result.qualityLabel = format.quality_label;
+        }
+        if (format.fps) {
+            result.fps = format.fps;
+        }
 
-            return result;
-        });
+        if (format.width) {
+            result.width = format.width;
+        }
+        if (format.height) {
+            result.height = format.height;
+        }
+        if (format.height && format.width) {
+            result.size = `${format.width}x${format.height}`;
+            result.resolution = `${format.height}p`;
+        }
+
+        return result;
     }
 
     static getStoryboards(videoInfo: VideoInfo) {
