@@ -7,7 +7,6 @@
 - [@oninit](#oninit)
 - [Bindings](#bindings)
 - [Job System Generator](#job-system-generator)
-- [Tracking transpilied files](#tracking-transpilied-files)
 - [Logger](#logger)
 - [Type Gen](#type-gen)
 - [Web Server](#web-server)
@@ -469,27 +468,6 @@ The job system creates job nodes inside task threads, which reduces the amount o
 The job system will auto scale up to a maximum number of tasks, in order to avoid `Too many threads` errors. Once the job system activity settles down, the job system will release task nodes that has been idle for a certain amount of time.
 
 Although very useful, this pattern might not be the best for long running tasks (like the Web Server) and it is simpler to create dedicated tasks for those.
-
-## Tracking transpilied files
-
-**[Source](/tools/bs-plugins/track-transpiled-plugin.ts)**
-
-By now, you realize we make a lot of transformations to the source code through many plugins. As a sanity check, this plugin allows us to keep track of the transpiled files, so we can be sure that the output is what we expect.
-
-### Why
-
-This is useful to catch errors with the plugin usage, of bugs with the plugins themselves.
-
-### How
-
-When transpiling a file, say `MyComponent.xml`, the plugin will see if there is a `MyComponent.transpiled.xml` right next to it in the source.
-If a file is found, then the transpiled file of `MyComponent.xml` will be copied back from the staging folder to `MyComponent.transpiled.xml`.
-
-Additionally, if there's a folder `MyFolder` and `MyFolder.transpiled` in the source, then all transpiled files of `MyFolder` will also be copied back to `MyFolder.transpiled`. Keeping track of entire folders is primarily to track of transpiled files of test nodes and scripts.
-
-To reduce the noise of this plugin, it only runs when we're making a test build.
-
-Because we continiously make test build in Github actions, the tracked transpilied files will be automatically added to PRs, so that we notice if outputs do not look right.
 
 ## Logger
 
