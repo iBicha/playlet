@@ -1005,6 +1005,8 @@ namespace Innertube
         contentType = ValidString(nodeData["contentType"])
         if contentType = "LOCKUP_CONTENT_TYPE_VIDEO"
             return LockupViewModelTypeVideo(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_SHORT"
+            return LockupViewModelTypeShort(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
             return LockupViewModelTypePlaylist(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
@@ -1075,6 +1077,56 @@ namespace Innertube
             "lines": lines
             "videoThumbnails": videoThumbnails
             "videoCountText": lengthText
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function LockupViewModelTypeShort(nodeData as object, context as object) as object
+        if context.disableShorts = true
+            LogInfo("Skipping Short based on user settings")
+            return invalid
+        end if
+
+        videoId = nodeData["contentId"]
+        if not IsString(videoId)
+            Warning("Invalid video ID in lockupViewModelTypeShort", nodeData, context)
+            return invalid
+        end if
+
+        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
+
+        title = ObjectUtils.Dig(metadata, ["title", "content"])
+        authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
+
+        lines = invalid
+        contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
+        metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
+        if IsArray(metadataRows) and metadataRows.Count() > 0
+            delimiter = ValidString(contentMetadataViewModel["delimiter"])
+            lines = []
+            for each metadataRow in metadataRows
+                metadataParts = ObjectUtils.Dig(metadataRow, ["metadataParts"])
+                if IsArray(metadataParts) and metadataParts.Count() > 0
+                    parts = []
+                    for each metadataPart in metadataParts
+                        parts.Push(ValidString(ObjectUtils.Dig(metadataPart, ["text", "content"])))
+                    end for
+                    if parts.Count() > 0
+                        lines.Push(parts.Join(delimiter))
+                    end if
+                end if
+            end for
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "authorId": authorId
+            "lines": lines
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
         }
 
         PushFeedItem(video, context)
