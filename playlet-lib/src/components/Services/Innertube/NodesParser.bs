@@ -92,6 +92,8 @@ namespace Innertube
             "gridContinuation": ParseGridContinuation
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             "gridButtonRenderer": ParseGridButtonRenderer
+            "movieRenderer": ParseMovieRenderer
+            "compactMovieRenderer": ParseCompactMovieRenderer
             ' Ignored nodes:
             ' TODO:P2 handle navigateAction - which are usually a redirect
             "navigateAction": ParseNotImplemented
@@ -105,9 +107,7 @@ namespace Innertube
             ' It redirects to a page similar to a channel page, with browseId "FEhashtag"
             ' the hashtag name is encoded in a proto and passed as a param to the browseEndpoint.
             "hashtagTileRenderer": ParseNotImplemented
-            ' Movies are not supported.
-            "movieRenderer": ParseNotImplemented
-            "compactMovieRenderer": ParseNotImplemented
+            ' Movies and shows are partially supported, but these renderers are not yet implemented.
             "horizontalMovieListRenderer": ParseNotImplemented
             "gridMovieRenderer": ParseNotImplemented
             "gridShowRenderer": ParseNotImplemented
@@ -1706,6 +1706,100 @@ namespace Innertube
         return invalid
     end function
 
+    function ParseMovieRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            Warning("Invalid videoId in movieRenderer", nodeData, context)
+            return invalid
+        end if
+
+        title = ParseText(nodeData["title"])
+        author = ParseText(nodeData["longBylineText"])
+        if author = ""
+            author = ParseText(nodeData["shortBylineText"])
+        end if
+
+        authorId = ObjectUtils.Dig(nodeData, ["channelThumbnailSupportedRenderers", "channelThumbnailWithLinkRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
+
+        lengthText = ParseText(nodeData["lengthText"])
+        if lengthText = ""
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                    if parsedTimeStatusRenderer <> invalid
+                        lengthText = parsedTimeStatusRenderer.text
+                        if lengthText <> ""
+                            exit for
+                        end if
+                    end if
+                end for
+            end if
+        end if
+
+        lines = invalid
+        description = ParseText(nodeData["descriptionSnippet"])
+        if description <> ""
+            lines = [author, description]
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
+            "author": author
+            "authorId": authorId
+            "lines": lines
+            "lengthText": lengthText
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
+    function ParseCompactMovieRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            Warning("Invalid videoId in compactMovieRenderer", nodeData, context)
+            return invalid
+        end if
+
+        title = ParseText(nodeData["title"])
+        author = ParseText(nodeData["longBylineText"])
+        if author = ""
+            author = ParseText(nodeData["shortBylineText"])
+        end if
+
+        lengthText = ParseText(nodeData["lengthText"])
+        if lengthText = ""
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                    if parsedTimeStatusRenderer <> invalid
+                        lengthText = parsedTimeStatusRenderer.text
+                        if lengthText <> ""
+                            exit for
+                        end if
+                    end if
+                end for
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
+            "author": author
+            "lengthText": lengthText
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
     function ParseText(data as dynamic) as string
         if IsString(data)
             return data
@@ -1758,10 +1852,14 @@ namespace Innertube
         if IsString(data)
             return data
         end if
-        if not IsAssociativeArray(data) or not data.DoesExist("text")
+        if not IsAssociativeArray(data)
             return ""
         end if
-        return ParseText(data["text"])
+        text = ParseText(data["text"])
+        if text <> ""
+            return text
+        end if
+        return ValidString(ObjectUtils.Dig(data, ["badge", "metadataBadgeRenderer", "label"]))
     end function
 
     function ParseThumbnailOverlayTimeStatusRenderer(data as object) as object

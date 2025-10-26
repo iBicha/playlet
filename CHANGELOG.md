@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for DRM protected content (free with ads / purchased content)
+  - Only supported on Playlet backend (must be selected in settings)
+  - Must be logged in using a YouTube account (otherwise you would get a "Login to confirm your age" error)
+
 ### Fixed
 
 - Build scripts and tools on windows
