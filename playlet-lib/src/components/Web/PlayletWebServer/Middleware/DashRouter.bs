@@ -23,6 +23,11 @@ namespace Http
             request = context.request
             response = context.response
 
+            url = request.query.url
+            if not StringUtils.IsNullOrEmpty(url)
+                return m.GenerateDashManifestAppendStoryboards(context)
+            end if
+
             v = request.query.v
             local = request.query.local
             quality = request.query.quality
@@ -78,6 +83,46 @@ namespace Http
             end for
 
             return qualityFilter
+        end function
+
+        function GenerateDashManifestAppendStoryboards(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            url = request.query.url
+
+            storyboards = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content", "metadata", "storyboards"])
+            if not IsArray(storyboards) or storyboards.count() = 0
+                response.Redirect(url)
+                return true
+            end if
+
+            dashRequest = HttpClient.Get(url)
+            dashResponse = dashRequest.Await()
+
+            if not dashResponse.IsSuccess()
+                LogError("Failed to fetch DASH manifest from URL", dashResponse.ErrorMessage())
+                response.Redirect(url)
+                return true
+            end if
+
+            dashContent = ValidString(dashResponse.Text())
+            storyboardIndex = dashContent.InStr("</Period>")
+            if storyboardIndex = -1
+                response.Redirect(url)
+                return true
+            end if
+
+            xml = new XmlObject()
+            manifestObj = new DashManifest("")
+            manifestObj.generateImageAdaptationSets(xml, storyboards, 100)
+            storyboardXml = xml.ToXmlString(false)
+
+            newDashContent = dashContent.Left(storyboardIndex) + storyboardXml + dashContent.Mid(storyboardIndex)
+            response.http_code = 200
+            response.SetBodyDataString(newDashContent)
+            response.ContentType("application/dash+xml")
+            return true
         end function
 
     end class

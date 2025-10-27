@@ -86,214 +86,9 @@ class DashManifest
             if xml.Node("Period")
 
                 id = 0
-                for each audioSet in audioSets
-                    adaptationSetAttributes = {
-                        "id": `${id}`
-                        "mimeType": audioSet.mimeType
-                        "startWithSAP": "1"
-                        "subsegmentAlignment": "true"
-                    }
-                    if not StringUtils.IsNullOrEmpty(audioSet.lang)
-                        adaptationSetAttributes["lang"] = audioSet.lang
-                    end if
-
-                    if xml.Node("AdaptationSet", adaptationSetAttributes)
-                        xml.EmptyNode("Role", {
-                            "schemeIdUri": "urn:mpeg:dash:role:2011"
-                            "value": audioSet.acont = "original" ? "main" : "alternate"
-                        })
-
-                        for i = 0 to audioStreams.Count() - 1
-                            stream = audioStreams[i]
-                            streamMimeType = stream.type.Tokenize(";")[0]
-                            if streamMimeType <> audioSet.mimeType or stream.languageInfo.lang <> audioSet.lang or stream.languageInfo.acont <> audioSet.acont
-                                continue for
-                            end if
-
-                            codecs = stream.type.split("codecs=")[1]
-                            if codecs.startsWith(`"`)
-                                codecs = codecs.mid(1)
-                            end if
-                            if codecs.endsWith(`"`)
-                                codecs = codecs.left(codecs.len() - 1)
-                            end if
-
-                            if xml.Node("Representation", {
-                                    "id": stream.itag
-                                    "codecs": codecs
-                                    "bandwidth": stream.bitrate
-                                })
-
-                                xml.EmptyNode("AudioChannelConfiguration", {
-                                    "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
-                                    "value": `${stream.audioChannels}`
-                                })
-
-                                if StringUtils.IsNullOrEmpty(stream.url)
-                                    xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
-                                else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
-                                    xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
-                                end if
-                                xml.TextNode("BaseURL", ValidString(stream.url))
-
-                                if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
-                                    xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
-                                end if
-                                if xml.Node("SegmentBase", { "indexRange": stream.index })
-                                    xml.EmptyNode("Initialization", { "range": stream.init })
-
-                                    xml.End()
-                                end if
-
-                                xml.End()
-                            end if
-                        end for
-
-                        xml.End()
-                    end if
-
-                    id += 1
-                end for
-
-                for each mimeType in videoMimeTypes
-                    if xml.Node("AdaptationSet", {
-                            "id": `${id}`
-                            "mimeType": mimeType
-                            "startWithSAP": "1"
-                            "subsegmentAlignment": "true"
-                        })
-
-                        for i = 0 to videoStreams.Count() - 1
-                            stream = videoStreams[i]
-                            streamMimeType = stream.type.Tokenize(";")[0]
-                            if streamMimeType <> mimeType
-                                continue for
-                            end if
-
-                            codecs = stream.type.split("codecs=")[1]
-                            if codecs.startsWith(`"`)
-                                codecs = codecs.mid(1)
-                            end if
-                            if codecs.endsWith(`"`)
-                                codecs = codecs.left(codecs.len() - 1)
-                            end if
-
-                            representationAttributes = {
-                                "id": stream.itag
-                                "codecs": codecs
-                                "startWithSAP": "1"
-                                "maxPlayoutRate": "1"
-                                "bandwidth": stream.bitrate
-                            }
-                            if stream.width <> invalid
-                                representationAttributes["width"] = `${stream.width}`
-                            end if
-                            if stream.height <> invalid
-                                representationAttributes["height"] = `${stream.height}`
-                            end if
-                            if stream.fps <> invalid
-                                representationAttributes["frameRate"] = `${stream.fps}`
-                            end if
-
-                            if xml.Node("Representation", representationAttributes)
-                                m.AddColorInfo(stream, xml)
-
-                                if StringUtils.IsNullOrEmpty(stream.url)
-                                    xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
-                                else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
-                                    xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
-                                end if
-                                xml.TextNode("BaseURL", ValidString(stream.url))
-
-                                if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
-                                    xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
-                                end if
-                                if xml.Node("SegmentBase", { "indexRange": stream.index })
-                                    xml.EmptyNode("Initialization", { "range": stream.init })
-
-                                    xml.End()
-                                end if
-
-                                xml.End()
-                            end if
-                        end for
-
-                        xml.End()
-                    end if
-
-                    id += 1
-                end for
-
-                ' https://developer.roku.com/en-ca/docs/developer-program/media-playback/trick-mode/hls-and-dash.md#dash-standard-thumbnail-tiles
-                for each storyboard in storyboards
-                    interval = ValidInt(storyboard.interval)
-                    if interval = 0
-                        LogWarnNoTelemetry("Invalid storyboard interval:", storyboard.interval)
-                        continue for
-                    end if
-
-                    storyboardWidth = storyboard.storyboardWidth
-                    storyboardHeight = storyboard.storyboardHeight
-                    storyboardCount = storyboard.storyboardCount
-                    tileWidthInPixels = storyboard.width
-                    tileHeightInPixels = storyboard.height
-                    totalTileCount = storyboard.count
-
-                    ' For the last page, the image height might be smaller than the storyboard height
-                    if storyboardCount = 1
-                        storyboardHeight = totalTileCount \ storyboardWidth
-                        if totalTileCount mod storyboardWidth > 0
-                            storyboardHeight += 1
-                        end if
-                    end if
-
-                    intervalInSeconds = interval / 1000.0
-
-                    ' YouTube template uses the var $M for tile pages
-                    ' DASH-IF uses $Number$ in the SegmentTemplate
-                    ' https://dashif.org/docs/DASH-IF-IOP-v4.3.pdf
-                    url = storyboard.templateUrl.replace("$M", "$Number$")
-
-                    tilesPerPage = storyboardWidth * storyboardHeight
-                    duration = tilesPerPage * intervalInSeconds
-
-                    storyboardWidthInPixels = tileWidthInPixels * storyboardWidth
-                    storyboardHeightInPixels = tileHeightInPixels * storyboardHeight
-
-                    ' Bandwidth is kind of a guess...
-                    bandwidth = ((storyboardWidthInPixels * storyboardHeightInPixels * 0.5) / duration)
-
-                    if xml.Node("AdaptationSet", {
-                            "id": `${id}`
-                            "mimeType": "image/jpeg"
-                            "contentType": "image"
-                        })
-                        xml.EmptyNode("SegmentTemplate", {
-                            "media": url
-                            "duration": duration
-                            "startNumber": 0
-                        })
-
-                        if xml.Node("Representation", {
-                                "id": `thumbnails_${id}`
-                                "bandwidth": bandwidth
-                                "width": storyboardWidthInPixels
-                                "height": storyboardHeightInPixels
-                            })
-
-                            xml.EmptyNode("EssentialProperty", {
-                                "schemeIdUri": "http://dashif.org/guidelines/thumbnail_tile"
-                                "value": `${storyboardWidth}x${storyboardHeight}`
-                            })
-
-                            xml.End()
-                        end if
-
-                        xml.End()
-                    end if
-
-                    id += 1
-                end for
+                id = m.generateAudioAdaptationSets(xml, audioSets, audioStreams, id)
+                id = m.generateVideoAdaptationSets(xml, videoMimeTypes, videoStreams, id)
+                m.generateImageAdaptationSets(xml, storyboards, id)
 
                 xml.End()
             end if
@@ -301,6 +96,225 @@ class DashManifest
         end if
 
         return xml.ToXmlString()
+    end function
+
+    function generateAudioAdaptationSets(xml as object, audioSets as object, audioStreams as object, id as integer) as integer
+        for each audioSet in audioSets
+            adaptationSetAttributes = {
+                "id": `${id}`
+                "mimeType": audioSet.mimeType
+                "startWithSAP": "1"
+                "subsegmentAlignment": "true"
+            }
+            if not StringUtils.IsNullOrEmpty(audioSet.lang)
+                adaptationSetAttributes["lang"] = audioSet.lang
+            end if
+
+            if xml.Node("AdaptationSet", adaptationSetAttributes)
+                xml.EmptyNode("Role", {
+                    "schemeIdUri": "urn:mpeg:dash:role:2011"
+                    "value": audioSet.acont = "original" ? "main" : "alternate"
+                })
+
+                for i = 0 to audioStreams.Count() - 1
+                    stream = audioStreams[i]
+                    streamMimeType = stream.type.Tokenize(";")[0]
+                    if streamMimeType <> audioSet.mimeType or stream.languageInfo.lang <> audioSet.lang or stream.languageInfo.acont <> audioSet.acont
+                        continue for
+                    end if
+
+                    codecs = stream.type.split("codecs=")[1]
+                    if codecs.startsWith(`"`)
+                        codecs = codecs.mid(1)
+                    end if
+                    if codecs.endsWith(`"`)
+                        codecs = codecs.left(codecs.len() - 1)
+                    end if
+
+                    if xml.Node("Representation", {
+                            "id": stream.itag
+                            "codecs": codecs
+                            "bandwidth": stream.bitrate
+                        })
+
+                        xml.EmptyNode("AudioChannelConfiguration", {
+                            "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
+                            "value": `${stream.audioChannels}`
+                        })
+
+                        if StringUtils.IsNullOrEmpty(stream.url)
+                            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
+                        else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
+                            xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
+                        end if
+                        xml.TextNode("BaseURL", ValidString(stream.url))
+
+                        if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
+                            xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
+                        end if
+                        if xml.Node("SegmentBase", { "indexRange": stream.index })
+                            xml.EmptyNode("Initialization", { "range": stream.init })
+
+                            xml.End()
+                        end if
+
+                        xml.End()
+                    end if
+                end for
+
+                xml.End()
+            end if
+
+            id += 1
+        end for
+        return id
+    end function
+
+    function generateVideoAdaptationSets(xml as object, videoMimeTypes as object, videoStreams as object, id as integer) as integer
+        for each mimeType in videoMimeTypes
+            if xml.Node("AdaptationSet", {
+                    "id": `${id}`
+                    "mimeType": mimeType
+                    "startWithSAP": "1"
+                    "subsegmentAlignment": "true"
+                })
+
+                for i = 0 to videoStreams.Count() - 1
+                    stream = videoStreams[i]
+                    streamMimeType = stream.type.Tokenize(";")[0]
+                    if streamMimeType <> mimeType
+                        continue for
+                    end if
+
+                    codecs = stream.type.split("codecs=")[1]
+                    if codecs.startsWith(`"`)
+                        codecs = codecs.mid(1)
+                    end if
+                    if codecs.endsWith(`"`)
+                        codecs = codecs.left(codecs.len() - 1)
+                    end if
+
+                    representationAttributes = {
+                        "id": stream.itag
+                        "codecs": codecs
+                        "startWithSAP": "1"
+                        "maxPlayoutRate": "1"
+                        "bandwidth": stream.bitrate
+                    }
+                    if stream.width <> invalid
+                        representationAttributes["width"] = `${stream.width}`
+                    end if
+                    if stream.height <> invalid
+                        representationAttributes["height"] = `${stream.height}`
+                    end if
+                    if stream.fps <> invalid
+                        representationAttributes["frameRate"] = `${stream.fps}`
+                    end if
+
+                    if xml.Node("Representation", representationAttributes)
+                        m.AddColorInfo(stream, xml)
+
+                        if StringUtils.IsNullOrEmpty(stream.url)
+                            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
+                        else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
+                            xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
+                        end if
+                        xml.TextNode("BaseURL", ValidString(stream.url))
+
+                        if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
+                            xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
+                        end if
+                        if xml.Node("SegmentBase", { "indexRange": stream.index })
+                            xml.EmptyNode("Initialization", { "range": stream.init })
+
+                            xml.End()
+                        end if
+
+                        xml.End()
+                    end if
+                end for
+
+                xml.End()
+            end if
+
+            id += 1
+        end for
+        return id
+    end function
+
+    function generateImageAdaptationSets(xml as object, storyboards as object, id as integer) as integer
+        ' https://developer.roku.com/en-ca/docs/developer-program/media-playback/trick-mode/hls-and-dash.md#dash-standard-thumbnail-tiles
+        for i = storyboards.Count() - 1 to 0 step -1
+            storyboard = storyboards[i]
+            interval = ValidInt(storyboard.interval)
+            if interval = 0
+                LogWarnNoTelemetry("Invalid storyboard interval:", storyboard.interval)
+                continue for
+            end if
+
+            storyboardWidth = storyboard.storyboardWidth
+            storyboardHeight = storyboard.storyboardHeight
+            storyboardCount = storyboard.storyboardCount
+            tileWidthInPixels = storyboard.width
+            tileHeightInPixels = storyboard.height
+            totalTileCount = storyboard.count
+
+            ' For the last page, the image height might be smaller than the storyboard height
+            if storyboardCount = 1
+                storyboardHeight = totalTileCount \ storyboardWidth
+                if totalTileCount mod storyboardWidth > 0
+                    storyboardHeight += 1
+                end if
+            end if
+
+            intervalInSeconds = interval / 1000.0
+
+            ' YouTube template uses the var $M for tile pages
+            ' DASH-IF uses $Number$ in the SegmentTemplate
+            ' https://dashif.org/docs/DASH-IF-IOP-v4.3.pdf
+            url = storyboard.templateUrl.replace("$M", "$Number$")
+
+            tilesPerPage = storyboardWidth * storyboardHeight
+            duration = tilesPerPage * intervalInSeconds
+
+            storyboardWidthInPixels = tileWidthInPixels * storyboardWidth
+            storyboardHeightInPixels = tileHeightInPixels * storyboardHeight
+
+            ' Bandwidth is kind of a guess...
+            bandwidth = ((storyboardWidthInPixels * storyboardHeightInPixels * 0.5) / duration)
+
+            if xml.Node("AdaptationSet", {
+                    "id": `${id}`
+                    "mimeType": "image/jpeg"
+                    "contentType": "image"
+                })
+                xml.EmptyNode("SegmentTemplate", {
+                    "media": url
+                    "duration": duration
+                    "startNumber": 0
+                })
+
+                if xml.Node("Representation", {
+                        "id": `thumbnails_${id}`
+                        "bandwidth": bandwidth
+                        "width": storyboardWidthInPixels
+                        "height": storyboardHeightInPixels
+                    })
+
+                    xml.EmptyNode("EssentialProperty", {
+                        "schemeIdUri": "http://dashif.org/guidelines/thumbnail_tile"
+                        "value": `${storyboardWidth}x${storyboardHeight}`
+                    })
+
+                    xml.End()
+                end if
+
+                xml.End()
+            end if
+
+            id += 1
+        end for
+        return id
     end function
 
     function getAudioStreams(streams as object) as object
