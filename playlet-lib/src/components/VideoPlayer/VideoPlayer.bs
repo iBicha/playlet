@@ -557,29 +557,25 @@ function GetPlayerErrorData(videoId as string, errorInfo as object) as object
 end function
 
 function ReportVideoError(errorData as object, url as string) as void
-    if errorData.body.Instr("DRM exception") <> -1
-        return
-    end if
-
     attachments = invalid
     if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
-        lastGeneratedDash = ReadAsciiFile("cachefs:/last_generated_dash.xml")
-        if not StringUtils.IsNullOrEmpty(lastGeneratedDash)
-            attachments = [{
-                filename: "last_generated_dash.xml"
-                content_type: "plain/text"
-                data: lastGeneratedDash
-            }]
-        else
-            lastGeneratedHls = ReadAsciiFile("cachefs:/last_generated_hls.m3u8")
-            if not StringUtils.IsNullOrEmpty(lastGeneratedHls)
-                attachments = [{
-                    filename: "last_generated_hls.m3u8"
-                    content_type: "plain/text"
-                    data: lastGeneratedHls
-                }]
-            end if
-        end if
+        lastGeneratedDash = ValidString(ReadAsciiFile("cachefs:/last_generated_dash.xml"))
+        lastGeneratedHls = ValidString(ReadAsciiFile("cachefs:/last_generated_hls.m3u8"))
+        lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+
+        attachments = [{
+            filename: "last_generated_dash.xml"
+            content_type: "plain/text"
+            data: lastGeneratedDash
+        }, {
+            filename: "last_generated_hls.m3u8"
+            content_type: "plain/text"
+            data: lastGeneratedHls
+        }, {
+            filename: "last_player_response.json"
+            content_type: "application/json"
+            data: lastPlayerResponse
+        }]
     end if
 
     LogTelemetryEvent({
