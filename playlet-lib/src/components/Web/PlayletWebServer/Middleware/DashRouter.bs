@@ -34,19 +34,19 @@ namespace Http
 
             if StringUtils.IsNullOrEmpty(v)
                 response.Default(400, "Missing video id")
-                WriteAsciiFile("tmp:/last_generated_dash.xml", "400 Missing video id")
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 Missing video id")
                 return true
             end if
 
             metadata = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content", "metadata"])
             if not IsAssociativeArray(metadata)
                 response.Default(500, "videoQueue.player.content.metadata is invalid")
-                WriteAsciiFile("tmp:/last_generated_dash.xml", "500 videoQueue.player.content.metadata is invalid")
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", "500 videoQueue.player.content.metadata is invalid")
                 return true
             end if
             if metadata.videoId <> v
                 response.Default(400, "videoQueue.player.content.metadata.videoId does not match the requested video id")
-                WriteAsciiFile("tmp:/last_generated_dash.xml", "400 videoQueue.player.content.metadata.videoId does not match the requested video id")
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 videoQueue.player.content.metadata.videoId does not match the requested video id")
                 return true
             end if
 
@@ -59,7 +59,7 @@ namespace Http
             response.SetBodyDataString(xmlContent)
             response.ContentType("application/dash+xml")
 
-            WriteAsciiFile("tmp:/last_generated_dash.xml", xmlContent)
+            WriteAsciiFile("cachefs:/last_generated_dash.xml", xmlContent)
 
             return true
         end function
