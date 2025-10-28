@@ -1006,8 +1006,6 @@ namespace Innertube
         if contentType = "LOCKUP_CONTENT_TYPE_VIDEO"
             return LockupViewModelTypeVideo(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_SHORT"
-            ' Additional capture for LOCKUP_CONTENT_TYPE_SHORT
-            Warning(`Unknown content type: ${contentType}`, nodeData, context)
             return LockupViewModelTypeShort(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
             return LockupViewModelTypePlaylist(nodeData, context)
@@ -1102,6 +1100,16 @@ namespace Innertube
         title = ObjectUtils.Dig(metadata, ["title", "content"])
         authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
 
+        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "thumbnailViewModel"])
+        if context.generateVideoThumbnails = true
+            videoThumbnails = GenerateVideoThumbnails(videoId)
+        else
+            videoThumbnails = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources"])
+            if videoThumbnails = invalid
+                videoThumbnails = GenerateVideoThumbnails(videoId)
+            end if
+        end if
+
         lines = invalid
         contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
         metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
@@ -1128,7 +1136,7 @@ namespace Innertube
             "title": title
             "authorId": authorId
             "lines": lines
-            "videoThumbnails": GenerateVideoThumbnails(videoId)
+            "videoThumbnails": videoThumbnails
         }
 
         PushFeedItem(video, context)
