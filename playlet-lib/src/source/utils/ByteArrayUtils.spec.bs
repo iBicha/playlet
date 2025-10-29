@@ -1,0 +1,45 @@
+namespace Tests
+
+    @suite
+    class ByteArrayUtilsTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.ba = CreateObject("roByteArray")
+            m.ba.FromHexString("00010203040506070809")
+        end function
+
+        @describe("ByteArrayUtils.Slice and SliceFallback")
+
+        @it("slices a byte array correctly")
+        @params("positive start and end", 2, 5, "020304")
+        @params("to the end if end is not provided", 7, invalid, "070809")
+        @params("the whole array if no params provided", invalid, invalid, "00010203040506070809")
+        @params("with negative start", -4, invalid, "06070809")
+        @params("with negative end", 0, -3, "00010203040506")
+        @params("with negative start and negative end", -5, -2, "050607")
+        @params("returns empty array for start greater than end", 5, 2, "")
+        @params("returns empty for start out of bounds", 20, invalid, "")
+        @params("clamps end to array length", 8, 20, "0809")
+        @params("handles empty slice", 3, 3, "")
+        function testSlice(description as string, start_pos as dynamic, end_pos as dynamic, expectedHex as string)
+            resultBa = ByteArrayUtils.Slice(m.ba, start_pos, end_pos)
+            m.assertEqual(resultBa.ToHexString(), expectedHex, "Slice failed for: " + description)
+
+            resultBaFallback = ByteArrayUtils.SliceFallback(m.ba, start_pos, end_pos)
+            m.assertEqual(resultBaFallback.ToHexString(), expectedHex, "SliceFallback failed for: " + description)
+        end function
+
+        @it("handles empty byte array")
+        function handles_empty_byte_array()
+            emptyBa = CreateObject("roByteArray")
+
+            resultBa = ByteArrayUtils.Slice(emptyBa, 0, 0)
+            m.assertEqual(resultBa.ToHexString(), "")
+
+            resultBaFallback = ByteArrayUtils.SliceFallback(emptyBa, 0, 0)
+            m.assertEqual(resultBaFallback.ToHexString(), "")
+        end function
+
+    end class
+
+end namespace

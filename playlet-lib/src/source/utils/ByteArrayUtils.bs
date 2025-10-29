@@ -1,0 +1,65 @@
+import "StringUtils.bs"
+namespace ByteArrayUtils
+
+    function Slice(bytearray as object, start_pos = 0 as dynamic, end_pos = invalid as dynamic) as object
+        if FindMemberFunction(bytearray, "Slice") <> invalid
+            start_pos = ValidInt(start_pos)
+            if end_pos = invalid
+                return bytearray.Slice(start_pos)
+            end if
+            return bytearray.Slice(start_pos, end_pos)
+        end if
+        return SliceFallback(bytearray, start_pos, end_pos)
+    end function
+
+    function SliceFallback(bytearray as object, start_pos = 0 as dynamic, end_pos = invalid as dynamic) as object
+        copy = CreateObject("roByteArray")
+        arrCount = bytearray.Count()
+
+        ' default end_pos is array length
+        if end_pos = invalid
+            end_pos = arrCount
+        end if
+
+        start_pos = ValidInt(start_pos)
+        ' handle negative start_pos
+        if start_pos < 0
+            start_pos = arrCount + start_pos
+        end if
+
+        ' handle negative end_pos
+        if end_pos < 0
+            end_pos = arrCount + end_pos
+        end if
+
+        ' clamp start_pos to bounds
+        if start_pos < 0
+            start_pos = 0
+        else if start_pos > arrCount
+            start_pos = arrCount
+        end if
+
+        ' clamp end_pos to bounds
+        if end_pos < 0
+            end_pos = 0
+        else if end_pos > arrCount
+            end_pos = arrCount
+        end if
+
+        count = end_pos - start_pos
+        if count <= 0
+            return copy
+        end if
+
+        tmp = `tmp:/${StringUtils.RandomId()}.bin`
+        if not bytearray.WriteFile(tmp, start_pos, count)
+            DeleteFile(tmp)
+            return copy
+        end if
+
+        copy.ReadFile(tmp)
+        DeleteFile(tmp)
+        return copy
+    end function
+
+end namespace
