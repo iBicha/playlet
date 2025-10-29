@@ -93,9 +93,10 @@ namespace Innertube
             "tvSurfaceContentContinuation": ParseTvSurfaceContentContinuation
             "gridButtonRenderer": ParseGridButtonRenderer
             "movieRenderer": ParseMovieRenderer
+            "gridMovieRenderer": ParseGridMovieRenderer
             "compactMovieRenderer": ParseCompactMovieRenderer
+            "horizontalMovieListRenderer": ParseHorizontalMovieListRenderer
             ' Movies and shows are partially supported, but these renderers are not yet implemented.
-            ' "horizontalMovieListRenderer": ParseNotImplemented
             ' "gridMovieRenderer": ParseNotImplemented
             ' "gridShowRenderer": ParseNotImplemented
             ' "playlistShowMetadataRenderer": ParseNotImplemented
@@ -1793,6 +1794,59 @@ namespace Innertube
         return invalid
     end function
 
+    function ParseGridMovieRenderer(nodeData as object, context as object) as object
+        videoId = nodeData["videoId"]
+        if not IsString(videoId)
+            Warning("Invalid videoId in gridMovieRenderer", nodeData, context)
+            return invalid
+        end if
+
+        title = ParseText(nodeData["title"])
+        metadata = ParseText(nodeData["metadata"])
+
+        author = invalid
+        authorId = invalid
+        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
+            author = context.currentAuthor
+            authorId = context.currentAuthorId
+        end if
+
+        lines = invalid
+        if metadata <> ""
+            lines = [author, metadata]
+        end if
+
+        lengthText = ParseText(nodeData["lengthText"])
+        if lengthText = ""
+            thumbnailOverlays = nodeData["thumbnailOverlays"]
+            if IsArray(thumbnailOverlays)
+                for each overlay in thumbnailOverlays
+                    parsedTimeStatusRenderer = ParseThumbnailOverlayTimeStatusRenderer(overlay)
+                    if parsedTimeStatusRenderer <> invalid
+                        lengthText = parsedTimeStatusRenderer.text
+                        if lengthText <> ""
+                            exit for
+                        end if
+                    end if
+                end for
+            end if
+        end if
+
+        video = {
+            "type": "video"
+            "videoId": videoId
+            "title": title
+            "author": author
+            "authorId": authorId
+            "videoThumbnails": GenerateVideoThumbnails(videoId)
+            "lines": lines
+            "lengthText": lengthText
+        }
+
+        PushFeedItem(video, context)
+        return invalid
+    end function
+
     function ParseCompactMovieRenderer(nodeData as object, context as object) as object
         videoId = nodeData["videoId"]
         if not IsString(videoId)
@@ -1833,6 +1887,10 @@ namespace Innertube
 
         PushFeedItem(video, context)
         return invalid
+    end function
+
+    function ParseHorizontalMovieListRenderer(nodeData as object, _context as object) as object
+        return nodeData["items"]
     end function
 
     function ParseText(data as dynamic) as string
