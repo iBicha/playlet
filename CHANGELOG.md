@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.43.1] - 2025-10-28
 
+### Added
+
+- Support for additional nodes parsing
+
 ### Fixed
 
 - Trickplay storyboards on DRM videos

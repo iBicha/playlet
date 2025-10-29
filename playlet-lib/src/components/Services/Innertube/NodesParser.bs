@@ -103,7 +103,7 @@ namespace Innertube
             ' TODO:P2 handle navigateAction - which are usually a redirect
             ' "navigateAction": ParseNotImplemented
             ' TODO:P2 radioRenderer seems like a Mix https://github.com/iBicha/playlet/issues/709
-            ' "radioRenderer": ParseNotImplemented
+            "radioRenderer": ParseRadioRenderer
             ' "compactRadioRenderer": ParseNotImplemented
             ' TODO:P2 A carousel of videos, found on the home tab of a channel.
             ' Should probably be parsed.
@@ -992,6 +992,33 @@ namespace Innertube
             "videoCount": videoCount
             "videoCountText": videoCountText
         }
+
+        PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function ParseRadioRenderer(nodeData as object, context as object) as object
+        playlistId = nodeData["playlistId"]
+        if not IsString(playlistId)
+            Warning("Invalid playlist ID in radioRenderer", nodeData, context)
+            return invalid
+        end if
+
+        videoCountText = ParseText(nodeData["videoCountText"])
+
+        playlist = {
+            "type": "playlist"
+            "playlistId": playlistId
+            "title": ParseText(nodeData["title"])
+            "playlistThumbnail": ObjectUtils.Dig(nodeData, ["thumbnail", "thumbnails", 0, "url"])
+            "videoCountText": videoCountText
+        }
+
+        ' Mixes have a videoId, which is the first video in the mix
+        videoId = ObjectUtils.Dig(nodeData, ["navigationEndpoint", "watchEndpoint", "videoId"])
+        if IsString(videoId)
+            playlist["videoId"] = videoId
+        end if
 
         PushFeedItem(playlist, context)
         return invalid
