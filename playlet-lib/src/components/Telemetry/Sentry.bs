@@ -129,37 +129,22 @@ namespace Sentry
     end function
 
     function ReplaceRequestId(message as string) as dynamic
-        reqIdStart = `\nRequestId: `
-        reqIdPlaceholder = "<REQUEST_ID>"
-        result = message
-        replaced = false
-        searchIndex = 0
-        while true
-            requestIdIndex = result.InStr(searchIndex, reqIdStart)
-            if requestIdIndex = -1
-                exit while
-            end if
+        requestIdRegex = m.requestIdRegex
+        if requestIdRegex = invalid
+            requestIdRegex = /RequestId:\s*[0-9]+/
+            m.requestIdRegex = requestIdRegex
+        end if
 
-            reqIdStartIndex = requestIdIndex + reqIdStart.Len()
-            newLineIndex = result.InStr(reqIdStartIndex, `\n`)
-            if newLineIndex = -1
-                exit while
-            end if
-
-            reqIdEndIndex = newLineIndex - 1
-            if (reqIdEndIndex <= reqIdStartIndex) or ((reqIdEndIndex - reqIdStartIndex) > 20)
-                exit while
-            end if
-
-            result = result.Mid(0, reqIdStartIndex) + reqIdPlaceholder + result.Mid(reqIdEndIndex + 1)
-            replaced = true
-            searchIndex = reqIdStartIndex + reqIdPlaceholder.Len()
-        end while
-
-        if not replaced
+        matches = requestIdRegex.MatchAll(message)
+        if not IsArray(matches) or matches.Count() = 0
             return invalid
         end if
 
-        return result
+        for each match in matches
+            fullMatch = match[0]
+            message = message.Replace(fullMatch, "RequestId: <REQUEST_ID>")
+        end for
+
+        return message
     end function
 end namespace
