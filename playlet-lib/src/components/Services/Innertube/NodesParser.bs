@@ -1397,7 +1397,7 @@ namespace Innertube
         else if contentType = "TILE_CONTENT_TYPE_PLAYLIST"
             return TileRendererTypePlaylist(nodeData, context)
         else if contentType = "TILE_CONTENT_TYPE_CHANNEL"
-            ' Not implemented yet - https://github.com/iBicha/playlet/issues/724
+            return TileRendererTypeChannel(nodeData, context)
         else if contentType = "TILE_CONTENT_TYPE_EDU"
             ' Not implemented yet - https://github.com/iBicha/playlet/issues/751
         end if
@@ -1596,6 +1596,42 @@ namespace Innertube
         end if
 
         PushFeedItem(playlist, context)
+        return invalid
+    end function
+
+    function TileRendererTypeChannel(nodeData as object, context as object) as object
+        channelId = nodeData["contentId"]
+        if not IsString(channelId)
+            Warning("Invalid channel ID in tileRendererTypeChannel", nodeData, context)
+            return invalid
+        end if
+
+        ' TODO:P1 Channel IDs starting with "SC" are shows, not supported yet.
+        if channelId.StartsWith("SC")
+            LogWarnNoTelemetry("Shows are not supported yet in TileRendererTypeChannel")
+            return invalid
+        end if
+
+        renderedLines = []
+        lines = ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "lines"])
+        if IsArray(lines)
+            for each line in lines
+                if not IsAssociativeArray(line)
+                    continue for
+                end if
+                renderedLines.Push(ParseLineRenderer(line["lineRenderer"]))
+            end for
+        end if
+
+        channel = {
+            "type": "channel"
+            "authorId": channelId
+            "author": ParseText(ObjectUtils.Dig(nodeData, ["metadata", "tileMetadataRenderer", "title"]))
+            "authorThumbnails": ObjectUtils.Dig(nodeData, ["header", "tileHeaderRenderer", "thumbnail", "thumbnails"])
+            "lines": renderedLines
+        }
+
+        PushFeedItem(channel, context)
         return invalid
     end function
 
