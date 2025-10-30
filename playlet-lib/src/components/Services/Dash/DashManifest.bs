@@ -32,7 +32,7 @@ class DashManifest
         }
     end function
 
-    function fromVideoMetadata(metadata as object, qualityFilter as object, local as boolean) as string
+    function FromVideoMetadata(metadata as object, qualityFilter as object, local as boolean) as string
         adaptiveFormats = []
         adaptiveFormats.Append(metadata.adaptiveFormats)
 
@@ -91,9 +91,9 @@ class DashManifest
             if xml.Node("Period")
 
                 id = 0
-                id = m.generateAudioAdaptationSets(xml, audioSets, audioStreams, id)
-                id = m.generateVideoAdaptationSets(xml, videoMimeTypes, videoStreams, id)
-                m.generateImageAdaptationSets(xml, storyboards, id)
+                id = m.GenerateAudioAdaptationSets(xml, audioSets, audioStreams, id)
+                id = m.GenerateVideoAdaptationSets(xml, videoMimeTypes, videoStreams, id)
+                m.GenerateImageAdaptationSets(xml, storyboards, id)
 
                 xml.End()
             end if
@@ -103,7 +103,7 @@ class DashManifest
         return xml.ToXmlString()
     end function
 
-    function generateAudioAdaptationSets(xml as object, audioSets as object, audioStreams as object, id as integer) as integer
+    function GenerateAudioAdaptationSets(xml as object, audioSets as object, audioStreams as object, id as integer) as integer
         for each audioSet in audioSets
             adaptationSetAttributes = {
                 "id": `${id}`
@@ -157,7 +157,7 @@ class DashManifest
                         if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
                             xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
                         end if
-                        if xml.Node("SegmentBase", { "indexRange": stream.index })
+                        if xml.Node("SegmentBase", { "indexRange": stream.index, "indexRangeExact": "true" })
                             xml.EmptyNode("Initialization", { "range": stream.init })
 
                             xml.End()
@@ -175,7 +175,7 @@ class DashManifest
         return id
     end function
 
-    function generateVideoAdaptationSets(xml as object, videoMimeTypes as object, videoStreams as object, id as integer) as integer
+    function GenerateVideoAdaptationSets(xml as object, videoMimeTypes as object, videoStreams as object, id as integer) as integer
         for each mimeType in videoMimeTypes
             if xml.Node("AdaptationSet", {
                     "id": `${id}`
@@ -229,7 +229,7 @@ class DashManifest
                         if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
                             xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
                         end if
-                        if xml.Node("SegmentBase", { "indexRange": stream.index })
+                        if xml.Node("SegmentBase", { "indexRange": stream.index, "indexRangeExact": "true" })
                             xml.EmptyNode("Initialization", { "range": stream.init })
 
                             xml.End()
@@ -247,7 +247,7 @@ class DashManifest
         return id
     end function
 
-    function generateImageAdaptationSets(xml as object, storyboards as object, id as integer) as integer
+    function GenerateImageAdaptationSets(xml as object, storyboards as object, id as integer) as integer
         ' https://developer.roku.com/en-ca/docs/developer-program/media-playback/trick-mode/hls-and-dash.md#dash-standard-thumbnail-tiles
         for i = storyboards.Count() - 1 to 0 step -1
             storyboard = storyboards[i]

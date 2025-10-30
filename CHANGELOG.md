@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Playback error when regular videos are returned with DRM protection
 
 ## [0.43.3] - 2025-10-30
 

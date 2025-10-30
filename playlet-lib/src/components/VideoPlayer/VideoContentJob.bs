@@ -103,8 +103,8 @@ function ExecuteJob() as void
         return
     end if
 
-    isDrmDash = SupportsDrmDashManifest(metadata)
-    if isDrmDash
+    isDrm = not StringUtils.IsNullOrEmpty(metadata.drmParams)
+    if isDrm
         licenseServerURL = UrlUtils.BuildUrl(`http://127.0.0.1:${playletServerPort}/api/innertube/get_drm_license`, invalid, {
             videoId: metadata.videoId
             drmParams: metadata.drmParams
@@ -150,7 +150,7 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
 
     streamUrls = []
 
-    if SupportsDrmDashManifest(metadata)
+    if SupportsDrmDashManifestUrl(metadata)
         dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
             url: metadata.dashUrl
         })
@@ -195,8 +195,12 @@ function SupportsMuxedFormats(metadata as object) as boolean
     return IsArray(metadata.formatStreams) and metadata.formatStreams.Count() > 0
 end function
 
-function SupportsDrmDashManifest(metadata as object) as boolean
+function SupportsDrmDashManifestUrl(metadata as object) as boolean
     if StringUtils.IsNullOrEmpty(metadata.drmParams)
+        return false
+    end if
+
+    if StringUtils.IsNullOrEmpty(metadata.dashUrl)
         return false
     end if
 
@@ -209,10 +213,6 @@ function SupportsDrmDashManifest(metadata as object) as boolean
     end if
 
     if not IsArray(metadata.licenseInfos) or metadata.licenseInfos.Count() = 0
-        return false
-    end if
-
-    if StringUtils.IsNullOrEmpty(metadata.dashUrl)
         return false
     end if
 
