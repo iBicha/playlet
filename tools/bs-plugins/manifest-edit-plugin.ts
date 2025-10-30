@@ -42,6 +42,8 @@ export class ManifestEditPlugin implements CompilerPlugin {
         // Test flag
         // @ts-ignore
         const testMode = !!builder.options.testMode;
+        builder.logger.log(`Setting bs_const TEST_MODE to ${testMode}`)
+        manifestContent = manifestContent.replace(/TEST_MODE=(true|false)/i, `TEST_MODE=${testMode}`);
         if (testMode) {
             builder.logger.log(`Commenting out "sg_component_libs_provided"`)
             manifestContent = manifestContent.replace(/sg_component_libs_provided=/i, `# sg_component_libs_provided=`);

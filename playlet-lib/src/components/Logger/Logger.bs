@@ -59,14 +59,19 @@ function LoggerLoop()
     DeleteFile(previousLogsFile)
     MoveFile(logsFile, previousLogsFile)
 
-    startUpLogs = ReadAsciiFile(FILENAME_STARTUP)
-    if not StringUtils.IsNullOrEmpty(startUpLogs)
-        line = `************* Startup Logs *************\n${startUpLogs}*********** End Startup Logs ***********\n`
-        print line
-        buffer.FromAsciiString(line)
-        buffer.AppendFile(logsFile)
-    end if
-
+    ' Sometimes lastExitInfo.console_log (which would be contained in startUpLogs)
+    ' would contain 'AppExitComplete', which is used to detect test runner exits.
+    ' So we don't log it in test mode.
+    #if TEST_MODE
+    #else
+        startUpLogs = ReadAsciiFile(FILENAME_STARTUP)
+        if not StringUtils.IsNullOrEmpty(startUpLogs)
+            line = `************* Startup Logs *************\n${startUpLogs}*********** End Startup Logs ***********\n`
+            print line
+            buffer.FromAsciiString(line)
+            buffer.AppendFile(logsFile)
+        end if
+    #end if
     m.eventThrottleTimer = CreateObject("roTimespan")
 
     appMemoryMonitor = CreateObject("roAppMemoryMonitor")
