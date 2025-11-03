@@ -92,6 +92,7 @@ namespace Innertube
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         isLive = ValidBool(videoDetails["isLive"])
+        isPostLiveDvr = ValidBool(videoDetails["isPostLiveDvr"])
 
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
@@ -122,6 +123,7 @@ namespace Innertube
         parsedResponse["authorId"] = videoDetails["channelId"]
         parsedResponse["lengthSeconds"] = lengthSeconds
         parsedResponse["liveNow"] = isLive
+        parsedResponse["isPostLiveDvr"] = isPostLiveDvr
         parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
         parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
         parsedResponse["dashUrl"] = streamingData["dashManifestUrl"]
@@ -153,6 +155,10 @@ namespace Innertube
 
         parsedResponse["isLoggedIn"] = ParseIsLoggedIn(payload)
         parsedResponse["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, parsedResponse.isLoggedIn)
+
+        if isPostLiveDvr
+            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn)
+        end if
 
         return parsedResponse
     end function
@@ -610,10 +616,6 @@ namespace Innertube
         return false
     end function
 
-    function IsPostLiveDvr(payload as object) as boolean
-        return ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isPostLiveDvr"]))
-    end function
-
     function FormatsHaveLiveStreamingData(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -626,5 +628,42 @@ namespace Innertube
         end for
 
         return false
+    end function
+
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic) as void
+        if adaptiveFormats.Count() = 0
+            LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
+            return
+        end if
+
+        url = adaptiveFormats[0]["url"]
+        if StringUtils.IsNullOrEmpty(url)
+            LogWarn("GetPostLiveDvrInfo: URL is empty")
+            return
+        end if
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents["rn"] = "0"
+        queryComponents["sq"] = "0"
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
+        end if
+
+        url = UrlUtils.SetQueryParams(url, queryComponents)
+        req = HttpClient.Head(url)
+        res = req.Await()
+
+        if not res.IsSuccess()
+            LogError("Failed to fetch Post-Live DVR info", res.ErrorMessage())
+            return
+        end if
+
+        headers = res.Headers()
+
+        durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
+        segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
+
+        parsedResponse["postLiveDvrDurationMs"] = durationMs
+        parsedResponse["postLiveDvrSegmentCount"] = segmentCount
     end function
 end namespace
