@@ -22,6 +22,12 @@ namespace Innertube
 
         context = Innertube.CreateContext(client, deviceInfo, options)
 
+        if client = Innertube.ClientType.TV
+            referer = "https://www.youtube.com/tv#/watch?v=" + videoId
+        else
+            referer = "https://www.youtube.com/watch?v=" + videoId
+        end if
+
         payload = {
             "videoId": videoId
             "context": context
@@ -30,13 +36,12 @@ namespace Innertube
                 "contentPlaybackContext": {
                     "vis": 0
                     "splay": false
-                    "referer": "https://www.youtube.com/watch?v=" + videoId
+                    "referer": referer
                     "currentUrl": "/watch?v=" + videoId
                     "autonavState": "STATE_ON"
                     "autoCaptionsDefaultOn": false
                     "html5Preference": "HTML5_PREF_WANTS"
                     "lactMilliseconds": "-1"
-                    "isInlinePlaybackNoAd": true
                 }
             }
             "attestationRequest": {
@@ -109,6 +114,7 @@ namespace Innertube
         end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
+        isTypeOTF = FormatsHasTypeOTF(adaptiveFormats)
         hasDrm = (not StringUtils.IsNullOrEmpty(streamingData.drmParams)) or IsArray(streamingData.licenseInfos)
 
         shouldAnalyze = (not isLive) and (not hasLiveStreamingData) and (not hasDrm)
@@ -124,6 +130,7 @@ namespace Innertube
         parsedResponse["lengthSeconds"] = lengthSeconds
         parsedResponse["liveNow"] = isLive
         parsedResponse["isPostLiveDvr"] = isPostLiveDvr
+        parsedResponse["isTypeOTF"] = isTypeOTF
         parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
         parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
         parsedResponse["dashUrl"] = streamingData["dashManifestUrl"]
@@ -630,6 +637,19 @@ namespace Innertube
         return false
     end function
 
+    function FormatsHasTypeOTF(formats as object) as boolean
+        if not IsArray(formats)
+            return false
+        end if
+        for each fmt in formats
+            if ValidString(fmt["type"]) = "FORMAT_STREAM_TYPE_OTF"
+                return true
+            end if
+        end for
+
+        return false
+    end function
+
     function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic) as void
         if adaptiveFormats.Count() = 0
             LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
@@ -651,6 +671,7 @@ namespace Innertube
 
         url = UrlUtils.SetQueryParams(url, queryComponents)
         req = HttpClient.Head(url)
+        req.TryCount(3)
         res = req.Await()
 
         if not res.IsSuccess()
