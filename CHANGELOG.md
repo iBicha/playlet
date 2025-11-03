@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Playback error when regular videos are returned with DRM protection
-- Fallback to iOS HLS for post dvr videos
+- Playback error when regular videos are returned with DRM protection (unless they are OTF)
+- Fallback to iOS HLS for post dvr and OTF videos
 
 ## [0.43.3] - 2025-10-30
 
