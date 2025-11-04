@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Post live DVR video support
 - Better parsing of audio track metadata
+- Bug in detecting live videos in HLS streams
 
 ## [0.43.4] - 2025-11-03
 
