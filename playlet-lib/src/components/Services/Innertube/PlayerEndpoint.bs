@@ -97,7 +97,7 @@ namespace Innertube
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         isLive = ValidBool(videoDetails["isLive"])
-        _isPostLiveDvr = ValidBool(videoDetails["isPostLiveDvr"])
+        isPostLiveDvr = ValidBool(videoDetails["isPostLiveDvr"])
 
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
@@ -128,7 +128,7 @@ namespace Innertube
         parsedResponse["authorId"] = videoDetails["channelId"]
         parsedResponse["lengthSeconds"] = lengthSeconds
         parsedResponse["liveNow"] = isLive
-        parsedResponse["isPostLiveDvr"] = _isPostLiveDvr
+        parsedResponse["isPostLiveDvr"] = isPostLiveDvr
         parsedResponse["isTypeOTF"] = _isTypeOTF
         parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
         parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
@@ -162,7 +162,7 @@ namespace Innertube
         parsedResponse["isLoggedIn"] = ParseIsLoggedIn(payload)
         parsedResponse["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, parsedResponse.isLoggedIn)
 
-        if _isPostLiveDvr
+        if isPostLiveDvr
             GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, cancellation)
         end if
 
@@ -639,10 +639,6 @@ namespace Innertube
         end for
 
         return false
-    end function
-
-    function IsPostLiveDvr(payload as object) as boolean
-        return ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isPostLiveDvr"]))
     end function
 
     function IsTypeOTF(payload as object) as boolean
