@@ -450,6 +450,10 @@ class DashManifest
     end function
 
     function GenerateSegmentInformation(xml as object, stream as object, metadata as object) as void
+        if StringUtils.IsNullOrEmpty(stream.url)
+            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
+        end if
+
         if metadata.isPostLiveDvr = true
             if not IsInt(stream.targetDurationSec)
                 xml.Comment(`[ERROR] Post-Live DVR stream missing targetDurationSec for itag: ${stream.itag}`)
@@ -471,12 +475,29 @@ class DashManifest
                 xml.End()
             end if
         else if stream.isTypeOTF = true
-            xml.Comment(`[INFO] OTF stream segment info generation is not implemented yet for itag: ${stream.itag}`)
-            ' TODO: Implement OTF segment info fetching and generation
-        else
-            if StringUtils.IsNullOrEmpty(stream.url)
-                xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
+            segmentDurations = stream.otfSegmentDurations
+            if not IsArray(segmentDurations)
+                xml.Comment(`[ERROR] OTF stream missing otfSegmentDurations for itag: ${stream.itag}`)
+                return
             end if
+
+            if xml.Node("SegmentTemplate", { initialization: `${stream.url}&sq=0`, media: `${stream.url}&sq=$Number$`, timescale: "1000" })
+                if xml.Node("SegmentTimeline")
+                    if segmentDurations.Count() = 0
+                        xml.Comment(`[ERROR] OTF stream has empty otfSegmentDurations for itag: ${stream.itag}`)
+                    end if
+                    for each segment in segmentDurations
+                        sAttributes = { d: segment.duration.toStr() }
+                        if segment.repeatCount <> invalid
+                            sAttributes.r = segment.repeatCount.toStr()
+                        end if
+                        xml.EmptyNode("S", sAttributes)
+                    end for
+                    xml.End()
+                end if
+                xml.End()
+            end if
+        else
             xml.TextNode("BaseURL", ValidString(stream.url))
 
             if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)

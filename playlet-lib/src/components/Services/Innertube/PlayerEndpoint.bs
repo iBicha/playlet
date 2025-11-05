@@ -114,7 +114,7 @@ namespace Innertube
         end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
-        _isTypeOTF = FormatsHasTypeOTF(adaptiveFormats)
+        isOTF = IsTypeOTF(adaptiveFormats)
         hasDrm = (not StringUtils.IsNullOrEmpty(streamingData.drmParams)) or IsArray(streamingData.licenseInfos)
 
         adaptiveFormats = TransformFormats(adaptiveFormats)
@@ -129,7 +129,6 @@ namespace Innertube
         parsedResponse["lengthSeconds"] = lengthSeconds
         parsedResponse["liveNow"] = isLive
         parsedResponse["isPostLiveDvr"] = isPostLiveDvr
-        parsedResponse["isTypeOTF"] = _isTypeOTF
         parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
         parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
         parsedResponse["dashUrl"] = streamingData["dashManifestUrl"]
@@ -166,8 +165,8 @@ namespace Innertube
             GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, cancellation)
         end if
 
-        if _isTypeOTF
-            GetOTFSegmentInfo(parsedResponse, adaptiveFormats, cancellation)
+        if isOTF
+            GetOTFSegmentInfo(adaptiveFormats, cancellation)
         end if
 
         return parsedResponse
@@ -701,8 +700,80 @@ namespace Innertube
         end if
     end function
 
-    function GetOTFSegmentInfo(parsedResponse as object, adaptiveFormats as object, cancellation as object) as void
-        ' TODO
+    function GetOTFSegmentInfo(adaptiveFormats as object, cancellation as object) as void
+        requests = CreateObject("roArray", adaptiveFormats.Count(), false)
+
+        for i = 0 to adaptiveFormats.Count() - 1
+            format = adaptiveFormats[i]
+            if format.isTypeOTF <> true
+                continue for
+            end if
+
+            url = format.url
+            if StringUtils.IsNullOrEmpty(url)
+                LogError("GetOTFSegmentInfo: URL is empty for itag", format.itag)
+                continue for
+            end if
+
+            queryComponents = UrlUtils.ParseQueryComponents(url)
+            queryComponents["rn"] = "0"
+            queryComponents["sq"] = "0"
+
+            otfUrl = UrlUtils.SetQueryParams(url, queryComponents)
+
+            request = HttpClient.Get(otfUrl)
+            request.Cancellation(cancellation)
+            request.TryCount(2)
+            request.Send()
+            requests[`${i}`] = request
+        end for
+
+        for i = 0 to requests.Count() - 1
+            request = requests[`${i}`]
+            if request = invalid
+                continue for
+            end if
+
+            format = adaptiveFormats[i]
+            response = request.Await()
+
+            if not response.IsSuccess()
+                LogError("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
+                continue for
+            end if
+
+            responseText = response.Text()
+
+            segmentDurationsMs = StringUtils.GetBetween(responseText, "Segment-Durations-Ms:", `\r\n`)
+            if StringUtils.IsNullOrEmpty(segmentDurationsMs)
+                LogError("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
+                continue for
+            end if
+
+            segmentDurationStrings = segmentDurationsMs.Split(",")
+            segmentDurations = []
+            for each segmentDurationString in segmentDurationStrings
+                trimmedSegmentDuration = segmentDurationString.Trim()
+                if trimmedSegmentDuration.Len() = 0
+                    continue for
+                end if
+
+                repeatCount = invalid
+                repeatCountString = StringUtils.GetBetween(trimmedSegmentDuration, "(r=", ")")
+                if IsString(repeatCountString)
+                    repeatCount = repeatCountString.ToInt()
+                end if
+
+                duration = trimmedSegmentDuration.ToInt()
+
+                segmentDurations.Push({
+                    duration: duration
+                    repeatCount: repeatCount
+                })
+            end for
+
+            format["otfSegmentDurations"] = segmentDurations
+        end for
     end function
 
 end namespace
