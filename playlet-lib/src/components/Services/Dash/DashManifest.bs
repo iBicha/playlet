@@ -528,13 +528,19 @@ class DashManifest
     end function
 
     function HoistNumberAttribute(formats as object, property as string, hoisted as object) as dynamic
-        if formats.Count() < 2 or formats[0][property] = invalid
+        if formats.Count() < 2
             return invalid
         end if
 
-        firstValue = formats[0][property]
+        firstFormat = formats[0]
+        if firstFormat[property] = invalid
+            return invalid
+        end if
+
+        firstValue = firstFormat[property]
         for i = 1 to formats.Count() - 1
-            if formats[i][property] <> firstValue
+            otherValue = formats[i][property]
+            if type(otherValue) <> type(firstValue) or otherValue <> firstValue
                 return invalid
             end if
         end for
