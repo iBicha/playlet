@@ -114,7 +114,7 @@ namespace Innertube
         end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
-        isOTF = IsTypeOTF(adaptiveFormats)
+        isOTF = FormatsHasTypeOTF(adaptiveFormats)
         hasDrm = (not StringUtils.IsNullOrEmpty(streamingData.drmParams)) or IsArray(streamingData.licenseInfos)
 
         adaptiveFormats = TransformFormats(adaptiveFormats)
@@ -640,10 +640,6 @@ namespace Innertube
         return false
     end function
 
-    function IsTypeOTF(payload as object) as boolean
-        return FormatsHasTypeOTF(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
-    end function
-
     function FormatsHasTypeOTF(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -736,6 +732,10 @@ namespace Innertube
 
             format = adaptiveFormats[i]
             response = request.Await()
+
+            if response.IsCancelled()
+                return
+            end if
 
             if not response.IsSuccess()
                 LogError("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())

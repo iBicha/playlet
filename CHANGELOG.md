@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Post live DVR video support
+- Attempted OTF stream support
 - Better parsing of audio track metadata
 - Bug in detecting live videos in HLS streams
 
