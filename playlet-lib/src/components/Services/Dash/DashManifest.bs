@@ -460,13 +460,22 @@ class DashManifest
                 return
             end if
 
-            if not IsInt(metadata.postLiveDvrSegmentCount)
-                xml.Comment(`[ERROR] Post-Live DVR metadata missing postLiveDvrSegmentCount for itag: ${stream.itag}`)
+            if stream.targetDurationSec < 1
+                xml.Comment(`[ERROR] Post-Live DVR stream has invalid targetDurationSec (${stream.targetDurationSec}) for itag: ${stream.itag}`)
                 return
             end if
 
+            postLiveDvrSegmentCount = metadata.postLiveDvrSegmentCount
+            if not IsInt(postLiveDvrSegmentCount)
+                xml.Comment(`[ERROR] Post-Live DVR metadata missing postLiveDvrSegmentCount for itag: ${stream.itag}`)
+                ' We're going to guess segment count from targetDurationSec and total duration
+                totalDurationMs = m.GetDuration(metadata) * 1000.0
+                postLiveDvrSegmentCount = MathUtils.Max(Fix(totalDurationMs / (stream.targetDurationSec * 1000)), 1)
+                xml.Comment(`[INFO] Guessing postLiveDvrSegmentCount as ${postLiveDvrSegmentCount} for itag: ${stream.itag}`)
+            end if
+
             duration = (stream.targetDurationSec * 1000).toStr()
-            repeatCount = (metadata.postLiveDvrSegmentCount - 1).toStr()
+            repeatCount = (postLiveDvrSegmentCount - 1).toStr()
             if xml.Node("SegmentTemplate", { initialization: `${stream.url}&sq=0`, media: `${stream.url}&sq=$Number$`, timescale: "1000" })
                 if xml.Node("SegmentTimeline")
                     xml.EmptyNode("S", { d: duration, r: repeatCount })

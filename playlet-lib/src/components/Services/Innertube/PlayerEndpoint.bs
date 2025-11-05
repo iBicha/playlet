@@ -72,9 +72,9 @@ namespace Innertube
         return request
     end function
 
-    function ParseInnertubePlayerResponse(playerRequest as dynamic, playerResponse as dynamic, parsedResponse as object, cancellation as object) as object
+    function ParseInnertubePlayerResponse(playerRequest as dynamic, playerResponse as dynamic, client as Innertube.ClientType, cancellation as object) as object
         WriteAsciiFile("cachefs:/last_player_response.json", playerResponse.Text())
-
+        parsedResponse = {}
         payload = playerResponse.Json()
 
         error = ParsePlayerResponseForError(payload, playerRequest)
@@ -162,11 +162,11 @@ namespace Innertube
         parsedResponse["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, parsedResponse.isLoggedIn)
 
         if isPostLiveDvr
-            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, cancellation)
+            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, client, cancellation)
         end if
 
         if isOTF
-            GetOTFSegmentInfo(adaptiveFormats, cancellation)
+            GetOTFSegmentInfo(adaptiveFormats, client, cancellation)
         end if
 
         return parsedResponse
@@ -653,7 +653,7 @@ namespace Innertube
         return false
     end function
 
-    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, cancellation as object) as void
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
         if adaptiveFormats.Count() = 0
             LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
             return
@@ -673,17 +673,19 @@ namespace Innertube
         end if
 
         url = UrlUtils.SetQueryParams(url, queryComponents)
-        req = HttpClient.Head(url)
-        req.Cancellation(cancellation)
-        req.TryCount(3)
-        res = req.Await()
 
-        if not res.IsSuccess()
-            LogError("Failed to fetch Post-Live DVR info", res.ErrorMessage())
+        request = HttpClient.Head(url)
+        request.Headers(Innertube.CreateHeaders(client))
+        request.TryCount(2)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            LogError("Failed to fetch Post-Live DVR info", response.ErrorMessage())
             return
         end if
 
-        headers = res.Headers()
+        headers = response.Headers()
 
         durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
         segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
@@ -694,11 +696,16 @@ namespace Innertube
         if segmentCount > 0
             parsedResponse["postLiveDvrSegmentCount"] = segmentCount
         end if
+
+        if segmentCount = 0 or durationMs = 0
+            LogError("GetPostLiveDvrInfo: Missing Post-Live DVR info in headers", headers)
+        end if
     end function
 
-    function GetOTFSegmentInfo(adaptiveFormats as object, cancellation as object) as void
+    function GetOTFSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
         requests = CreateObject("roArray", adaptiveFormats.Count(), false)
 
+        requestHeaders = Innertube.CreateHeaders(client)
         for i = 0 to adaptiveFormats.Count() - 1
             format = adaptiveFormats[i]
             if format.isTypeOTF <> true
@@ -718,8 +725,9 @@ namespace Innertube
             otfUrl = UrlUtils.SetQueryParams(url, queryComponents)
 
             request = HttpClient.Get(otfUrl)
-            request.Cancellation(cancellation)
+            request.Headers(requestHeaders)
             request.TryCount(2)
+            request.Cancellation(cancellation)
             request.Send()
             requests[`${i}`] = request
         end for
@@ -773,6 +781,20 @@ namespace Innertube
             end for
 
             format["otfSegmentDurations"] = segmentDurations
+
+            if segmentDurations.Count() = 0
+                LogErrorNoTelemetry("No OTF segment durations found for itag", format.itag)
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `No OTF segment durations found for itag ${format.itag}`
+                    fingerprint: ["OTF No Segment Durations"]
+                    attachments: [{
+                        filename: "otf.txt"
+                        content_type: "plain/text"
+                        data: responseText
+                    }]
+                })
+            end if
         end for
     end function
 
