@@ -756,7 +756,17 @@ namespace Innertube
             end if
 
             if not response.IsSuccess()
-                LogError("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
+                LogErrorNoTelemetry("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `Failed to fetch OTF segment info for itag ${format.itag}`
+                    fingerprint: ["OTF Fetch Error"]
+                    attachments: [{
+                        filename: "otf.txt"
+                        content_type: "plain/text"
+                        data: response.ErrorMessage()
+                    }]
+                })
                 continue for
             end if
 
@@ -764,7 +774,21 @@ namespace Innertube
 
             segmentDurationsMs = StringUtils.GetBetween(responseText, "Segment-Durations-Ms:", `\r\n`)
             if StringUtils.IsNullOrEmpty(segmentDurationsMs)
-                LogError("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
+                LogErrorNoTelemetry("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `Failed to extract Segment-Durations-Ms from OTF stream for itag ${format.itag}`
+                    fingerprint: ["OTF Missing Segment Durations"]
+                    attachments: [{
+                        filename: "otf.txt"
+                        content_type: "plain/text"
+                        data: responseText
+                    }, {
+                        filename: "headers.json"
+                        content_type: "application/json"
+                        data: FormatJson(response.Headers())
+                    }]
+                })
                 continue for
             end if
 
@@ -793,6 +817,10 @@ namespace Innertube
                             filename: "otf.txt"
                             content_type: "plain/text"
                             data: responseText
+                        }, {
+                            filename: "headers.json"
+                            content_type: "application/json"
+                            data: FormatJson(response.Headers())
                         }]
                     })
                     continue for
@@ -816,6 +844,10 @@ namespace Innertube
                         filename: "otf.txt"
                         content_type: "plain/text"
                         data: responseText
+                    }, {
+                        filename: "headers.json"
+                        content_type: "application/json"
+                        data: FormatJson(response.Headers())
                     }]
                 })
             end if
