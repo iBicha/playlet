@@ -307,7 +307,7 @@ class DashManifest
                     for each drmFamily in firstFormat.drmFamilies
                         systemId = m.GetDrmSystemId(drmFamily)
                         if IsString(systemId)
-                            xml.EmptyNode("ContentProtection", { schemeIdUri: `urn:uuid:${systemId}` })
+                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
                         end if
                     end for
                 end if
@@ -316,7 +316,7 @@ class DashManifest
                     ' Roles
                     roles = m.GetTrackRoles(firstFormat)
                     for each role in roles
-                        xml.EmptyNode("Role", { schemeIdUri: "urn:mpeg:dash:role:2011", value: role })
+                        xml.EmptyNode("Role", { "schemeIdUri": "urn:mpeg:dash:role:2011", "value": role })
                     end for
 
                     ' Label
@@ -325,7 +325,7 @@ class DashManifest
                         if firstFormat.isDrc = true
                             displayName = `${displayName} (Stable Volume)`
                         end if
-                        xml.Node("Label", { id: id.toStr() })
+                        xml.Node("Label", { "id": id })
                         xml.Text(displayName)
                         xml.End()
                     end if
@@ -335,8 +335,8 @@ class DashManifest
                 channels = m.HoistAudioChannels(group, hoisted)
                 if IsInt(channels)
                     xml.EmptyNode("AudioChannelConfiguration", {
-                        schemeIdUri: "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
-                        value: channels.toStr()
+                        "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
+                        "value": channels
                     })
                 end if
 
@@ -363,8 +363,8 @@ class DashManifest
                     if xml.Node("Representation", representationAttributes)
                         if hoisted["AudioChannelConfiguration"] = invalid and IsInt(stream.audioChannels)
                             xml.EmptyNode("AudioChannelConfiguration", {
-                                schemeIdUri: "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
-                                value: stream.audioChannels.toStr()
+                                "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
+                                "value": stream.audioChannels
                             })
                         end if
 
@@ -410,7 +410,7 @@ class DashManifest
                     for each drmFamily in firstFormat.drmFamilies
                         systemId = m.GetDrmSystemId(drmFamily)
                         if IsString(systemId)
-                            xml.EmptyNode("ContentProtection", { schemeIdUri: `urn:uuid:${systemId}` })
+                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
                         end if
                     end for
                 end if
@@ -476,9 +476,9 @@ class DashManifest
 
             duration = stream.targetDurationSec * 1000
             repeatCount = postLiveDvrSegmentCount - 1
-            if xml.Node("SegmentTemplate", { initialization: `${stream.url}&sq=0`, media: `${stream.url}&sq=$Number$`, timescale: "1000" })
+            if xml.Node("SegmentTemplate", { "initialization": `${stream.url}&sq=0`, "media": `${stream.url}&sq=$Number$`, "timescale": "1000" })
                 if xml.Node("SegmentTimeline")
-                    xml.EmptyNode("S", { d: duration, r: repeatCount })
+                    xml.EmptyNode("S", { "d": duration, "r": repeatCount })
                     xml.End()
                 end if
                 xml.End()
@@ -490,15 +490,15 @@ class DashManifest
                 return
             end if
 
-            if xml.Node("SegmentTemplate", { initialization: `${stream.url}&sq=0`, media: `${stream.url}&sq=$Number$`, timescale: "1000" })
+            if xml.Node("SegmentTemplate", { "initialization": `${stream.url}&sq=0`, "media": `${stream.url}&sq=$Number$`, "timescale": "1000" })
                 if xml.Node("SegmentTimeline")
                     if segmentDurations.Count() = 0
                         xml.Comment(`[ERROR] OTF stream has empty otfSegmentDurations for itag: ${stream.itag}`)
                     end if
                     for each segment in segmentDurations
-                        sAttributes = { d: segment.duration }
+                        sAttributes = { "d": segment.duration }
                         if segment.repeatCount <> invalid
-                            sAttributes.r = segment.repeatCount
+                            sAttributes["r"] = segment.repeatCount
                         end if
                         xml.EmptyNode("S", sAttributes)
                     end for
