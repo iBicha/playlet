@@ -81,16 +81,16 @@ namespace InnertubeService
             end if
 
             playerResponseJson = playerResponse.Json()
-            notDashSupported = Innertube.IsLiveStream(playerResponseJson) or Innertube.IsPostLiveDvr(playerResponseJson) or Innertube.IsTypeOTF(playerResponseJson)
+            notDashSupported = Innertube.IsLiveStream(playerResponseJson)
             if notDashSupported and client = Innertube.ClientType.Tv
-                LogDebug("Falling back to iOS client for live/DVR/OTF video.")
+                LogDebug("Falling back to iOS client for live video.")
                 isLoggedIn = Innertube.ParseIsLoggedIn(playerResponseJson)
                 playbackTrackingUrls = Innertube.ParsePlaybackTrackingUrls(playerResponseJson, isLoggedIn)
                 client = Innertube.ClientType.IOS
                 continue while
             end if
 
-            parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, {}, cancellation)
+            parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, client, cancellation)
 
             if parsedResponse.error = invalid
                 exit while

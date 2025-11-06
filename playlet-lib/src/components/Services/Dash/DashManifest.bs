@@ -48,14 +48,19 @@ class DashManifest
             end for
         end if
 
-        audioStreams = m.getAudioStreams(adaptiveFormats)
-        videoStreams = m.getVideoStreams(adaptiveFormats, qualityFilter)
-        if videoStreams.Count() = 0
+        duration = m.GetDuration(metadata)
+
+        groupings = m.CreateFormatGroupings(adaptiveFormats, metadata.isPostLiveDvr)
+        audioGroups = groupings.audio
+        videoGroups = groupings.video
+
+        filteredVideoGroups = m.FilterVideoGroups(videoGroups, qualityFilter)
+        if filteredVideoGroups.Count() = 0 and videoGroups.Count() > 0
             LogWarnNoTelemetry("No video streams found using quality filter:", qualityFilter, "Falling back to all video streams")
-            videoStreams = m.getVideoStreams(adaptiveFormats, {})
+            filteredVideoGroups = videoGroups
         end if
 
-        if videoStreams.Count() = 0
+        if filteredVideoGroups.Count() = 0
             lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
             LogTelemetryEvent({
                 level: "error"
@@ -72,9 +77,6 @@ class DashManifest
                 }]
             })
         end if
-
-        videoMimeTypes = m.getMimeTypes(videoStreams)
-        audioSets = m.getMimeTypeLanguageCombos(audioStreams)
         storyboards = metadata.storyboards
 
         xml = new XmlObject()
@@ -86,83 +88,355 @@ class DashManifest
                 "profiles": "urn:mpeg:dash:profile:full:2011"
                 "minBufferTime": "PT1.5S"
                 "type": "static"
-                "mediaPresentationDuration": `PT${metadata.lengthSeconds ?? 0}S`
+                "mediaPresentationDuration": `PT${duration}S`
+                "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
+                "xsi:schemaLocation": "urn:mpeg:dash:schema:mpd:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
             })
             if xml.Node("Period")
 
                 id = 0
-                id = m.GenerateAudioAdaptationSets(xml, audioSets, audioStreams, id)
-                id = m.GenerateVideoAdaptationSets(xml, videoMimeTypes, videoStreams, id)
+                id = m.GenerateAudioAdaptationSets(xml, audioGroups, id, metadata)
+                id = m.GenerateVideoAdaptationSets(xml, filteredVideoGroups, id, metadata)
                 m.GenerateImageAdaptationSets(xml, storyboards, id)
 
                 xml.End()
             end if
             xml.End()
         end if
-
         return xml.ToXmlString()
     end function
 
-    function GenerateAudioAdaptationSets(xml as object, audioSets as object, audioStreams as object, id as integer) as integer
-        for each audioSet in audioSets
+    function GetDuration(metadata as object) as dynamic
+        if metadata["isPostLiveDvr"] = true and IsInt(metadata["postLiveDvrDurationMs"])
+            return metadata["postLiveDvrDurationMs"] / 1000.0
+        end if
+
+        approxDurationMs = ValidString(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "approxDurationMs"])).ToInt()
+        if approxDurationMs > 0
+            return approxDurationMs / 1000.0
+        end if
+
+        return ValidInt(metadata["lengthSeconds"])
+    end function
+
+    function CreateFormatGroupings(formats as object, isPostLiveDvr as boolean) as object
+        groupInfo = {}
+
+        for each format in formats
+            isOtf = format.isTypeOTF = true
+            hasInit = not StringUtils.IsNullOrEmpty(format.init)
+            hasIndex = not StringUtils.IsNullOrEmpty(format.index)
+            isValid = (hasInit and hasIndex) or isOtf or isPostLiveDvr
+            if not isValid
+                continue for
+            end if
+
+            if not IsString(format.type)
+                continue for
+            end if
+
+            if (format.width = invalid or format.height = invalid) and not StringUtils.IsNullOrEmpty(format.size)
+                if format.size.instr("x") > 0
+                    parts = format.size.Tokenize("x")
+                    if parts.Count() = 2
+                        format.width = ValidInt(parts[0].toInt())
+                        format.height = ValidInt(parts[1].toInt())
+                    end if
+                end if
+            end if
+
+            codecs = ""
+            mimeType = format.type.Tokenize(";")[0]
+            if format.type.inStr("codecs=") <> -1
+                codecs = format.type.split("codecs=")[1]
+                if codecs.startsWith(`"`)
+                    codecs = codecs.mid(1)
+                end if
+                if codecs.endsWith(`"`)
+                    codecs = codecs.left(codecs.len() - 1)
+                end if
+            end if
+
+            justCodec = codecs.split(".")[0]
+
+            colorInfo = ""
+            if IsAssociativeArray(format.colorInfo)
+                colorInfo = `${format.colorInfo.primaries}-${format.colorInfo.transferCharacteristics}-${format.colorInfo.matrixCoefficients}`
+            end if
+
+            audioTrackId = ""
+            if IsAssociativeArray(format.audioTrack) and IsString(format.audioTrack.id)
+                audioTrackId = format.audioTrack.id
+            end if
+
+            if format.type.startsWith("audio")
+                xtagsInfo = m.GetXtagsInfo(format)
+                format.xtagsInfo = xtagsInfo
+                format.isDrc = xtagsInfo.isDrc
+                format.isDubbed = xtagsInfo.isDubbed
+                format.isAutoDubbed = xtagsInfo.isAutoDubbed
+                format.isDescriptive = xtagsInfo.isDescriptive
+                format.isSecondary = xtagsInfo.isSecondary
+                format.isOriginal = xtagsInfo.isOriginal
+            end if
+
+            drc = ""
+            if format.isDrc = true
+                drc = "drc"
+            end if
+
+            groupId = `${mimeType}-${justCodec}-${colorInfo}-${audioTrackId}-${drc}`
+
+            if groupInfo[groupId] = invalid
+                groupInfo[groupId] = []
+            end if
+            groupInfo[groupId].Push(format)
+        end for
+
+        audioGroups = []
+        videoGroups = []
+
+        for each key in groupInfo
+            group = groupInfo[key]
+            if group[0].type.startsWith("audio")
+                audioGroups.Push(group)
+            else if group[0].type.startsWith("video")
+                videoGroups.Push(group)
+            end if
+        end for
+
+        return { audio: audioGroups, video: videoGroups }
+    end function
+
+    function FilterVideoGroups(videoGroups as object, qualityFilter as object) as object
+        if qualityFilter.Count() = 0
+            return videoGroups
+        end if
+
+        filteredGroups = []
+        for each group in videoGroups
+            filteredStreams = []
+            for each stream in group
+                if m.IsVideoFormatIncluded(stream, qualityFilter)
+                    filteredStreams.Push(stream)
+                end if
+            end for
+
+            if filteredStreams.Count() > 0
+                filteredGroups.Push(filteredStreams)
+            end if
+        end for
+        return filteredGroups
+    end function
+
+    function IsVideoFormatIncluded(stream as object, qualityFilter as object) as boolean
+        if qualityFilter.Count() = 0
+            return true
+        end if
+
+        qualityLabel = stream.qualityLabel
+        if not StringUtils.IsNullOrEmpty(qualityLabel)
+            pIndex = qualityLabel.InStr("p")
+            if pIndex <> -1
+                qualityLabel = qualityLabel.Mid(0, pIndex)
+            end if
+            if qualityFilter[qualityLabel] = true
+                return true
+            end if
+        end if
+
+        if stream.height <> invalid
+            if qualityFilter[ToString(stream.height)] = true
+                return true
+            end if
+        end if
+
+        resolution = stream.resolution
+        if not StringUtils.IsNullOrEmpty(resolution)
+            pIndex = resolution.InStr("p")
+            if pIndex <> -1
+                resolution = resolution.Mid(0, pIndex)
+            end if
+            if qualityFilter[resolution] = true
+                return true
+            end if
+        end if
+
+        size = stream.size
+        if not StringUtils.IsNullOrEmpty(size)
+            sizeParts = size.Split("x")
+            if sizeParts.Count() = 2
+                if qualityFilter[sizeParts[1]] = true
+                    return true
+                end if
+            end if
+        end if
+
+        return false
+    end function
+
+    function GenerateAudioAdaptationSets(xml as object, audioGroups as object, id as integer, metadata as object) as integer
+        for each group in audioGroups
+            firstFormat = group[0]
+            hoisted = {}
+
             adaptationSetAttributes = {
                 "id": `${id}`
-                "mimeType": audioSet.mimeType
+                "mimeType": firstFormat.type.Tokenize(";")[0]
                 "startWithSAP": "1"
                 "subsegmentAlignment": "true"
+                "contentType": "audio"
             }
-            if not StringUtils.IsNullOrEmpty(audioSet.lang)
-                adaptationSetAttributes["lang"] = audioSet.lang
+
+            if IsAssociativeArray(firstFormat.audioTrack) and IsString(firstFormat.audioTrack.languageCode)
+                adaptationSetAttributes["lang"] = firstFormat.audioTrack.languageCode
+            end if
+
+            ' Hoist common attributes
+            codecs = m.HoistCodecs(group, hoisted)
+            if IsString(codecs)
+                adaptationSetAttributes["codecs"] = codecs
+            end if
+            audioSampleRate = m.HoistNumberAttribute(group, "audioSampleRate", hoisted)
+            if IsInt(audioSampleRate)
+                adaptationSetAttributes["audioSamplingRate"] = audioSampleRate
             end if
 
             if xml.Node("AdaptationSet", adaptationSetAttributes)
-                xml.EmptyNode("Role", {
-                    "schemeIdUri": "urn:mpeg:dash:role:2011"
-                    "value": audioSet.acont = "original" ? "main" : "alternate"
-                })
+                if IsArray(firstFormat.drmFamilies)
+                    for each drmFamily in firstFormat.drmFamilies
+                        systemId = m.GetDrmSystemId(drmFamily)
+                        if IsString(systemId)
+                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
+                        end if
+                    end for
+                end if
 
-                for i = 0 to audioStreams.Count() - 1
-                    stream = audioStreams[i]
-                    streamMimeType = stream.type.Tokenize(";")[0]
-                    if streamMimeType <> audioSet.mimeType or stream.languageInfo.lang <> audioSet.lang or stream.languageInfo.acont <> audioSet.acont
-                        continue for
+                if IsAssociativeArray(firstFormat.audioTrack) or firstFormat.isDrc = true
+                    ' Roles
+                    roles = m.GetTrackRoles(firstFormat)
+                    for each role in roles
+                        xml.EmptyNode("Role", { "schemeIdUri": "urn:mpeg:dash:role:2011", "value": role })
+                    end for
+
+                    ' Label
+                    if IsAssociativeArray(firstFormat.audioTrack) and IsString(firstFormat.audioTrack.displayName)
+                        displayName = firstFormat.audioTrack.displayName
+                        if firstFormat.isDrc = true
+                            displayName = `${displayName} (Stable Volume)`
+                        end if
+                        xml.Node("Label", { "id": id })
+                        xml.Text(displayName)
+                        xml.End()
+                    end if
+                end if
+
+                ' AudioChannelConfiguration
+                channels = m.HoistAudioChannels(group, hoisted)
+                if IsInt(channels)
+                    xml.EmptyNode("AudioChannelConfiguration", {
+                        "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
+                        "value": channels
+                    })
+                end if
+
+                for each stream in group
+                    representationId = stream.itag
+                    if IsAssociativeArray(stream.audioTrack) and IsString(stream.audioTrack.id)
+                        representationId = `${representationId}-${stream.audioTrack.id}`
+                    end if
+                    if stream.isDrc = true
+                        representationId = `${representationId}-drc`
                     end if
 
-                    codecs = stream.type.split("codecs=")[1]
-                    if codecs.startsWith(`"`)
-                        codecs = codecs.mid(1)
+                    representationAttributes = {
+                        "id": representationId
+                        "bandwidth": stream.bitrate
+                    }
+                    if hoisted["codecs"] = invalid and (stream.type.inStr("codecs=") <> -1)
+                        representationAttributes["codecs"] = stream.type.split("codecs=")[1].replace(`"`, "").replace(`"`, "")
                     end if
-                    if codecs.endsWith(`"`)
-                        codecs = codecs.left(codecs.len() - 1)
+                    if hoisted["audioSampleRate"] = invalid
+                        representationAttributes["audioSamplingRate"] = stream.audioSampleRate
                     end if
 
-                    if xml.Node("Representation", {
-                            "id": stream.itag
-                            "codecs": codecs
-                            "bandwidth": stream.bitrate
-                        })
-
-                        xml.EmptyNode("AudioChannelConfiguration", {
-                            "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
-                            "value": `${stream.audioChannels}`
-                        })
-
-                        if StringUtils.IsNullOrEmpty(stream.url)
-                            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
-                        else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
-                            xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
-                        end if
-                        xml.TextNode("BaseURL", ValidString(stream.url))
-
-                        if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
-                            xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
-                        end if
-                        if xml.Node("SegmentBase", { "indexRange": stream.index, "indexRangeExact": "true" })
-                            xml.EmptyNode("Initialization", { "range": stream.init })
-
-                            xml.End()
+                    if xml.Node("Representation", representationAttributes)
+                        if hoisted["AudioChannelConfiguration"] = invalid and IsInt(stream.audioChannels)
+                            xml.EmptyNode("AudioChannelConfiguration", {
+                                "schemeIdUri": "urn:mpeg:dash:23003:3:audio_channel_configuration:2011"
+                                "value": stream.audioChannels
+                            })
                         end if
 
+                        m.GenerateSegmentInformation(xml, stream, metadata)
+
+                        xml.End()
+                    end if
+                end for
+
+                xml.End()
+            end if
+            id += 1
+        end for
+        return id
+    end function
+
+    function GenerateVideoAdaptationSets(xml as object, videoGroups as object, id as integer, metadata as object) as integer
+        for each group in videoGroups
+            firstFormat = group[0]
+            hoisted = {}
+
+            adaptationSetAttributes = {
+                "id": `${id}`
+                "mimeType": firstFormat.type.Tokenize(";")[0]
+                "startWithSAP": "1"
+                "subsegmentAlignment": "true"
+                "maxPlayoutRate": "1"
+                "contentType": "video"
+            }
+
+            ' Hoist common attributes
+            codecs = m.HoistCodecs(group, hoisted)
+            if IsString(codecs)
+                adaptationSetAttributes["codecs"] = codecs
+            end if
+            fps = m.HoistNumberAttribute(group, "fps", hoisted)
+            if fps <> invalid
+                adaptationSetAttributes["frameRate"] = fps
+            end if
+
+            if xml.Node("AdaptationSet", adaptationSetAttributes)
+                if IsArray(firstFormat.drmFamilies)
+                    for each drmFamily in firstFormat.drmFamilies
+                        systemId = m.GetDrmSystemId(drmFamily)
+                        if IsString(systemId)
+                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
+                        end if
+                    end for
+                end if
+
+                m.AddColorInfo(firstFormat, xml)
+
+                for each stream in group
+                    representationAttributes = {
+                        "id": stream.itag
+                        "bandwidth": stream.bitrate
+                    }
+                    if stream.width <> invalid
+                        representationAttributes["width"] = stream.width
+                    end if
+                    if stream.height <> invalid
+                        representationAttributes["height"] = stream.height
+                    end if
+                    if hoisted["codecs"] = invalid and (stream.type.inStr("codecs=") <> -1)
+                        representationAttributes["codecs"] = stream.type.split("codecs=")[1].replace(`"`, "").replace(`"`, "")
+                    end if
+                    if hoisted["fps"] = invalid
+                        representationAttributes["frameRate"] = stream.fps
+                    end if
+
+                    if xml.Node("Representation", representationAttributes)
+                        m.GenerateSegmentInformation(xml, stream, metadata)
                         xml.End()
                     end if
                 end for
@@ -175,76 +449,160 @@ class DashManifest
         return id
     end function
 
-    function GenerateVideoAdaptationSets(xml as object, videoMimeTypes as object, videoStreams as object, id as integer) as integer
-        for each mimeType in videoMimeTypes
-            if xml.Node("AdaptationSet", {
-                    "id": `${id}`
-                    "mimeType": mimeType
-                    "startWithSAP": "1"
-                    "subsegmentAlignment": "true"
-                })
+    function GenerateSegmentInformation(xml as object, stream as object, metadata as object) as void
+        if StringUtils.IsNullOrEmpty(stream.url)
+            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
+        end if
 
-                for i = 0 to videoStreams.Count() - 1
-                    stream = videoStreams[i]
-                    streamMimeType = stream.type.Tokenize(";")[0]
-                    if streamMimeType <> mimeType
-                        continue for
-                    end if
-
-                    codecs = stream.type.split("codecs=")[1]
-                    if codecs.startsWith(`"`)
-                        codecs = codecs.mid(1)
-                    end if
-                    if codecs.endsWith(`"`)
-                        codecs = codecs.left(codecs.len() - 1)
-                    end if
-
-                    representationAttributes = {
-                        "id": stream.itag
-                        "codecs": codecs
-                        "startWithSAP": "1"
-                        "maxPlayoutRate": "1"
-                        "bandwidth": stream.bitrate
-                    }
-                    if stream.width <> invalid
-                        representationAttributes["width"] = `${stream.width}`
-                    end if
-                    if stream.height <> invalid
-                        representationAttributes["height"] = `${stream.height}`
-                    end if
-                    if stream.fps <> invalid
-                        representationAttributes["frameRate"] = `${stream.fps}`
-                    end if
-
-                    if xml.Node("Representation", representationAttributes)
-                        m.AddColorInfo(stream, xml)
-
-                        if StringUtils.IsNullOrEmpty(stream.url)
-                            xml.Comment(`[ERROR] Stream.url is null or empty for itag: ${stream.itag}`)
-                        else if stream.url.InStr("yt_live_broadcast") <> -1 or stream.url.InStr("yt_premiere_broadcast") <> -1
-                            xml.Comment(`[WARN] Stream URL indicates a live broadcast for itag: ${stream.itag}`)
-                        end if
-                        xml.TextNode("BaseURL", ValidString(stream.url))
-
-                        if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
-                            xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
-                        end if
-                        if xml.Node("SegmentBase", { "indexRange": stream.index, "indexRangeExact": "true" })
-                            xml.EmptyNode("Initialization", { "range": stream.init })
-
-                            xml.End()
-                        end if
-
-                        xml.End()
-                    end if
-                end for
-
-                xml.End()
+        if metadata.isPostLiveDvr = true
+            if not IsInt(stream.targetDurationSec)
+                xml.Comment(`[ERROR] Post-Live DVR stream missing targetDurationSec for itag: ${stream.itag}`)
+                return
             end if
 
-            id += 1
+            if stream.targetDurationSec < 1
+                xml.Comment(`[ERROR] Post-Live DVR stream has invalid targetDurationSec (${stream.targetDurationSec}) for itag: ${stream.itag}`)
+                return
+            end if
+
+            postLiveDvrSegmentCount = metadata.postLiveDvrSegmentCount
+            if not IsInt(postLiveDvrSegmentCount)
+                xml.Comment(`[ERROR] Post-Live DVR metadata missing postLiveDvrSegmentCount for itag: ${stream.itag}`)
+                ' We're going to guess segment count from targetDurationSec and total duration
+                totalDurationMs = m.GetDuration(metadata) * 1000.0
+                postLiveDvrSegmentCount = MathUtils.Max(Fix(totalDurationMs / (stream.targetDurationSec * 1000)), 1)
+                xml.Comment(`[INFO] Guessing postLiveDvrSegmentCount as ${postLiveDvrSegmentCount} for itag: ${stream.itag}`)
+            end if
+
+            duration = stream.targetDurationSec * 1000
+            repeatCount = postLiveDvrSegmentCount - 1
+            if xml.Node("SegmentTemplate", { "initialization": `${stream.url}&sq=0`, "media": `${stream.url}&sq=$Number$`, "timescale": "1000" })
+                if xml.Node("SegmentTimeline")
+                    xml.EmptyNode("S", { "d": duration, "r": repeatCount })
+                    xml.End()
+                end if
+                xml.End()
+            end if
+        else if stream.isTypeOTF = true
+            segmentDurations = stream.otfSegmentDurations
+            if not IsArray(segmentDurations)
+                xml.Comment(`[ERROR] OTF stream missing otfSegmentDurations for itag: ${stream.itag}`)
+                return
+            end if
+
+            if xml.Node("SegmentTemplate", { "initialization": `${stream.url}&sq=0`, "media": `${stream.url}&sq=$Number$`, "timescale": "1000" })
+                if xml.Node("SegmentTimeline")
+                    if segmentDurations.Count() = 0
+                        xml.Comment(`[ERROR] OTF stream has empty otfSegmentDurations for itag: ${stream.itag}`)
+                    end if
+                    for each segment in segmentDurations
+                        sAttributes = { "d": segment.duration }
+                        if segment.repeatCount <> invalid
+                            sAttributes["r"] = segment.repeatCount
+                        end if
+                        xml.EmptyNode("S", sAttributes)
+                    end for
+                    xml.End()
+                end if
+                xml.End()
+            end if
+        else
+            xml.TextNode("BaseURL", ValidString(stream.url))
+
+            if StringUtils.IsNullOrEmpty(stream.index) or StringUtils.IsNullOrEmpty(stream.init)
+                xml.Comment(`[ERROR] Stream index: ${stream.index}, init: ${stream.init} is invalid for itag: ${stream.itag}`)
+            end if
+            if xml.Node("SegmentBase", { "indexRange": stream.index })
+                xml.EmptyNode("Initialization", { "range": stream.init })
+                xml.End()
+            end if
+        end if
+    end function
+
+    function HoistCodecs(formats as object, hoisted as object) as dynamic
+        if formats.Count() < 2
+            return invalid
+        end if
+
+        firstCodec = formats[0].type.split("codecs=")[1]
+        for i = 1 to formats.Count() - 1
+            currentCodec = formats[i].type.split("codecs=")[1]
+            if firstCodec <> currentCodec
+                return invalid
+            end if
         end for
-        return id
+
+        hoisted["codecs"] = true
+        return firstCodec.replace(`"`, "").replace(`"`, "")
+    end function
+
+    function HoistNumberAttribute(formats as object, property as string, hoisted as object) as dynamic
+        if formats.Count() < 2
+            return invalid
+        end if
+
+        firstFormat = formats[0]
+        if firstFormat[property] = invalid
+            return invalid
+        end if
+
+        firstValue = firstFormat[property]
+        for i = 1 to formats.Count() - 1
+            otherValue = formats[i][property]
+            if type(otherValue) <> type(firstValue) or otherValue <> firstValue
+                return invalid
+            end if
+        end for
+
+        hoisted[property] = true
+        return firstValue
+    end function
+
+    function HoistAudioChannels(formats as object, hoisted as object) as dynamic
+        if formats.Count() < 2
+            return invalid
+        end if
+
+        firstValue = formats[0].audioChannels
+        if firstValue = invalid
+            firstValue = 2
+        end if
+
+        for i = 1 to formats.Count() - 1
+            currentValue = formats[i].audioChannels
+            if currentValue = invalid
+                currentValue = 2
+            end if
+            if currentValue <> firstValue
+                return invalid
+            end if
+        end for
+
+        hoisted["AudioChannelConfiguration"] = true
+        return firstValue
+    end function
+
+    function GetTrackRoles(format as object) as object
+        roles = []
+        if format.isOriginal = true
+            roles.Push("main")
+        else
+            roles.Push("alternate")
+        end if
+
+        if format.isDubbed = true or format.isAutoDubbed = true
+            roles.Push("dub")
+        end if
+
+        if format.isDescriptive = true
+            roles.Push("description")
+        end if
+
+        if format.isDrc = true
+            roles.Push("enhanced-audio-intelligibility")
+        end if
+
+        return roles
     end function
 
     function GenerateImageAdaptationSets(xml as object, storyboards as object, id as integer) as integer
@@ -322,169 +680,6 @@ class DashManifest
         return id
     end function
 
-    function getAudioStreams(streams as object) as object
-        audioStreams = []
-        for i = 0 to streams.Count() - 1
-            stream = streams[i]
-            if stream.type.startsWith("audio/")
-                if StringUtils.IsNullOrEmpty(stream.bitrate)
-                    LogWarnNoTelemetry("Invalid audio stream bitrate, itag:", stream.itag)
-                    continue for
-                end if
-                if StringUtils.IsNullOrEmpty(stream.init)
-                    LogWarnNoTelemetry("Invalid audio stream init, itag:", stream.itag)
-                    continue for
-                end if
-                if StringUtils.IsNullOrEmpty(stream.index)
-                    LogWarnNoTelemetry("Invalid audio stream index, itag:", stream.itag)
-                    continue for
-                end if
-                stream.languageInfo = m.ParseAudioLanguage(stream.url)
-                audioStreams.Push(stream)
-            end if
-        end for
-
-        audioStreams.SortBy("bitrate", "r")
-        return audioStreams
-    end function
-
-    function getVideoStreams(streams as object, qualityFilter as object) as object
-        videoStreams = []
-        for i = 0 to streams.Count() - 1
-            if not m.isVideoFormatIncluded(streams[i], qualityFilter)
-                continue for
-            end if
-
-            stream = streams[i]
-            if stream.type.startsWith("video/")
-                if StringUtils.IsNullOrEmpty(stream.bitrate)
-                    LogWarnNoTelemetry("Invalid video stream bitrate, itag:", stream.itag)
-                    continue for
-                end if
-                if StringUtils.IsNullOrEmpty(stream.init)
-                    LogWarnNoTelemetry("Invalid video stream init, itag:", stream.itag)
-                    continue for
-                end if
-                if StringUtils.IsNullOrEmpty(stream.index)
-                    LogWarnNoTelemetry("Invalid video stream index, itag:", stream.itag)
-                    continue for
-                end if
-
-                if (stream.width = invalid or stream.height = invalid) and not StringUtils.IsNullOrEmpty(stream.size)
-                    if stream.size.instr("x") > 0
-                        parts = stream.size.Tokenize("x")
-                        if parts.Count() = 2
-                            stream.width = ValidInt(parts[0].toInt())
-                            stream.height = ValidInt(parts[1].toInt())
-                        end if
-                    end if
-                end if
-
-                videoStreams.Push(stream)
-            end if
-        end for
-
-        videoStreams.SortBy("bitrate", "r")
-        return videoStreams
-    end function
-
-    function isVideoFormatIncluded(stream as object, qualityFilter as object) as boolean
-        if qualityFilter.Count() = 0
-            return true
-        end if
-
-        qualityLabel = stream.qualityLabel
-        if not StringUtils.IsNullOrEmpty(qualityLabel)
-            pIndex = qualityLabel.InStr("p")
-            if pIndex <> -1
-                qualityLabel = qualityLabel.Mid(0, pIndex)
-            end if
-            if qualityFilter[qualityLabel] = true
-                return true
-            end if
-        end if
-
-        resolution = stream.resolution
-        if not StringUtils.IsNullOrEmpty(resolution)
-            pIndex = resolution.InStr("p")
-            if pIndex <> -1
-                resolution = resolution.Mid(0, pIndex)
-            end if
-            if qualityFilter[resolution] = true
-                return true
-            end if
-        end if
-
-        size = stream.size
-        if not StringUtils.IsNullOrEmpty(size)
-            size = size.Split("x")
-            if size.Count() = 2
-                if qualityFilter[size[1]] = true
-                    return true
-                end if
-            end if
-        end if
-
-        return false
-    end function
-
-    function getMimeTypes(streams as object) as object
-        mimeTypes = {}
-        for i = 0 to streams.Count() - 1
-            stream = streams[i]
-            mimeType = stream.type.Tokenize(";")[0]
-            mimeTypes[mimeType] = true
-        end for
-        return mimeTypes.Keys()
-    end function
-
-    function getMimeTypeLanguageCombos(streams as object) as object
-        types = {}
-        for i = 0 to streams.Count() - 1
-            stream = streams[i]
-            mimeType = stream.type.Tokenize(";")[0]
-            types[`${mimeType}-${stream.languageInfo.lang}-${stream.languageInfo.acont}`] = {
-                "mimeType": mimeType
-                "lang": stream.languageInfo.lang
-                "acont": stream.languageInfo.acont
-            }
-        end for
-
-        combos = []
-        for each t in types
-            combos.Push(types[t])
-        end for
-
-        return combos
-    end function
-
-    function ParseAudioLanguage(url as dynamic) as object
-        result = { lang: "", acont: "" }
-        if StringUtils.IsNullOrEmpty(url)
-            return result
-        end if
-        queryParams = UrlUtils.ParseQueryComponents(url)
-        if StringUtils.IsNullOrEmpty(queryParams["xtags"])
-            return result
-        end if
-
-        xtags = queryParams["xtags"].split(":")
-        for each xtag in xtags
-            if xtag.instr("=") > 0
-                parts = xtag.split("=")
-                if parts.Count() = 2
-                    if parts[0] = "lang"
-                        result["lang"] = parts[1]
-                    end if
-                    if parts[0] = "acont"
-                        result["acont"] = parts[1]
-                    end if
-                end if
-            end if
-        end for
-        return result
-    end function
-
     function AddColorInfo(videoStream as object, xml as object) as void
         if videoStream.colorInfo = invalid
             return
@@ -493,7 +688,7 @@ class DashManifest
         if videoStream.colorInfo.primaries <> invalid
             primaries = m.colorInfo.primaries[videoStream.colorInfo.primaries]
             if primaries <> invalid
-                xml.EmptyNode("EssentialProperty", {
+                xml.EmptyNode("SupplementalProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:ColourPrimaries"
                     "value": primaries
                 })
@@ -505,7 +700,7 @@ class DashManifest
         if videoStream.colorInfo.transferCharacteristics <> invalid
             transferCharacteristics = m.colorInfo.transferCharacteristics[videoStream.colorInfo.transferCharacteristics]
             if transferCharacteristics <> invalid
-                xml.EmptyNode("EssentialProperty", {
+                xml.EmptyNode("SupplementalProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:TransferCharacteristics"
                     "value": transferCharacteristics
                 })
@@ -517,7 +712,7 @@ class DashManifest
         if videoStream.colorInfo.matrixCoefficients <> invalid
             matrixCoefficients = m.colorInfo.matrixCoefficients[videoStream.colorInfo.matrixCoefficients]
             if matrixCoefficients <> invalid
-                xml.EmptyNode("EssentialProperty", {
+                xml.EmptyNode("SupplementalProperty", {
                     "schemeIdUri": "urn:mpeg:mpegB:cicp:MatrixCoefficients"
                     "value": matrixCoefficients
                 })
@@ -525,6 +720,83 @@ class DashManifest
                 LogWarn("Unknown colorInfo.matrixCoefficients:", videoStream.colorInfo.matrixCoefficients)
             end if
         end if
+    end function
+
+    function GetXtagsInfo(format as object) as object
+        result = {
+            lang: ""
+            acont: ""
+            isDrc: false
+            isDubbed: false
+            isAutoDubbed: false
+            isDescriptive: false
+            isSecondary: false
+            isOriginal: false
+        }
+
+        if StringUtils.IsNullOrEmpty(format.url)
+            return result
+        end if
+
+        ' Technically format.xtags can be used, but it is protobuf encoded
+        ' so this is simpler. Also, this is consistent for both local
+        ' Innertube and Invidious.
+        queryParams = UrlUtils.ParseQueryComponents(format.url)
+        xtagsString = queryParams["xtags"]
+        if StringUtils.IsNullOrEmpty(xtagsString)
+            return result
+        end if
+
+        tags = {}
+        xtagsList = xtagsString.split(":")
+        for each xtag in xtagsList
+            pair = xtag.split("=")
+            if pair.Count() = 2
+                tags[pair[0]] = pair[1]
+            end if
+        end for
+
+        for each key in tags
+            if key = "lang"
+                result.lang = tags[key]
+            else if key = "acont"
+                result.acont = tags[key]
+            else if key = "drc" and tags[key] = "1"
+                result.isDrc = true
+            end if
+        end for
+
+        if format.isDrc = true
+            result.isDrc = true
+        end if
+
+        if result.acont = "dubbed"
+            result.isDubbed = true
+        else if result.acont = "dubbed-auto"
+            result.isAutoDubbed = true
+        else if result.acont = "descriptive"
+            result.isDescriptive = true
+        else if result.acont = "secondary"
+            result.isSecondary = true
+        end if
+
+        if result.acont = "original" or (not result.isDubbed and not result.isAutoDubbed and not result.isDescriptive and not result.isSecondary)
+            result.isOriginal = true
+        end if
+
+        return result
+    end function
+
+    function GetDrmSystemId(drmFamily as dynamic) as dynamic
+        if not IsString(drmFamily)
+            return invalid
+        end if
+        if drmFamily = "WIDEVINE"
+            return "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
+        else if drmFamily = "PLAYREADY"
+            return "9a04f079-9840-4286-ab92-e65be0885f95"
+        end if
+        return invalid
     end function
 
 end class

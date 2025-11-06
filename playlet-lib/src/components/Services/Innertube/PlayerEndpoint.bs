@@ -22,6 +22,12 @@ namespace Innertube
 
         context = Innertube.CreateContext(client, deviceInfo, options)
 
+        if client = Innertube.ClientType.TV
+            referer = "https://www.youtube.com/tv#/watch?v=" + videoId
+        else
+            referer = "https://www.youtube.com/watch?v=" + videoId
+        end if
+
         payload = {
             "videoId": videoId
             "context": context
@@ -30,13 +36,12 @@ namespace Innertube
                 "contentPlaybackContext": {
                     "vis": 0
                     "splay": false
-                    "referer": "https://www.youtube.com/watch?v=" + videoId
+                    "referer": referer
                     "currentUrl": "/watch?v=" + videoId
                     "autonavState": "STATE_ON"
                     "autoCaptionsDefaultOn": false
                     "html5Preference": "HTML5_PREF_WANTS"
                     "lactMilliseconds": "-1"
-                    "isInlinePlaybackNoAd": true
                 }
             }
             "attestationRequest": {
@@ -67,9 +72,9 @@ namespace Innertube
         return request
     end function
 
-    function ParseInnertubePlayerResponse(playerRequest as dynamic, playerResponse as dynamic, parsedResponse as object, cancellation as object) as object
+    function ParseInnertubePlayerResponse(playerRequest as dynamic, playerResponse as dynamic, client as Innertube.ClientType, cancellation as object) as object
         WriteAsciiFile("cachefs:/last_player_response.json", playerResponse.Text())
-
+        parsedResponse = {}
         payload = playerResponse.Json()
 
         error = ParsePlayerResponseForError(payload, playerRequest)
@@ -92,6 +97,7 @@ namespace Innertube
 
         lengthSeconds = videoDetails["lengthSeconds"].ToInt()
         isLive = ValidBool(videoDetails["isLive"])
+        isPostLiveDvr = ValidBool(videoDetails["isPostLiveDvr"])
 
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
@@ -108,11 +114,11 @@ namespace Innertube
         end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
+        isOTF = FormatsHasTypeOTF(adaptiveFormats)
         hasDrm = (not StringUtils.IsNullOrEmpty(streamingData.drmParams)) or IsArray(streamingData.licenseInfos)
 
-        shouldAnalyze = (not isLive) and (not hasLiveStreamingData) and (not hasDrm)
-        adaptiveFormats = TransformFormats(adaptiveFormats, shouldAnalyze)
-        formats = TransformFormats(formats, false)
+        adaptiveFormats = TransformFormats(adaptiveFormats)
+        formats = TransformFormats(formats)
 
         parsedResponse["type"] = "video"
         parsedResponse["videoId"] = videoDetails["videoId"]
@@ -122,6 +128,7 @@ namespace Innertube
         parsedResponse["authorId"] = videoDetails["channelId"]
         parsedResponse["lengthSeconds"] = lengthSeconds
         parsedResponse["liveNow"] = isLive
+        parsedResponse["isPostLiveDvr"] = isPostLiveDvr
         parsedResponse["hasLiveStreamingData"] = hasLiveStreamingData
         parsedResponse["hlsUrl"] = streamingData["hlsManifestUrl"]
         parsedResponse["dashUrl"] = streamingData["dashManifestUrl"]
@@ -153,6 +160,16 @@ namespace Innertube
 
         parsedResponse["isLoggedIn"] = ParseIsLoggedIn(payload)
         parsedResponse["playbackTrackingUrls"] = ParsePlaybackTrackingUrls(payload, parsedResponse.isLoggedIn)
+
+        if isPostLiveDvr
+            LogDebug("Fetching Post-Live DVR info")
+            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, client, cancellation)
+        end if
+
+        if isOTF
+            LogDebug("Fetching OTF segment info")
+            GetOTFSegmentInfo(adaptiveFormats, client, cancellation)
+        end if
 
         return parsedResponse
     end function
@@ -333,57 +350,33 @@ namespace Innertube
         return captions
     end function
 
-    function TransformFormats(formats as object, analyze as boolean) as object
-        analysis = invalid
-        if analyze
-            analysis = {
-                "issueDetected": false
-            }
-        end if
-
+    function TransformFormats(formats as object) as object
         result = []
         for i = 0 to formats.Count() - 1
-            result.Push(TransformFormat(formats[i], analysis))
+            result.Push(TransformFormat(formats[i]))
         end for
-
-        if analyze and analysis.issueDetected
-            ' Are these OTF streams?
-            LogTelemetryEvent({
-                level: "error"
-                message: `Some formats are missing initRange or indexRange\nFormats: ${FormatJson(formats)}`
-                fingerprint: ["Some formats are missing initRange or indexRange"]
-            })
-        end if
 
         return result
     end function
 
-    function TransformFormat(fmt as object, analysis as object) as object
+    function TransformFormat(fmt as object) as object
         itag = `${fmt["itag"]}`
         result = {
             "bitrate": `${fmt["bitrate"]}`
             "url": fmt["url"]
             "itag": itag
             "type": fmt["mimeType"]
-            "clen": `${fmt["approxDurationMs"]}`
-            "lmt": `${fmt["lastModified"]}`
         }
+
+        if fmt["approxDurationMs"] <> invalid
+            result["approxDurationMs"] = fmt["approxDurationMs"]
+        end if
 
         if IsAssociativeArray(fmt["initRange"])
             result["init"] = `${fmt["initRange"]["start"]}-${fmt["initRange"]["end"]}`
-        else
-            result["init"] = ""
-            if analysis <> invalid
-                analysis.issueDetected = true
-            end if
         end if
         if IsAssociativeArray(fmt["indexRange"])
             result["index"] = `${fmt["indexRange"]["start"]}-${fmt["indexRange"]["end"]}`
-        else
-            result["index"] = ""
-            if analysis <> invalid
-                analysis.issueDetected = true
-            end if
         end if
 
         if fmt["audioQuality"] <> invalid
@@ -401,6 +394,31 @@ namespace Innertube
         end if
         if fmt["fps"] <> invalid
             result["fps"] = ToString(fmt["fps"])
+        end if
+
+        if fmt["colorInfo"] <> invalid
+            result["colorInfo"] = fmt["colorInfo"]
+        end if
+        if fmt["audioTrack"] <> invalid
+            result["audioTrack"] = fmt["audioTrack"]
+        end if
+        if fmt["isDrc"] <> invalid
+            result["isDrc"] = fmt["isDrc"]
+        end if
+        if fmt["targetDurationSec"] <> invalid
+            result["targetDurationSec"] = fmt["targetDurationSec"]
+        end if
+
+        if ValidString(fmt["type"]) = "FORMAT_STREAM_TYPE_OTF"
+            result["isTypeOTF"] = true
+        end if
+
+        if fmt["drmFamilies"] <> invalid
+            result["drmFamilies"] = fmt["drmFamilies"]
+        end if
+
+        if fmt["xtags"] <> invalid
+            result["xtags"] = fmt["xtags"]
         end if
 
         result["width"] = fmt["width"]
@@ -610,10 +628,6 @@ namespace Innertube
         return false
     end function
 
-    function IsPostLiveDvr(payload as object) as boolean
-        return ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isPostLiveDvr"]))
-    end function
-
     function FormatsHaveLiveStreamingData(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -628,10 +642,6 @@ namespace Innertube
         return false
     end function
 
-    function IsTypeOTF(payload as object) as boolean
-        return FormatsHasTypeOTF(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
-    end function
-
     function FormatsHasTypeOTF(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -643,6 +653,165 @@ namespace Innertube
         end for
 
         return false
+    end function
+
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
+        if adaptiveFormats.Count() = 0
+            LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
+            return
+        end if
+
+        url = adaptiveFormats[0]["url"]
+        if StringUtils.IsNullOrEmpty(url)
+            LogWarn("GetPostLiveDvrInfo: URL is empty")
+            return
+        end if
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents["rn"] = "0"
+        queryComponents["sq"] = "0"
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
+        end if
+
+        url = UrlUtils.SetQueryParams(url, queryComponents)
+
+        request = HttpClient.Head(url)
+        request.Headers(Innertube.CreateHeaders(client))
+        request.TryCount(2)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            LogError("Failed to fetch Post-Live DVR info", response.ErrorMessage())
+            return
+        end if
+
+        headers = response.Headers()
+
+        durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
+        segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
+
+        if durationMs > 0
+            parsedResponse["postLiveDvrDurationMs"] = durationMs
+        end if
+        if segmentCount > 0
+            parsedResponse["postLiveDvrSegmentCount"] = segmentCount
+        end if
+
+        if segmentCount = 0 or durationMs = 0
+            LogError("GetPostLiveDvrInfo: Missing Post-Live DVR info in headers", headers)
+        end if
+    end function
+
+    function GetOTFSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
+        requests = CreateObject("roArray", adaptiveFormats.Count(), false)
+
+        requestHeaders = Innertube.CreateHeaders(client)
+        for i = 0 to adaptiveFormats.Count() - 1
+            format = adaptiveFormats[i]
+            if format.isTypeOTF <> true
+                continue for
+            end if
+
+            url = format.url
+            if StringUtils.IsNullOrEmpty(url)
+                LogError("GetOTFSegmentInfo: URL is empty for itag", format.itag)
+                continue for
+            end if
+
+            queryComponents = UrlUtils.ParseQueryComponents(url)
+            queryComponents["rn"] = "0"
+            queryComponents["sq"] = "0"
+
+            otfUrl = UrlUtils.SetQueryParams(url, queryComponents)
+
+            request = HttpClient.Get(otfUrl)
+            request.Headers(requestHeaders)
+            request.TryCount(2)
+            request.Cancellation(cancellation)
+            request.Send()
+            requests[`${i}`] = request
+        end for
+
+        for i = 0 to requests.Count() - 1
+            request = requests[`${i}`]
+            if request = invalid
+                continue for
+            end if
+
+            format = adaptiveFormats[i]
+            response = request.Await()
+
+            if response.IsCancelled()
+                return
+            end if
+
+            if not response.IsSuccess()
+                LogError("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
+                continue for
+            end if
+
+            responseText = response.Text()
+
+            segmentDurationsMs = StringUtils.GetBetween(responseText, "Segment-Durations-Ms:", `\r\n`)
+            if StringUtils.IsNullOrEmpty(segmentDurationsMs)
+                LogError("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
+                continue for
+            end if
+
+            segmentDurationStrings = segmentDurationsMs.Split(",")
+            segmentDurations = []
+            for each segmentDurationString in segmentDurationStrings
+                trimmedSegmentDuration = segmentDurationString.Trim()
+                if trimmedSegmentDuration.Len() = 0
+                    continue for
+                end if
+
+                repeatCount = invalid
+                repeatCountString = StringUtils.GetBetween(trimmedSegmentDuration, "(r=", ")")
+                if not StringUtils.IsNullOrEmpty(repeatCountString)
+                    repeatCount = repeatCountString.ToInt()
+                end if
+
+                duration = trimmedSegmentDuration.ToInt()
+                if duration <= 0
+                    LogErrorNoTelemetry("Invalid OTF segment duration parsed", trimmedSegmentDuration, "for itag", format.itag)
+                    LogTelemetryEvent({
+                        level: "error"
+                        message: `Invalid OTF segment duration parsed: ${trimmedSegmentDuration} for itag ${format.itag}`
+                        fingerprint: ["OTF Invalid Segment Duration"]
+                        attachments: [{
+                            filename: "otf.txt"
+                            content_type: "plain/text"
+                            data: responseText
+                        }]
+                    })
+                    continue for
+                end if
+
+                segmentDurations.Push({
+                    duration: duration
+                    repeatCount: repeatCount
+                })
+            end for
+
+            format["otfSegmentDurations"] = segmentDurations
+
+            if segmentDurations.Count() = 0
+                LogErrorNoTelemetry("No OTF segment durations found for itag", format.itag)
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `No OTF segment durations found for itag ${format.itag}`
+                    fingerprint: ["OTF No Segment Durations"]
+                    attachments: [{
+                        filename: "otf.txt"
+                        content_type: "plain/text"
+                        data: responseText
+                    }]
+                })
+            end if
+        end for
     end function
 
 end namespace
