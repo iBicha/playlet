@@ -677,7 +677,12 @@ namespace Innertube
         url = UrlUtils.SetQueryParams(url, queryComponents)
 
         request = HttpClient.Head(url)
-        request.Headers(Innertube.CreateHeaders(client))
+        requestHeaders = Innertube.CreateHeaders(client)
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
+        request.Headers(requestHeaders)
+
         request.TryCount(2)
         request.Cancellation(cancellation)
         response = request.Await()
@@ -708,6 +713,9 @@ namespace Innertube
         requests = CreateObject("roArray", adaptiveFormats.Count(), false)
 
         requestHeaders = Innertube.CreateHeaders(client)
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
         for i = 0 to adaptiveFormats.Count() - 1
             format = adaptiveFormats[i]
             if format.isTypeOTF <> true
