@@ -781,12 +781,16 @@ namespace Innertube
                 LogErrorNoTelemetry("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
                 LogTelemetryEvent({
                     level: "error"
-                    message: `Failed to fetch OTF segment info for itag ${format.itag}`
+                    message: `Failed to fetch OTF segment info for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
                     fingerprint: ["OTF Fetch Error"]
                     attachments: [{
                         filename: "otf.txt"
                         content_type: "plain/text"
                         data: response.ErrorMessage()
+                    }, {
+                        filename: "headers.json"
+                        content_type: "application/json"
+                        data: FormatJson(response.Headers())
                     }]
                 })
                 continue for
@@ -799,7 +803,7 @@ namespace Innertube
                 LogErrorNoTelemetry("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
                 LogTelemetryEvent({
                     level: "error"
-                    message: `Failed to extract Segment-Durations-Ms from OTF stream for itag ${format.itag}`
+                    message: `Failed to extract Segment-Durations-Ms from OTF stream for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
                     fingerprint: ["OTF Missing Segment Durations"]
                     attachments: [{
                         filename: "otf.txt"
@@ -833,7 +837,7 @@ namespace Innertube
                     LogErrorNoTelemetry("Invalid OTF segment duration parsed", trimmedSegmentDuration, "for itag", format.itag)
                     LogTelemetryEvent({
                         level: "error"
-                        message: `Invalid OTF segment duration parsed: ${trimmedSegmentDuration} for itag ${format.itag}`
+                        message: `Invalid OTF segment duration parsed: ${trimmedSegmentDuration} for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
                         fingerprint: ["OTF Invalid Segment Duration"]
                         attachments: [{
                             filename: "otf.txt"
@@ -860,7 +864,7 @@ namespace Innertube
                 LogErrorNoTelemetry("No OTF segment durations found for itag", format.itag)
                 LogTelemetryEvent({
                     level: "error"
-                    message: `No OTF segment durations found for itag ${format.itag}`
+                    message: `No OTF segment durations found for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
                     fingerprint: ["OTF No Segment Durations"]
                     attachments: [{
                         filename: "otf.txt"
