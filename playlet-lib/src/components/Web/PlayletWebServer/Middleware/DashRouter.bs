@@ -55,6 +55,24 @@ namespace Http
             qualityFilter = m.CreateQualityFilter(quality)
             xmlContent = m.dashManifest.FromVideoMetadata(metadata, qualityFilter, ValidString(local) = "true")
 
+            if xmlContent.InStr("[ERROR]") <> -1
+                LogError("Dash manifest generated with errors")
+                lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+                LogTelemetryEvent({
+                    level: "error"
+                    message: "Dash manifest generated with errors"
+                    attachments: [{
+                        filename: "dash.xml"
+                        content_type: "text/plain"
+                        data: xmlContent
+                    }, {
+                        filename: "last_player_response.json"
+                        content_type: "application/json"
+                        data: lastPlayerResponse
+                    }]
+                })
+            end if
+
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
             response.ContentType("application/dash+xml")

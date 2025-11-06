@@ -770,11 +770,25 @@ namespace Innertube
 
                 repeatCount = invalid
                 repeatCountString = StringUtils.GetBetween(trimmedSegmentDuration, "(r=", ")")
-                if IsString(repeatCountString)
+                if not StringUtils.IsNullOrEmpty(repeatCountString)
                     repeatCount = repeatCountString.ToInt()
                 end if
 
                 duration = trimmedSegmentDuration.ToInt()
+                if duration <= 0
+                    LogErrorNoTelemetry("Invalid OTF segment duration parsed", trimmedSegmentDuration, "for itag", format.itag)
+                    LogTelemetryEvent({
+                        level: "error"
+                        message: `Invalid OTF segment duration parsed: ${trimmedSegmentDuration} for itag ${format.itag}`
+                        fingerprint: ["OTF Invalid Segment Duration"]
+                        attachments: [{
+                            filename: "otf.txt"
+                            content_type: "plain/text"
+                            data: responseText
+                        }]
+                    })
+                    continue for
+                end if
 
                 segmentDurations.Push({
                     duration: duration
