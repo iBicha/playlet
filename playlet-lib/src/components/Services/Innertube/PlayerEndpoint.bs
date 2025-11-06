@@ -547,8 +547,7 @@ namespace Innertube
         for i = 0 to decipheredFormats.Count() - 1
             fmt = formats[i]
             decipheredFmt = decipheredFormats[i]
-
-            fmt["url"] = decipheredFmt["url"]
+            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"])
         end for
 
         decipheredAdaptiveFormats = json["adaptiveFormats"]
@@ -562,9 +561,32 @@ namespace Innertube
         for i = 0 to decipheredAdaptiveFormats.Count() - 1
             fmt = adaptiveFormats[i]
             decipheredFmt = decipheredAdaptiveFormats[i]
-            fmt["url"] = decipheredFmt["url"]
+            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"])
         end for
         return invalid
+    end function
+
+    ' YouTube.js sets cver to hardcoded values that might be different from
+    ' What's used in Playlet. There's no indication that this makes a difference,
+    ' but it makes sense to keep it consistent.
+    function ResetUrlClientVersion(url as dynamic) as dynamic
+        if StringUtils.IsNullOrEmpty(url)
+            return url
+        end if
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        client = ValidString(queryComponents["c"])
+        if client = "TVHTML5"
+            queryComponents["cver"] = INNERTUBE_TV_CLIENT_VERSION
+        else if client = "IOS"
+            queryComponents["cver"] = INNERTUBE_IOS_CLIENT_VERSION
+        else if client = "WEB"
+            queryComponents["cver"] = INNERTUBE_WEB_CLIENT_VERSION
+        else
+            return url
+        end if
+
+        return UrlUtils.SetQueryParams(url, queryComponents)
     end function
 
     function ParseIsLoggedIn(payload as object) as boolean
