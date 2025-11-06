@@ -689,6 +689,10 @@ namespace Innertube
 
         headers = response.Headers()
 
+        if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
+            LogError("GetPostLiveDvrInfo: Missing Post-Live DVR info in headers", headers)
+        end if
+
         durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
         segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
 
@@ -697,10 +701,6 @@ namespace Innertube
         end if
         if segmentCount > 0
             parsedResponse["postLiveDvrSegmentCount"] = segmentCount
-        end if
-
-        if segmentCount = 0 or durationMs = 0
-            LogError("GetPostLiveDvrInfo: Missing Post-Live DVR info in headers", headers)
         end if
     end function
 
