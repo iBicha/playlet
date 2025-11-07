@@ -718,7 +718,13 @@ namespace Innertube
         headers = response.Headers()
 
         if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
-            LogError("GetPostLiveDvrInfo: Missing Post-Live DVR info in headers", headers)
+            msg = "GetPostLiveDvrInfo: Missing Post-Live DVR info in headers"
+            LogErrorNoTelemetry(msg, url, headers)
+            LogTelemetryEvent({
+                level: "error"
+                message: msg + `\nVideoID: ${parsedResponse["videoId"]}\nUrl: ${url}\nHeaders: ${FormatJson(headers)}`
+                fingerprint: ["GetPostLiveDvrInfo Missing Post-Live DVR info in headers"]
+            })
         end if
 
         durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
