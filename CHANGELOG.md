@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix in url decipher logic
+- Redo OTF segment processing
 
 ## [0.43.7] - 2025-11-06
 

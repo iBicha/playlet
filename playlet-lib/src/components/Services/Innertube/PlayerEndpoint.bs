@@ -1,5 +1,6 @@
 import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/components/Services/Innertube/OTFSegmentInfo.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -168,7 +169,7 @@ namespace Innertube
 
         if isOTF
             LogDebug("Fetching OTF segment info")
-            GetOTFSegmentInfo(adaptiveFormats, client, cancellation)
+            OTFGetSegmentInfo(adaptiveFormats, client, cancellation)
         end if
 
         return parsedResponse
@@ -729,155 +730,6 @@ namespace Innertube
         if segmentCount > 0
             parsedResponse["postLiveDvrSegmentCount"] = segmentCount
         end if
-    end function
-
-    function GetOTFSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
-        requests = CreateObject("roArray", adaptiveFormats.Count(), false)
-
-        requestHeaders = Innertube.CreateHeaders(client)
-        requestHeaders["origin"] = "https://www.youtube.com"
-        requestHeaders["referer"] = "https://www.youtube.com"
-        requestHeaders["DNT"] = "?1"
-        for i = 0 to adaptiveFormats.Count() - 1
-            format = adaptiveFormats[i]
-            if format.isTypeOTF <> true
-                continue for
-            end if
-
-            url = format.url
-            if StringUtils.IsNullOrEmpty(url)
-                LogError("GetOTFSegmentInfo: URL is empty for itag", format.itag)
-                continue for
-            end if
-
-            queryComponents = UrlUtils.ParseQueryComponents(url)
-            queryComponents["rn"] = "0"
-            queryComponents["sq"] = "0"
-
-            otfUrl = UrlUtils.SetQueryParams(url, queryComponents)
-
-            request = HttpClient.Get(otfUrl)
-            request.Headers(requestHeaders)
-            request.TryCount(2)
-            request.Cancellation(cancellation)
-            request.Send()
-            requests[i] = request
-        end for
-
-        for i = 0 to requests.Count() - 1
-            request = requests[i]
-            if request = invalid
-                continue for
-            end if
-
-            format = adaptiveFormats[i]
-            response = request.Await()
-
-            if response.IsCancelled()
-                return
-            end if
-
-            if not response.IsSuccess()
-                LogErrorNoTelemetry("Failed to fetch OTF segment info for itag", format.itag, response.ErrorMessage())
-                LogTelemetryEvent({
-                    level: "error"
-                    message: `Failed to fetch OTF segment info for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
-                    fingerprint: ["OTF Fetch Error"]
-                    attachments: [{
-                        filename: "otf.txt"
-                        content_type: "plain/text"
-                        data: response.ErrorMessage()
-                    }, {
-                        filename: "headers.json"
-                        content_type: "application/json"
-                        data: FormatJson(response.Headers())
-                    }]
-                })
-                continue for
-            end if
-
-            responseText = response.Text()
-
-            segmentDurationsMs = StringUtils.GetBetween(responseText, "Segment-Durations-Ms:", `\r\n`)
-            if StringUtils.IsNullOrEmpty(segmentDurationsMs)
-                LogErrorNoTelemetry("Failed to extract Segment-Durations-Ms from OTF stream for itag", format.itag)
-                LogTelemetryEvent({
-                    level: "error"
-                    message: `Failed to extract Segment-Durations-Ms from OTF stream for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
-                    fingerprint: ["OTF Missing Segment Durations"]
-                    attachments: [{
-                        filename: "otf.txt"
-                        content_type: "plain/text"
-                        data: responseText
-                    }, {
-                        filename: "headers.json"
-                        content_type: "application/json"
-                        data: FormatJson(response.Headers())
-                    }]
-                })
-                continue for
-            end if
-
-            segmentDurationStrings = segmentDurationsMs.Split(",")
-            segmentDurations = []
-            for each segmentDurationString in segmentDurationStrings
-                trimmedSegmentDuration = segmentDurationString.Trim()
-                if trimmedSegmentDuration.Len() = 0
-                    continue for
-                end if
-
-                repeatCount = invalid
-                repeatCountString = StringUtils.GetBetween(trimmedSegmentDuration, "(r=", ")")
-                if not StringUtils.IsNullOrEmpty(repeatCountString)
-                    repeatCount = repeatCountString.ToInt()
-                end if
-
-                duration = trimmedSegmentDuration.ToInt()
-                if duration <= 0
-                    LogErrorNoTelemetry("Invalid OTF segment duration parsed", trimmedSegmentDuration, "for itag", format.itag)
-                    LogTelemetryEvent({
-                        level: "error"
-                        message: `Invalid OTF segment duration parsed: ${trimmedSegmentDuration} for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
-                        fingerprint: ["OTF Invalid Segment Duration"]
-                        attachments: [{
-                            filename: "otf.txt"
-                            content_type: "plain/text"
-                            data: responseText
-                        }, {
-                            filename: "headers.json"
-                            content_type: "application/json"
-                            data: FormatJson(response.Headers())
-                        }]
-                    })
-                    continue for
-                end if
-
-                segmentDurations.Push({
-                    duration: duration
-                    repeatCount: repeatCount
-                })
-            end for
-
-            format["otfSegmentDurations"] = segmentDurations
-
-            if segmentDurations.Count() = 0
-                LogErrorNoTelemetry("No OTF segment durations found for itag", format.itag)
-                LogTelemetryEvent({
-                    level: "error"
-                    message: `No OTF segment durations found for itag ${format.itag}\nurl: ${request.BuildUrl()}\nstatus: ${response.StatusCode()}`
-                    fingerprint: ["OTF No Segment Durations"]
-                    attachments: [{
-                        filename: "otf.txt"
-                        content_type: "plain/text"
-                        data: responseText
-                    }, {
-                        filename: "headers.json"
-                        content_type: "application/json"
-                        data: FormatJson(response.Headers())
-                    }]
-                })
-            end if
-        end for
     end function
 
 end namespace

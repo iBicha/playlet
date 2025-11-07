@@ -299,6 +299,11 @@ namespace HttpClient
             return m
         end function
 
+        function ToFile(filePath as string) as HttpRequest
+            m._toFilePath = filePath
+            return m
+        end function
+
         function ToCurlCommand() as string
             command = `curl "${m.BuildUrl()}"`
             if m._method = "HEAD"
@@ -387,6 +392,10 @@ namespace HttpClient
                 end if
             #end if
 
+            if m._toFilePath <> invalid and m._method <> "GET"
+                throw "ToFile() can only be used with GET requests."
+            end if
+
             if m._method = "POST"
                 body = m._body
                 if body = invalid
@@ -394,7 +403,11 @@ namespace HttpClient
                 end if
                 m._sent = m.urlTransfer.AsyncPostFromString(body)
             else if m._method = "GET"
-                m._sent = m.urlTransfer.AsyncGetToString()
+                if m._toFilePath <> invalid
+                    m._sent = m.urlTransfer.AsyncGetToFile(m._toFilePath)
+                else
+                    m._sent = m.urlTransfer.AsyncGetToString()
+                end if
             else if m._method = "HEAD"
                 m._sent = m.urlTransfer.AsyncHead()
             else

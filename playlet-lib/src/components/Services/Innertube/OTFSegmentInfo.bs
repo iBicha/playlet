@@ -1,0 +1,181 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+
+namespace Innertube
+
+    const OTF_MAX_REQUEST_COUNT = 8
+
+    function OTFGetSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
+        errors = {
+            message: ""
+            attachments: []
+        }
+
+        formatsToProcess = []
+        for i = 0 to adaptiveFormats.Count() - 1
+            formatsToProcess.Push({
+                format: adaptiveFormats[i]
+                file: `tmp:/otf_segments/${i}.bin`
+            })
+        end for
+
+        pendingFormats = []
+
+        requestHeaders = Innertube.CreateHeaders(client)
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
+
+        fs = CreateObject("roFileSystem")
+        fs.Delete("tmp:/otf_segments")
+        fs.CreateDirectory("tmp:/otf_segments")
+
+        while true
+            while formatsToProcess.Count() > 0 and pendingFormats.Count() < OTF_MAX_REQUEST_COUNT
+                formatToProcess = formatsToProcess.Pop()
+                request = OTFMakeSegmentInfoRequest(formatToProcess.format, formatToProcess.file, requestHeaders, errors, cancellation)
+                if request <> invalid
+                    formatToProcess.request = request
+                    pendingFormats.Push(formatToProcess)
+                end if
+            end while
+
+            if pendingFormats.Count() = 0
+                exit while
+            end if
+
+            pendingFormat = pendingFormats.Shift()
+            ' returns false if processing should stop (e.g., cancelled)
+            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.file, errors)
+                exit while
+            end if
+        end while
+
+        fs.Delete("tmp:/otf_segments")
+
+        if not StringUtils.IsNullOrEmpty(errors.message) or errors.attachments.Count() > 0
+            LogTelemetryEvent({
+                level: "error"
+                message: `OTF errors during segment info retrieval: \n${errors.message}`
+                fingerprint: ["OTF errors during segment info retrieval"]
+                attachments: errors.attachments
+            })
+        end if
+    end function
+
+    function OTFMakeSegmentInfoRequest(format as object, file as string, requestHeaders as object, errors as object, cancellation as object) as object
+        url = format.url
+        if StringUtils.IsNullOrEmpty(url)
+            errors.message += `URL is empty for itag ${format.itag}.\n`
+            return invalid
+        end if
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents["rn"] = "0"
+        queryComponents["sq"] = "0"
+        otfUrl = UrlUtils.SetQueryParams(url, queryComponents)
+
+        request = HttpClient.Get(otfUrl)
+        request.Headers(requestHeaders)
+        request.ToFile(file)
+        request.Cancellation(cancellation)
+        request.Send()
+
+        return request
+    end function
+
+    function OTFProcessPendingFormat(format as object, request as object, file as string, errors as object) as boolean
+        response = request.Await()
+
+        if response.IsCancelled()
+            return false
+        end if
+
+        if not response.IsSuccess()
+            errors.message += `Failed to get segment info for itag ${format.itag}: ${response.ErrorMessage()}\n`
+            return true
+        end if
+
+        segmentDurations = OTFParseFileForSegmentInfo(file, errors)
+        if segmentDurations = invalid
+            errors.message += `Failed to parse segment info for itag ${format.itag}.\n`
+            errors.message += `Headers: ${ToString(response.Headers())}\n`
+            return true
+        end if
+
+        format.otfSegmentInfo = segmentDurations
+        return true
+    end function
+
+    function OTFParseFileForSegmentInfo(filePath as string, errors as object) as dynamic
+        buffer = CreateObject("roByteArray")
+
+        buffer.FromAsciiString("Segment-Durations-Ms:")
+        startMarkerHex = buffer.ToHexString()
+
+        buffer.FromAsciiString(`\r\n`)
+        endMarkerHex = buffer.ToHexString()
+
+        if not buffer.ReadFile(filePath)
+            errors.message += `Failed to read file at path ${filePath}.\n`
+            return invalid
+        end if
+        contentHex = buffer.ToHexString()
+
+        startIndex = contentHex.InStr(startMarkerHex)
+        if startIndex = -1
+            errors.message += `Start marker not found in file at path ${filePath}.\n`
+            errors.attachments.Push({
+                filename: filePath
+                content_type: "plain/text"
+                data: contentHex
+            })
+            return invalid
+        end if
+
+        endIndex = contentHex.InStr(startIndex, endMarkerHex)
+        if endIndex = -1
+            errors.message += `End marker not found in file at path ${filePath}.\n`
+            errors.attachments.Push({
+                filename: filePath
+                content_type: "plain/text"
+                data: contentHex
+            })
+            return invalid
+        end if
+
+        segmentDurationsMsHex = contentHex.Mid(startIndex + startMarkerHex.len(), endIndex - (startIndex + startMarkerHex.len()))
+        buffer.FromHexString(segmentDurationsMsHex)
+        segmentDurationsMs = buffer.ToAsciiString()
+
+        regex = CreateObject("roRegex", "(\d+)(?:\(r=(\d+)\))?", "g")
+        matches = regex.MatchAll(segmentDurationsMs)
+        if not IsArray(matches) or matches.Count() = 0
+            errors.message += `No segment duration matches found in file at path ${filePath}.\n`
+            errors.attachments.Push({
+                filename: filePath
+                content_type: "plain/text"
+                data: contentHex
+            })
+            return invalid
+        end if
+
+        segmentDurations = CreateObject("roArray", matches.Count(), false)
+
+        for i = 0 to matches.Count() - 1
+            match = matches[i]
+            segment = {}
+            ' We set duration and repeatCount to "d" and "r" so that we can feed
+            ' them directly into the DashManifest generation code.
+            if match.Count() >= 2
+                segment["d"] = match[1].ToInt()
+            end if
+            if match.Count() >= 3
+                segment["r"] = match[2].ToInt()
+            end if
+            segmentDurations[i] = segment
+        end for
+
+        return segmentDurations
+    end function
+
+end namespace
