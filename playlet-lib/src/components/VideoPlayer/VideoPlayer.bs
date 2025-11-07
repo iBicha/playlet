@@ -447,7 +447,7 @@ function OnVideoPlayerStateChange() as void
         errorData = GetPlayerErrorData(content.videoId, errorInfo)
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
-        ReportVideoError(errorData, content.url)
+        ReportVideoError(errorData, content.url, content.playletStreamUrls, content.playletStreamUrlIndex)
         errorReported = true
 
         if m.videoPlayingSuccess <> true
@@ -509,7 +509,7 @@ function OnVideoPlayerStateChange() as void
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
         if not errorReported
-            ReportVideoError(errorData, content.url)
+            ReportVideoError(errorData, content.url, content.playletStreamUrls, content.playletStreamUrlIndex)
         end if
 
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
@@ -557,7 +557,7 @@ function GetPlayerErrorData(videoId as string, errorInfo as object) as object
     }
 end function
 
-function ReportVideoError(errorData as object, url as string) as void
+function ReportVideoError(errorData as object, url as string, urls as object, urlIndex as dynamic) as void
     attachments = invalid
     if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
         lastGeneratedDash = ValidString(ReadAsciiFile("cachefs:/last_generated_dash.xml"))
@@ -581,9 +581,18 @@ function ReportVideoError(errorData as object, url as string) as void
 
     position = m.top.position
     duration = m.top.duration
+    message = [
+        errorData.title
+        errorData.body
+        `Position: ${position}`
+        `Duration: ${duration}`
+        `Url: ${url}`
+        `Urls: ` + ToString(urls)
+        `Url index: ${urlIndex}`
+    ].Join(`\n`)
     LogTelemetryEvent({
         level: "error"
-        message: errorData.title + " " + errorData.body + `\nurl: ${url}\nposition: ${position}\nduration: ${duration}`
+        message: message
         fingerprint: errorData.fingerprint
         attachments: attachments
     })
