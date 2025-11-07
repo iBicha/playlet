@@ -2,6 +2,19 @@ import "pkg:/components/Services/Innertube/Context.bs"
 
 namespace Innertube
 
+    ' OTF (On-The-Fly?) segment info retrieval and parsing
+    ' When innertube returns adaptive formats, sometimes there's a property
+    ' attached to the object: adaptiveFormats[].type = "FORMAT_STREAM_TYPE_OTF".
+    ' When that happens, the segment info (durations, repeat counts) is not included
+    ' in the response. Instead, they are appended to the media init segment itself.
+    ' The init segment would contain video init information, which is binary, appended
+    ' with a text section in this format:
+    ' `Segment-Count: 731\r\n` +
+    ' `Segment-Durations-Ms: 5333,5334,5333(r=1),5334,5333(r=1),\r\n`
+    ' Because of this, the init segment needs to be downloaded to a tmp file, loaded in
+    ' a byte array, converted to hex, and parsed. Loading the file to ascii string directly
+    ' would not work because it would be truncated at the first null byte.
+
     const OTF_MAX_REQUEST_COUNT = 8
 
     function OTFGetSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
