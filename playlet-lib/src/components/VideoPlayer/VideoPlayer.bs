@@ -441,32 +441,23 @@ function OnVideoPlayerStateChange() as void
         m.videoPlayingSuccess = true
     end if
 
-    errorReported = false
+    errorData = invalid
     if state = "error"
         errorInfo = m.top.errorInfo
         errorData = GetPlayerErrorData(content.videoId, errorInfo)
 
         LogErrorNoTelemetry(errorData.title, errorData.body)
-        ReportVideoError(errorData, content.url, content.playletStreamUrls, content.playletStreamUrlIndex)
-        errorReported = true
 
         if m.videoPlayingSuccess <> true
             ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
-                currentUrl = content.url
                 playletStreamUrls = content.playletStreamUrls
-                playletStreamUrlIndex = content.playletStreamUrlIndex
-                playletStreamUrlIndex++
-                content.playletStreamUrlIndex = playletStreamUrlIndex
-                if playletStreamUrlIndex < playletStreamUrls.Count()
-                    nextUrl = playletStreamUrls[playletStreamUrlIndex]
-                    msg = `Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`
-                    LogErrorNoTelemetry(msg)
-                    LogTelemetryEvent({
-                        level: "error"
-                        message: msg
-                        fingerprint: ["Stream <URL> failed to play. Trying next stream <URL>"]
-                    })
+                currentUrlIndex = content.playletStreamUrlIndex
+                nextUrlIndex = currentUrlIndex + 1
+                content.playletStreamUrlIndex = nextUrlIndex
+                if nextUrlIndex < playletStreamUrls.Count()
+                    currentUrl = content.url
+                    nextUrl = playletStreamUrls[nextUrlIndex]
 
                     if StringUtils.IsNullOrEmpty(nextUrl)
                         LogError("Next stream URL is empty, cannot try next stream")
@@ -487,6 +478,12 @@ function OnVideoPlayerStateChange() as void
                     if hasTimestamp and timestamp > 0
                         m.top.seek = content.timestamp
                     end if
+
+                    msg = `Stream ${currentUrl} failed to play. Trying next stream ${nextUrl}`
+                    LogErrorNoTelemetry(msg)
+
+                    errorData.title = msg + `\n` + errorData.title
+                    ReportVideoError(errorData, currentUrl, playletStreamUrls, currentUrlIndex, false)
                     return
                 end if
             end if
@@ -504,13 +501,8 @@ function OnVideoPlayerStateChange() as void
     end if
 
     if state = "error"
-        errorInfo = m.top.errorInfo
-        errorData = GetPlayerErrorData(content.videoId, errorInfo)
-
         LogErrorNoTelemetry(errorData.title, errorData.body)
-        if not errorReported
-            ReportVideoError(errorData, content.url, content.playletStreamUrls, content.playletStreamUrlIndex)
-        end if
+        ReportVideoError(errorData, content.url, content.playletStreamUrls, content.playletStreamUrlIndex, true)
 
         buttons = [Tr(Locale.Buttons.PlayNextVideo), Tr(Locale.Buttons.Cancel)]
 
@@ -557,7 +549,7 @@ function GetPlayerErrorData(videoId as string, errorInfo as object) as object
     }
 end function
 
-function ReportVideoError(errorData as object, url as string, urls as object, urlIndex as dynamic) as void
+function ReportVideoError(errorData as object, url as dynamic, urls as object, urlIndex as dynamic, shownInDialog as boolean) as void
     attachments = invalid
     if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
         lastGeneratedDash = ValidString(ReadAsciiFile("cachefs:/last_generated_dash.xml"))
@@ -584,12 +576,16 @@ function ReportVideoError(errorData as object, url as string, urls as object, ur
     message = [
         errorData.title
         errorData.body
+        `Dialog shown: ${shownInDialog}`
         `Position: ${position}`
         `Duration: ${duration}`
         `Url: ${url}`
         `Urls: ` + ToString(urls)
         `Url index: ${urlIndex}`
     ].Join(`\n`)
+
+    errorData.fingerprint.push(shownInDialog)
+
     LogTelemetryEvent({
         level: "error"
         message: message
