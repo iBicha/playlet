@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Implemented compactRadioRenderer node
+- Prioritise manually created subtitles over auto-generated ones
 
 ## [0.43.9] - 2025-11-07
 
