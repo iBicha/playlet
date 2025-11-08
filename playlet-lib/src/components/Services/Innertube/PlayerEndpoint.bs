@@ -316,6 +316,7 @@ namespace Innertube
         end if
 
         captions = []
+        autoCaptions = []
         for each track in tracks
             if not IsAssociativeArray(track)
                 continue for
@@ -341,13 +342,22 @@ namespace Innertube
 
             label = ParseText(track["name"])
 
-            captions.Push({
+            thisCaption = {
                 "label": label
                 "language_code": languageCode
                 "url": baseUrl
-            })
+            }
+
+            if track["kind"] = "asr"
+                autoCaptions.Push(thisCaption)
+                continue for
+            end if
+
+            captions.Push(thisCaption)
         end for
 
+        ' Put automatically generated captions at the end so human-generated ones take priority
+        captions.Append(autoCaptions)
         return captions
     end function
 
