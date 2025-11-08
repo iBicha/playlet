@@ -325,9 +325,16 @@ class LoungeApi
                 LogInfo(commandIndex, commandType)
                 m[handler](commandIndex, commandType, commandArgs, messagesToSend)
             else
-                LogWarn("Unknown command type:", commandType, "command:", command)
+                fingerprint = "Unknown command type:" + ToString(commandType)
+                message = fingerprint + " command:" + ToString(command)
+                LogWarnNoTelemetry(message)
+                LogTelemetryEvent({
+                    level: "warning"
+                    message: message
+                    fingerprint: fingerprint
+                })
                 #if DEBUG
-                    throw `Unknown command type: ${commandType} command: ${ToString(command)}`
+                    throw message
                 #end if
             end if
         end for

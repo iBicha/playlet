@@ -99,7 +99,19 @@ function ExecuteJob() as void
     streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
     if streamUrls.Count() = 0
         contentNode.addFields({ metadata: metadata })
-        JobError("No playable streams found for this video.")
+        error = "No playable streams found for this video."
+        lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+        LogTelemetryEvent({
+            level: "error"
+            message: error
+            fingerprint: error
+            attachments: [{
+                filename: "last_player_response.json"
+                content_type: "application/json"
+                data: lastPlayerResponse
+            }]
+        })
+        JobError(error)
         return
     end if
 
