@@ -27,7 +27,7 @@ namespace Innertube
         for i = 0 to adaptiveFormats.Count() - 1
             formatsToProcess.Push({
                 format: adaptiveFormats[i]
-                file: `tmp:/otf_segments/${i}.bin`
+                filePath: `tmp:/otf_segments/${i}.bin`
             })
         end for
 
@@ -38,6 +38,8 @@ namespace Innertube
         requestHeaders["referer"] = "https://www.youtube.com"
         requestHeaders["DNT"] = "?1"
 
+        segmentDurationsRegex = CreateObject("roRegex", "(\d+)(?:\(r=(\d+)\))?", "g")
+
         fs = CreateObject("roFileSystem")
         fs.Delete("tmp:/otf_segments")
         fs.CreateDirectory("tmp:/otf_segments")
@@ -45,7 +47,7 @@ namespace Innertube
         while true
             while formatsToProcess.Count() > 0 and pendingFormats.Count() < OTF_MAX_REQUEST_COUNT
                 formatToProcess = formatsToProcess.Pop()
-                request = OTFMakeSegmentInfoRequest(formatToProcess.format, formatToProcess.file, requestHeaders, errors, cancellation)
+                request = OTFMakeSegmentInfoRequest(formatToProcess.format, formatToProcess.filePath, requestHeaders, errors, cancellation)
                 if request <> invalid
                     formatToProcess.request = request
                     pendingFormats.Push(formatToProcess)
@@ -58,7 +60,7 @@ namespace Innertube
 
             pendingFormat = pendingFormats.Shift()
             ' returns false if processing should stop (e.g., cancelled)
-            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.file, errors)
+            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.filePath, segmentDurationsRegex, errors)
                 exit while
             end if
         end while
@@ -75,7 +77,7 @@ namespace Innertube
         end if
     end function
 
-    function OTFMakeSegmentInfoRequest(format as object, file as string, requestHeaders as object, errors as object, cancellation as object) as object
+    function OTFMakeSegmentInfoRequest(format as object, filePath as string, requestHeaders as object, errors as object, cancellation as object) as object
         url = format.url
         if StringUtils.IsNullOrEmpty(url)
             errors.message += `URL is empty for itag ${format.itag}.\n`
@@ -89,14 +91,14 @@ namespace Innertube
 
         request = HttpClient.Get(otfUrl)
         request.Headers(requestHeaders)
-        request.ToFile(file)
+        request.ToFile(filePath)
         request.Cancellation(cancellation)
         request.Send()
 
         return request
     end function
 
-    function OTFProcessPendingFormat(format as object, request as object, file as string, errors as object) as boolean
+    function OTFProcessPendingFormat(format as object, request as object, filePath as string, segmentDurationsRegex as object, errors as object) as boolean
         response = request.Await()
 
         if response.IsCancelled()
@@ -108,7 +110,7 @@ namespace Innertube
             return true
         end if
 
-        segmentDurations = OTFParseFileForSegmentDurations(file, errors)
+        segmentDurations = OTFParseFileForSegmentDurations(filePath, segmentDurationsRegex, errors)
         if segmentDurations = invalid
             errors.message += `Failed to parse segment durations for itag ${format.itag}.\n`
             errors.message += `Headers: ${ToString(response.Headers())}\n`
@@ -119,7 +121,7 @@ namespace Innertube
         return true
     end function
 
-    function OTFParseFileForSegmentDurations(filePath as string, errors as object) as dynamic
+    function OTFParseFileForSegmentDurations(filePath as string, segmentDurationsRegex as object, errors as object) as dynamic
         buffer = CreateObject("roByteArray")
 
         buffer.FromAsciiString("Segment-Durations-Ms:")
@@ -129,14 +131,14 @@ namespace Innertube
         endMarkerHex = buffer.ToHexString()
 
         if not buffer.ReadFile(filePath)
-            errors.message += `Failed to read file at path ${filePath}.\n`
+            errors.message += `Failed to read filePath ${filePath}.\n`
             return invalid
         end if
         contentHex = buffer.ToHexString()
 
         startIndex = contentHex.InStr(startMarkerHex)
         if startIndex = -1
-            errors.message += `Start marker not found in file at path ${filePath}.\n`
+            errors.message += `Start marker not found in filePath ${filePath}.\n`
             errors.attachments.Push({
                 filename: filePath
                 content_type: "plain/text"
@@ -147,7 +149,7 @@ namespace Innertube
 
         endIndex = contentHex.InStr(startIndex, endMarkerHex)
         if endIndex = -1
-            errors.message += `End marker not found in file at path ${filePath}.\n`
+            errors.message += `End marker not found in filePath ${filePath}.\n`
             errors.attachments.Push({
                 filename: filePath
                 content_type: "plain/text"
@@ -160,10 +162,9 @@ namespace Innertube
         buffer.FromHexString(segmentDurationsMsHex)
         segmentDurationsMs = buffer.ToAsciiString()
 
-        regex = CreateObject("roRegex", "(\d+)(?:\(r=(\d+)\))?", "g")
-        matches = regex.MatchAll(segmentDurationsMs)
+        matches = segmentDurationsRegex.MatchAll(segmentDurationsMs)
         if not IsArray(matches) or matches.Count() = 0
-            errors.message += `No segment duration matches found in file at path ${filePath}.\n`
+            errors.message += `No segment duration matches found in filePath ${filePath}.\n`
             errors.attachments.Push({
                 filename: filePath
                 content_type: "plain/text"
