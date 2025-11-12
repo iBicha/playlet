@@ -44,7 +44,7 @@ namespace Innertube
         return context.feeds
     end function
 
-    function ParseChannelPageResponseData(responseData as object, response as object) as object
+    function ParseChannelPageResponseData(browseId as string, responseData as object, response as object) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -63,6 +63,9 @@ namespace Innertube
             author = ObjectUtils.Dig(responseData, ["header", "pageHeaderRenderer", "pageTitle"])
         end if
         authorId = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "externalId"])
+        if StringUtils.IsNullOrEmpty(authorId)
+            authorId = browseId
+        end if
 
         thumbnails = ObjectUtils.Dig(responseData, ["metadata", "channelMetadataRenderer", "avatar", "thumbnails"])
         if thumbnails = invalid
@@ -149,6 +152,7 @@ namespace Innertube
             response: response
             "currentAuthor": author
             "currentAuthorId": authorId
+            browseId: browseId
         })
         if feeds.Count() > 0
             items = ValidArray(feeds[0].items)
@@ -183,7 +187,7 @@ namespace Innertube
         return channel
     end function
 
-    function ParsePlaylistPageResponseData(responseData as object, response as object) as object
+    function ParsePlaylistPageResponseData(browseId as string, responseData as object, response as object) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -251,13 +255,16 @@ namespace Innertube
             end if
         end if
 
+        if StringUtils.IsNullOrEmpty(playlistId)
+            playlistId = browseId
+        end if
+
         playlist = {
+            "playlistId": playlistId
             "videoCount": videoCount
             "videos": []
         }
-        if playlistId <> invalid
-            playlist["playlistId"] = playlistId
-        end if
+
         if title <> invalid
             playlist["title"] = title
         end if
@@ -279,6 +286,7 @@ namespace Innertube
 
         feeds = ParseResponseDataForFeeds(responseData, {
             response: response
+            browseId: browseId
         })
         if feeds.Count() > 0
             playlist["videos"] = ValidArray(feeds[0].items)

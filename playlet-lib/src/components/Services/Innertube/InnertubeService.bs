@@ -272,6 +272,7 @@ namespace InnertubeService
         trendingType = LCase(OptionUtils.GetOrDefault(options, "type", ""))
         disableShorts = OptionUtils.GetOrDefault(options, "disableShorts", false)
         raw = OptionUtils.GetOrDefault(options, "raw", false)
+        browseId = "FEtrending"
 
         params = ""
         if trendingType = "music"
@@ -285,7 +286,7 @@ namespace InnertubeService
             params = "4gIKGgh0cmFpbGVycw%3D%3D"
         end if
 
-        request = Innertube.CreateBrowseRequest("FEtrending", Innertube.ClientType.WEB, { params: params })
+        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.WEB, { params: params })
         request.Cancellation(cancellation)
 
         if raw
@@ -308,6 +309,7 @@ namespace InnertubeService
             response: response
             disableCreatorOnTheRise: true
             disableShorts: disableShorts
+            browseId: browseId
         })
 
         result = {
@@ -338,12 +340,12 @@ namespace InnertubeService
         return GetBrowseAuthenticatedPage("FEplaylist_aggregation", options)
     end function
 
-    function GetBrowseAuthenticatedPage(browserId as string, options = invalid as object) as object
+    function GetBrowseAuthenticatedPage(browseId as string, options = invalid as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
         disableShorts = OptionUtils.GetOrDefault(options, "disableShorts", false)
 
-        request = Innertube.CreateBrowseRequest(browserId, Innertube.ClientType.Tv, options)
+        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.Tv, options)
 
         if accessToken <> invalid
             request.Header("Authorization", "Bearer " + accessToken)
@@ -360,6 +362,7 @@ namespace InnertubeService
         feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
             response: response
             disableShorts: disableShorts
+            browseId: browseId
         })
 
         result = {
@@ -521,7 +524,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParseChannelPageResponseData(response.Json(), response)
+        result = Innertube.ParseChannelPageResponseData(channelId, response.Json(), response)
         if result.authorId = invalid and result.error = invalid
             result["authorId"] = channelId
         end if
@@ -663,7 +666,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParsePlaylistPageResponseData(response.Json(), response)
+        result = Innertube.ParsePlaylistPageResponseData(playlistId, response.Json(), response)
 
         if result.playlistId = invalid and result.error = invalid
             result["playlistId"] = playlistId
