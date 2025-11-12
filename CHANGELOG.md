@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Small change in post-live dvr detection
 - Issue where recommended videos are all "UPCOMING" paid content
+- Errors related to loading the trending feeds. Trending will be removed from Playlet in a future release.
 
 ## [0.44.0] - 2025-11-09
 

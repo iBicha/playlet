@@ -65,31 +65,9 @@ function ExecuteJob() as void
             })
 
             if not response.success
-                if response.error = Invidious.ERROR_NOT_AUTHENTICATED
-                    if feedSources.Count() = 1
-                        parent = feedContentNode.getParent()
-                        if parent <> invalid
-                            parent.removeChild(feedContentNode)
-                        end if
-                        JobSuccess()
-                        return
-                    end if
-
-                    continue while
-                end if
-
-                if response.error.instr("Administrator has disabled this endpoint.") > -1
-                    LogWarnNoTelemetry(feedSource.endpoint, "feedSource not available:", response.error)
-                    if feedSources.Count() = 1
-                        parent = feedContentNode.getParent()
-                        if parent <> invalid
-                            parent.removeChild(feedContentNode)
-                        end if
-                        JobSuccess()
-                        return
-                    end if
-
-                    continue while
+                if RemoveSingleFailedRow(response.error, feedSource, feedSources, feedContentNode)
+                    JobSuccess()
+                    return
                 end if
 
                 feedSource.state.loadState = FeedLoadState.Error
@@ -241,6 +219,31 @@ function DeduplicateAppendAuthPlaylists(feedContentNode as object, itemNodes as 
     end if
     feedContentNode.appendChildren(nodesToAdd)
     return nodesToAdd.Count()
+end function
+
+function RemoveSingleFailedRow(error as dynamic, feedSource as object, feedSources as object, feedContentNode as object) as boolean
+    error = ValidString(error)
+    LogWarnNoTelemetry(feedSource.id, "feedSource not available:", error)
+
+    if feedSources.Count() <> 1
+        return false
+    end if
+
+    isError = error = Invidious.ERROR_NOT_AUTHENTICATED
+    isError = isError or error.instr("Administrator has disabled this endpoint") <> -1
+    isError = isError or error.instr("API disabled") <> -1
+    isError = isError or feedSource.id.instr("inv_trending") <> -1
+    isError = isError or feedSource.id.instr("inv_popular") <> -1
+    if not isError
+        return false
+    end if
+
+    parent = feedContentNode.getParent()
+    if parent <> invalid
+        parent.removeChild(feedContentNode)
+    end if
+
+    return true
 end function
 
 function HandleFeedLoadErrorDialog(error as object, isCancelled as boolean, rowList as object) as void
