@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Small change in post-live dvr detection
+- Issue where recommended videos are all "UPCOMING" paid content
 
 ## [0.44.0] - 2025-11-09
 
