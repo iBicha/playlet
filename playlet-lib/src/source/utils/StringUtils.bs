@@ -29,5 +29,18 @@ namespace StringUtils
     function RandomId() as string
         return StrI(rnd(2147483647), 36)
     end function
+
+    function ParseJsonSafe(jsonString as dynamic) as dynamic
+        if IsNullOrEmpty(jsonString)
+            return invalid
+        end if
+        ' bs:disable-next-line NO_PARSE_JSON
+        json = ParseJson(jsonString)
+        if json <> invalid
+            return json
+        end if
+        ' bs:disable-next-line NO_PARSE_JSON
+        return ParseJson(jsonString.Replace("\u0000", ""))
+    end function
 end namespace
 
