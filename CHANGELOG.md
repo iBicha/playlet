@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Removed
+
+- Trending endpoints from code base
 
 ## [0.44.3] - 2025-11-14
 

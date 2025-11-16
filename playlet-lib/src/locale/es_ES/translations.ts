@@ -81,22 +81,6 @@
         <translation>Ver el historial</translation>
     </message>
     <message>
-        <source>Trending</source>
-        <translation>Tendencias</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Tendencias - Películas</translation>
-    </message>
-    <message>
-        <source>Trending - Music</source>
-        <translation>Tendencias - Música</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Tendencias - Juegos</translation>
-    </message>
-    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

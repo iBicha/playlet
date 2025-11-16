@@ -37,10 +37,6 @@
         <translation>Filtros</translation>
     </message>
     <message>
-        <source>Trending - Music</source>
-        <translation>Tendencias - Música</translation>
-    </message>
-    <message>
         <source>Login to Invidious in order to view Subscriptions, Playlists, and use the Watch history.</source>
         <translation>Accede a Invidious para ver tus suscripciones, playlists, y usar el historial de reproducción.</translation>
     </message>
@@ -79,18 +75,6 @@
     <message>
         <source>Watch history</source>
         <translation>Historial de reproducción</translation>
-    </message>
-    <message>
-        <source>Trending</source>
-        <translation>Tendencias</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Tendencias - Películas</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Tendencias - Videojuegos</translation>
     </message>
     <message>
         <source>Edit</source>

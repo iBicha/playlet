@@ -267,63 +267,6 @@ namespace InnertubeService
         return Innertube.Search(query, options)
     end function
 
-    function GetTrending(options = invalid as object) as object
-        cancellation = OptionUtils.Get(options, "cancellation")
-        trendingType = LCase(OptionUtils.GetOrDefault(options, "type", ""))
-        disableShorts = OptionUtils.GetOrDefault(options, "disableShorts", false)
-        raw = OptionUtils.GetOrDefault(options, "raw", false)
-        browseId = "FEtrending"
-
-        params = ""
-        if trendingType = "music"
-            ' {"44:proto": {"3:string": "ytma_charts"}}
-            params = "4gINGgt5dG1hX2NoYXJ0cw%3D%3D"
-        else if trendingType = "gaming"
-            ' {"44:proto": {"3:string": "gaming_corpus_most_popular"}}
-            params = "4gIcGhpnYW1pbmdfY29ycHVzX21vc3RfcG9wdWxhcg%3D%3D"
-        else if trendingType = "movies"
-            ' {"44:proto": {"3:string": "trailers"}}
-            params = "4gIKGgh0cmFpbGVycw%3D%3D"
-        end if
-
-        request = Innertube.CreateBrowseRequest(browseId, Innertube.ClientType.WEB, { params: params })
-        request.Cancellation(cancellation)
-
-        if raw
-            request.LogCurlCommand(true)
-            request.NoCache()
-        end if
-
-        response = request.Await()
-        if not response.IsSuccess()
-            return {
-                error: response.ErrorMessage()
-            }
-        end if
-
-        if raw
-            return response.Json()
-        end if
-
-        feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
-            response: response
-            disableCreatorOnTheRise: true
-            disableShorts: disableShorts
-            browseId: browseId
-        })
-
-        result = {
-            feeds: feeds
-        }
-
-        cacheControl = Innertube.ParseResponseForCacheControl(response)
-        if cacheControl <> invalid
-            result["cache-control"] = cacheControl
-        end if
-
-        return result
-    end function
-
     function GetHome(options = invalid as object) as object
         return GetBrowseAuthenticatedPage("FEwhat_to_watch", options)
     end function

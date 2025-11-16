@@ -141,22 +141,6 @@
         <translation>Histórico de assistidos</translation>
     </message>
     <message>
-        <source>Trending</source>
-        <translation>Em alta</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Em alta - Flimes</translation>
-    </message>
-    <message>
-        <source>Trending - Music</source>
-        <translation>Em alta - Música</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Em alta - Jogos</translation>
-    </message>
-    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

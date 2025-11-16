@@ -89,22 +89,6 @@
         <translation>Watch history</translation>
     </message>
     <message>
-        <source>Trending</source>
-        <translation>Trending</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Trending - Movies</translation>
-    </message>
-    <message>
-        <source>Trending - Music</source>
-        <translation>Trending - Music</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Trending - Gaming</translation>
-    </message>
-    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

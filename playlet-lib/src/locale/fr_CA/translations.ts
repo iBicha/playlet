@@ -77,22 +77,6 @@
         <translation>Historique</translation>
     </message>
     <message>
-        <source>Trending</source>
-        <translation>Tendances</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Tendances - Films</translation>
-    </message>
-    <message>
-        <source>Trending - Music</source>
-        <translation>Tendances - Musique</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Tendances - Jeux vidéo</translation>
-    </message>
-    <message>
         <source>Popular</source>
         <translation>Populaire</translation>
     </message>

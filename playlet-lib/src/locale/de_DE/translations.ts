@@ -313,22 +313,6 @@
         <translation>Wiedergabeverlauf</translation>
     </message>
     <message>
-        <source>Trending</source>
-        <translation>Trends</translation>
-    </message>
-    <message>
-        <source>Trending - Movies</source>
-        <translation>Trends - Filme</translation>
-    </message>
-    <message>
-        <source>Trending - Music</source>
-        <translation>Trends - Musik</translation>
-    </message>
-    <message>
-        <source>Trending - Gaming</source>
-        <translation>Trends - Gaming</translation>
-    </message>
-    <message>
         <source>Popular</source>
         <translation>Populär</translation>
     </message>
