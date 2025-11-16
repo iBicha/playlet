@@ -15,6 +15,6 @@ INVIDIOUS_HMAC_KEY=PASSWORD_1
 INVIDIOUS_COMPANION_KEY=PASSWORD_2
 ```
 
-- Run `docker-compose up`
+- Run `docker compose up -d --pull always`
 
 Invidious should now be running locally on port 3000.
