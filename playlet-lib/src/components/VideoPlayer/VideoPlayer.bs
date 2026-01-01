@@ -54,6 +54,11 @@ function Init()
     m.showUIEnabled = m.top.hasField("showUI")
     LogDebug(`Custom OK handler is ${m.showUIEnabled ? "enabled" : "disabled"}`)
 
+    m.statsOverlayEnabled = false
+    m.statsResolution = ""
+    m.statsBitrate = invalid
+    m.statsFps = ""
+
     ' asyncStopSemantics available since Roku OS 12.5
     ' It is set to true because stopping synchronously causes timeout and crash
     ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
@@ -130,6 +135,7 @@ function OnNodeReady()
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
 
+    SetupStatsOverlay()
     SponsorBlock.SetupSponsorBlock()
 end function
 
@@ -746,6 +752,7 @@ function OnFullScreenChange()
     m.top.showFullScreenHint = not m.container.fullscreen
 
     SponsorBlock.SetVisible(m.notifications, m.container.fullscreen)
+    UpdateStatsOverlayVisibility()
 end function
 
 function OnShowFullScreenHint() as void
@@ -777,4 +784,459 @@ function OnFullScreenHintTimer()
     if showFullScreenHint
         m.top.showFullScreenHint = false
     end if
+end function
+
+function SetupStatsOverlay() as void
+    m.statsOverlay = m.top.findNode("statsOverlay")
+    m.statsOverlayLabel = m.top.findNode("statsOverlayLabel")
+    m.statsOverlayTimer = m.top.findNode("statsOverlayTimer")
+
+    if m.statsOverlayTimer <> invalid
+        m.statsOverlayTimer.ObserveField("fire", FuncName(OnStatsOverlayTimer))
+    end if
+
+    if m.top.hasField("streamingSegment")
+        m.top.ObserveField("streamingSegment", FuncName(OnStreamingSegmentChangeStats))
+    end if
+    m.top.ObserveField("audioFormat", FuncName(UpdateStatsOverlay))
+    m.top.ObserveField("videoFormat", FuncName(UpdateStatsOverlay))
+    m.top.ObserveField("state", FuncName(UpdateStatsOverlay))
+    m.top.ObserveField("content", FuncName(UpdateStatsOverlay))
+
+    if m.top.preferences <> invalid
+        m.top.preferences.observeFieldScoped("playback.stats_for_nerds", FuncName(OnStatsPreferenceChange))
+    end if
+    OnStatsPreferenceChange()
+end function
+
+function OnStatsPreferenceChange() as void
+    enabled = false
+    if m.top.preferences <> invalid
+        enabled = m.top.preferences["playback.stats_for_nerds"] = true
+    end if
+    m.statsOverlayEnabled = enabled
+    UpdateStatsOverlayVisibility()
+end function
+
+function UpdateStatsOverlayVisibility() as void
+    if m.statsOverlay = invalid
+        return
+    end if
+
+    visible = m.statsOverlayEnabled
+    if m.container <> invalid and not m.container.fullscreen
+        visible = false
+    end if
+
+    m.statsOverlay.visible = visible
+    if m.statsOverlayTimer <> invalid
+        m.statsOverlayTimer.control = visible ? "start" : "stop"
+    end if
+    if visible
+        UpdateStatsOverlay()
+    end if
+end function
+
+function OnStatsOverlayTimer() as void
+    UpdateStatsOverlay()
+end function
+
+function OnStreamingSegmentChangeStats() as void
+    segment = m.top.streamingSegment
+    if not IsAssociativeArray(segment)
+        return
+    end if
+
+    m.statsBitrate = invalid
+
+    width = segment.width
+    height = segment.height
+    if width > 0 and height > 0
+        m.statsResolution = `${width}x${height}`
+    end if
+
+    if segment.DoesExist("fps")
+        m.statsFps = ToString(segment.fps)
+    else if segment.DoesExist("frameRate")
+        m.statsFps = ToString(segment.frameRate)
+    end if
+
+    bitrate = ExtractSegmentBitrate(segment)
+    if bitrate <> invalid
+        m.statsBitrate = bitrate
+    else
+        inferred = InferBitrateFromMetadata()
+        if inferred <> invalid
+            m.statsBitrate = inferred
+        end if
+    end if
+
+    UpdateStatsOverlay()
+end function
+
+function UpdateStatsOverlay() as void
+    if m.statsOverlay = invalid or not m.statsOverlay.visible or m.statsOverlayLabel = invalid
+        return
+    end if
+
+    lines = []
+
+    state = ValidString(m.top.state)
+    if not StringUtils.IsNullOrEmpty(state)
+        lines.Push(`State: ${state}`)
+    end if
+
+    url = ""
+    if m.top.content <> invalid
+        url = ValidString(m.top.content.url)
+    end if
+
+    query = ParseUrlQuery(url)
+    containerParam = ExtractQueryValue(query, "container")
+    if not StringUtils.IsNullOrEmpty(containerParam)
+        container = containerParam
+    else
+        container = InferContainerFromUrl(url)
+    end if
+    if not StringUtils.IsNullOrEmpty(container)
+        lines.Push(`Container: ${container}`)
+    end if
+
+    quality = ExtractQueryValue(query, "quality")
+    if not StringUtils.IsNullOrEmpty(quality)
+        if quality.InStr(",") <> -1
+            quality = quality.Split(",")[0].Trim()
+        end if
+        lines.Push(`Quality: ${quality}`)
+        if StringUtils.IsNullOrEmpty(m.statsResolution)
+            m.statsResolution = quality
+        end if
+    end if
+
+    videoFormat = ValidString(m.top.videoFormat)
+    if not StringUtils.IsNullOrEmpty(videoFormat)
+        lines.Push(`Video format: ${videoFormat}`)
+        parsedVideo = ParseMimeType(videoFormat)
+        if not StringUtils.IsNullOrEmpty(parsedVideo.codec)
+            lines.Push(`Video codec: ${parsedVideo.codec}`)
+        end if
+    end if
+
+    audioFormat = ValidString(m.top.audioFormat)
+    if not StringUtils.IsNullOrEmpty(audioFormat)
+        lines.Push(`Audio format: ${audioFormat}`)
+        parsedAudio = ParseMimeType(audioFormat)
+        if not StringUtils.IsNullOrEmpty(parsedAudio.codec)
+            lines.Push(`Audio codec: ${parsedAudio.codec}`)
+        end if
+    end if
+
+    resolution = m.statsResolution
+    if not StringUtils.IsNullOrEmpty(resolution)
+        resLine = `Resolution: ${resolution}`
+        if not StringUtils.IsNullOrEmpty(m.statsFps)
+            resLine = resLine + ` @${m.statsFps}fps`
+        end if
+        lines.Push(resLine)
+    end if
+
+    if m.statsBitrate = invalid
+        inferred = InferBitrateFromMetadata()
+        if inferred <> invalid
+            m.statsBitrate = inferred
+        end if
+    end if
+
+    bitrate = FormatBitrate(m.statsBitrate)
+    if not StringUtils.IsNullOrEmpty(bitrate)
+        lines.Push(`Bitrate: ${bitrate}`)
+    end if
+
+    positionText = FormatTime(m.top.position)
+    durationText = FormatTime(m.top.duration)
+    if not StringUtils.IsNullOrEmpty(positionText) or not StringUtils.IsNullOrEmpty(durationText)
+        lines.Push(`Position: ${positionText} / ${durationText}`)
+    end if
+
+    if not StringUtils.IsNullOrEmpty(url)
+        lines.Push(`Source: ${TruncateString(url, 140)}`)
+    end if
+
+    if lines.Count() = 0
+        lines.Push("Stats unavailable")
+    end if
+
+    m.statsOverlayLabel.text = lines.Join(`\n`)
+end function
+
+function InferContainerFromUrl(url as string) as string
+    if StringUtils.IsNullOrEmpty(url)
+        return ""
+    end if
+
+    lower = LCase(url)
+    if lower.InStr(".mpd") <> -1 or lower.InStr("/dash") <> -1 or lower.InStr("/mux") <> -1
+        return "dash"
+    end if
+    if lower.InStr(".m3u8") <> -1
+        return "hls"
+    end if
+    if lower.InStr(".webm") <> -1
+        return "webm"
+    end if
+    if lower.InStr(".mkv") <> -1
+        return "mkv"
+    end if
+    if lower.InStr(".mp4") <> -1
+        return "mp4"
+    end if
+
+    return ""
+end function
+
+function ParseUrlQuery(url as string) as object
+    if StringUtils.IsNullOrEmpty(url)
+        return {}
+    end if
+    if url.InStr("?") = -1
+        return {}
+    end if
+    return UrlUtils.ParseQueryComponents(url)
+end function
+
+function ExtractQueryValue(query as object, key as string) as string
+    if query = invalid or StringUtils.IsNullOrEmpty(key)
+        return ""
+    end if
+    if not query.DoesExist(key)
+        return ""
+    end if
+
+    value = query[key]
+    if IsArray(value)
+        if value.Count() = 0
+            return ""
+        end if
+        value = value[0]
+    end if
+
+    return ValidString(value)
+end function
+
+function ParseMimeType(mimeType as string) as object
+    result = { container: "", codec: "" }
+    if StringUtils.IsNullOrEmpty(mimeType)
+        return result
+    end if
+
+    parts = mimeType.Split(";")
+    typePart = parts[0].Trim()
+    slashIndex = typePart.InStr("/")
+    if slashIndex <> -1
+        result.container = typePart.Mid(slashIndex + 1)
+    end if
+
+    for each part in parts
+        trimmed = part.Trim()
+        if trimmed.StartsWith("codecs=")
+            codecList = trimmed.Mid(7)
+            codecList = codecList.Replace(chr(34), "")
+            codecList = codecList.Replace("'", "")
+            result.codec = codecList
+            exit for
+        end if
+    end for
+
+    return result
+end function
+
+function FormatBitrate(value as dynamic) as string
+    bitrate = ParseNumeric(value)
+    if bitrate = invalid or bitrate <= 0
+        return ""
+    end if
+
+    kbps = bitrate \ 1000
+    if kbps <= 0
+        return `${bitrate} bps`
+    end if
+    return `${kbps} kbps`
+end function
+
+function FormatTime(value as dynamic) as string
+    seconds = NormalizeSeconds(value)
+    if seconds < 0
+        return ""
+    end if
+
+    hours = seconds \ 3600
+    minutes = (seconds mod 3600) \ 60
+    secs = seconds mod 60
+
+    if hours > 0
+        return `${hours}:${Pad2(minutes)}:${Pad2(secs)}`
+    end if
+    return `${minutes}:${Pad2(secs)}`
+end function
+
+function Pad2(value as integer) as string
+    if value < 10
+        return "0" + value.ToStr()
+    end if
+    return value.ToStr()
+end function
+
+function TruncateString(value as string, maxLen as integer) as string
+    if value.Len() <= maxLen
+        return value
+    end if
+    return value.Left(maxLen) + "..."
+end function
+
+function NormalizeSeconds(value as dynamic) as integer
+    if IsInt(value)
+        return value
+    end if
+    if IsFloat(value)
+        return CInt(value)
+    end if
+    if IsDouble(value)
+        return CInt(value)
+    end if
+    if IsString(value)
+        return CInt(Val(value))
+    end if
+    return -1
+end function
+
+function ParseNumeric(value as dynamic) as dynamic
+    if IsInt(value)
+        return value
+    end if
+    if IsFloat(value)
+        return CInt(value)
+    end if
+    if IsDouble(value)
+        return CInt(value)
+    end if
+    if IsString(value)
+        parsed = Val(value)
+        if parsed > 0
+            return CInt(parsed)
+        end if
+    end if
+    return invalid
+end function
+
+function ExtractSegmentBitrate(segment as object) as dynamic
+    if segment = invalid
+        return invalid
+    end if
+
+    keys = ["bitrate", "bandwidth", "bitsPerSecond", "bps"]
+    for each key in keys
+        if segment.DoesExist(key)
+            value = ParseNumeric(segment[key])
+            if value <> invalid
+                return value
+            end if
+        end if
+    end for
+
+    return invalid
+end function
+
+function InferBitrateFromMetadata() as dynamic
+    content = m.top.content
+    if content = invalid
+        return invalid
+    end if
+
+    metadata = content.metadata
+    if not IsAssociativeArray(metadata)
+        return invalid
+    end if
+
+    targetHeight = ParseResolutionHeight(m.statsResolution)
+    if targetHeight <= 0
+        return invalid
+    end if
+
+    bestBitrate = 0
+    formats = ValidArray(metadata.adaptiveFormats)
+    if formats.Count() = 0
+        formats = ValidArray(metadata.formatStreams)
+    end if
+
+    for each fmt in formats
+        mimeType = ValidString(fmt["type"])
+        if StringUtils.IsNullOrEmpty(mimeType) or not mimeType.StartsWith("video/")
+            continue for
+        end if
+
+        height = ParseFormatHeight(fmt)
+        if height <> targetHeight
+            continue for
+        end if
+
+        bitrate = ParseNumeric(fmt["bitrate"])
+        if bitrate <> invalid and bitrate > bestBitrate
+            bestBitrate = bitrate
+        end if
+    end for
+
+    if bestBitrate > 0
+        return bestBitrate
+    end if
+
+    return invalid
+end function
+
+function ParseFormatHeight(fmt as object) as integer
+    if fmt = invalid
+        return 0
+    end if
+
+    heightValue = fmt["height"]
+    if IsInt(heightValue)
+        return heightValue
+    end if
+    if IsFloat(heightValue) or IsDouble(heightValue)
+        return CInt(heightValue)
+    end if
+
+    size = ValidString(fmt["size"])
+    if not StringUtils.IsNullOrEmpty(size)
+        heightFromSize = ParseResolutionHeight(size)
+        if heightFromSize > 0
+            return heightFromSize
+        end if
+    end if
+
+    resolution = ValidString(fmt["resolution"])
+    if not StringUtils.IsNullOrEmpty(resolution)
+        return ParseResolutionHeight(resolution)
+    end if
+
+    return 0
+end function
+
+function ParseResolutionHeight(value as string) as integer
+    if StringUtils.IsNullOrEmpty(value)
+        return 0
+    end if
+
+    lower = LCase(value)
+    if lower.InStr("x") <> -1
+        parts = lower.Split("x")
+        if parts.Count() >= 2
+            return CInt(Val(parts[1]))
+        end if
+    end if
+
+    if lower.InStr("p") <> -1
+        return CInt(Val(lower.Replace("p", "")))
+    end if
+
+    return CInt(Val(lower))
 end function
