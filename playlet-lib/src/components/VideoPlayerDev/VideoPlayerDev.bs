@@ -1,4 +1,3 @@
-import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
@@ -8,16 +7,27 @@ import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+const SKIP_SECONDS = 10
 
 function Init()
     InitializePlayerUi()
 
     httpAgent = m.top.getHttpAgent()
     httpAgent.AddHeader("User-Agent", VIDEO_PLAYER_USER_AGENT)
+
+    m.ccEnabled = false
+
+    m.statsOverlayEnabled = false
+    m.statsResolution = ""
+    m.statsBitrate = invalid
+    m.statsFps = ""
 end function
 
 function OnNodeReady()
@@ -28,9 +38,17 @@ function OnNodeReady()
     OnHasPreviousChange()
     OnHasNextChange()
 
+    ' Center playback buttons
     DisposableObserveFieldScoped(m.previousButton, "buttonSelected", FuncName(OnPreviousButtonSelected))
+    DisposableObserveFieldScoped(m.skipBackButton, "buttonSelected", FuncName(OnSkipBackButtonSelected))
     DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
+    DisposableObserveFieldScoped(m.skipForwardButton, "buttonSelected", FuncName(OnSkipForwardButtonSelected))
     DisposableObserveFieldScoped(m.nextButton, "buttonSelected", FuncName(OnNextButtonSelected))
+
+    ' Right feature buttons (quality button disabled - see TODO.md)
+    DisposableObserveFieldScoped(m.ccButton, "buttonSelected", FuncName(OnCCButtonSelected))
+    DisposableObserveFieldScoped(m.statsButton, "buttonSelected", FuncName(OnStatsButtonSelected))
+    DisposableObserveFieldScoped(m.bookmarkButton, "buttonSelected", FuncName(OnBookmarkButtonSelected))
     DisposableObserveFieldScoped(m.minimizeButton, "buttonSelected", FuncName(OnMinimizeButtonSelected))
 
     DisposableObserveField(m.top, "state", FuncName(OnPlayerStateChange))
@@ -38,82 +56,119 @@ function OnNodeReady()
 
     DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
 
-    SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton)
-    SetNavigation(m.playButton, RemoteKeys.Right, m.nextButton)
-    SetNavigation(m.nextButton, RemoteKeys.Right, m.minimizeButton)
-    SetNavigation(m.playButton, RemoteKeys.Right, m.minimizeButton)
+    SetupNavigation()
+    SetupStatsOverlay()
 
-    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.nextButton)
-    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.playButton)
-    SetNavigation(m.nextButton, RemoteKeys.Left, m.playButton)
-    SetNavigation(m.playButton, RemoteKeys.Left, m.previousButton)
+    ' Disable quality button until focus restoration issue is fixed (see TODO.md)
+    m.qualityButton.disabled = true
 
     if m.top.hasFocus() and m.videoUi.visible and m.videoUi.opacity = 1
         NodeSetFocus(m.playButton, true)
     end if
 end function
 
-function PlayWithContent(contentNode as object)
-    videoContentNode = CreateObject("roSGNode", "ContentNode")
+function SetupNavigation()
+    ' Linear navigation through all buttons (left to right):
+    ' PreviousButton <-> SkipBackButton <-> PlayButton <-> SkipForwardButton <-> NextButton <->
+    ' QualityButton <-> SpeedButton <-> CCButton <-> StatsButton <-> BookmarkButton <-> CommentsButton <-> MinimizeButton
+    '
+    ' Fallback routes are added so disabled buttons can be skipped
 
-    videoId = contentNode.videoId
-    title = contentNode.title
-    author = contentNode._author
-    thumbnail = contentNode.thumbnail
+    ' Center playback buttons
+    SetNavigation(m.previousButton, RemoteKeys.Right, m.skipBackButton)
+    SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton) ' fallback
 
-    if not StringUtils.IsNullOrEmpty(videoId)
-        videoContentNode.AddFields({ videoId: videoId })
-    end if
-    if not StringUtils.IsNullOrEmpty(title)
-        videoContentNode.title = title
-    end if
-    ' NOTE: "_author" not "author". See PlaylistContentNode.xml for explanation.
-    if not StringUtils.IsNullOrEmpty(author)
-        videoContentNode.secondaryTitle = author
-    end if
+    SetNavigation(m.skipBackButton, RemoteKeys.Left, m.previousButton)
+    SetNavigation(m.skipBackButton, RemoteKeys.Left, m.playButton) ' fallback
+    SetNavigation(m.skipBackButton, RemoteKeys.Right, m.playButton)
 
-    if not StringUtils.IsNullOrEmpty(thumbnail)
-        m.backgroundPosterSmall.uri = thumbnail
-    end if
+    SetNavigation(m.playButton, RemoteKeys.Left, m.skipBackButton)
+    SetNavigation(m.playButton, RemoteKeys.Right, m.skipForwardButton)
 
-    StartVideoContentDevJob(videoContentNode)
+    SetNavigation(m.skipForwardButton, RemoteKeys.Left, m.playButton)
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.nextButton)
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.qualityButton) ' fallback
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.ccButton) ' fallback when next/quality are disabled
+
+    SetNavigation(m.nextButton, RemoteKeys.Left, m.skipForwardButton)
+    SetNavigation(m.nextButton, RemoteKeys.Left, m.playButton) ' fallback
+    SetNavigation(m.nextButton, RemoteKeys.Right, m.qualityButton)
+    SetNavigation(m.nextButton, RemoteKeys.Right, m.ccButton) ' fallback when quality is disabled
+
+    ' Right feature buttons
+    SetNavigation(m.qualityButton, RemoteKeys.Left, m.nextButton)
+    SetNavigation(m.qualityButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
+    SetNavigation(m.qualityButton, RemoteKeys.Right, m.speedButton)
+    SetNavigation(m.qualityButton, RemoteKeys.Right, m.ccButton) ' fallback
+
+    SetNavigation(m.speedButton, RemoteKeys.Left, m.qualityButton)
+    SetNavigation(m.speedButton, RemoteKeys.Right, m.ccButton)
+
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.speedButton)
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.qualityButton) ' fallback
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.nextButton) ' fallback when speed/quality are disabled
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
+    SetNavigation(m.ccButton, RemoteKeys.Right, m.statsButton)
+    SetNavigation(m.ccButton, RemoteKeys.Right, m.bookmarkButton) ' fallback when stats is disabled
+
+    SetNavigation(m.statsButton, RemoteKeys.Left, m.ccButton)
+    SetNavigation(m.statsButton, RemoteKeys.Left, m.speedButton) ' fallback
+    SetNavigation(m.statsButton, RemoteKeys.Left, m.qualityButton) ' fallback
+    SetNavigation(m.statsButton, RemoteKeys.Right, m.bookmarkButton)
+    SetNavigation(m.statsButton, RemoteKeys.Right, m.minimizeButton) ' fallback
+
+    SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.statsButton)
+    SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.ccButton) ' fallback
+    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.commentsButton)
+    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.minimizeButton) ' fallback
+
+    SetNavigation(m.commentsButton, RemoteKeys.Left, m.bookmarkButton)
+    SetNavigation(m.commentsButton, RemoteKeys.Right, m.minimizeButton)
+
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.commentsButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.bookmarkButton) ' fallback
 end function
 
-function StartVideoContentDevJob(videoContentNode as object)
+@component("VideoPlayer")
+function PlayWithContent(content as object) as void
+    m.top.content = content
+
+    player = m.top.previousPlayer
+    if player <> invalid
+        player.close = true
+    end if
+    m.top.previousPlayer = invalid
+
     if m.videoContentDevJob <> invalid
         m.videoContentDevJob.cancel = true
     end if
 
-    m.top.content = videoContentNode
-
-    m.loadingLabel.text = Tr(Locale.VideoPlayer.Loading)
-    m.loadingPercentLabel.text = ""
-    m.loadingUi.visible = true
-    m.loadingSpinner.control = "start"
-
     input = {
         titleLabel: m.titleLabel
         secondaryTitleLabel: m.secondaryTitleLabel
-        content: videoContentNode
+        viewCountLabel: m.viewCountLabel
+        backgroundPoster: m.backgroundPoster
+        content: content
         invidious: m.top.invidious
         preferences: m.top.preferences
-        backgroundPoster: m.backgroundPoster
     }
 
-    m.videoContentDevJob = JobSystem.CreateCallback(OnVideoContentDevJobDone)
-    JobSystem.QueueJob(m.jobQueue, Jobs.VideoContentDevJob, input, m.videoContentDevJob)
+    m.videoContentDevJob = JobSystem.CreateCallback(OnVideoContentDevJobComplete)
+    JobSystem.QueueJob(m.top.jobQueue, "VideoContentDevJob", input, m.videoContentDevJob)
 end function
 
-function OnVideoContentDevJobDone(event as object) as void
+function OnVideoContentDevJobComplete(event as object) as void
     JobSystem.UnobserveCallback(event.getRoSGNode())
     m.videoContentDevJob = invalid
 
     info = event.getInfo()
+
     if info.cancel
         return
     end if
 
     if not info.success
+        LogError("VideoContentDevJob failed:", ErrorUtils.Format(info.error))
         m.top.close = true
         return
     end if
@@ -182,6 +237,17 @@ function OnKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
+    ' Remote skip buttons (rewind/fast forward)
+    if key = RemoteKeys.Rewind
+        OnSkipBackButtonSelected()
+        return true
+    end if
+
+    if key = RemoteKeys.FastForward
+        OnSkipForwardButtonSelected()
+        return true
+    end if
+
     return false
 end function
 
@@ -193,6 +259,27 @@ function OnHasNextChange()
     m.nextButton.disabled = not m.videoQueue.hasNext
 end function
 
+' Skip button handlers (10 second skip)
+function OnSkipBackButtonSelected()
+    currentPosition = m.top.position
+    newPosition = currentPosition - SKIP_SECONDS
+    if newPosition < 0
+        newPosition = 0
+    end if
+    m.top.seek = newPosition
+end function
+
+function OnSkipForwardButtonSelected()
+    currentPosition = m.top.position
+    duration = m.top.duration
+    newPosition = currentPosition + SKIP_SECONDS
+    if duration > 0 and newPosition > duration
+        newPosition = duration
+    end if
+    m.top.seek = newPosition
+end function
+
+' Playback button handlers
 function OnPlayButtonSelected()
     state = m.top.state
     if state = "playing"
@@ -208,6 +295,69 @@ end function
 
 function OnNextButtonSelected()
     m.videoQueue.next = true
+end function
+
+' Feature button handlers
+function OnCCButtonSelected()
+    m.ccEnabled = not m.ccEnabled
+
+    ' Some Roku firmwares expose global caption control on the Video node.
+    ' Guard it so we don't crash on devices that don't.
+    if m.top.hasField("globalCaptionMode")
+        if m.ccEnabled
+            m.top.globalCaptionMode = "On"
+        else
+            m.top.globalCaptionMode = "Off"
+        end if
+    else
+        LogWarn("globalCaptionMode is not supported; CC toggle is best-effort")
+    end if
+
+    LogInfo("Closed captions toggled:", m.ccEnabled)
+end function
+
+function OnStatsButtonSelected() as void
+    prefs = m.top.preferences
+    if prefs = invalid
+        LogWarn("Cannot toggle stats overlay: preferences node is invalid")
+        return
+    end if
+
+    enabled = prefs["playback.stats_for_nerds"] = true
+    prefs["playback.stats_for_nerds"] = not enabled
+end function
+
+function OnBookmarkButtonSelected() as void
+    content = m.top.content
+    if content = invalid
+        LogWarn("Cannot add bookmark: content is invalid")
+        return
+    end if
+
+    videoId = content.videoId
+    if StringUtils.IsNullOrEmpty(videoId)
+        LogWarn("Cannot add bookmark: videoId is empty")
+        return
+    end if
+
+    bookmarksService = m.top.bookmarksService
+    if bookmarksService = invalid
+        LogWarn("Cannot add bookmark: bookmarksService is invalid")
+        return
+    end if
+
+    ' Check if already bookmarked
+    bookmark = bookmarksService.content.findNode(videoId)
+    if bookmark <> invalid
+        ' Remove bookmark
+        bookmarksService@.RemoveBookmark(videoId)
+        LogInfo("Removed video from bookmarks:", videoId)
+    else
+        ' Add bookmark
+        group = Tr(Locale.Feed.Videos)
+        bookmarksService@.AddVideoBookmark(videoId, group)
+        LogInfo("Added video to bookmarks:", videoId)
+    end if
 end function
 
 function OnMinimizeButtonSelected()
@@ -257,14 +407,484 @@ function OnBufferingStatusChange() as void
     m.loadingPercentLabel.text = `${bufferingStatus.percentage}%`
 end function
 
+function SetupStatsOverlay() as void
+    m.statsOverlay = m.top.findNode("StatsOverlay")
+    m.statsOverlayLabel = m.top.findNode("StatsOverlayLabel")
+    m.statsOverlayTimer = m.top.findNode("StatsOverlayTimer")
+
+    if m.statsOverlayTimer <> invalid
+        DisposableObserveField(m.statsOverlayTimer, "fire", FuncName(OnStatsOverlayTimer))
+    end if
+
+    DisposableObserveField(m.top, "streamingSegment", FuncName(OnStreamingSegmentChangeStats))
+    DisposableObserveField(m.top, "audioFormat", FuncName(UpdateStatsOverlay))
+    DisposableObserveField(m.top, "videoFormat", FuncName(UpdateStatsOverlay))
+    DisposableObserveField(m.top, "state", FuncName(UpdateStatsOverlay))
+    DisposableObserveField(m.top, "content", FuncName(UpdateStatsOverlay))
+
+    if m.container <> invalid
+        DisposableObserveFieldScoped(m.container, "fullscreen", FuncName(UpdateStatsOverlayVisibility))
+    end if
+
+    if m.top.preferences <> invalid
+        DisposableObserveFieldScoped(m.top.preferences, "playback.stats_for_nerds", FuncName(OnStatsPreferenceChange))
+    end if
+
+    OnStatsPreferenceChange()
+end function
+
+function OnStatsPreferenceChange() as void
+    enabled = false
+    if m.top.preferences <> invalid
+        enabled = m.top.preferences["playback.stats_for_nerds"] = true
+    end if
+
+    m.statsOverlayEnabled = enabled
+
+    if m.statsButton <> invalid
+        m.statsButton.toggleState = enabled
+    end if
+
+    UpdateStatsOverlayVisibility()
+end function
+
+function UpdateStatsOverlayVisibility() as void
+    if m.statsOverlay = invalid
+        return
+    end if
+
+    visible = m.statsOverlayEnabled
+    if m.container <> invalid and not m.container.fullscreen
+        visible = false
+    end if
+
+    m.statsOverlay.visible = visible
+    if m.statsOverlayTimer <> invalid
+        m.statsOverlayTimer.control = visible ? "start" : "stop"
+    end if
+
+    if visible
+        UpdateStatsOverlay()
+    end if
+end function
+
+function OnStatsOverlayTimer() as void
+    UpdateStatsOverlay()
+end function
+
+function OnStreamingSegmentChangeStats() as void
+    segment = m.top.streamingSegment
+    if not IsAssociativeArray(segment)
+        return
+    end if
+
+    m.statsBitrate = invalid
+
+    width = segment.width
+    height = segment.height
+    if width > 0 and height > 0
+        m.statsResolution = `${width}x${height}`
+    end if
+
+    if segment.DoesExist("fps")
+        m.statsFps = ToString(segment.fps)
+    else if segment.DoesExist("frameRate")
+        m.statsFps = ToString(segment.frameRate)
+    end if
+
+    bitrate = ExtractSegmentBitrate(segment)
+    if bitrate <> invalid
+        m.statsBitrate = bitrate
+    else
+        inferred = InferBitrateFromMetadata()
+        if inferred <> invalid
+            m.statsBitrate = inferred
+        end if
+    end if
+
+    UpdateStatsOverlay()
+end function
+
+function UpdateStatsOverlay() as void
+    if m.statsOverlay = invalid or not m.statsOverlay.visible or m.statsOverlayLabel = invalid
+        return
+    end if
+
+    lines = []
+
+    state = ValidString(m.top.state)
+    if not StringUtils.IsNullOrEmpty(state)
+        lines.Push(`State: ${state}`)
+    end if
+
+    url = ""
+    if m.top.content <> invalid
+        url = ValidString(m.top.content.url)
+    end if
+
+    query = ParseUrlQuery(url)
+    containerParam = ExtractQueryValue(query, "container")
+    if not StringUtils.IsNullOrEmpty(containerParam)
+        container = containerParam
+    else
+        container = InferContainerFromUrl(url)
+    end if
+    if not StringUtils.IsNullOrEmpty(container)
+        lines.Push(`Container: ${container}`)
+    end if
+
+    quality = ExtractQueryValue(query, "quality")
+    if not StringUtils.IsNullOrEmpty(quality)
+        if quality.InStr(",") <> -1
+            quality = quality.Split(",")[0].Trim()
+        end if
+        lines.Push(`Quality: ${quality}`)
+        if StringUtils.IsNullOrEmpty(m.statsResolution)
+            m.statsResolution = quality
+        end if
+    end if
+
+    videoFormat = ValidString(m.top.videoFormat)
+    if not StringUtils.IsNullOrEmpty(videoFormat)
+        lines.Push(`Video format: ${videoFormat}`)
+        parsedVideo = ParseMimeType(videoFormat)
+        if not StringUtils.IsNullOrEmpty(parsedVideo.codec)
+            lines.Push(`Video codec: ${parsedVideo.codec}`)
+        end if
+    end if
+
+    audioFormat = ValidString(m.top.audioFormat)
+    if not StringUtils.IsNullOrEmpty(audioFormat)
+        lines.Push(`Audio format: ${audioFormat}`)
+        parsedAudio = ParseMimeType(audioFormat)
+        if not StringUtils.IsNullOrEmpty(parsedAudio.codec)
+            lines.Push(`Audio codec: ${parsedAudio.codec}`)
+        end if
+    end if
+
+    resolution = m.statsResolution
+    if not StringUtils.IsNullOrEmpty(resolution)
+        resLine = `Resolution: ${resolution}`
+        if not StringUtils.IsNullOrEmpty(m.statsFps)
+            resLine = resLine + ` @${m.statsFps}fps`
+        end if
+        lines.Push(resLine)
+    end if
+
+    if m.statsBitrate = invalid
+        inferred = InferBitrateFromMetadata()
+        if inferred <> invalid
+            m.statsBitrate = inferred
+        end if
+    end if
+
+    bitrate = FormatBitrate(m.statsBitrate)
+    if not StringUtils.IsNullOrEmpty(bitrate)
+        lines.Push(`Bitrate: ${bitrate}`)
+    end if
+
+    positionText = FormatTime(m.top.position)
+    durationText = FormatTime(m.top.duration)
+    if not StringUtils.IsNullOrEmpty(positionText) or not StringUtils.IsNullOrEmpty(durationText)
+        lines.Push(`Position: ${positionText} / ${durationText}`)
+    end if
+
+    if not StringUtils.IsNullOrEmpty(url)
+        lines.Push(`Source: ${TruncateString(url, 140)}`)
+    end if
+
+    if lines.Count() = 0
+        lines.Push("Stats unavailable")
+    end if
+
+    m.statsOverlayLabel.text = lines.Join(`\n`)
+end function
+
+function InferContainerFromUrl(url as string) as string
+    if StringUtils.IsNullOrEmpty(url)
+        return ""
+    end if
+
+    lower = LCase(url)
+    if lower.InStr(".mpd") <> -1 or lower.InStr("/dash") <> -1 or lower.InStr("/mux") <> -1
+        return "dash"
+    end if
+    if lower.InStr(".m3u8") <> -1
+        return "hls"
+    end if
+    if lower.InStr(".webm") <> -1
+        return "webm"
+    end if
+    if lower.InStr(".mkv") <> -1
+        return "mkv"
+    end if
+    if lower.InStr(".mp4") <> -1
+        return "mp4"
+    end if
+
+    return ""
+end function
+
+function ParseUrlQuery(url as string) as object
+    if StringUtils.IsNullOrEmpty(url)
+        return {}
+    end if
+    if url.InStr("?") = -1
+        return {}
+    end if
+    return UrlUtils.ParseQueryComponents(url)
+end function
+
+function ExtractQueryValue(query as object, key as string) as string
+    if query = invalid or StringUtils.IsNullOrEmpty(key)
+        return ""
+    end if
+    if not query.DoesExist(key)
+        return ""
+    end if
+
+    value = query[key]
+    if IsArray(value)
+        if value.Count() = 0
+            return ""
+        end if
+        value = value[0]
+    end if
+
+    return ValidString(value)
+end function
+
+function ParseMimeType(mimeType as string) as object
+    result = { container: "", codec: "" }
+    if StringUtils.IsNullOrEmpty(mimeType)
+        return result
+    end if
+
+    parts = mimeType.Split(";")
+    typePart = parts[0].Trim()
+    slashIndex = typePart.InStr("/")
+    if slashIndex <> -1
+        result.container = typePart.Mid(slashIndex + 1)
+    end if
+
+    for each part in parts
+        trimmed = part.Trim()
+        if trimmed.StartsWith("codecs=")
+            codecList = trimmed.Mid(7)
+            codecList = codecList.Replace(chr(34), "")
+            codecList = codecList.Replace("'", "")
+            result.codec = codecList
+            exit for
+        end if
+    end for
+
+    return result
+end function
+
+function FormatBitrate(value as dynamic) as string
+    bitrate = ParseNumeric(value)
+    if bitrate = invalid or bitrate <= 0
+        return ""
+    end if
+
+    kbps = bitrate \ 1000
+    if kbps <= 0
+        return `${bitrate} bps`
+    end if
+    return `${kbps} kbps`
+end function
+
+function FormatTime(value as dynamic) as string
+    seconds = NormalizeSeconds(value)
+    if seconds < 0
+        return ""
+    end if
+
+    hours = seconds \ 3600
+    minutes = (seconds mod 3600) \ 60
+    secs = seconds mod 60
+
+    if hours > 0
+        return `${hours}:${Pad2(minutes)}:${Pad2(secs)}`
+    end if
+    return `${minutes}:${Pad2(secs)}`
+end function
+
+function Pad2(value as integer) as string
+    if value < 10
+        return "0" + value.ToStr()
+    end if
+    return value.ToStr()
+end function
+
+function TruncateString(value as string, maxLen as integer) as string
+    if value.Len() <= maxLen
+        return value
+    end if
+    return value.Left(maxLen) + "..."
+end function
+
+function NormalizeSeconds(value as dynamic) as integer
+    if IsInt(value)
+        return value
+    end if
+    if IsFloat(value)
+        return CInt(value)
+    end if
+    if IsDouble(value)
+        return CInt(value)
+    end if
+    if IsString(value)
+        return CInt(Val(value))
+    end if
+    return -1
+end function
+
+function ParseNumeric(value as dynamic) as dynamic
+    if IsInt(value)
+        return value
+    end if
+    if IsFloat(value)
+        return CInt(value)
+    end if
+    if IsDouble(value)
+        return CInt(value)
+    end if
+    if IsString(value)
+        parsed = Val(value)
+        if parsed > 0
+            return CInt(parsed)
+        end if
+    end if
+    return invalid
+end function
+
+function ExtractSegmentBitrate(segment as object) as dynamic
+    if segment = invalid
+        return invalid
+    end if
+
+    keys = ["bitrate", "bandwidth", "bitsPerSecond", "bps"]
+    for each key in keys
+        if segment.DoesExist(key)
+            value = ParseNumeric(segment[key])
+            if value <> invalid
+                return value
+            end if
+        end if
+    end for
+
+    return invalid
+end function
+
+function InferBitrateFromMetadata() as dynamic
+    content = m.top.content
+    if content = invalid
+        return invalid
+    end if
+
+    metadata = content.metadata
+    if not IsAssociativeArray(metadata)
+        return invalid
+    end if
+
+    targetHeight = ParseResolutionHeight(m.statsResolution)
+    if targetHeight <= 0
+        return invalid
+    end if
+
+    bestBitrate = 0
+    formats = ValidArray(metadata.adaptiveFormats)
+    if formats.Count() = 0
+        formats = ValidArray(metadata.formatStreams)
+    end if
+
+    for each fmt in formats
+        mimeType = ValidString(fmt["type"])
+        if StringUtils.IsNullOrEmpty(mimeType) or not mimeType.StartsWith("video/")
+            continue for
+        end if
+
+        height = ParseFormatHeight(fmt)
+        if height <> targetHeight
+            continue for
+        end if
+
+        bitrate = ParseNumeric(fmt["bitrate"])
+        if bitrate <> invalid and bitrate > bestBitrate
+            bestBitrate = bitrate
+        end if
+    end for
+
+    if bestBitrate > 0
+        return bestBitrate
+    end if
+
+    return invalid
+end function
+
+function ParseFormatHeight(fmt as object) as integer
+    if fmt = invalid
+        return 0
+    end if
+
+    heightValue = fmt["height"]
+    if IsInt(heightValue)
+        return heightValue
+    end if
+    if IsFloat(heightValue) or IsDouble(heightValue)
+        return CInt(heightValue)
+    end if
+
+    size = ValidString(fmt["size"])
+    if not StringUtils.IsNullOrEmpty(size)
+        heightFromSize = ParseResolutionHeight(size)
+        if heightFromSize > 0
+            return heightFromSize
+        end if
+    end if
+
+    resolution = ValidString(fmt["resolution"])
+    if not StringUtils.IsNullOrEmpty(resolution)
+        return ParseResolutionHeight(resolution)
+    end if
+
+    return 0
+end function
+
+function ParseResolutionHeight(value as string) as integer
+    if StringUtils.IsNullOrEmpty(value)
+        return 0
+    end if
+
+    lower = LCase(value)
+    if lower.InStr("x") <> -1
+        parts = lower.Split("x")
+        if parts.Count() >= 2
+            return CInt(Val(parts[1]))
+        end if
+    end if
+
+    if lower.InStr("p") <> -1
+        return CInt(Val(lower.Replace("p", "")))
+    end if
+
+    return CInt(Val(lower))
+end function
+
 function OnProgress() as void
     duration = m.top.duration
+    position = m.top.position
+
+    m.trickPlayBar.position = position
+    m.trickPlayBar.duration = duration
+
     if duration = 0
         m.trickPlayBar.progress = 0
         return
     end if
 
-    m.trickPlayBar.progress = m.top.position / duration
+    m.trickPlayBar.progress = position / duration
 end function
 
 function OnDispose()
