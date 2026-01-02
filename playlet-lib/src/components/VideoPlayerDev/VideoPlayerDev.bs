@@ -45,7 +45,8 @@ function OnNodeReady()
     DisposableObserveFieldScoped(m.skipForwardButton, "buttonSelected", FuncName(OnSkipForwardButtonSelected))
     DisposableObserveFieldScoped(m.nextButton, "buttonSelected", FuncName(OnNextButtonSelected))
 
-    ' Right feature buttons (quality button disabled - see TODO.md)
+    ' Right feature buttons
+    DisposableObserveFieldScoped(m.qualityButton, "buttonSelected", FuncName(OnQualityButtonSelected))
     DisposableObserveFieldScoped(m.ccButton, "buttonSelected", FuncName(OnCCButtonSelected))
     DisposableObserveFieldScoped(m.statsButton, "buttonSelected", FuncName(OnStatsButtonSelected))
     DisposableObserveFieldScoped(m.bookmarkButton, "buttonSelected", FuncName(OnBookmarkButtonSelected))
@@ -58,9 +59,7 @@ function OnNodeReady()
 
     SetupNavigation()
     SetupStatsOverlay()
-
-    ' Disable quality button until focus restoration issue is fixed (see TODO.md)
-    m.qualityButton.disabled = true
+    SetupQualityButton()
 
     if m.top.hasFocus() and m.videoUi.visible and m.videoUi.opacity = 1
         NodeSetFocus(m.playButton, true)
@@ -70,7 +69,7 @@ end function
 function SetupNavigation()
     ' Linear navigation through all buttons (left to right):
     ' PreviousButton <-> SkipBackButton <-> PlayButton <-> SkipForwardButton <-> NextButton <->
-    ' QualityButton <-> SpeedButton <-> CCButton <-> StatsButton <-> BookmarkButton <-> CommentsButton <-> MinimizeButton
+    ' QualityButton <-> CCButton <-> StatsButton <-> BookmarkButton <-> MinimizeButton
     '
     ' Fallback routes are added so disabled buttons can be skipped
 
@@ -98,35 +97,69 @@ function SetupNavigation()
     ' Right feature buttons
     SetNavigation(m.qualityButton, RemoteKeys.Left, m.nextButton)
     SetNavigation(m.qualityButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
-    SetNavigation(m.qualityButton, RemoteKeys.Right, m.speedButton)
-    SetNavigation(m.qualityButton, RemoteKeys.Right, m.ccButton) ' fallback
+    SetNavigation(m.qualityButton, RemoteKeys.Right, m.ccButton)
 
-    SetNavigation(m.speedButton, RemoteKeys.Left, m.qualityButton)
-    SetNavigation(m.speedButton, RemoteKeys.Right, m.ccButton)
-
-    SetNavigation(m.ccButton, RemoteKeys.Left, m.speedButton)
-    SetNavigation(m.ccButton, RemoteKeys.Left, m.qualityButton) ' fallback
-    SetNavigation(m.ccButton, RemoteKeys.Left, m.nextButton) ' fallback when speed/quality are disabled
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.qualityButton)
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.nextButton) ' fallback when quality is disabled
     SetNavigation(m.ccButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
     SetNavigation(m.ccButton, RemoteKeys.Right, m.statsButton)
     SetNavigation(m.ccButton, RemoteKeys.Right, m.bookmarkButton) ' fallback when stats is disabled
 
     SetNavigation(m.statsButton, RemoteKeys.Left, m.ccButton)
-    SetNavigation(m.statsButton, RemoteKeys.Left, m.speedButton) ' fallback
     SetNavigation(m.statsButton, RemoteKeys.Left, m.qualityButton) ' fallback
     SetNavigation(m.statsButton, RemoteKeys.Right, m.bookmarkButton)
     SetNavigation(m.statsButton, RemoteKeys.Right, m.minimizeButton) ' fallback
 
     SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.statsButton)
     SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.ccButton) ' fallback
-    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.commentsButton)
-    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.minimizeButton) ' fallback
+    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.minimizeButton)
 
-    SetNavigation(m.commentsButton, RemoteKeys.Left, m.bookmarkButton)
-    SetNavigation(m.commentsButton, RemoteKeys.Right, m.minimizeButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.bookmarkButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.statsButton) ' fallback
+end function
 
-    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.commentsButton)
-    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.bookmarkButton) ' fallback
+function SetupQualityButton() as void
+    if m.qualityButton = invalid
+        return
+    end if
+
+    m.qualityButton.disabled = m.top.preferences = invalid
+
+    if m.top.preferences <> invalid
+        DisposableObserveFieldScoped(m.top.preferences, "playback.preferred_quality", FuncName(OnPreferredQualityChange))
+    end if
+
+    OnPreferredQualityChange()
+end function
+
+function OnPreferredQualityChange() as void
+    if m.qualityButton = invalid
+        return
+    end if
+
+    value = ""
+    if m.top.preferences <> invalid
+        value = ValidString(m.top.preferences["playback.preferred_quality"])
+    end if
+
+    m.qualityButton.text = FormatQualityButtonLabel(value)
+end function
+
+function FormatQualityButtonLabel(value as string) as string
+    if StringUtils.IsNullOrEmpty(value) or value = "auto"
+        return Tr(Locale.Settings.AutoQuality)
+    end if
+
+    if value.InStr(",") <> -1
+        value = value.Split(",")[0].Trim()
+    end if
+
+    ' Remove the "p" suffix for compact display (e.g., "1080p" -> "1080")
+    if value.EndsWith("p")
+        value = value.Left(value.Len() - 1)
+    end if
+
+    return value
 end function
 
 @component("VideoPlayer")
@@ -261,6 +294,7 @@ end function
 
 ' Skip button handlers (10 second skip)
 function OnSkipBackButtonSelected()
+    StartHideVideoUiTimer()
     currentPosition = m.top.position
     newPosition = currentPosition - SKIP_SECONDS
     if newPosition < 0
@@ -270,6 +304,7 @@ function OnSkipBackButtonSelected()
 end function
 
 function OnSkipForwardButtonSelected()
+    StartHideVideoUiTimer()
     currentPosition = m.top.position
     duration = m.top.duration
     newPosition = currentPosition + SKIP_SECONDS
@@ -281,6 +316,7 @@ end function
 
 ' Playback button handlers
 function OnPlayButtonSelected()
+    StartHideVideoUiTimer()
     state = m.top.state
     if state = "playing"
         m.top.control = "pause"
@@ -290,15 +326,54 @@ function OnPlayButtonSelected()
 end function
 
 function OnPreviousButtonSelected()
+    StartHideVideoUiTimer()
     m.videoQueue.previous = true
 end function
 
 function OnNextButtonSelected()
+    StartHideVideoUiTimer()
     m.videoQueue.next = true
 end function
 
 ' Feature button handlers
+function OnQualityButtonSelected() as void
+    StartHideVideoUiTimer()
+    if m.top.preferences = invalid
+        LogWarn("Cannot change quality: preferences node is invalid")
+        return
+    end if
+
+    ' Cycle through quality options: auto -> 1080p -> 720p -> 480p -> 360p -> 240p -> 144p -> auto
+    qualityOptions = ["auto", "1080p", "720p", "480p", "360p", "240p", "144p"]
+
+    currentValue = ValidString(m.top.preferences["playback.preferred_quality"])
+    if StringUtils.IsNullOrEmpty(currentValue)
+        currentValue = "auto"
+    end if
+
+    ' If current value contains multiple qualities (e.g. "1080p,720p"), use the first one
+    if currentValue.InStr(",") <> -1
+        currentValue = currentValue.Split(",")[0].Trim()
+    end if
+
+    ' Find current index and move to next
+    currentIndex = 0
+    for i = 0 to qualityOptions.Count() - 1
+        if LCase(qualityOptions[i]) = LCase(currentValue)
+            currentIndex = i
+            exit for
+        end if
+    end for
+
+    nextIndex = (currentIndex + 1) mod qualityOptions.Count()
+    newValue = qualityOptions[nextIndex]
+
+    m.top.preferences["playback.preferred_quality"] = newValue
+    LogInfo("Quality changed to:", newValue)
+end function
+
 function OnCCButtonSelected()
+    StartHideVideoUiTimer()
     m.ccEnabled = not m.ccEnabled
     m.ccButton.active = m.ccEnabled
 
@@ -318,6 +393,7 @@ function OnCCButtonSelected()
 end function
 
 function OnStatsButtonSelected() as void
+    StartHideVideoUiTimer()
     prefs = m.top.preferences
     if prefs = invalid
         LogWarn("Cannot toggle stats overlay: preferences node is invalid")
@@ -330,6 +406,7 @@ function OnStatsButtonSelected() as void
 end function
 
 function OnBookmarkButtonSelected() as void
+    StartHideVideoUiTimer()
     content = m.top.content
     if content = invalid
         LogWarn("Cannot add bookmark: content is invalid")
@@ -363,6 +440,7 @@ function OnBookmarkButtonSelected() as void
 end function
 
 function OnMinimizeButtonSelected()
+    StartHideVideoUiTimer()
     VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
 end function
 

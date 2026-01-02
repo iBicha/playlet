@@ -21,6 +21,7 @@ function InitializePlayerUi()
     DisposableObserveField(m.hideVideoUiTimer, "fire", FuncName(OnHideVideoUiTimer))
 
     DisposableObserveField(m.top, "playerUiState", FuncName(OnPlayerUiState))
+    DisposableObserveField(m.top, "focusedChild", FuncName(OnPlayerFocusChange))
 
     m.top.playerUiState = PlayerUiState.Visible
 end function
@@ -42,11 +43,9 @@ function FindUiNodes()
 
     ' Right feature buttons
     m.qualityButton = m.top.findNode("QualityButton")
-    m.speedButton = m.top.findNode("SpeedButton")
     m.ccButton = m.top.findNode("CCButton")
     m.statsButton = m.top.findNode("StatsButton")
     m.bookmarkButton = m.top.findNode("BookmarkButton")
-    m.commentsButton = m.top.findNode("CommentsButton")
     m.minimizeButton = m.top.findNode("MinimizeButton")
 
     m.trickPlayBar = m.top.findNode("TrickPlayBar")
@@ -129,6 +128,21 @@ function OnPlayerUiHidden()
     if m.top.isInFocusChain() and not m.top.hasFocus()
         NodeSetFocus(m.top, false)
         NodeSetFocus(m.top, true)
+    end if
+end function
+
+function OnPlayerFocusChange() as void
+    ' When the player itself gains focus (not a child button), focus the play button
+    ' This handles the case when returning to the player from another screen
+    if not m.top.hasFocus()
+        return
+    end if
+
+    state = m.top.playerUiState
+    if state = PlayerUiState.Visible or state = PlayerUiState.FadingIn
+        if m.playButton <> invalid
+            NodeSetFocus(m.playButton, true)
+        end if
     end if
 end function
 
