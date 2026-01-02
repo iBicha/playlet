@@ -3,15 +3,25 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
+import "pkg:/components/VideoPlayer/PictureInPicture.bs"
+import "pkg:/components/VideoPlayer/PlayerUi.bs"
 import "pkg:/components/VideoPlayer/SponsorBlock.bs"
-import "pkg:/components/VideoPlayer/VideoPlayerStyle.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
+import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 enum DownloadErrors
     Unknown = 900
@@ -25,53 +35,34 @@ enum DownloadErrors
     BadMedia = 970
 end enum
 
+const SKIP_SECONDS = 10
+
 function Init()
-    SetPlayerStyle()
-    SetupAnimation()
-    m.fullScreenHint = m.top.findNode("fullScreenHint")
-    m.fullScreenHintLabel = m.top.findNode("fullScreenHintLabel")
-    m.fullScreenHintTimer = m.top.findNode("fullScreenHintTimer")
-    m.fullScreenHintTimer.ObserveField("fire", FuncName(OnFullScreenHintTimer))
-    m.trickplayUITimer = m.top.findNode("trickplayUITimer")
-    m.trickplayUITimer.ObserveField("fire", FuncName(OnTrickplayUITimer))
-    m.top.notificationInterval = 1
+    InitializePlayerUi()
 
-    ' videoPlayingSuccess indicates if we started playing a video successfully
-    ' We use it to detect if we should try another link for a video, or if another error
-    ' occurred (such as a network error)
+    httpAgent = m.top.getHttpAgent()
+    httpAgent.AddHeader("User-Agent", VIDEO_PLAYER_USER_AGENT)
+
+    m.ccEnabled = false
     m.videoPlayingSuccess = false
-    ' ignoreNextFinishedState indicates if we should ignore the next finished state
-    ' This is used to prevent the video from playing the next video when we are
-    ' still trying to find a working stream url.
-    ' This is also used to prevent playing the next video when we're still displaying
-    ' an error dialog.
     m.ignoreNextFinishedState = false
-
-    ' Indicates that we're currently paused and seeking position
     m.isSeekingPosition = false
-
-    ' Checks if current RokuOS version has showUI field in Video node
-    m.showUIEnabled = m.top.hasField("showUI")
-    LogDebug(`Custom OK handler is ${m.showUIEnabled ? "enabled" : "disabled"}`)
 
     m.statsOverlayEnabled = false
     m.statsResolution = ""
     m.statsBitrate = invalid
     m.statsFps = ""
 
+    ' Skip seek debouncing - accumulate rapid button presses
+    m.pendingSkipSeconds = 0
+    m.skipSeekTimer = m.top.findNode("SkipSeekTimer")
+
+    m.top.notificationInterval = 1
+
     ' asyncStopSemantics available since Roku OS 12.5
-    ' It is set to true because stopping synchronously causes timeout and crash
-    ' Usually we would need to wait for the video state to move to "stopping" then to "stopped"
-    ' before considering the video node closed, and creating a new one.
-    ' However, since we have a job to load video details, there should be enough time for the
-    ' video node to close before we create a new one.
     if m.top.hasField("asyncStopSemantics")
         m.top.asyncStopSemantics = true
     end if
-
-    httpAgent = m.top.getHttpAgent()
-    ' TODO:P2 user agent should not be hardcoded, it should be part of video metadata
-    httpAgent.AddHeader("User-Agent", VIDEO_PLAYER_USER_AGENT)
 
     #if DEBUG_LOG_VIDEO_QUALITY
         m.top.addFields({
@@ -81,11 +72,8 @@ function Init()
         })
 
         m.top.observeField("streamingSegment", FuncName(OnStreamingSegmentChangeDebug))
-
         m.top.observeField("audioFormat", FuncName(OnFormatChangeDebug))
         m.top.observeField("videoFormat", FuncName(OnFormatChangeDebug))
-        m.top.observeField("_resolution", FuncName(OnFormatChangeDebug))
-
         m.top.observeField("_audioFormat", FuncName(OnQualityChangeDebug))
         m.top.observeField("_videoFormat", FuncName(OnQualityChangeDebug))
     #end if
@@ -116,27 +104,135 @@ end function
 #end if
 
 function OnNodeReady()
-    minRect = m.top.minRect
-    rect = m.container.fullscreen ? m.top.maxRect : minRect
+    InitializePictureInPicture()
 
-    m.top.width = rect.width
-    m.top.height = rect.height
-    m.top.translation = [rect.x, rect.y]
+    DisposableObserveFieldScoped(m.videoQueue, "hasPrevious", FuncName(OnHasPreviousChange))
+    DisposableObserveFieldScoped(m.videoQueue, "hasNext", FuncName(OnHasNextChange))
+    OnHasPreviousChange()
+    OnHasNextChange()
 
-    m.fullScreenHint.width = minRect.width
-    m.fullScreenHintLabel.width = minRect.width
-    m.fullScreenHint.translation = [0, minRect.height - m.fullScreenHint.height]
+    ' Center playback buttons
+    DisposableObserveFieldScoped(m.previousButton, "buttonSelected", FuncName(OnPreviousButtonSelected))
+    DisposableObserveFieldScoped(m.skipBackButton, "buttonSelected", FuncName(OnSkipBackButtonSelected))
+    DisposableObserveFieldScoped(m.playButton, "buttonSelected", FuncName(OnPlayButtonSelected))
+    DisposableObserveFieldScoped(m.skipForwardButton, "buttonSelected", FuncName(OnSkipForwardButtonSelected))
+    DisposableObserveFieldScoped(m.nextButton, "buttonSelected", FuncName(OnNextButtonSelected))
 
-    ' TODO:P2 show a loading spinner if video is loading minimized
-    ' Probably only worth doing after the video player is redone
-    m.top.enableUI = m.container.fullscreen
-    m.top.showFullScreenHint = not m.container.fullscreen
+    ' Right feature buttons
+    DisposableObserveFieldScoped(m.qualityButton, "buttonSelected", FuncName(OnQualityButtonSelected))
+    DisposableObserveFieldScoped(m.ccButton, "buttonSelected", FuncName(OnCCButtonSelected))
+    DisposableObserveFieldScoped(m.statsButton, "buttonSelected", FuncName(OnStatsButtonSelected))
+    DisposableObserveFieldScoped(m.bookmarkButton, "buttonSelected", FuncName(OnBookmarkButtonSelected))
+    DisposableObserveFieldScoped(m.minimizeButton, "buttonSelected", FuncName(OnMinimizeButtonSelected))
 
-    m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
-    m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
+    DisposableObserveField(m.top, "state", FuncName(OnVideoPlayerStateChange))
+    DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
 
+    DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
+    DisposableObserveField(m.skipSeekTimer, "fire", FuncName(OnSkipSeekTimer))
+
+    SetupNavigation()
     SetupStatsOverlay()
+    SetupQualityButton()
     SponsorBlock.SetupSponsorBlock()
+
+    if m.top.hasFocus() and m.videoUi.visible and m.videoUi.opacity = 1
+        NodeSetFocus(m.playButton, true)
+    end if
+end function
+
+function SetupNavigation()
+    ' Linear navigation through all buttons (left to right):
+    ' PreviousButton <-> SkipBackButton <-> PlayButton <-> SkipForwardButton <-> NextButton <->
+    ' QualityButton <-> CCButton <-> StatsButton <-> BookmarkButton <-> MinimizeButton
+
+    ' Center playback buttons
+    SetNavigation(m.previousButton, RemoteKeys.Right, m.skipBackButton)
+    SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton) ' fallback
+
+    SetNavigation(m.skipBackButton, RemoteKeys.Left, m.previousButton)
+    SetNavigation(m.skipBackButton, RemoteKeys.Right, m.playButton)
+
+    SetNavigation(m.playButton, RemoteKeys.Left, m.skipBackButton)
+    SetNavigation(m.playButton, RemoteKeys.Left, m.previousButton) ' fallback
+    SetNavigation(m.playButton, RemoteKeys.Right, m.skipForwardButton)
+
+    SetNavigation(m.skipForwardButton, RemoteKeys.Left, m.playButton)
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.nextButton)
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.qualityButton) ' fallback
+    SetNavigation(m.skipForwardButton, RemoteKeys.Right, m.ccButton) ' fallback
+
+    SetNavigation(m.nextButton, RemoteKeys.Left, m.skipForwardButton)
+    SetNavigation(m.nextButton, RemoteKeys.Left, m.playButton) ' fallback
+    SetNavigation(m.nextButton, RemoteKeys.Right, m.qualityButton)
+    SetNavigation(m.nextButton, RemoteKeys.Right, m.ccButton) ' fallback
+
+    ' Right feature buttons
+    SetNavigation(m.qualityButton, RemoteKeys.Left, m.nextButton)
+    SetNavigation(m.qualityButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
+    SetNavigation(m.qualityButton, RemoteKeys.Right, m.ccButton)
+
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.qualityButton)
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.nextButton) ' fallback
+    SetNavigation(m.ccButton, RemoteKeys.Left, m.skipForwardButton) ' fallback
+    SetNavigation(m.ccButton, RemoteKeys.Right, m.statsButton)
+    SetNavigation(m.ccButton, RemoteKeys.Right, m.bookmarkButton) ' fallback
+
+    SetNavigation(m.statsButton, RemoteKeys.Left, m.ccButton)
+    SetNavigation(m.statsButton, RemoteKeys.Left, m.qualityButton) ' fallback
+    SetNavigation(m.statsButton, RemoteKeys.Right, m.bookmarkButton)
+    SetNavigation(m.statsButton, RemoteKeys.Right, m.minimizeButton) ' fallback
+
+    SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.statsButton)
+    SetNavigation(m.bookmarkButton, RemoteKeys.Left, m.ccButton) ' fallback
+    SetNavigation(m.bookmarkButton, RemoteKeys.Right, m.minimizeButton)
+
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.bookmarkButton)
+    SetNavigation(m.minimizeButton, RemoteKeys.Left, m.statsButton) ' fallback
+end function
+
+function SetupQualityButton() as void
+    if m.qualityButton = invalid
+        return
+    end if
+
+    m.qualityButton.disabled = (m.top.preferences = invalid)
+
+    if m.top.preferences <> invalid
+        DisposableObserveFieldScoped(m.top.preferences, "playback.preferred_quality", FuncName(OnPreferredQualityChange))
+    end if
+
+    OnPreferredQualityChange()
+end function
+
+function OnPreferredQualityChange() as void
+    if m.qualityButton = invalid
+        return
+    end if
+
+    value = ""
+    if m.top.preferences <> invalid
+        value = ValidString(m.top.preferences["playback.preferred_quality"])
+    end if
+
+    m.qualityButton.text = FormatQualityButtonLabel(value)
+end function
+
+function FormatQualityButtonLabel(value as string) as string
+    if StringUtils.IsNullOrEmpty(value) or value = "auto"
+        return Tr(Locale.Settings.AutoQuality)
+    end if
+
+    if value.InStr(",") <> -1
+        value = value.Split(",")[0].Trim()
+    end if
+
+    ' Remove the "p" suffix for compact display (e.g., "1080p" -> "1080")
+    if value.EndsWith("p")
+        value = value.Left(value.Len() - 1)
+    end if
+
+    return value
 end function
 
 function PlayWithContent(contentNode as object)
@@ -169,6 +265,13 @@ function PlayWithContent(contentNode as object)
         videoContentNode.AddFields({ metadata: metadata })
     end if
 
+    ' Update UI labels immediately with available info
+    m.titleLabel.text = videoContentNode.title
+    m.secondaryTitleLabel.text = videoContentNode.secondaryTitle
+    if m.viewCountLabel <> invalid
+        m.viewCountLabel.text = ""
+    end if
+
     StartVideoContentJob(videoContentNode)
     Lounge.SendNowPlayingLoading(contentNode.videoId)
 end function
@@ -179,7 +282,6 @@ function StartVideoContentJob(videoContentNode as object)
     end if
 
     m.top.content = videoContentNode
-
 
     input = {
         content: videoContentNode
@@ -226,6 +328,9 @@ function OnVideoContentJobDone(event as object) as void
         return
     end if
 
+    ' Update UI with metadata
+    UpdateUiFromMetadata(content)
+
     metadata = content.metadata
     SponsorBlock.FetchSponsorBlock(metadata)
 
@@ -235,18 +340,50 @@ function OnVideoContentJobDone(event as object) as void
     MarkVideoWatched(content.videoId, metadata.playbackTrackingUrls)
 end function
 
+function UpdateUiFromMetadata(content as object) as void
+    if content = invalid
+        return
+    end if
+
+    m.titleLabel.text = ValidString(content.title)
+    m.secondaryTitleLabel.text = ValidString(content.secondaryTitle)
+
+    metadata = content.metadata
+    if IsAssociativeArray(metadata)
+        ' Set view count and publish date
+        viewCountText = ""
+        viewCount = InvidiousContent.VideoGetViewCountText(metadata)
+        if not StringUtils.IsNullOrEmpty(viewCount)
+            viewCountText = viewCount
+        end if
+        publishedText = InvidiousContent.VideoGetPublishedText(metadata)
+        if not StringUtils.IsNullOrEmpty(publishedText)
+            if viewCountText.Len() > 0
+                viewCountText = `${viewCountText} • ${publishedText}`
+            else
+                viewCountText = publishedText
+            end if
+        end if
+        if m.viewCountLabel <> invalid
+            m.viewCountLabel.text = viewCountText
+        end if
+
+        ' Set background poster
+        if m.backgroundPoster <> invalid and not StringUtils.IsNullOrEmpty(content.videoId)
+            service = new Invidious.InvidiousService(m.top.invidious)
+            instance = service.GetInstance()
+            m.backgroundPoster.uri = `${instance}/vi/${content.videoId}/maxresdefault.jpg`
+        end if
+    end if
+end function
+
 function SeekToInitialPosition(content as object) as void
     if content = invalid
         return
     end if
 
-    ' For trickplay of live streams, apps should seek to a position of
-    ' 999,999 seconds (for both DASH and HLS streams). The Roku media
-    ' player clips that position to the current availability window and
-    ' provides a robust buffer.
-    ' https://developer.roku.com/en-ca/docs/specs/media/streaming-specifications.md
     if content.Live = true
-        LogInfo("Seeking to enge of live stream")
+        LogInfo("Seeking to edge of live stream")
         m.top.seek = 999999
         return
     end if
@@ -275,12 +412,10 @@ function SeekToPercentOfDuration() as void
 
     duration = m.top.duration
     if duration = 0
-        ' If the duration is not available, wait for it to be set
         m.top.ObserveField("duration", FuncName(SeekToPercentOfDuration))
         return
     end if
 
-    ' If the stream is less than 30 seconds, it's not worth seeking
     if duration < 30
         return
     end if
@@ -326,7 +461,6 @@ function OnPreviousPlayerState(event as object) as void
 
     if previousPlayerState = "stopped" or previousPlayerState = "error" or previousPlayerState = "finished" or previousPlayerState = "none"
         previousPlayer.unobserveFieldScoped("state")
-
         m.top.control = "play"
     end if
 end function
@@ -353,8 +487,8 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic) a
         return
     end if
 
-    invidious = m.top.invidious
-    authToken = invidious.authToken
+    invidiousNode = m.top.invidious
+    authToken = invidiousNode.authToken
     if authToken = invalid
         return
     end if
@@ -367,7 +501,7 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic) a
 
     input = {
         videoId: videoId
-        invidious: invidious
+        invidious: invidiousNode
         authToken: authToken
         profileType: profileType
         playbackTrackingUrls: playbackTrackingUrls
@@ -381,8 +515,6 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic) a
         return
     end if
 
-    ' Progress reported to Innertube. It is the position in seconds,
-    ' with 20 second steps.
     m.watchTimeMarker = -1
     m.top.ObserveFieldScoped("position", FuncName(OnPositionChangeMarkWatchTime))
 end function
@@ -403,7 +535,6 @@ end function
 
 function OnClose()
     m.onCloseCalled = true
-
     m.top.previousPlayer = invalid
 
     if m.markVideoWatchedJob <> invalid
@@ -425,7 +556,6 @@ function OnClose()
     end if
     SponsorBlock.RemoveNotifcation(m.notifications)
 
-    ' Stopping a video is slow and synchronous, and can lead to execution timeout crashes.
     try
         m.top.control = "stop"
     catch error
@@ -439,6 +569,7 @@ function OnClose()
     end try
 
     m.top.content = invalid
+    m.top.dispose = true
 end function
 
 function OnVideoPlayerStateChange() as void
@@ -447,18 +578,47 @@ function OnVideoPlayerStateChange() as void
     state = m.top.state
     content = m.top.content
 
-    ' Reset isSeekingPosition when started to play the video
     if state = "playing"
         m.isSeekingPosition = false
     end if
 
-    ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
-    ' This is to reduce false positives, as we do not want retry another link if the first link is working fine.
     if state = "playing" and not m.videoPlayingSuccess
         LogInfo(`Now playing video ${content.url}`)
         m.videoPlayingSuccess = true
     end if
 
+    ' Update play button state
+    if state = "playing"
+        m.playButton.toggleState = false ' Pause icon
+        m.playButton.disabled = false
+        m.progressTimer.control = "start"
+    else if state = "paused"
+        m.playButton.toggleState = true ' Play icon
+        m.playButton.disabled = false
+    else
+        m.playButton.disabled = true
+    end if
+
+    ' Handle buffering UI
+    if state = "buffering"
+        m.loadingLabel.text = Tr(Locale.VideoPlayer.Buffering)
+        m.loadingSpinner.control = "start"
+        m.loadingUi.visible = true
+        m.backgroundPoster.visible = true
+        m.backgroundPosterSmall.visible = true
+    else
+        m.loadingSpinner.control = "stop"
+        m.loadingUi.visible = false
+        m.backgroundPoster.visible = false
+        m.backgroundPosterSmall.visible = false
+    end if
+
+    if state = "stopping" or state = "stopped"
+        m.videoUi.visible = false
+        return
+    end if
+
+    ' Error handling with retry logic
     errorData = invalid
     if state = "error"
         errorInfo = m.top.errorInfo
@@ -467,7 +627,6 @@ function OnVideoPlayerStateChange() as void
         LogErrorNoTelemetry(errorData.title, errorData.body)
 
         if m.videoPlayingSuccess <> true
-            ' http for stream format, mediaerror for DASH
             if errorInfo.category = "http" or errorInfo.category = "mediaerror"
                 playletStreamUrls = content.playletStreamUrls
                 currentUrlIndex = content.playletStreamUrlIndex
@@ -482,11 +641,8 @@ function OnVideoPlayerStateChange() as void
                     end if
 
                     content.url = nextUrl
-
                     SeekToInitialPosition(content)
 
-                    ' This video errored, and is about to finish, so don't close the video yet
-                    ' That's why we should ignore the next "finished" event
                     m.ignoreNextFinishedState = true
                     m.top.control = "play"
 
@@ -624,82 +780,51 @@ function OnVideoFinished() as void
     end if
 end function
 
+function OnBufferingStatusChange() as void
+    bufferingStatus = m.top.bufferingStatus
+    if bufferingStatus = invalid
+        return
+    end if
+
+    m.loadingPercentLabel.text = `${bufferingStatus.percentage}%`
+end function
+
 function IsLiveVideo() as boolean
     content = m.top.content
     return content <> invalid and content.Live = true
-end function
-
-function ShowUIAndStartTimer()
-    if m.showUIEnabled
-        m.top.showUI = { "show": true, "trickPlaybar": true, "titleAndTime": true, "trickplayBackgroundOverlay": true, "focusTrickplayBar": false }
-        m.trickplayUITimer.control = "start"
-    end if
-end function
-
-function HideUIAndStopTimer()
-    if m.showUIEnabled
-        m.top.showUI = { "show": false, "focusTrickplayBar": false }
-        m.trickplayUITimer.control = "stop"
-    end if
-end function
-
-function HandleOKPress() as boolean
-    if SponsorBlock.ManualSkipSegment()
-        return false
-    end if
-
-    if not m.showUIEnabled
-        return false
-    end if
-
-    handled = false
-    state = m.top.state
-    uiVisible = m.top.trickPlaybar.visible
-    isLive = IsLiveVideo()
-    LogDebug(`Handling OK button: state = ${state}, uiVisible = ${uiVisible} isLive = ${isLive}`)
-    if state = "playing"
-        if not uiVisible
-            ' Video is playing and UI is not visible, show it
-            ShowUIAndStartTimer()
-        else if not isLive
-            ' Trickplay bar is visible and video is currently played, pause it and retain the UI
-            m.trickplayUITimer.control = "stop"
-            m.top.control = "pause"
-            ShowUIAndStartTimer()
-        else
-            HideUIAndStopTimer()
-        end if
-        handled = true
-    else if state = "paused"
-        ' Exit early if we're in seeking mode to avoid messing up internal Video node state
-        if m.isSeekingPosition
-            return false
-        end if
-
-        if not uiVisible
-            ' Video is paused and UI is not visible, show it
-            ShowUIAndStartTimer()
-        else
-            ' Video is currently paused with visible UI, resume it and hide UI
-            HideUIAndStopTimer()
-            m.top.control = "resume"
-        end if
-        handled = true
-    end if
-    return handled
 end function
 
 function OnKeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
     end if
-    ' Unfortunately, a Video node cannot capture the "options" key (because, Roku...)
-    ' https://community.roku.com/t5/Roku-Developer-Program/Bug-in-10-0-1-Options-key-is-not-being-consumed-by-onKeyEvent-when-Video-node-is-in-focus/m-p/709200/highlight/true#M49312
-    ' Because of that, the button "down" is used to shrink the video for picture in picture mode
-    if key = RemoteKeys.Down
-        if VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
-            return true
+
+    state = m.top.state
+    uiState = m.top.playerUiState
+
+    if key = RemoteKeys.Play
+        if state = "paused" and uiState = PlayerUiState.Hidden
+            return false
         end if
+    end if
+
+    if key = RemoteKeys.Play or key = RemoteKeys.PlayOnly
+        if state = "playing" and uiState = PlayerUiState.Hidden
+            m.top.playerUiState = PlayerUiState.FadingIn
+            return false
+        end if
+    end if
+
+    if uiState = PlayerUiState.Visible
+        StartHideVideoUiTimer()
+    end if
+
+    if uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut
+        m.top.playerUiState = PlayerUiState.FadingIn
+    end if
+
+    if NavigationKeyHandler(key, press).handled
+        return true
     end if
 
     if key = RemoteKeys.Back
@@ -707,105 +832,252 @@ function OnKeyEvent(key as string, press as boolean) as boolean
         return true
     end if
 
-    if key = RemoteKeys.Ok
-        return HandleOKPress()
+    ' Remote skip buttons (rewind/fast forward)
+    if key = RemoteKeys.Rewind
+        OnSkipBackButtonSelected()
+        return true
     end if
 
-    if key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
-        ' We're paused and one of the buttons is pressed: left, right ff, rw.
-        ' That means we're seeking position. Check that in HandleOKPress and exit early
+    if key = RemoteKeys.FastForward
+        OnSkipForwardButtonSelected()
+        return true
+    end if
+
+    if key = RemoteKeys.Left or key = RemoteKeys.Right
         m.isSeekingPosition = true
     end if
 
-    ' Always stop UI timer when pressing any button to avoid UI being hidden twice
-    m.trickplayUITimer.control = "stop"
     return false
 end function
 
-function SetupAnimation()
-    m.minimizeAnimation = m.top.findNode("minimizeAnimation")
-    m.widthInterpolator = m.top.findNode("widthInterpolator")
-    m.heightInterpolator = m.top.findNode("heightInterpolator")
-    m.translationInterpolator = m.top.findNode("translationInterpolator")
-
-    minRect = m.top.minRect
-    maxRect = m.top.maxRect
-
-    m.widthInterpolator.keyValue = [maxRect.width, (maxRect.width + minRect.width) / 2, minRect.width]
-    m.heightInterpolator.keyValue = [maxRect.height, (maxRect.height + minRect.height) / 2, minRect.height]
-    maxTranslation = [maxRect.x, maxRect.y]
-    minTranslation = [minRect.x, minRect.y]
-    midTranslation = [(maxRect.x + minRect.x) / 2, (maxRect.y + minRect.y) / 2]
-    m.translationInterpolator.keyValue = [maxTranslation, midTranslation, minTranslation]
-end function
-
-function OnFullScreenChange()
-    HideUIAndStopTimer()
-
-    m.widthInterpolator.reverse = m.container.fullscreen
-    m.heightInterpolator.reverse = m.container.fullscreen
-    m.translationInterpolator.reverse = m.container.fullscreen
-
-    m.minimizeAnimation.control = "start"
-
-    m.top.enableUI = m.container.fullscreen
-    m.top.showFullScreenHint = not m.container.fullscreen
-
-    SponsorBlock.SetVisible(m.notifications, m.container.fullscreen)
-    UpdateStatsOverlayVisibility()
-end function
-
+' Deprecated - kept for compatibility with old preferences
 function OnShowFullScreenHint() as void
-    m.fullScreenHintTimer.control = "stop"
+end function
 
-    if m.container.fullscreen
-        m.fullScreenHint.visible = false
+function OnHasPreviousChange()
+    m.previousButton.disabled = not m.videoQueue.hasPrevious
+end function
+
+function OnHasNextChange()
+    m.nextButton.disabled = not m.videoQueue.hasNext
+end function
+
+' Skip button handlers (10 second skip with debouncing)
+function OnSkipBackButtonSelected()
+    StartHideVideoUiTimer()
+    AccumulateSkip(-SKIP_SECONDS)
+end function
+
+function OnSkipForwardButtonSelected()
+    StartHideVideoUiTimer()
+    AccumulateSkip(SKIP_SECONDS)
+end function
+
+function AccumulateSkip(seconds as integer) as void
+    m.pendingSkipSeconds += seconds
+    UpdatePendingSkipPosition()
+
+    m.skipSeekTimer.control = "stop"
+    m.skipSeekTimer.control = "start"
+end function
+
+function UpdatePendingSkipPosition() as void
+    if m.pendingSkipSeconds = 0
         return
     end if
 
-    if m.top.showFullScreenHint
-        ' Take 1 second until the shrink animation finishes to show the hint
-        m.fullScreenHintTimer.duration = 1
+    currentPosition = m.top.position
+    duration = m.top.duration
+    pendingPosition = currentPosition + m.pendingSkipSeconds
+
+    if pendingPosition < 0
+        pendingPosition = 0
+    end if
+    if duration > 0 and pendingPosition > duration
+        pendingPosition = duration
+    end if
+
+    m.trickPlayBar.position = pendingPosition
+    if duration > 0
+        m.trickPlayBar.progress = pendingPosition / duration
+    end if
+end function
+
+function OnSkipSeekTimer() as void
+    if m.pendingSkipSeconds = 0
+        return
+    end if
+
+    currentPosition = m.top.position
+    duration = m.top.duration
+    newPosition = currentPosition + m.pendingSkipSeconds
+
+    if newPosition < 0
+        newPosition = 0
+    end if
+    if duration > 0 and newPosition > duration
+        newPosition = duration
+    end if
+
+    m.pendingSkipSeconds = 0
+    m.top.seek = newPosition
+end function
+
+function OnPlayButtonSelected()
+    StartHideVideoUiTimer()
+    state = m.top.state
+    if state = "playing"
+        m.top.control = "pause"
+    else if state = "paused"
+        m.top.control = "resume"
+    end if
+end function
+
+function OnPreviousButtonSelected()
+    StartHideVideoUiTimer()
+    m.videoQueue.previous = true
+end function
+
+function OnNextButtonSelected()
+    StartHideVideoUiTimer()
+    m.videoQueue.next = true
+end function
+
+function OnQualityButtonSelected() as void
+    StartHideVideoUiTimer()
+    if m.top.preferences = invalid
+        LogWarn("Cannot change quality: preferences node is invalid")
+        return
+    end if
+
+    qualityOptions = ["auto", "1080p", "720p", "480p", "360p", "240p", "144p"]
+
+    currentValue = ValidString(m.top.preferences["playback.preferred_quality"])
+    if StringUtils.IsNullOrEmpty(currentValue)
+        currentValue = "auto"
+    end if
+
+    if currentValue.InStr(",") <> -1
+        currentValue = currentValue.Split(",")[0].Trim()
+    end if
+
+    currentIndex = 0
+    for i = 0 to qualityOptions.Count() - 1
+        if LCase(qualityOptions[i]) = LCase(currentValue)
+            currentIndex = i
+            exit for
+        end if
+    end for
+
+    nextIndex = (currentIndex + 1) mod qualityOptions.Count()
+    newValue = qualityOptions[nextIndex]
+
+    m.top.preferences["playback.preferred_quality"] = newValue
+    LogInfo("Quality changed to:", newValue)
+end function
+
+function OnCCButtonSelected()
+    StartHideVideoUiTimer()
+    m.ccEnabled = not m.ccEnabled
+    m.ccButton.active = m.ccEnabled
+
+    if m.top.hasField("globalCaptionMode")
+        if m.ccEnabled
+            m.top.globalCaptionMode = "On"
+        else
+            m.top.globalCaptionMode = "Off"
+        end if
     else
-        ' Wait 5 seconds then hide the hint
-        m.fullScreenHintTimer.duration = 5
+        LogWarn("globalCaptionMode is not supported; CC toggle is best-effort")
     end if
 
-    m.fullScreenHintTimer.control = "start"
+    LogInfo("Closed captions toggled:", m.ccEnabled)
 end function
 
-function OnTrickplayUITimer()
-    HideUIAndStopTimer()
-end function
-
-function OnFullScreenHintTimer()
-    showFullScreenHint = m.top.showFullScreenHint
-    m.fullScreenHint.visible = showFullScreenHint
-    if showFullScreenHint
-        m.top.showFullScreenHint = false
+function OnStatsButtonSelected() as void
+    StartHideVideoUiTimer()
+    prefs = m.top.preferences
+    if prefs = invalid
+        LogWarn("Cannot toggle stats overlay: preferences node is invalid")
+        return
     end if
+
+    enabled = prefs["playback.stats_for_nerds"] = true
+    prefs["playback.stats_for_nerds"] = not enabled
+end function
+
+function OnBookmarkButtonSelected() as void
+    StartHideVideoUiTimer()
+    content = m.top.content
+    if content = invalid
+        LogWarn("Cannot add bookmark: content is invalid")
+        return
+    end if
+
+    videoId = content.videoId
+    if StringUtils.IsNullOrEmpty(videoId)
+        LogWarn("Cannot add bookmark: videoId is empty")
+        return
+    end if
+
+    bookmarksService = m.top.bookmarksService
+    if bookmarksService = invalid
+        LogWarn("Cannot add bookmark: bookmarksService is invalid")
+        return
+    end if
+
+    bookmark = bookmarksService.content.findNode(videoId)
+    if bookmark <> invalid
+        bookmarksService@.RemoveBookmark(videoId)
+        LogInfo("Removed video from bookmarks:", videoId)
+    else
+        group = Tr(Locale.Feed.Videos)
+        bookmarksService@.AddVideoBookmark(videoId, group)
+        LogInfo("Added video to bookmarks:", videoId)
+    end if
+end function
+
+function OnMinimizeButtonSelected()
+    StartHideVideoUiTimer()
+    VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+end function
+
+function OnProgress() as void
+    if m.pendingSkipSeconds <> 0
+        return
+    end if
+
+    duration = m.top.duration
+    position = m.top.position
+
+    m.trickPlayBar.position = position
+    m.trickPlayBar.duration = duration
+
+    if duration = 0
+        m.trickPlayBar.progress = 0
+        return
+    end if
+
+    m.trickPlayBar.progress = position / duration
 end function
 
 function SetupStatsOverlay() as void
-    m.statsOverlay = m.top.findNode("statsOverlay")
-    m.statsOverlayLabel = m.top.findNode("statsOverlayLabel")
-    m.statsOverlayTimer = m.top.findNode("statsOverlayTimer")
+    m.statsOverlay = m.top.findNode("StatsOverlay")
+    m.statsOverlayLabel = m.top.findNode("StatsOverlayLabel")
+    m.statsOverlayTimer = m.top.findNode("StatsOverlayTimer")
 
     if m.statsOverlayTimer <> invalid
-        m.statsOverlayTimer.ObserveField("fire", FuncName(OnStatsOverlayTimer))
+        DisposableObserveField(m.statsOverlayTimer, "fire", FuncName(OnStatsOverlayTimer))
     end if
 
-    if m.top.hasField("streamingSegment")
-        m.top.ObserveField("streamingSegment", FuncName(OnStreamingSegmentChangeStats))
-    end if
-    m.top.ObserveField("audioFormat", FuncName(UpdateStatsOverlay))
-    m.top.ObserveField("videoFormat", FuncName(UpdateStatsOverlay))
-    m.top.ObserveField("state", FuncName(UpdateStatsOverlay))
-    m.top.ObserveField("content", FuncName(UpdateStatsOverlay))
+    DisposableObserveField(m.top, "streamingSegment", FuncName(OnStreamingSegmentChangeStats))
+    DisposableObserveField(m.top, "audioFormat", FuncName(UpdateStatsOverlay))
+    DisposableObserveField(m.top, "videoFormat", FuncName(UpdateStatsOverlay))
 
     if m.top.preferences <> invalid
-        m.top.preferences.observeFieldScoped("playback.stats_for_nerds", FuncName(OnStatsPreferenceChange))
+        DisposableObserveFieldScoped(m.top.preferences, "playback.stats_for_nerds", FuncName(OnStatsPreferenceChange))
     end if
+
     OnStatsPreferenceChange()
 end function
 
@@ -814,7 +1086,13 @@ function OnStatsPreferenceChange() as void
     if m.top.preferences <> invalid
         enabled = m.top.preferences["playback.stats_for_nerds"] = true
     end if
+
     m.statsOverlayEnabled = enabled
+
+    if m.statsButton <> invalid
+        m.statsButton.active = enabled
+    end if
+
     UpdateStatsOverlayVisibility()
 end function
 
@@ -830,8 +1108,13 @@ function UpdateStatsOverlayVisibility() as void
 
     m.statsOverlay.visible = visible
     if m.statsOverlayTimer <> invalid
-        m.statsOverlayTimer.control = visible ? "start" : "stop"
+        if visible
+            m.statsOverlayTimer.control = "start"
+        else
+            m.statsOverlayTimer.control = "stop"
+        end if
     end if
+
     if visible
         UpdateStatsOverlay()
     end if
@@ -1239,4 +1522,10 @@ function ParseResolutionHeight(value as string) as integer
     end if
 
     return CInt(Val(lower))
+end function
+
+function OnDispose()
+    ShutDownPictureInPicture()
+    ShutDownPlayerUi()
+    DisposeObservers()
 end function

@@ -54,33 +54,44 @@ namespace SponsorBlock
         m.top.seekMode = "accurate"
 
         barPath = info.data.barPath
-        if barPath <> invalid
-            m.top.trickPlayBar.trackImageUri = barPath
-            m.top.trickPlayBar.filledBarBlendColor = "#FF000080"
+        bar = GetTrickPlayBar()
+        if barPath <> invalid and bar <> invalid
+            bar.trackImageUri = barPath
+            bar.filledBarBlendColor = "#FF000080"
         end if
 
         m.top.ObserveFieldScoped("position", FuncName(OnPositionChangeSkipSponsorBlockSections))
 
-        if m.top.hasField("trickPlayPosition")
-            PositionChapterLabel()
+        if bar <> invalid
+            PositionChapterLabel(bar)
             m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
             m.chapterLabelTimer.observeField("fire", FuncName(OnChapterLabelTimer))
             m._sponsorBlockLastTimeChapterUpdated = 0.0#
-            m.top.trickPlayBar.observeField("visible", FuncName(OnTrickPlayBarVisible))
+            m.sponsorBlockTrickPlayBar = bar
+            bar.observeField("visible", FuncName(OnTrickPlayBarVisible))
+            OnTrickPlayBarVisible()
         end if
     end function
 
-    function PositionChapterLabel()
+    function PositionChapterLabel(bar as object)
+        if bar = invalid
+            return
+        end if
         m.chapterLabel = m.top.findNode("chapterLabel")
-        ' We move the chapter label under m.top.trickPlayBar
+        ' We move the chapter label under the custom trickplay bar
         ' We could move it to m.top.pivotNode, but that is only available on Roku OS 11.5+
-        m.chapterLabel.reparent(m.top.trickPlayBar, false)
-        trickPlayBarWidth = m.top.trickPlayBar.boundingRect().width
+        m.chapterLabel.reparent(bar, false)
+        trickPlayBarWidth = bar.boundingRect().width
         m.chapterLabel.translation = [trickPlayBarWidth / 4 - m.chapterLabel.width / 2, 25]
     end function
 
     function OnTrickPlayBarVisible()
-        if m.top.trickPlayBar.visible
+        bar = m.sponsorBlockTrickPlayBar
+        if bar = invalid
+            return
+        end if
+
+        if bar.visible
             m.top.chapter = ""
             m.chapterLabelTimer.control = "start"
         else
@@ -89,13 +100,33 @@ namespace SponsorBlock
     end function
 
     function OnChapterLabelTimer() as void
-        trickPlayPosition = m.top.trickPlayPosition
-        if m._sponsorBlockLastTimeChapterUpdated = trickPlayPosition
+        time = GetCurrentChapterTime()
+        if m._sponsorBlockLastTimeChapterUpdated = time
             return
         end if
 
-        m._sponsorBlockLastTimeChapterUpdated = trickPlayPosition
-        UpdateSponsorBlockChapter(trickPlayPosition)
+        m._sponsorBlockLastTimeChapterUpdated = time
+        UpdateSponsorBlockChapter(time)
+    end function
+
+    function GetTrickPlayBar() as object
+        if m.trickPlayBar <> invalid
+            return m.trickPlayBar
+        end if
+        if m.top <> invalid and m.top.hasField("trickPlayBar")
+            return m.top.trickPlayBar
+        end if
+        return invalid
+    end function
+
+    function GetCurrentChapterTime() as dynamic
+        if m.sponsorBlockTrickPlayBar = m.trickPlayBar
+            return m.top.position
+        end if
+        if m.top.hasField("trickPlayPosition")
+            return m.top.trickPlayPosition
+        end if
+        return m.top.position
     end function
 
     function UpdateSponsorBlockChapter(time as double) as void

@@ -1,4 +1,4 @@
-<component name="VideoPlayer" extends="Video" includes="AutoBind">
+<component name="VideoPlayer" extends="Video" includes="AutoBind,Disposable">
     <interface>
         <field id="appController" type="node" bind="/AppController" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
@@ -10,30 +10,177 @@
         <field id="invidious" type="node" bind="../../Invidious" />
         <field id="webServer" type="node" bind="../../WebServer" />
         <field id="loungeService" type="node" bind="../../LoungeService" />
+        <field id="bookmarksService" type="node" bind="../../BookmarksService" />
         <field id="previousPlayer" type="node" />
         <field id="minRect" type="rect2D" value="[834,460,426,240]" />
         <field id="maxRect" type="rect2D" value="[0,0,1280,720]" />
         <field id="chapter" type="string" alias="chapterLabel.text" />
         <field id="showFullScreenHint" type="boolean" alwaysNotify="true" onChange="OnShowFullScreenHint" />
         <field id="close" type="boolean" alwaysNotify="true" onChange="OnClose" />
+        <field id="minimizeState" type="integer" />
+        <field id="playerUiState" type="integer" />
         <function name="PlayWithContent" />
     </interface>
     <children>
+        <Group id="VideoUi">
+            <Poster
+                id="BackgroundPosterSmall"
+                width="1280"
+                height="720"
+                blendColor="0x323232" />
+            <Poster
+                id="BackgroundPoster"
+                width="1280"
+                height="720"
+                blendColor="0x323232" />
+            <Group id="TopUi">
+                <Poster
+                    uri="pkg:/images/black-gradient.png"
+                    opacity="0.8"
+                    width="1280"
+                    height="240"
+                    scaleRotateCenter="[640,120]"
+                    rotation="3.14159265359" />
+                <Clock id="Clock" />
+                <LayoutGroup
+                    itemSpacings="[5]"
+                    translation="[68,40]">
+                    <Label
+                        id="TitleLabel"
+                        font="font:LargeBoldSystemFont"
+                        width="900"
+                        wrap="true" />
+                    <Label
+                        id="SecondaryTitleLabel"
+                        font="font:SmallestSystemFont"
+                        width="900"
+                        wrap="true" />
+                    <Label
+                        id="ViewCountLabel"
+                        font="font:SmallestSystemFont"
+                        color="#AAAAAA"
+                        width="900"
+                        wrap="true" />
+                </LayoutGroup>
+            </Group>
+            <Poster
+                uri="pkg:/images/black-gradient.png"
+                opacity="0.8"
+                width="1280"
+                height="360"
+                translation="[0,360]" />
+
+            <Group id="Buttons">
+                <!-- Centered playback controls -->
+                <LayoutGroup
+                    id="PlaybackButtons"
+                    layoutDirection="horiz"
+                    horizAlignment="center"
+                    itemSpacings="[8]"
+                    translation="[640,517]">
+                    <VideoPlayerButton
+                        id="PreviousButton"
+                        iconUri="pkg:/images/icons/player/previous.png"
+                        disabled="true" />
+                    <VideoPlayerButton
+                        id="SkipBackButton"
+                        iconUri="pkg:/images/icons/player/skip-back.png" />
+                    <VideoPlayerButton
+                        id="PlayButton"
+                        iconUri="pkg:/images/icons/player/play.png"
+                        iconUri2="pkg:/images/icons/player/pause.png"
+                        disabled="true" />
+                    <VideoPlayerButton
+                        id="SkipForwardButton"
+                        iconUri="pkg:/images/icons/player/skip-forward.png" />
+                    <VideoPlayerButton
+                        id="NextButton"
+                        iconUri="pkg:/images/icons/player/next.png"
+                        disabled="true" />
+                </LayoutGroup>
+
+                <!-- Right aligned feature controls -->
+                <LayoutGroup
+                    id="FeatureButtons"
+                    layoutDirection="horiz"
+                    horizAlignment="right"
+                    itemSpacings="[8]"
+                    translation="[1212,517]">
+                    <!-- bs:disable-next-line LOCALE_MISSING_TRANSLATIONS -->
+                    <VideoPlayerTextButton id="QualityButton" text="720p" />
+                    <VideoPlayerButton
+                        id="CCButton"
+                        iconUri="pkg:/images/icons/player/cc.png" />
+                    <VideoPlayerButton
+                        id="StatsButton"
+                        iconUri="pkg:/images/icons/player/stats.png"
+                        iconUri2="pkg:/images/icons/player/stats.png" />
+                    <VideoPlayerButton
+                        id="BookmarkButton"
+                        iconUri="pkg:/images/icons/player/bookmark.png" />
+                    <VideoPlayerButton
+                        id="MinimizeButton"
+                        iconUri="pkg:/images/icons/player/pip.png" />
+                </LayoutGroup>
+            </Group>
+            <Group
+                id="LoadingUi"
+                visible="false">
+                <Poster
+                    id="LoadingSpinnerBackground"
+                    width="80"
+                    height="80"
+                    uri="pkg:/images/white-circle.png"
+                    opacity="0.4"
+                    blendColor="0x000000" />
+                <BusySpinner
+                    id="LoadingSpinner"
+                    spinInterval="1">
+                    <Label
+                        id="LoadingPercentLabel"
+                        horizAlign="center"
+                        vertAlign="center"
+                        width="150"
+                        height="150"
+                        font="font:SmallestSystemFont" />
+                    <Label
+                        id="LoadingLabel"
+                        width="150"
+                        horizAlign="center"
+                        translation="[0,150]"
+                        font="font:SmallestSystemFont" />
+                </BusySpinner>
+            </Group>
+            <Group>
+                <Timer id="ProgressTimer" repeat="true" duration="1" />
+                <TrickPlayBar
+                    id="TrickPlayBar"
+                    translation="[68,580]" />
+            </Group>
+        </Group>
+
         <Label id="chapterLabel" width="350" height="25" horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" />
         <Timer id="chapterLabelTimer" repeat="true" duration="0.5" />
-        <Animation id="minimizeAnimation" duration="0.3" optional="true">
+
+        <Rectangle id="StatsOverlay" width="620" height="280" color="0x000000" opacity="0.75" visible="false" translation="[20,20]">
+            <Label id="StatsOverlayLabel" width="600" height="260" translation="[10,10]" color="0xFFFFFF" horizAlign="left" vertAlign="top" font="font:SmallestSystemFont" wrap="true" />
+            <Timer id="StatsOverlayTimer" duration="1" repeat="true" />
+        </Rectangle>
+
+        <Timer id="HideVideoUiTimer" duration="3" />
+        <Timer id="SkipSeekTimer" duration="0.5" />
+        <Animation id="UiFadeAnimation" duration="0.3" optional="true">
+            <FloatFieldInterpolator id="UiFadeOpacityInterpolator" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 0.5, 1.0]" fieldToInterp="VideoUi.opacity" />
+        </Animation>
+
+        <Animation id="minimizeAnimation" duration="0.2" optional="true">
             <FloatFieldInterpolator id="widthInterpolator" key="[0.0, 0.5, 1.0]" fieldToInterp="VideoPlayer.width" />
             <FloatFieldInterpolator id="heightInterpolator" key="[0.0, 0.5, 1.0]" fieldToInterp="VideoPlayer.height" />
             <Vector2DFieldInterpolator id="translationInterpolator" key="[0.0, 0.5, 1.0]" fieldToInterp="VideoPlayer.translation" />
         </Animation>
-        <Rectangle id="fullScreenHint" height="26" color="0x000000" opacity="0.8" visible="false">
-            <Label id="fullScreenHintLabel" text="Press Options (*) for full screen" height="26" color="0xFFFFFF" horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" />
+        <Rectangle id="fullScreenHint" height="26" color="#000000" opacity="0.8" visible="false">
+            <Label id="fullScreenHintLabel" text="Press Options (*) for full screen" height="26" color="#FFFFFF" horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" />
             <Timer id="fullScreenHintTimer" duration="5" />
-            <Timer id="trickplayUITimer" duration="5" />
-        </Rectangle>
-        <Rectangle id="statsOverlay" width="620" height="280" color="0x000000" opacity="0.75" visible="false" translation="[20,20]">
-            <Label id="statsOverlayLabel" width="600" height="260" translation="[10,10]" color="0xFFFFFF" horizAlign="left" vertAlign="top" font="font:SmallestSystemFont" wrap="true" />
-            <Timer id="statsOverlayTimer" duration="1" repeat="true" />
         </Rectangle>
     </children>
 </component>
