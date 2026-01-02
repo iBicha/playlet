@@ -28,6 +28,10 @@ function Init()
     m.statsResolution = ""
     m.statsBitrate = invalid
     m.statsFps = ""
+
+    ' Skip seek debouncing - accumulate rapid button presses
+    m.pendingSkipSeconds = 0
+    m.skipSeekTimer = m.top.findNode("SkipSeekTimer")
 end function
 
 function OnNodeReady()
@@ -56,6 +60,7 @@ function OnNodeReady()
     DisposableObserveField(m.top, "bufferingStatus", FuncName(OnBufferingStatusChange))
 
     DisposableObserveField(m.progressTimer, "fire", FuncName(OnProgress))
+    DisposableObserveField(m.skipSeekTimer, "fire", FuncName(OnSkipSeekTimer))
 
     SetupNavigation()
     SetupStatsOverlay()
@@ -78,10 +83,11 @@ function SetupNavigation()
     SetNavigation(m.previousButton, RemoteKeys.Right, m.playButton) ' fallback
 
     SetNavigation(m.skipBackButton, RemoteKeys.Left, m.previousButton)
-    SetNavigation(m.skipBackButton, RemoteKeys.Left, m.playButton) ' fallback
+    ' No fallback for skipBackButton Left - it's the leftmost when previousButton is disabled
     SetNavigation(m.skipBackButton, RemoteKeys.Right, m.playButton)
 
     SetNavigation(m.playButton, RemoteKeys.Left, m.skipBackButton)
+    SetNavigation(m.playButton, RemoteKeys.Left, m.previousButton) ' fallback when skipBackButton could be disabled
     SetNavigation(m.playButton, RemoteKeys.Right, m.skipForwardButton)
 
     SetNavigation(m.skipForwardButton, RemoteKeys.Left, m.playButton)
@@ -292,25 +298,77 @@ function OnHasNextChange()
     m.nextButton.disabled = not m.videoQueue.hasNext
 end function
 
-' Skip button handlers (10 second skip)
+' Skip button handlers (10 second skip with debouncing)
+' Multiple rapid presses are accumulated and executed as a single seek
 function OnSkipBackButtonSelected()
     StartHideVideoUiTimer()
-    currentPosition = m.top.position
-    newPosition = currentPosition - SKIP_SECONDS
-    if newPosition < 0
-        newPosition = 0
-    end if
-    m.top.seek = newPosition
+    AccumulateSkip(-SKIP_SECONDS)
 end function
 
 function OnSkipForwardButtonSelected()
     StartHideVideoUiTimer()
+    AccumulateSkip(SKIP_SECONDS)
+end function
+
+' Accumulate skip amount and restart debounce timer
+function AccumulateSkip(seconds as integer) as void
+    m.pendingSkipSeconds += seconds
+
+    ' Update UI to show pending position
+    UpdatePendingSkipPosition()
+
+    ' Restart debounce timer - seek will execute when user stops pressing
+    m.skipSeekTimer.control = "stop"
+    m.skipSeekTimer.control = "start"
+end function
+
+' Update progress bar to show where we'll seek to
+function UpdatePendingSkipPosition() as void
+    if m.pendingSkipSeconds = 0
+        return
+    end if
+
     currentPosition = m.top.position
     duration = m.top.duration
-    newPosition = currentPosition + SKIP_SECONDS
+    pendingPosition = currentPosition + m.pendingSkipSeconds
+
+    ' Clamp to valid range
+    if pendingPosition < 0
+        pendingPosition = 0
+    end if
+    if duration > 0 and pendingPosition > duration
+        pendingPosition = duration
+    end if
+
+    ' Update trickplay bar to show pending position
+    m.trickPlayBar.position = pendingPosition
+    if duration > 0
+        m.trickPlayBar.progress = pendingPosition / duration
+    end if
+end function
+
+' Timer fired - execute the accumulated seek
+function OnSkipSeekTimer() as void
+    if m.pendingSkipSeconds = 0
+        return
+    end if
+
+    currentPosition = m.top.position
+    duration = m.top.duration
+    newPosition = currentPosition + m.pendingSkipSeconds
+
+    ' Clamp to valid range
+    if newPosition < 0
+        newPosition = 0
+    end if
     if duration > 0 and newPosition > duration
         newPosition = duration
     end if
+
+    ' Reset pending amount before seeking
+    m.pendingSkipSeconds = 0
+
+    ' Execute the seek
     m.top.seek = newPosition
 end function
 
@@ -953,6 +1011,11 @@ function ParseResolutionHeight(value as string) as integer
 end function
 
 function OnProgress() as void
+    ' Don't update progress bar if we have a pending skip - let the pending position show
+    if m.pendingSkipSeconds <> 0
+        return
+    end if
+
     duration = m.top.duration
     position = m.top.position
 
