@@ -1,0 +1,55 @@
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.background = m.top.findNode("background")
+    m.label = m.top.findNode("label")
+
+    OnDisabledChange()
+
+    m.top.observeField("focusedChild", FuncName(OnFocusedChild))
+end function
+
+function OnFocusedChild()
+    m.top.buttonFocused = m.top.hasFocus()
+end function
+
+function OnButtonFocused()
+    buttonFocused = m.top.buttonFocused
+
+    if buttonFocused
+        m.background.blendColor = m.top.focusedBackgroundColor
+        m.label.color = m.top.focusedTextColor
+    else
+        m.background.blendColor = m.top.backgroundColor
+        m.label.color = m.top.textColor
+    end if
+end function
+
+function OnDisabledChange()
+    disabled = m.top.disabled
+
+    if disabled
+        m.background.blendColor = m.top.disabledBackgroundColor
+        m.label.color = m.top.disabledTextColor
+    else
+        OnButtonFocused()
+    end if
+    m.top.focusable = not disabled
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+
+    if key = RemoteKeys.Ok
+        disabled = m.top.disabled
+        if not disabled
+            m.top.buttonSelected = true
+        end if
+        return true
+    end if
+
+    return false
+end function

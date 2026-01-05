@@ -1,0 +1,38 @@
+import "pkg:/source/utils/TimeUtils.bs"
+
+const PROGRESS_WIDTH = 1144
+const PROGRESS_HEIGHT = 6
+const SEEK_HANDLE_WIDTH = 16
+const SEEK_HANDLE_HEIGHT = 16
+
+function Init()
+    m.progressBar = m.top.findNode("ProgressBar")
+    m.seekHandle = m.top.findNode("SeekHandle")
+    m.positionLabel = m.top.findNode("PositionLabel")
+    m.durationLabel = m.top.findNode("DurationLabel")
+    OnProgressChange()
+end function
+
+function OnProgressChange()
+    position = PROGRESS_WIDTH * m.top.progress
+    m.progressBar.width = position
+    m.seekHandle.translation = [position - SEEK_HANDLE_WIDTH / 2, (PROGRESS_HEIGHT - SEEK_HANDLE_HEIGHT) / 2]
+end function
+
+function OnPositionChange()
+    positionSeconds = m.top.position
+    m.positionLabel.text = FormatTimeLabel(positionSeconds)
+end function
+
+function OnDurationChange()
+    durationSeconds = m.top.duration
+    m.durationLabel.text = FormatTimeLabel(durationSeconds)
+end function
+
+function FormatTimeLabel(seconds as dynamic) as string
+    if seconds = invalid or seconds <= 0
+        return "0:00"
+    end if
+
+    return TimeUtils.GetFormattedTime(seconds)
+end function

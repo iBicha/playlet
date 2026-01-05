@@ -1,0 +1,76 @@
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+function Init()
+    m.background = m.top.findNode("background")
+    m.icon = m.top.findNode("icon")
+    m.icon2 = m.top.findNode("icon2")
+
+    OnDisabledChange()
+
+    m.top.observeField("focusedChild", FuncName(OnFocusedChild))
+end function
+
+function OnFocusedChild()
+    m.top.buttonFocused = m.top.hasFocus()
+end function
+
+function OnButtonFocused()
+    buttonFocused = m.top.buttonFocused
+    active = m.top.active
+
+    if buttonFocused
+        m.background.blendColor = m.top.focusedBackgroundColor
+        m.icon.blendColor = m.top.focusedIconColor
+        m.icon2.blendColor = m.top.focusedIconColor
+    else
+        m.background.blendColor = m.top.backgroundColor
+        if active
+            m.icon.blendColor = m.top.activeIconColor
+            m.icon2.blendColor = m.top.activeIconColor
+        else
+            m.icon.blendColor = m.top.iconColor
+            m.icon2.blendColor = m.top.iconColor
+        end if
+    end if
+end function
+
+function OnActiveChange()
+    OnButtonFocused()
+end function
+
+function OnDisabledChange()
+    disabled = m.top.disabled
+
+    if disabled
+        m.background.blendColor = m.top.disabledBackgroundColor
+        m.icon.blendColor = m.top.disabledIconColor
+        m.icon2.blendColor = m.top.disabledIconColor
+    else
+        OnButtonFocused()
+    end if
+    m.top.focusable = not disabled
+end function
+
+function OnKeyEvent(key as string, press as boolean) as boolean
+    if not press
+        return false
+    end if
+
+    if key = RemoteKeys.Ok
+        disabled = m.top.disabled
+        if not disabled
+            m.top.buttonSelected = true
+        end if
+        return true
+    end if
+
+    return false
+end function
+
+function OnToggleStateChange()
+    toggleState = m.top.toggleState
+
+    m.icon.visible = toggleState
+    m.icon2.visible = not toggleState
+end function

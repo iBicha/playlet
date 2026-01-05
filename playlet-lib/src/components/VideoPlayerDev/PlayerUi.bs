@@ -1,0 +1,186 @@
+import "pkg:/source/utils/DisposableObserve.bs"
+import "pkg:/source/utils/FocusManagement.bs"
+import "pkg:/source/utils/Types.bs"
+
+enum PlayerUiState
+    None ' None is not a valid state, but it is the default value pre-initialization
+    FadingIn
+    Visible
+    FadingOut
+    Hidden
+end enum
+
+function InitializePlayerUi()
+    m.top.enableUI = false
+    m.top.enableTrickPlay = false
+
+    FindUiNodes()
+    SetupLoadingSpinner()
+
+    DisposableObserveFieldScoped(m.uiFadeAnimation, "state", FuncName(OnUiFadeAnimationStateChange))
+    DisposableObserveField(m.hideVideoUiTimer, "fire", FuncName(OnHideVideoUiTimer))
+
+    DisposableObserveField(m.top, "playerUiState", FuncName(OnPlayerUiState))
+    DisposableObserveField(m.top, "focusedChild", FuncName(OnPlayerFocusChange))
+
+    m.top.playerUiState = PlayerUiState.Visible
+end function
+
+function FindUiNodes()
+    m.clock = m.top.findNode("Clock")
+    m.titleLabel = m.top.findNode("TitleLabel")
+    m.secondaryTitleLabel = m.top.findNode("SecondaryTitleLabel")
+    m.viewCountLabel = m.top.findNode("ViewCountLabel")
+    m.backgroundPoster = m.top.findNode("BackgroundPoster")
+    m.backgroundPosterSmall = m.top.findNode("BackgroundPosterSmall")
+
+    ' Center playback buttons (in order)
+    m.previousButton = m.top.findNode("PreviousButton")
+    m.skipBackButton = m.top.findNode("SkipBackButton")
+    m.playButton = m.top.findNode("PlayButton")
+    m.skipForwardButton = m.top.findNode("SkipForwardButton")
+    m.nextButton = m.top.findNode("NextButton")
+
+    ' Right feature buttons
+    m.qualityButton = m.top.findNode("QualityButton")
+    m.ccButton = m.top.findNode("CCButton")
+    m.statsButton = m.top.findNode("StatsButton")
+    m.bookmarkButton = m.top.findNode("BookmarkButton")
+    m.minimizeButton = m.top.findNode("MinimizeButton")
+
+    m.trickPlayBar = m.top.findNode("TrickPlayBar")
+    m.videoUi = m.top.findNode("VideoUi")
+    m.progressTimer = m.top.findNode("ProgressTimer")
+    m.hideVideoUiTimer = m.top.findNode("HideVideoUiTimer")
+    m.uiFadeAnimation = m.top.findNode("UiFadeAnimation")
+    m.uiFadeOpacityInterpolator = m.top.findNode("UiFadeOpacityInterpolator")
+    m.loadingUi = m.top.findNode("LoadingUi")
+    m.loadingSpinnerBackground = m.loadingUi.findNode("LoadingSpinnerBackground")
+    m.loadingSpinner = m.loadingUi.findNode("LoadingSpinner")
+    m.loadingLabel = m.loadingSpinner.findNode("LoadingLabel")
+    m.loadingPercentLabel = m.loadingSpinner.findNode("LoadingPercentLabel")
+end function
+
+function SetupLoadingSpinner()
+    poster = m.loadingSpinner.poster
+
+    size = 150
+    poster.width = size
+    poster.height = size
+    centerx = (1280 - size) / 2
+    centery = (720 - size) / 2
+    m.loadingSpinner.translation = [centerx, centery]
+    poster.opacity = 0.8
+    poster.uri = "pkg:/images/spinner.png"
+
+    size = 80
+    centerx = (1280 - size) / 2
+    centery = (720 - size) / 2
+    m.loadingSpinnerBackground.translation = [centerx, centery]
+end function
+
+function OnPlayerUiState()
+    state = m.top.playerUiState
+
+    if state = PlayerUiState.FadingIn
+        OnPlayerUiFadingIn()
+    else if state = PlayerUiState.Visible
+        OnPlayerUiVisible()
+    else if state = PlayerUiState.FadingOut
+        OnPlayerUiFadingOut()
+    else if state = PlayerUiState.Hidden
+        OnPlayerUiHidden()
+    end if
+end function
+
+function OnPlayerUiFadingIn()
+    ' Ensure UI group is visible before animating opacity
+    m.videoUi.visible = true
+
+    if m.top.hasFocus()
+        NodeSetFocus(m.playButton, true)
+    end if
+
+    m.uiFadeOpacityInterpolator.reverse = false
+    m.uiFadeAnimation.control = "start"
+end function
+
+function OnPlayerUiVisible()
+    ' Ensure UI is visible (critical when entering Visible state directly, not via FadingIn animation)
+    m.videoUi.visible = true
+    m.videoUi.opacity = 1
+
+    if m.top.hasFocus()
+        NodeSetFocus(m.playButton, true)
+    end if
+
+    StartHideVideoUiTimer()
+end function
+
+function OnPlayerUiFadingOut()
+    m.uiFadeOpacityInterpolator.reverse = true
+    m.uiFadeAnimation.control = "start"
+end function
+
+function OnPlayerUiHidden()
+    m.videoUi.opacity = 0
+
+    if m.top.isInFocusChain() and not m.top.hasFocus()
+        NodeSetFocus(m.top, false)
+        NodeSetFocus(m.top, true)
+    end if
+end function
+
+function OnPlayerFocusChange() as void
+    ' When the player itself gains focus (not a child button), focus the play button
+    ' This handles the case when returning to the player from another screen
+    if not m.top.hasFocus()
+        return
+    end if
+
+    state = m.top.playerUiState
+    if state = PlayerUiState.Visible or state = PlayerUiState.FadingIn
+        if m.playButton <> invalid
+            NodeSetFocus(m.playButton, true)
+        end if
+    end if
+end function
+
+function StartHideVideoUiTimer()
+    m.hideVideoUiTimer.control = "stop"
+    m.hideVideoUiTimer.control = "start"
+end function
+
+function StopHideVideoUiTimer()
+    m.hideVideoUiTimer.control = "stop"
+end function
+
+function OnHideVideoUiTimer() as void
+    if m.top.playerUiState = PlayerUiState.Hidden
+        return
+    end if
+
+    m.top.playerUiState = PlayerUiState.FadingOut
+end function
+
+function OnUiFadeAnimationStateChange() as void
+    ' "stopped" Indicates that the animation has either run to completion or has been explicitly stopped.
+    ' Since we don't stop the animation explicitly, we can assume that the animation has run to completion.
+    ' This assumption becomes invalid if we set m.uiFadeAnimation.control = "stop"
+    if m.uiFadeAnimation.state <> "stopped"
+        return
+    end if
+
+    state = m.top.playerUiState
+    if state = PlayerUiState.FadingIn
+        m.top.playerUiState = PlayerUiState.Visible
+    else if state = PlayerUiState.FadingOut
+        m.top.playerUiState = PlayerUiState.Hidden
+    end if
+end function
+
+function ShutDownPlayerUi()
+    m.hideVideoUiTimer.control = "stop"
+    m.loadingSpinner.control = "stop"
+    m.clock.dispose = true
+end function
