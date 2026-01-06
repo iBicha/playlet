@@ -59,6 +59,13 @@ function Init()
     m.pendingSkipSeconds = 0
     m.skipSeekTimer = m.top.findNode("SkipSeekTimer")
 
+    ' Native Video node UI / trickplay (thumbnails + speed overlay)
+    m.showUIEnabled = m.top.hasField("showUI")
+    m.trickplayUITimer = m.top.findNode("trickplayUITimer")
+    if m.trickplayUITimer <> invalid
+        DisposableObserveField(m.trickplayUITimer, "fire", FuncName(OnTrickplayUITimer))
+    end if
+
     m.top.notificationInterval = 1
 
     ' asyncStopSemantics available since Roku OS 12.5
@@ -582,6 +589,7 @@ function OnVideoPlayerStateChange() as void
 
     if state = "playing"
         m.isSeekingPosition = false
+        HideNativeTrickplayUi()
     end if
 
     if state = "playing" and not m.videoPlayingSuccess
@@ -796,6 +804,59 @@ function IsLiveVideo() as boolean
     return content <> invalid and content.Live = true
 end function
 
+function ShowNativeTrickplayUi() as void
+    ' Only show native trickplay UI when fullscreen to avoid visual clutter in PiP/minimized.
+    if m.container <> invalid and not m.container.fullscreen
+        return
+    end if
+
+    ' enableUI must be true for the Video node to render its native trickplay overlays.
+    m.top.enableUI = true
+
+    if m.showUIEnabled
+        ' Show only the trickplay UI elements (thumbnails/speed overlay) and background overlay.
+        ' Keep title/time disabled to avoid duplicating our custom top UI.
+        m.top.showUI = {
+            show: true
+            trickPlaybar: true
+            titleAndTime: false
+            trickplayBackgroundOverlay: true
+            focusTrickplayBar: false
+        }
+    end if
+
+    if m.trickplayUITimer <> invalid
+        m.trickplayUITimer.control = "stop"
+        m.trickplayUITimer.control = "start"
+    end if
+
+    ' Hide our custom progress bar while native trickplay UI is visible
+    if m.trickPlayBar <> invalid
+        m.trickPlayBar.visible = false
+    end if
+end function
+
+function HideNativeTrickplayUi() as void
+    if m.showUIEnabled
+        m.top.showUI = { show: false, focusTrickplayBar: false }
+    end if
+
+    if m.trickplayUITimer <> invalid
+        m.trickplayUITimer.control = "stop"
+    end if
+
+    ' Disable native UI again so OK doesn't bring up Roku default controls.
+    m.top.enableUI = false
+
+    if m.trickPlayBar <> invalid
+        m.trickPlayBar.visible = true
+    end if
+end function
+
+function OnTrickplayUITimer()
+    HideNativeTrickplayUi()
+end function
+
 function OnKeyEvent(key as string, press as boolean) as boolean
     if press = false
         return false
@@ -811,6 +872,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     state = m.top.state
     uiState = m.top.playerUiState
+    isTrickPlayKey = key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
 
     if key = RemoteKeys.Play
         if state = "paused" and uiState = PlayerUiState.Hidden
@@ -829,8 +891,18 @@ function OnKeyEvent(key as string, press as boolean) as boolean
         StartHideVideoUiTimer()
     end if
 
+    ' Show the custom UI when any key is pressed, including trickplay keys,
+    ' so the new icons/buttons remain visible above the native trickplay bar.
     if uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut
         m.top.playerUiState = PlayerUiState.FadingIn
+    end if
+
+    if isTrickPlayKey
+        ' Show native trickplay overlays (thumbnails/speed indicator), but let the Video node
+        ' handle the actual trickplay behavior by returning false.
+        m.isSeekingPosition = true
+        ShowNativeTrickplayUi()
+        return false
     end if
 
     if NavigationKeyHandler(key, press).handled
@@ -840,21 +912,6 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     if key = RemoteKeys.Back
         m.videoQueue.closePlayer = true
         return true
-    end if
-
-    ' Remote skip buttons (rewind/fast forward)
-    if key = RemoteKeys.Rewind
-        OnSkipBackButtonSelected()
-        return true
-    end if
-
-    if key = RemoteKeys.FastForward
-        OnSkipForwardButtonSelected()
-        return true
-    end if
-
-    if key = RemoteKeys.Left or key = RemoteKeys.Right
-        m.isSeekingPosition = true
     end if
 
     return false

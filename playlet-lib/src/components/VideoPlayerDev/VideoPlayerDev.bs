@@ -23,6 +23,7 @@ function Init()
     httpAgent.AddHeader("User-Agent", VIDEO_PLAYER_USER_AGENT)
 
     m.ccEnabled = false
+    m.isSeekingPosition = false
 
     m.statsOverlayEnabled = false
     m.statsResolution = ""
@@ -32,6 +33,60 @@ function Init()
     ' Skip seek debouncing - accumulate rapid button presses
     m.pendingSkipSeconds = 0
     m.skipSeekTimer = m.top.findNode("SkipSeekTimer")
+
+    ' Native Video node UI / trickplay (thumbnails + speed overlay)
+    m.showUIEnabled = m.top.hasField("showUI")
+    m.trickplayUITimer = m.top.findNode("trickplayUITimer")
+    if m.trickplayUITimer <> invalid
+        DisposableObserveField(m.trickplayUITimer, "fire", FuncName(OnTrickplayUITimer))
+    end if
+end function
+
+function ShowNativeTrickplayUi() as void
+    if m.container <> invalid and not m.container.fullscreen
+        return
+    end if
+
+    m.top.enableUI = true
+
+    if m.showUIEnabled
+        m.top.showUI = {
+            show: true
+            trickPlaybar: true
+            titleAndTime: false
+            trickplayBackgroundOverlay: true
+            focusTrickplayBar: false
+        }
+    end if
+
+    if m.trickplayUITimer <> invalid
+        m.trickplayUITimer.control = "stop"
+        m.trickplayUITimer.control = "start"
+    end if
+
+    if m.trickPlayBar <> invalid
+        m.trickPlayBar.visible = false
+    end if
+end function
+
+function HideNativeTrickplayUi() as void
+    if m.showUIEnabled
+        m.top.showUI = { show: false, focusTrickplayBar: false }
+    end if
+
+    if m.trickplayUITimer <> invalid
+        m.trickplayUITimer.control = "stop"
+    end if
+
+    m.top.enableUI = false
+
+    if m.trickPlayBar <> invalid
+        m.trickPlayBar.visible = true
+    end if
+end function
+
+function OnTrickplayUITimer()
+    HideNativeTrickplayUi()
 end function
 
 function OnNodeReady()
@@ -241,6 +296,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     state = m.top.state
     uiState = m.top.playerUiState
+    isTrickPlayKey = key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
 
     if key = RemoteKeys.Play
         if state = "paused" and uiState = PlayerUiState.Hidden
@@ -263,8 +319,16 @@ function OnKeyEvent(key as string, press as boolean) as boolean
         StartHideVideoUiTimer()
     end if
 
+    ' Show the custom UI when any key is pressed, including trickplay keys,
+    ' so the new icons/buttons remain visible above the native trickplay bar.
     if uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut
         m.top.playerUiState = PlayerUiState.FadingIn
+    end if
+
+    if isTrickPlayKey
+        m.isSeekingPosition = true
+        ShowNativeTrickplayUi()
+        return false
     end if
 
     if NavigationKeyHandler(key, press).handled
@@ -273,17 +337,6 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     if key = RemoteKeys.Back
         m.videoQueue.closePlayer = true
-        return true
-    end if
-
-    ' Remote skip buttons (rewind/fast forward)
-    if key = RemoteKeys.Rewind
-        OnSkipBackButtonSelected()
-        return true
-    end if
-
-    if key = RemoteKeys.FastForward
-        OnSkipForwardButtonSelected()
         return true
     end if
 
@@ -511,6 +564,8 @@ function OnPlayerStateChange() as void
     end if
 
     if state = "playing"
+        m.isSeekingPosition = false
+        HideNativeTrickplayUi()
         m.playButton.toggleState = false ' Pause icon
         m.playButton.disabled = false
 
