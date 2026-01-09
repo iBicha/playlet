@@ -320,12 +320,16 @@ export class YoutubeJs {
             init: format.init_range ? `${format.init_range.start}-${format.init_range.end}` : "",
             index: format.index_range ? `${format.index_range.start}-${format.index_range.end}` : "",
             bitrate: `${format.bitrate}`,
-            url: await format.decipher(YoutubeJs.innerTube.session.player),
             itag: `${format.itag}`,
             type: format.mime_type,
             clen: `${format.approx_duration_ms}`,
             lmt: `${format.last_modified}`,
         };
+
+        if (format.url || format.signature_cipher || format.cipher) {
+            result.url = await format.decipher(YoutubeJs.innerTube.session.player);
+        }
+
         if (format.audio_quality) {
             result.audioQuality = format.audio_quality;
         }

@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Error handling when ytjs formats have missing urls
 
 ## [0.44.4] - 2025-11-23
 
