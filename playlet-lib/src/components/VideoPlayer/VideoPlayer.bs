@@ -825,6 +825,12 @@ function ShowNativeTrickplayUi() as void
         }
     end if
 
+    ' Always hide custom TopUi when native trickplay UI is visible to avoid duplicate titles.
+    ' The titleAndTime: false setting above may not work reliably on all devices/firmware.
+    if m.topUi <> invalid
+        m.topUi.visible = false
+    end if
+
     if m.trickplayUITimer <> invalid
         m.trickplayUITimer.control = "stop"
         m.trickplayUITimer.control = "start"
@@ -850,6 +856,11 @@ function HideNativeTrickplayUi() as void
 
     if m.trickPlayBar <> invalid
         m.trickPlayBar.visible = true
+    end if
+
+    ' Restore custom TopUi visibility (may have been hidden on older devices without showUI support)
+    if m.topUi <> invalid
+        m.topUi.visible = true
     end if
 end function
 
@@ -882,13 +893,8 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     state = m.top.state
     uiState = m.top.playerUiState
 
-    ' Rewind/FastForward always seek (dedicated media buttons)
-    isMediaSeekKey = key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
-
-    ' Left/Right only seek when UI is hidden; otherwise they navigate the player bar
-    isDpadSeekKey = (key = RemoteKeys.Left or key = RemoteKeys.Right) and (uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut)
-
-    isTrickPlayKey = isMediaSeekKey or isDpadSeekKey
+    ' Only Rewind/FastForward seek; Left/Right are reserved for showing/navigating the player bar
+    isTrickPlayKey = key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
 
     if key = RemoteKeys.Play
         if state = "paused" and uiState = PlayerUiState.Hidden
