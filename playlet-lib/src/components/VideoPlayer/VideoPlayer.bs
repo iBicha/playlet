@@ -854,7 +854,16 @@ function HideNativeTrickplayUi() as void
 end function
 
 function OnTrickplayUITimer()
-    HideNativeTrickplayUi()
+    ' Don't hide native trickplay UI while user is actively seeking.
+    ' Restart timer and check again later.
+    if m.isSeekingPosition = true
+        if m.trickplayUITimer <> invalid
+            m.trickplayUITimer.control = "stop"
+            m.trickplayUITimer.control = "start"
+        end if
+    else
+        HideNativeTrickplayUi()
+    end if
 end function
 
 function OnKeyEvent(key as string, press as boolean) as boolean
@@ -872,7 +881,14 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     state = m.top.state
     uiState = m.top.playerUiState
-    isTrickPlayKey = key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
+
+    ' Rewind/FastForward always seek (dedicated media buttons)
+    isMediaSeekKey = key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
+
+    ' Left/Right only seek when UI is hidden; otherwise they navigate the player bar
+    isDpadSeekKey = (key = RemoteKeys.Left or key = RemoteKeys.Right) and (uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut)
+
+    isTrickPlayKey = isMediaSeekKey or isDpadSeekKey
 
     if key = RemoteKeys.Play
         if state = "paused" and uiState = PlayerUiState.Hidden
@@ -900,6 +916,10 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     if isTrickPlayKey
         ' Show native trickplay overlays (thumbnails/speed indicator), but let the Video node
         ' handle the actual trickplay behavior by returning false.
+        ' Always reset the hide timer on trickplay key presses to keep UI visible while seeking.
+        ' This fixes the bug where UI would hide during active seeking when presses occurred
+        ' while UI was in FadingIn state (where the earlier timer reset check doesn't run).
+        StartHideVideoUiTimer()
         m.isSeekingPosition = true
         ShowNativeTrickplayUi()
         return false

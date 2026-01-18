@@ -14,6 +14,17 @@ function InitializePlayerUi()
     m.top.enableUI = false
     m.top.enableTrickPlay = true
 
+    ' Configure native trickplay intervals:
+    ' - D-pad Left/Right scrub by 10 seconds (default is 5)
+    ' - FF/RW cycles through 10/30/60 second skips (1/2/3 arrows)
+    if m.top.hasField("jumpIntervalSeconds")
+        m.top.jumpIntervalSeconds = 10
+    end if
+    if m.top.hasField("trickPlaySpeed")
+        ' Speed multipliers: at base interval, these give 10/30/60 second skips
+        m.top.trickPlaySpeed = [2, 6, 12]
+    end if
+
     FindUiNodes()
     SetupLoadingSpinner()
 
@@ -157,6 +168,13 @@ end function
 
 function OnHideVideoUiTimer() as void
     if m.top.playerUiState = PlayerUiState.Hidden
+        return
+    end if
+
+    ' Don't hide custom UI while user is actively seeking.
+    ' Restart timer and check again later.
+    if m.isSeekingPosition = true
+        StartHideVideoUiTimer()
         return
     end if
 
