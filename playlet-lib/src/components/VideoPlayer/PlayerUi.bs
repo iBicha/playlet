@@ -106,6 +106,13 @@ function OnPlayerUiState()
 end function
 
 function OnPlayerUiFadingIn()
+    ' Only show full UI overlay when fullscreen. In PiP/minimized mode, the
+    ' PictureInPicture module manages videoUi visibility and we should not
+    ' override it, as the full-size 1280x720 overlay would not fit the smaller window.
+    if m.container <> invalid and not m.container.fullscreen
+        return
+    end if
+
     ' Ensure UI group is visible before animating opacity
     m.videoUi.visible = true
 
@@ -118,6 +125,12 @@ function OnPlayerUiFadingIn()
 end function
 
 function OnPlayerUiVisible()
+    ' Only show full UI overlay when fullscreen. In PiP/minimized mode, the
+    ' PictureInPicture module manages videoUi visibility.
+    if m.container <> invalid and not m.container.fullscreen
+        return
+    end if
+
     ' Ensure UI is visible (critical when entering Visible state directly, not via FadingIn animation)
     m.videoUi.visible = true
     m.videoUi.opacity = 1
@@ -136,6 +149,9 @@ end function
 
 function OnPlayerUiHidden()
     m.videoUi.opacity = 0
+    ' Hide the UI group entirely so invisible buttons don't capture focus.
+    ' This prevents navigation keys from changing focus on hidden controls.
+    m.videoUi.visible = false
 
     if m.top.isInFocusChain() and not m.top.hasFocus()
         NodeSetFocus(m.top, false)

@@ -882,6 +882,11 @@ function OnKeyEvent(key as string, press as boolean) as boolean
         return false
     end if
 
+    ' OK behavior: Unlike the native Video node (with enableUI=true), OK does not directly
+    ' toggle play/pause. Instead, OK brings up the custom player UI, and the user navigates
+    ' to the Play button to toggle playback. On remotes without a dedicated Play/Pause key,
+    ' this means "OK to show UI, then OK on the focused Play button to pause/resume."
+    '
     ' If SponsorBlock is showing a "Press OK to skip" notification, OK should skip
     ' instead of only bringing up the player UI.
     if key = RemoteKeys.Ok
@@ -915,6 +920,8 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     ' Show the custom UI when any key is pressed, including trickplay keys,
     ' so the new icons/buttons remain visible above the native trickplay bar.
+    ' Note: In PiP/minimized mode, OnPlayerUiFadingIn guards against showing the
+    ' full-size overlay, so this state transition is safe even when not fullscreen.
     if uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut
         m.top.playerUiState = PlayerUiState.FadingIn
     end if
