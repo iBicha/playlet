@@ -329,6 +329,9 @@ function OnVideoContentJobErrorDialogResponse(event as object)
     shouldPlayNext = false
     if event <> invalid
         dialog = event.getRoSGNode()
+        if m.errorDialog <> invalid and dialog.isSameNode(m.errorDialog)
+            m.errorDialog = invalid
+        end if
         dialog.unobserveFieldScoped("wasClosed")
         shouldPlayNext = dialog.actualButtonSelected = 0
     end if
@@ -444,6 +447,14 @@ function OnVideoPlayerStateChange() as void
     ' Reset isSeekingPosition when started to play the video
     if state = "playing"
         m.isSeekingPosition = false
+
+        ' If we somehow was able to recover playback after an error dialog, close the dialog
+        errorDialog = m.errorDialog
+        if errorDialog <> invalid
+            m.errorDialog = invalid
+            errorDialog.unobserveFieldScoped("wasClosed")
+            errorDialog.close = true
+        end if
     end if
 
     ' If we successfully played the video, then any error that comes later is not due to a 403 (FORBIDDEN).
@@ -520,6 +531,7 @@ function OnVideoPlayerStateChange() as void
 
         dialog = DialogUtils.ShowTimedDialogButtons(errorData.body, errorData.title, buttons, 0, 10, true)
         if dialog <> invalid
+            m.errorDialog = dialog
             dialog.observeFieldScoped("wasClosed", FuncName(OnVideoContentJobErrorDialogResponse))
         else
             OnVideoContentJobErrorDialogResponse(invalid)
