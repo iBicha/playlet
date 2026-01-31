@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Error dialog doesn't close automatically when playback recovers after an error
 - All audio track names are shown as "Other" in multi audio track videos
 
 ## [0.44.5] - 2026-01-17
