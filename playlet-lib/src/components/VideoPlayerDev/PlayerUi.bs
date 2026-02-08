@@ -34,6 +34,7 @@ function InitializePlayerUi()
     DisposableObserveField(m.top, "playerUiState", FuncName(OnPlayerUiState))
     DisposableObserveField(m.top, "focusedChild", FuncName(OnPlayerFocusChange))
 
+    m.focusPlayButtonOnNextUiShow = true
     m.top.playerUiState = PlayerUiState.Visible
 end function
 
@@ -116,9 +117,7 @@ function OnPlayerUiFadingIn() as void
     ' Ensure UI group is visible before animating opacity
     m.videoUi.visible = true
 
-    if m.top.hasFocus()
-        NodeSetFocus(m.playButton, true)
-    end if
+    FocusPlayButtonOnUiShow()
 
     m.uiFadeOpacityInterpolator.reverse = false
     m.uiFadeAnimation.control = "start"
@@ -135,9 +134,7 @@ function OnPlayerUiVisible() as void
     m.videoUi.visible = true
     m.videoUi.opacity = 1
 
-    if m.top.hasFocus()
-        NodeSetFocus(m.playButton, true)
-    end if
+    FocusPlayButtonOnUiShow()
 
     StartHideVideoUiTimer()
 end function
@@ -168,10 +165,51 @@ function OnPlayerFocusChange() as void
 
     state = m.top.playerUiState
     if state = PlayerUiState.Visible or state = PlayerUiState.FadingIn
-        if m.playButton <> invalid
-            NodeSetFocus(m.playButton, true)
-        end if
+        FocusPlayButtonOnUiShow()
     end if
+end function
+
+function FocusPlayButtonOnUiShow() as void
+    if m.focusPlayButtonOnNextUiShow <> true
+        return
+    end if
+
+    if not m.top.hasFocus()
+        return
+    end if
+
+    focusTarget = GetDefaultUiFocusTarget()
+    if focusTarget = invalid
+        return
+    end if
+
+    NodeSetFocus(focusTarget, true)
+    m.focusPlayButtonOnNextUiShow = false
+end function
+
+function GetDefaultUiFocusTarget() as object
+    if m.playButton <> invalid and m.playButton.visible and m.playButton.focusable
+        return m.playButton
+    end if
+
+    focusCandidates = [
+        m.skipBackButton
+        m.skipForwardButton
+        m.qualityButton
+        m.ccButton
+        m.statsButton
+        m.bookmarkButton
+        m.minimizeButton
+        m.previousButton
+        m.nextButton
+    ]
+    for each candidate in focusCandidates
+        if candidate <> invalid and candidate.visible and candidate.focusable
+            return candidate
+        end if
+    end for
+
+    return invalid
 end function
 
 function StartHideVideoUiTimer()

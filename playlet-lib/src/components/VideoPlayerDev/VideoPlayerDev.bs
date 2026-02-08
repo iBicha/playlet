@@ -95,10 +95,45 @@ function Init()
 end function
 
 function OnFocusedChildChanged() as void
-    fc = m.top.focusedChild
-    if fc <> invalid
-        m.lastFocused = fc
+    focusedControl = GetFocusedPlayerControlNode()
+    if focusedControl <> invalid
+        m.lastFocused = focusedControl
     end if
+end function
+
+function IsPlayerControlNode(node as object) as boolean
+    if node = invalid
+        return false
+    end if
+
+    controls = [
+        m.previousButton
+        m.skipBackButton
+        m.playButton
+        m.skipForwardButton
+        m.nextButton
+        m.qualityButton
+        m.ccButton
+        m.statsButton
+        m.bookmarkButton
+        m.minimizeButton
+    ]
+
+    for each control in controls
+        if control <> invalid and node.isSameNode(control)
+            return true
+        end if
+    end for
+
+    return false
+end function
+
+function GetFocusedPlayerControlNode() as object
+    focusedNode = GetFocusedNode()
+    if IsPlayerControlNode(focusedNode)
+        return focusedNode
+    end if
+    return invalid
 end function
 
 #if DEBUG_LOG_VIDEO_QUALITY
@@ -830,7 +865,16 @@ function ShowNativeTrickplayUi() as void
 
     ' Hide our custom buttons while native trickplay overlays are visible
     ' and ensure the Video node holds focus for trickplay key handling.
-    m.focusRestore = m.lastFocused
+    focusedControl = GetFocusedPlayerControlNode()
+    if focusedControl <> invalid
+        m.lastFocused = focusedControl
+        m.focusRestore = focusedControl
+    else
+        m.focusRestore = m.lastFocused
+    end if
+
+    ' Trickplay should not re-home focus to Play until UI is explicitly shown again.
+    m.focusPlayButtonOnNextUiShow = false
     if m.buttons <> invalid
         m.buttons.visible = false
     end if
@@ -890,9 +934,9 @@ function HideNativeTrickplayUi() as void
 
     ' Restore focus after trickplay if UI is currently visible
     if m.videoUi <> invalid and m.videoUi.visible and m.videoUi.opacity = 1
-        if m.focusRestore <> invalid and m.focusRestore.visible = true
+        if m.focusRestore <> invalid and m.focusRestore.visible = true and m.focusRestore.focusable
             NodeSetFocus(m.focusRestore, true)
-        else if m.playButton <> invalid and m.playButton.visible = true
+        else if m.playButton <> invalid and m.playButton.visible = true and m.playButton.focusable
             NodeSetFocus(m.playButton, true)
         end if
     end if
@@ -950,6 +994,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
 
     if key = RemoteKeys.Play or key = RemoteKeys.PlayOnly
         if canShowCustomUi and state = "playing" and uiState = PlayerUiState.Hidden
+            m.focusPlayButtonOnNextUiShow = true
             m.top.playerUiState = PlayerUiState.FadingIn
             return false
         end if
@@ -963,6 +1008,7 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     ' Avoid transitioning to FadingIn while minimized/PiP because that can leave
     ' playerUiState stale until returning fullscreen.
     if canShowCustomUi and (uiState = PlayerUiState.Hidden or uiState = PlayerUiState.FadingOut)
+        m.focusPlayButtonOnNextUiShow = true
         m.top.playerUiState = PlayerUiState.FadingIn
     end if
 
