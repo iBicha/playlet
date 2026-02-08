@@ -27,6 +27,9 @@
 
 Playlet is an unofficial YouTube client for Roku 📺
 
+**[Playlet February 2026 Update](https://github.com/iBicha/playlet/discussions/827)**
+
+
 ## Screenshots
 
   <a href="./docs/screenshots/README.md">
