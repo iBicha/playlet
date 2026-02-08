@@ -1,0 +1,255 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Services/SponsorBlock/Notifications/SponsorBlockNotificationUtils.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "SponsorBlockSegmentAction.bs"
+import "VideoPlayerDev.bs"
+
+namespace SponsorBlock
+
+    function SetupSponsorBlock() as void
+        if not m.preferences["sponsorblock.enabled"]
+            return
+        end if
+
+        m.sponsorBlockService = new SponsorBlock.SponsorBlockService()
+        SponsorBlock.SetVisible(m.notifications, m.container.fullscreen)
+    end function
+
+    function FetchSponsorBlock(metadata as object) as void
+        if not m.preferences["sponsorblock.enabled"]
+            return
+        end if
+
+        if m.sponsorBlockSegmentsJob <> invalid
+            m.sponsorBlockSegmentsJob.cancel = true
+        end if
+
+        input = {
+            videoId: metadata.videoId
+            lengthSeconds: metadata.lengthSeconds
+            showNotifications: m.preferences["sponsorblock.show_notifications"]
+            categories: m.preferences["sponsorblock.categories"]
+        }
+
+        m.sponsorBlockSegmentsJob = JobSystem.CreateCallback(OnSponsorBlockSegmentsJobDone)
+        JobSystem.QueueJob(m.jobQueue, Jobs.SponsorBlockSegmentsJob, input, m.sponsorBlockSegmentsJob)
+    end function
+
+    function OnSponsorBlockSegmentsJobDone(event as object) as void
+        JobSystem.UnobserveCallback(event.getRoSGNode())
+        m.sponsorBlockSegmentsJob = invalid
+
+        info = event.getInfo()
+        if not info.success
+            return
+        end if
+
+        skipSegments = info.data.skipSegments
+        if skipSegments = invalid or skipSegments.Count() = 0
+            return
+        end if
+
+        m.skipSegments = skipSegments
+        m.top.seekMode = "accurate"
+
+        barPath = info.data.barPath
+        bar = GetTrickPlayBar()
+        if barPath <> invalid and bar <> invalid
+            bar.trackImageUri = barPath
+            bar.filledBarBlendColor = "#FF000080"
+        end if
+
+        m.top.ObserveFieldScoped("position", FuncName(OnPositionChangeSkipSponsorBlockSections))
+
+        if bar <> invalid
+            PositionChapterLabel(bar)
+            m.chapterLabelTimer = m.top.findNode("chapterLabelTimer")
+            m.chapterLabelTimer.observeField("fire", FuncName(OnChapterLabelTimer))
+            m._sponsorBlockLastTimeChapterUpdated = 0.0#
+            m.sponsorBlockTrickPlayBar = bar
+            bar.observeField("visible", FuncName(OnTrickPlayBarVisible))
+            OnTrickPlayBarVisible()
+        end if
+    end function
+
+    function PositionChapterLabel(bar as object) as void
+        if bar = invalid
+            return
+        end if
+        m.chapterLabel = m.top.findNode("chapterLabel")
+        ' We move the chapter label under the custom trickplay bar
+        ' We could move it to m.top.pivotNode, but that is only available on Roku OS 11.5+
+        m.chapterLabel.reparent(bar, false)
+        trickPlayBarWidth = bar.boundingRect().width
+        m.chapterLabel.translation = [trickPlayBarWidth / 4 - m.chapterLabel.width / 2, 25]
+    end function
+
+    function OnTrickPlayBarVisible() as void
+        bar = m.sponsorBlockTrickPlayBar
+        if bar = invalid
+            return
+        end if
+
+        if bar.visible
+            m.top.chapter = ""
+            m.chapterLabelTimer.control = "start"
+        else
+            m.chapterLabelTimer.control = "stop"
+        end if
+    end function
+
+    function OnChapterLabelTimer() as void
+        time = GetCurrentChapterTime()
+        if m._sponsorBlockLastTimeChapterUpdated = time
+            return
+        end if
+
+        m._sponsorBlockLastTimeChapterUpdated = time
+        UpdateSponsorBlockChapter(time)
+    end function
+
+    function GetTrickPlayBar() as object
+        if m.trickPlayBar <> invalid
+            return m.trickPlayBar
+        end if
+        if m.top <> invalid and m.top.hasField("trickPlayBar")
+            return m.top.trickPlayBar
+        end if
+        return invalid
+    end function
+
+    function GetCurrentChapterTime() as dynamic
+        ' Use trickPlayPosition when available (for seek preview), otherwise current position.
+        ' Removed problematic node comparison that caused runtime errors on some devices.
+        if m.top.hasField("trickPlayPosition")
+            return m.top.trickPlayPosition
+        end if
+        return m.top.position
+    end function
+
+    function UpdateSponsorBlockChapter(time as double) as void
+        segments = m.skipSegments
+        segment = FindSegmentByTime(segments, time)
+        if segment = invalid
+            m.top.chapter = ""
+            return
+        end if
+        m.top.chapter = segment.title
+    end function
+
+    function FindSegmentByTime(segments as object, time as dynamic) as dynamic
+        ' Binary search for the segment that contains the time.
+        ' This search sometimes fails if the segments overlap.
+        ' For most cases, this is acceptable, since it is not common for segments to overlap.
+        low = 0
+        high = segments.Count() - 1
+        while low <= high
+            middle = (low + high) \ 2
+            segment = segments[middle]
+            if time < segment.start
+                high = middle - 1
+            else if time > segment.end
+                low = middle + 1
+            else
+                return segment
+            end if
+        end while
+        return invalid
+    end function
+
+    function OnPositionChangeSkipSponsorBlockSections(event as object) as void
+        segments = m.skipSegments
+        position = event.getData()
+
+        segment = FindSegmentByTime(segments, position)
+        if segment = invalid
+            return
+        end if
+
+        action = segment.option
+
+        ' If we're close to the end of the segment, we don't want to show
+        ' a notification, since it is possible this is where we skipped to.
+        ' Seeking is not super accurate.
+        if segment.showNotification and Abs(segment.end - position) >= 1
+            SponsorBlock.ShowNotifcation(m.notifications, segment)
+
+            if action = SegmentAction.ManualSkip
+                ' We'll save the segment here, and handle it in case the user
+                ' presses the OK button on the notification.
+                m.manualSkipSegment = segment
+                return
+            end if
+        end if
+
+        if action = SegmentAction.AutoSkip
+            SkipSegment(segment, position)
+        end if
+    end function
+
+    function SkipSegment(segment as object, position as dynamic) as void
+        segmentEnd = segment.end
+
+        duration = m.top.duration
+        ' Sometimes segmentEnd is greater than duration
+        if duration > 0 and segmentEnd > duration
+            segmentEnd = duration
+        end if
+
+        ' If we're skipping a very short distance, it's not worth it
+        ' since we can cause rebuffering
+        if Abs(segmentEnd - position) < 2
+            LogInfo("Skip position is within 2 seconds of segment end, not skipping")
+            return
+        end if
+
+        ' If the segment is at the end of the video, skip the video instead of seeking
+        if duration > 0 and Abs(segmentEnd - duration) < 2
+            LogInfo("Skipping section:", segment.category, "at end of video")
+            OnVideoFinished()
+        else
+            LogInfo("Skipping section:", segment.category)
+            m.top.seek = segmentEnd
+        end if
+        SendSkippedSectionEvent(segment.UUID)
+    end function
+
+    function ManualSkipSegment() as boolean
+        segment = m.manualSkipSegment
+        if segment = invalid
+            return false
+        end if
+
+        m.manualSkipSegment = invalid
+
+        notification = SponsorBlock.GetCurrentNotification(m.notifications)
+        if notification = invalid
+            return false
+        end if
+
+        notificationSegmentId = notification.segmentId
+        if notificationSegmentId <> segment.UUID
+            return false
+        end if
+
+        position = m.top.position
+        if (position < segment.start) or (segment.end < position)
+            return false
+        end if
+
+        SkipSegment(segment, position)
+        SponsorBlock.RemoveNotifcation(m.notifications)
+        return true
+    end function
+
+    function SendSkippedSectionEvent(segmentId as string)
+        if m.sponsorSkipEventJob <> invalid
+            m.sponsorSkipEventJob.cancel = true
+        end if
+
+        m.sponsorSkipEventJob = JobSystem.CreateCallback()
+        JobSystem.QueueJob(m.jobQueue, Jobs.SponsorBlockSegmentViewedJob, { segmentId: segmentId }, m.sponsorSkipEventJob)
+    end function
+
+end namespace

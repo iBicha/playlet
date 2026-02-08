@@ -1,20 +1,21 @@
-<!-- 
-    VideoPlayerDev is the player that will eventually be used in the Playlet app.
-    It extends the Video component, and will be fully managing the UI, progress,
-    buffering, and any state of the video playback.
-    This would allow us to be flexible with the UI beyond the customizations
-    of the stock Roku Video component. 
- -->
 <component name="VideoPlayerDev" extends="Video" includes="AutoBind,Disposable">
     <interface>
+        <field id="appController" type="node" bind="/AppController" />
         <field id="jobQueue" type="node" bind="/JobQueue" />
         <field id="container" type="node" bind=".." />
+        <field id="notifications" type="node" bind="../../Notifications" />
         <field id="videoQueue" type="node" bind="../../VideoQueue" />
         <field id="preferences" type="node" bind="../../Preferences" />
+        <field id="innertube" type="node" bind="../../Innertube" />
         <field id="invidious" type="node" bind="../../Invidious" />
+        <field id="webServer" type="node" bind="../../WebServer" />
+        <field id="loungeService" type="node" bind="../../LoungeService" />
+        <field id="bookmarksService" type="node" bind="../../BookmarksService" />
         <field id="previousPlayer" type="node" />
         <field id="minRect" type="rect2D" value="[834,460,426,240]" />
         <field id="maxRect" type="rect2D" value="[0,0,1280,720]" />
+        <field id="chapter" type="string" alias="chapterLabel.text" />
+        <field id="showFullScreenHint" type="boolean" alwaysNotify="true" onChange="OnShowFullScreenHint" />
         <field id="close" type="boolean" alwaysNotify="true" onChange="OnClose" />
         <field id="minimizeState" type="integer" />
         <field id="playerUiState" type="integer" />
@@ -22,12 +23,11 @@
     </interface>
     <children>
         <!-- bs:disable-next-line LOCALE_MISSING_TRANSLATIONS -->
-        <SimpleLabel text="Dev Player!"
+        <SimpleLabel text="Dev"
             color="#FF0000"
             fontUri="font:SmallestBoldSystemFont"
             horizOrigin="right"
             translation="[1280,0]" />
-
         <Group id="VideoUi">
             <Poster
                 id="BackgroundPosterSmall"
@@ -47,10 +47,6 @@
                     height="240"
                     scaleRotateCenter="[640,120]"
                     rotation="3.14159265359" />
-                <!-- 
-                    TODO:P2 once VideoPlayerDev replaces VideoPlayer, the clock can 
-                    be removed to reuse the Clock from MainScene
-                -->
                 <Clock id="Clock" />
                 <LayoutGroup
                     itemSpacings="[5]"
@@ -65,6 +61,12 @@
                         font="font:SmallestSystemFont"
                         width="900"
                         wrap="true" />
+                    <Label
+                        id="ViewCountLabel"
+                        font="font:SmallestSystemFont"
+                        color="#AAAAAA"
+                        width="900"
+                        wrap="true" />
                 </LayoutGroup>
             </Group>
             <Poster
@@ -75,27 +77,57 @@
                 translation="[0,360]" />
 
             <Group id="Buttons">
+                <!-- Centered playback controls -->
                 <LayoutGroup
+                    id="PlaybackButtons"
                     layoutDirection="horiz"
-                    horizAlignment="left"
-                    itemSpacings="[15,15,50]"
-                    translation="[562,600]">
-                    <VideoPlayerButton
+                    horizAlignment="center"
+                    itemSpacings="[8]"
+                    translation="[640,517]">
+                    <VideoPlayerButtonDev
                         id="PreviousButton"
                         iconUri="pkg:/images/icons/player/previous.png"
                         disabled="true" />
-                    <VideoPlayerButton
+                    <VideoPlayerButtonDev
+                        id="SkipBackButton"
+                        iconUri="pkg:/images/icons/player/skip-back.png" />
+                    <VideoPlayerButtonDev
                         id="PlayButton"
                         iconUri="pkg:/images/icons/player/play.png"
                         iconUri2="pkg:/images/icons/player/pause.png"
                         disabled="true" />
-                    <VideoPlayerButton
+                    <VideoPlayerButtonDev
+                        id="SkipForwardButton"
+                        iconUri="pkg:/images/icons/player/skip-forward.png" />
+                    <VideoPlayerButtonDev
                         id="NextButton"
                         iconUri="pkg:/images/icons/player/next.png"
                         disabled="true" />
-                    <VideoPlayerButton
+                </LayoutGroup>
+
+                <!-- Right aligned feature controls -->
+                <LayoutGroup
+                    id="FeatureButtons"
+                    layoutDirection="horiz"
+                    horizAlignment="right"
+                    itemSpacings="[8]"
+                    translation="[1212,517]">
+                    <!-- bs:disable-next-line LOCALE_MISSING_TRANSLATIONS -->
+                    <VideoPlayerTextButtonDev id="QualityButton" text="720p" />
+                    <VideoPlayerButtonDev
+                        id="CCButton"
+                        iconUri="pkg:/images/icons/player/cc-off.png"
+                        iconUri2="pkg:/images/icons/player/cc-on.png" />
+                    <VideoPlayerButtonDev
+                        id="StatsButton"
+                        iconUri="pkg:/images/icons/player/stats-off.png"
+                        iconUri2="pkg:/images/icons/player/stats-on.png" />
+                    <VideoPlayerButtonDev
+                        id="BookmarkButton"
+                        iconUri="pkg:/images/icons/player/bookmark.png" />
+                    <VideoPlayerButtonDev
                         id="MinimizeButton"
-                        iconUri="pkg:/images/icons/player/minimize.png" />
+                        iconUri="pkg:/images/icons/player/pip.png" />
                 </LayoutGroup>
             </Group>
             <Group
@@ -105,7 +137,7 @@
                     id="LoadingSpinnerBackground"
                     width="80"
                     height="80"
-                    uri="pkg:/images/white-circle.png"
+                    uri="pkg:/images/white-circle-aa-80.png"
                     opacity="0.4"
                     blendColor="0x000000" />
                 <BusySpinner
@@ -128,13 +160,18 @@
             </Group>
             <Group>
                 <Timer id="ProgressTimer" repeat="true" duration="1" />
-                <TrickPlayBar
+                <TrickPlayBarDev
                     id="TrickPlayBar"
-                    translation="[68,660]" />
+                    translation="[68,580]" />
             </Group>
         </Group>
 
+        <Label id="chapterLabel" width="350" height="25" horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" />
+        <Timer id="chapterLabelTimer" repeat="true" duration="0.5" />
+
         <Timer id="HideVideoUiTimer" duration="3" />
+        <Timer id="trickplayUITimer" duration="5" />
+        <Timer id="SkipSeekTimer" duration="0.5" />
         <Animation id="UiFadeAnimation" duration="0.3" optional="true">
             <FloatFieldInterpolator id="UiFadeOpacityInterpolator" key="[0.0, 0.5, 1.0]" keyValue="[0.0, 0.5, 1.0]" fieldToInterp="VideoUi.opacity" />
         </Animation>
