@@ -1,0 +1,31 @@
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace Lounge
+
+    function SendNowPlayingLoading(videoId as dynamic) as void
+        if StringUtils.IsNullOrEmpty(m.loungeService.loungeToken)
+            return
+        end if
+
+        overrides = {}
+        overrides[FIELD_STATE] = PlayerState.BUFFERING
+        loungeStateMsg = LoungeMessages.OnStateChange(m.top, overrides)
+        if not StringUtils.IsNullOrEmpty(videoId)
+            overrides[FIELD_VIDEO_ID] = videoId
+        end if
+        nowPlayingMsg = LoungeMessages.NowPlaying(m.top, overrides)
+        m.loungeService.outgoingMessages = [nowPlayingMsg, loungeStateMsg]
+    end function
+
+    function SendOnStateChange() as void
+        if StringUtils.IsNullOrEmpty(m.loungeService.loungeToken)
+            return
+        end if
+
+        loungeStateMsg = LoungeMessages.OnStateChange(m.top)
+        m.loungeService.outgoingMessages = [loungeStateMsg]
+    end function
+
+end namespace

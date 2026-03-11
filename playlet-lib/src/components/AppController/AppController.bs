@@ -24,10 +24,24 @@ function PushScreen(node as object)
     FocusTopScreen(invalid)
 end function
 
-function PopScreen(_unused as dynamic)
+function PopScreen(_unused as dynamic) as void
     childCount = m.stack.getChildCount()
     if childCount > 1
+        screen = m.stack.getChild(childCount - 1)
         m.stack.removeChildIndex(childCount - 1)
+
+        focusNode = invalid
+        if screen <> invalid and screen.hasField("returnFocusNode")
+            focusNode = screen.returnFocusNode
+        end if
+
+        if focusNode <> invalid
+            NodeSetFocus(focusNode, true)
+            if focusNode.hasFocus()
+                return
+            end if
+        end if
+
         FocusTopScreen(invalid)
     end if
 end function
