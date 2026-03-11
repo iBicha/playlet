@@ -11,6 +11,7 @@ function ExecuteJob() as void
     authToken = input.authToken
     profileType = input.profileType
     playbackTrackingUrls = input.playbackTrackingUrls
+    cpn = input.cpn
 
     cancellation = JobGetCancellation()
 
@@ -43,9 +44,14 @@ function ExecuteJob() as void
         return
     end if
 
+    if StringUtils.IsNullOrEmpty(cpn)
+        cpn = InnertubeService.CreateClientPlaybackNonce()
+    end if
+
     markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
         accessToken: authToken.token
         onBehalfOfUser: authToken.activeIdentifyToken
+        cpn: cpn
         cancellation: cancellation
     })
     if not markedAsWatched
@@ -68,6 +74,7 @@ function ExecuteJob() as void
     MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
     successiveFailures = 0
+    lastReportedTime = 0.0
     while true
         message = wait(60000, port)
         if CancellationUtils.IsCancellationEvent(cancellation, message)
@@ -90,16 +97,27 @@ function ExecuteJob() as void
         end while
 
         watchTime = message.getData()
-        success = InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
+        ' On seek-back, clamp st to not exceed et - I don't know if we really need to
+        if lastReportedTime > watchTime
+            lastReportedTime = watchTime - 20
+            if lastReportedTime < 0
+                lastReportedTime = 0
+            end if
+        end if
+
+        success = InnertubeService.AuthMarkVideoWatchTime(lastReportedTime, watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
             accessToken: authToken.token
             onBehalfOfUser: authToken.activeIdentifyToken
+            cpn: cpn
             ' TODO:P1 if we pass cancellation here, http client will remove scoped
             ' observer, which is stored on the current node.
             ' This requires an extra observer node to be independent.
+            cmt: lastReportedTime
             cancellation: invalid
         })
         if success
             successiveFailures = 0
+            lastReportedTime = watchTime
         else
             successiveFailures += 1
         end if
