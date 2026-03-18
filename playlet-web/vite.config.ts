@@ -2,7 +2,6 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig, UserConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import viteCompression from 'vite-plugin-compression';
-import tsconfigPaths from 'vite-tsconfig-paths'
 import ip from 'ip';
 import { existsSync, readFileSync } from 'fs'
 import { join as joinPath } from 'path'
@@ -13,7 +12,6 @@ const PORT = 5173
 
 const config: UserConfig = {
   plugins: [
-    tsconfigPaths(),
     svelte(),
     legacy({
       targets: ['defaults', 'not IE 11'],
@@ -23,6 +21,9 @@ const config: UserConfig = {
       deleteOriginFile: true
     })
   ],
+  resolve: {
+    tsconfigPaths: true
+  },
   build: {
     outDir: "../playlet-lib/src/www",
     emptyOutDir: true

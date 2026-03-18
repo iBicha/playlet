@@ -141,20 +141,8 @@ export class YoutubeJs {
 
     static initJsEvaluator() {
         Platform.shim.eval = async (data: Types.BuildScriptResult, env: Record<string, Types.VMPrimative>) => {
-            const properties = [];
-
-            if (env.n) {
-                properties.push(`n: exportedVars.nFunction("${env.n}")`)
-            }
-
-            if (env.sig) {
-                properties.push(`sig: exportedVars.sigFunction("${env.sig}")`)
-            }
-
-            const code = `${data.output}\nreturn { ${properties.join(', ')} }`;
-
-            return new Function(code)();
-        }
+            return new Function(data.output)();
+        };
     }
 
     static async generateVisitorData() {
@@ -254,6 +242,10 @@ export class YoutubeJs {
             client: 'TV',
             po_token: await YoutubeJs.generatePoToken(videoId),
         });
+
+        if (info.playability_status.status !== 'OK') {
+            throw new Error(`Video is not playable: ${info.playability_status.status}\nReason: ${info.playability_status.reason}`);
+        }
 
         // We can't generate a proper dash from live videos.
         // By returning null, we're telling Playlet to fetch video info itself.
