@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Always use `signatureTimestamp` in `/player` calls to prevent "reload page" errors. This affects watch history.
+- Attempt 2 to fix watch history and watch progress
+
 ## [0.44.7] - 2026-04-23
 
 ### Fixed

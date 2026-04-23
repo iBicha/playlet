@@ -363,8 +363,6 @@ namespace InnertubeService
         accessToken = OptionUtils.Get(options, "accessToken")
         onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
         cpn = OptionUtils.Get(options, "cpn")
-        cmt = OptionUtils.GetOrDefault(options, "cmt", 0)
-        cmtStr = cmt.ToStr("%.3f")
 
         videostatsPlaybackUrl = videostatsPlaybackUrl.replace("https://s.", "https://www.")
         queryParams = UrlUtils.ParseQueryComponents(videostatsPlaybackUrl)
@@ -372,8 +370,9 @@ namespace InnertubeService
         queryParams["cbrver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["ver"] = "2"
+        queryParams["cmt"] = "0"
         queryParams["cpn"] = cpn
-        queryParams["cmt"] = cmtStr
+        queryParams["final"] = "1"
         videostatsPlaybackUrl = UrlUtils.SetQueryParams(videostatsPlaybackUrl, queryParams)
 
         request = HttpClient.Get(videostatsPlaybackUrl)
@@ -395,15 +394,13 @@ namespace InnertubeService
         return true
     end function
 
-    function AuthMarkVideoWatchTime(startTime as float, endTime as float, videostatsWatchtimeUrl as string, options = invalid as object) as boolean
+    function AuthMarkVideoWatchTime(time as float, videostatsWatchtimeUrl as string, options = invalid as object) as boolean
         cancellation = OptionUtils.Get(options, "cancellation")
         accessToken = OptionUtils.Get(options, "accessToken")
         onBehalfOfUser = OptionUtils.Get(options, "onBehalfOfUser")
+
+        timeStr = time.ToStr("%.3f")
         cpn = OptionUtils.Get(options, "cpn")
-        cmt = OptionUtils.GetOrDefault(options, "cmt", 0)
-        cmtStr = cmt.ToStr("%.3f")
-        stStr = startTime.ToStr("%.3f")
-        etStr = endTime.ToStr("%.3f")
 
         videostatsWatchtimeUrl = videostatsWatchtimeUrl.replace("https://s.", "https://www.")
         queryParams = UrlUtils.ParseQueryComponents(videostatsWatchtimeUrl)
@@ -412,9 +409,10 @@ namespace InnertubeService
         queryParams["cver"] = INNERTUBE_TV_CLIENT_VERSION
         queryParams["ver"] = "2"
         queryParams["cpn"] = cpn
-        queryParams["cmt"] = cmtStr
-        queryParams["st"] = stStr
-        queryParams["et"] = etStr
+        queryParams["cmt"] = "0"
+        queryParams["st"] = timeStr
+        queryParams["et"] = timeStr
+        queryParams["final"] = "1"
         videostatsWatchtimeUrl = UrlUtils.SetQueryParams(videostatsWatchtimeUrl, queryParams)
 
         request = HttpClient.Get(videostatsWatchtimeUrl)
@@ -432,7 +430,7 @@ namespace InnertubeService
             return false
         end if
 
-        LogDebug("Marked video watch time:", stStr, "-", etStr)
+        LogDebug("Marked video watch time:", timeStr)
         return true
     end function
 

@@ -13,8 +13,6 @@ namespace Innertube
         cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
-        doSignatureTimestamp = ValidBool(OptionUtils.Get(options, "signatureTimestamp"))
-
         cpn = InnertubeService.CreateClientPlaybackNonce()
 
         useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
@@ -52,12 +50,9 @@ namespace Innertube
             "contentCheckOk": true
         }
 
-        signatureTimestamp = invalid
-        if doSignatureTimestamp
-            signatureTimestamp = GetSignatureTimestamp(cancellation)
-            if signatureTimestamp <> invalid
-                payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = signatureTimestamp
-            end if
+        signatureTimestamp = GetSignatureTimestamp(cancellation)
+        if signatureTimestamp <> invalid
+            payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = signatureTimestamp
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
