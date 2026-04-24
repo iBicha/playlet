@@ -8,6 +8,26 @@ Playlet does not show advertising, whether personalized or non personalized.
 
 Playlet may integrate with 3rd party telemetry services in order to capture anonymous diagnostics data. The only purpose of this data is to diagnose issues and improve the app.
 
+### Current telemetry implementation
+
+> This section tries to explain in more detail what data is collected and how it is used. Due to the granularity and details of the following explanation, it might be slightly out of date, but mostly represents the reality of the "Playlet may integrate with 3rd party telemetry services"
+
+Currently, Playlet captures a bunch of errors through the [telemetry client code](https://github.com/iBicha/playlet/tree/f3c159218ac8e3eec08eb7b62cbd45ad6c451b99/playlet-lib/src/components/Telemetry).
+It's mostly OS info (version, device model, etc), app info, user country code, locale, error messages, and stack traces. Nothing more than necessary is captured to debug problems.
+
+In addition to that, an anonymous user id (just a guid stable across app launches of Playlet) and a session id (generated on every launch) are collected.
+
+The user id is used to understand how many people an error affects. Sometimes one issue is spread out evenly among users, sometimes it's a handful of users (or even just one) spamming the same errors. This helps investigate that aspect.
+
+The session id is used to understand how an error happened. By isolating a specific error to a session, it helps understand what led to said error.
+
+This data is currently sent to a server, then forwarded to a self-hosted instance [Glitch-Tip](https://gitlab.com/glitchtip/glitchtip) which provides a simple dashboard showing how frequent errors are, and on which versions they occur.
+
+This data is anonymous. The data is not collected in a way that can be linked back to a real person, or a YouTube profile for example.
+The data is stored on a local hard drive, does not leave said hard drive, and accessed only by the currently single developer of Playlet, and frequently purged (because honestly I don't have the disk space).
+
+The data is used to investigate errors, like playback errors, feed load errors, login errors, and so on.
+
 ## Invidious
 
 Playlet may request information from one or more [Invidious](https://invidious.io/)
