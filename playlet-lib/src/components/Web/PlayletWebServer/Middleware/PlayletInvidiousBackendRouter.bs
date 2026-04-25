@@ -56,17 +56,13 @@ namespace Http
             request = context.request
             response = context.response
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
                 "disableShorts": m.preferences["content_feed.disable_shorts"]
             }
 
@@ -117,12 +113,8 @@ namespace Http
             request = context.request
             response = context.response
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
@@ -135,17 +127,13 @@ namespace Http
             request = context.request
             response = context.response
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
             }
 
             activeIdentifyToken = request.query.activeIdentifyToken
@@ -187,17 +175,13 @@ namespace Http
             request = context.request
             response = context.response
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
             }
 
             activeIdentifyToken = request.query.activeIdentifyToken
@@ -274,17 +258,13 @@ namespace Http
             request = context.request
             response = context.response
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
                 "disableShorts": m.preferences["content_feed.disable_shorts"]
             }
 
@@ -624,9 +604,9 @@ namespace Http
                 raw: raw
             }
 
-            accessToken = request.headers["authorization"]
-            if not StringUtils.IsNullOrEmpty(accessToken) and accessToken.StartsWith("Bearer ")
-                options["accessToken"] = accessToken.Mid("Bearer ".Len())
+            accessToken = m.GetAccessToken(request)
+            if accessToken <> invalid
+                options["accessToken"] = accessToken
 
                 activeIdentifyToken = request.query.activeIdentifyToken
                 if not StringUtils.IsNullOrEmpty(activeIdentifyToken)
@@ -692,12 +672,8 @@ namespace Http
             response = context.response
             route = request.route
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
@@ -850,12 +826,8 @@ namespace Http
             response = context.response
             route = request.route
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
@@ -873,7 +845,7 @@ namespace Http
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
             }
 
             activeIdentifyToken = request.query.activeIdentifyToken
@@ -910,12 +882,8 @@ namespace Http
             response = context.response
             route = request.route
 
-            accessToken = request.headers["authorization"]
-            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
-                response.Json({
-                    "error": "Missing or invalid 'Authorization' header"
-                })
-                response.http_code = 403
+            accessToken = m.RequireAccessToken(request, response)
+            if accessToken = invalid
                 return true
             end if
 
@@ -933,7 +901,7 @@ namespace Http
             end if
 
             options = {
-                "accessToken": accessToken.Mid("Bearer ".Len())
+                "accessToken": accessToken
             }
 
             activeIdentifyToken = request.query.activeIdentifyToken
@@ -1011,6 +979,29 @@ namespace Http
 
             response.Redirect(`https://redirect.invidious.io/channel/${channelId}`)
             return true
+        end function
+
+
+        function GetAccessToken(request as object) as dynamic
+            accessToken = request.headers["authorization"]
+            if StringUtils.IsNullOrEmpty(accessToken) or not accessToken.StartsWith("Bearer ")
+                return invalid
+            end if
+
+            return accessToken.Mid("Bearer ".Len())
+        end function
+
+        function RequireAccessToken(request as object, response as object) as dynamic
+            accessToken = m.GetAccessToken(request)
+            if accessToken = invalid
+                response.Json({
+                    "error": "Missing or invalid 'Authorization' header. Please login again."
+                })
+                response.http_code = 403
+                return invalid
+            end if
+
+            return accessToken
         end function
 
     end class
