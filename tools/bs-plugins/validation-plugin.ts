@@ -44,6 +44,9 @@ export class ValidationPlugin implements CompilerPlugin {
 
         this.validation.forEach((validation) => {
             const regex = validation.regexObject;
+            if (!regex) {
+                return;
+            }
             const fileContents = file.fileContents;
 
             let match: RegExpExecArray | null;

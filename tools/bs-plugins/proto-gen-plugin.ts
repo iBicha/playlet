@@ -260,7 +260,7 @@ end function`;
       bsfmtPath: bsfmtPath
     });
 
-    return new Formatter(options);
+    return new Formatter(options ?? undefined);
   }
 
   getCurrentFileHash() {
