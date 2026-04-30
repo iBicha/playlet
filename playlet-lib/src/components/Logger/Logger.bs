@@ -116,8 +116,7 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
         return
     end if
     httpCode = ValidInt(info.HttpCode)
-    status = ValidString(info.Status)
-    if (httpCode >= 200 and httpCode < 300) and status = "generalsocketerror"
+    if httpCode >= 200 and httpCode < 300
         return
     end if
 
@@ -126,7 +125,7 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 
-    fingerprint = `SysLog${status}${info.LogType}${httpCode}${info.Method}`
+    fingerprint = `SysLog${info.Status}${info.LogType}${httpCode}${info.Method}`
 
     if ThrottleEvent("SysLogError", fingerprint, 60)
         return
