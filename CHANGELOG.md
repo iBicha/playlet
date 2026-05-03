@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Bug where home screen editor is empty with a fresh install
 
 ## [0.44.9] - 2026-04-25
 

@@ -7,10 +7,10 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
-    m.homeLayout = {}
-    homeLayout = StringUtils.ParseJsonSafe(ReadAsciiFile("libpkg:/config/default_home_layout.yaml"))
-    for each item in homeLayout
-        m.homeLayout[item.id] = item
+    m.homeLayoutMap = {}
+    homeLayoutMap = StringUtils.ParseJsonSafe(ReadAsciiFile("libpkg:/config/default_home_layout.yaml"))
+    for each item in homeLayoutMap
+        m.homeLayoutMap[item.id] = item
     end for
 
     m.checkList = m.top.findNode("checkList")
@@ -81,17 +81,34 @@ function OnValueChange()
 
     nodes = []
     checkedState = []
+    homeLayoutMap = {}
+    homeLayoutMap.Append(m.homeLayoutMap)
+
     for each item in value
-        feed = m.homeLayout[item.id]
+        feed = homeLayoutMap[item.id]
         if feed = invalid
             LogWarn("unknown feed id:", item.id)
+            continue for
+        end if
+        homeLayoutMap.Delete(item.id)
+        node = CreateObject("roSGNode", "ContentNode")
+        node.id = feed.id
+        node.title = Tr(feed.title)
+        nodes.push(node)
+        checkedState.push(item.enabled)
+    end for
+
+    for each id in homeLayoutMap
+        feed = homeLayoutMap[id]
+        if feed = invalid
+            LogWarn("unknown feed id:", id)
             continue for
         end if
         node = CreateObject("roSGNode", "ContentNode")
         node.id = feed.id
         node.title = Tr(feed.title)
         nodes.push(node)
-        checkedState.push(item.enabled)
+        checkedState.push(false)
     end for
 
     labelCount = content.getChildCount()
