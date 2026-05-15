@@ -4,7 +4,7 @@ import "pkg:/source/utils/StringUtils.bs"
 
 namespace Lounge
 
-    function SendNowPlayingLoading(videoId as dynamic) as void
+    function SendNowPlayingLoading(videoId as dynamic, playbackSpeed as float) as void
         if StringUtils.IsNullOrEmpty(m.loungeService.loungeToken)
             return
         end if
@@ -16,7 +16,9 @@ namespace Lounge
             overrides[FIELD_VIDEO_ID] = videoId
         end if
         nowPlayingMsg = LoungeMessages.NowPlaying(m.top, overrides)
-        m.loungeService.outgoingMessages = [nowPlayingMsg, loungeStateMsg]
+        ' Sending playback speed to indicate that we will reset it to 1.0 when the content starts playing
+        playbackSpeedMsg = LoungeMessages.OnPlaybackSpeedChanged(playbackSpeed, true)
+        m.loungeService.outgoingMessages = [nowPlayingMsg, loungeStateMsg, playbackSpeedMsg]
     end function
 
     function SendOnStateChange() as void

@@ -69,6 +69,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_GET_RECEIVER_STATUS] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_SEND_DEBUG_COMMAND] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_SET_AUTOPLAY_MODE] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_GET_PARTY_GAMES_MODE] = m.HandleIgnoreCommand
 
         commandHandlers[COMMAND_TYPE_GET_NOW_PLAYING] = m.HandleGetPlayingNow
         commandHandlers[COMMAND_TYPE_SESSION_ID] = m.HandleSessionId
@@ -84,6 +85,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_NEXT] = m.HandleNext
         commandHandlers[COMMAND_TYPE_STOP_VIDEO] = m.HandleStopVideo
         commandHandlers[COMMAND_TYPE_SEEK_TO] = m.HandleSeekTo
+        commandHandlers[COMMAND_TYPE_SET_PLAYBACK_SPEED] = m.HandleSetPlaybackSpeed
 
         for each key in commandHandlers
             m[COMMAND_HANDLER_PREFIX + key] = commandHandlers[key]
@@ -176,7 +178,7 @@ class LoungeApi
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
-            "capabilities": ""
+            "capabilities": "vsp"
             "mdxVersion": "2"
             "VER": "8"
             "v": "2"
@@ -224,7 +226,7 @@ class LoungeApi
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
-            "capabilities": ""
+            "capabilities": "vsp"
             "mdxVersion": "2"
             "VER": "8"
             "v": "2"
@@ -490,6 +492,48 @@ class LoungeApi
         player.seek = seekTo
     end function
 
+    function HandleSetPlaybackSpeed(_commandId as integer, _commandType as string, commandArgs as object, messagesToSend as object) as void
+        player = m.videoQueueNode.player
+        if player = invalid
+            return
+        end if
+
+        if not player.hasField("playbackSpeed")
+            LogWarn("Video node does not support 'playbackSpeed' field on this device, ignoring setPlaybackSpeed command")
+            return
+        end if
+
+        speed = Val(commandArgs[FIELD_PLAYBACK_SPEED])
+        if speed <= 0
+            speed = 1.0
+        end if
+
+        currentSpeed = ValidFloat(player.playbackSpeed)
+
+        if Abs(currentSpeed - speed) < 0.001
+            LogDebug("Playback speed is already close to the requested speed. current:", currentSpeed, "requested:", speed)
+            return
+        end if
+
+        LogInfo("Setting playback speed to:", speed)
+
+        ' Usually playbackSpeed doesn't get applied without pausing and resuming.
+        didPause = false
+        state = player.state
+        if state = "playing"
+            player.control = "pause"
+            didPause = true
+        end if
+
+        player.playbackSpeed = speed
+
+        if didPause
+            player.control = "resume"
+        end if
+
+        messagesToSend.Push(LoungeMessages.OnPlaybackSpeedChanged(speed, true))
+    end function
+
     function SendMessages(messages as object, loungeData = invalid as object) as void
         if messages.Count() = 0
             return
@@ -498,7 +542,7 @@ class LoungeApi
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
-            "capabilities": ""
+            "capabilities": "vsp"
             "mdxVersion": "2"
             "VER": "8"
             "v": "2"
