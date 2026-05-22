@@ -801,6 +801,14 @@
         <translation>Feed preferences</translation>
     </message>
     <message>
+        <source>Disable auto-dubbed audio</source>
+        <translation>Disable auto-dubbed audio</translation>
+    </message>
+    <message>
+        <source>Remove AI-generated dubbed audio tracks.</source>
+        <translation>Remove AI-generated dubbed audio tracks.</translation>
+    </message>
+    <message>
         <source>Disable Shorts</source>
         <translation>Disable Shorts</translation>
     </message>
