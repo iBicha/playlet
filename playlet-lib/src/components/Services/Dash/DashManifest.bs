@@ -7,9 +7,11 @@ import "pkg:/source/utils/UrlUtils.bs"
 class DashManifest
 
     public invidiousInstance as dynamic
+    public disableAutoDubbed as boolean
 
-    function new(invidiousInstance as string)
+    function new(invidiousInstance as string, disableAutoDubbed = false as boolean)
         m.invidiousInstance = invidiousInstance
+        m.disableAutoDubbed = disableAutoDubbed
 
         m.utils = new Http.Utils()
 
@@ -279,6 +281,9 @@ class DashManifest
     function GenerateAudioAdaptationSets(xml as object, audioGroups as object, id as integer, metadata as object) as integer
         for each group in audioGroups
             firstFormat = group[0]
+            if m.disableAutoDubbed and ValidBool(firstFormat.isAutoDubbed)
+                continue for
+            end if
             hoisted = {}
 
             adaptationSetAttributes = {
