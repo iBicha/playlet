@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Experimental support for changing playback speed from YouTube mobile app using Leanback/Lounge api
+- Support for disabling AI auto-dubbed audio tracks
 
 ## [0.44.10] - 2026-05-03
 
