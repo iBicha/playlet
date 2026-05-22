@@ -1113,6 +1113,46 @@
         <translation>No Bookmarks</translation>
     </message>
     <message>
+        <source>Export bookmarks</source>
+        <translation>Export bookmarks</translation>
+    </message>
+    <message>
+        <source>Import bookmarks</source>
+        <translation>Import bookmarks</translation>
+    </message>
+    <message>
+        <source>This will replace all existing bookmarks. Continue?</source>
+        <translation>This will replace all existing bookmarks. Continue?</translation>
+    </message>
+    <message>
+        <source>Bookmarks imported. Restart the app to see the changes.</source>
+        <translation>Bookmarks imported. Restart the app to see the changes.</translation>
+    </message>
+    <message>
+        <source>Failed to import bookmarks. Make sure the file is valid JSON.</source>
+        <translation>Failed to import bookmarks. Make sure the file is valid JSON.</translation>
+    </message>
+    <message>
+        <source>Failed to export bookmarks.</source>
+        <translation>Failed to export bookmarks.</translation>
+    </message>
+    <message>
+        <source>Invalid bookmarks file: not a JSON object.</source>
+        <translation>Invalid bookmarks file: not a JSON object.</translation>
+    </message>
+    <message>
+        <source>Invalid bookmarks file: missing version field.</source>
+        <translation>Invalid bookmarks file: missing version field.</translation>
+    </message>
+    <message>
+        <source>Invalid bookmarks file: missing groups.</source>
+        <translation>Invalid bookmarks file: missing groups.</translation>
+    </message>
+    <message>
+        <source>Invalid bookmarks file: no bookmarks found.</source>
+        <translation>Invalid bookmarks file: no bookmarks found.</translation>
+    </message>
+    <message>
         <source>To add bookmarks, select a video, playlist or channel, and add a bookmark.</source>
         <translation>To add bookmarks, select a video, playlist or channel, and add a bookmark.</translation>
     </message>

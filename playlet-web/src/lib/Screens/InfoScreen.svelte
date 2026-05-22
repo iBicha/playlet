@@ -2,6 +2,7 @@
   import JSZip from "jszip";
   import { getHost } from "lib/Api/Host";
   import { PlayletApi } from "lib/Api/PlayletApi";
+  import { triggerDownload } from "lib/Utils/Download";
   import { playletStateStore, translate } from "lib/Stores";
 
   export let visibility: boolean;
@@ -222,22 +223,7 @@ ${JSON.stringify(profilesInfo, null, 2)}
     }
   }
 
-  function triggerDownload(filename, content, mimeType) {
-    const blob = new Blob([content], { type: mimeType });
-    let url;
-    const a = document.createElement("a");
-    try {
-      url = URL.createObjectURL(blob);
-      a.href = url;
-      a.download = filename;
-      a.click();
-    } finally {
-      a.remove();
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
-    }
-  }
+
 </script>
 
 <div class={visibility ? "" : "hidden"}>

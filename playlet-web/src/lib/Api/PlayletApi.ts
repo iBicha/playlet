@@ -169,6 +169,22 @@ export class PlayletApi {
         return await response.json();
     }
 
+    static async getBookmarks() {
+        const response = await fetch(`${PlayletApi.host()}/api/bookmarks`);
+        return await response.text();
+    }
+
+    static async setBookmarks(bookmarks: string) {
+        const response = await fetch(`${PlayletApi.host()}/api/bookmarks`, {
+            headers: { 'Content-Type': 'application/json' },
+            method: "PUT",
+            body: bookmarks
+        });
+        if (!response.ok) {
+            throw new Error(`Failed to import bookmarks: ${response.statusText}`);
+        }
+    }
+
     static async showExportRegistryCode() {
         await fetch(`${PlayletApi.host()}/api/registry/export/code`);
     }

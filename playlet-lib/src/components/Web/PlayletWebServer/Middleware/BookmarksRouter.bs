@@ -1,6 +1,7 @@
 import "pkg:/components/Services/BookmarksService/BookmarksServiceUtils.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 namespace Http
 
@@ -28,6 +29,22 @@ namespace Http
             response.ContentType("application/json")
             response.http_code = 200
 
+            return true
+        end function
+
+        @put("/api/bookmarks")
+        function SetBookmarks(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            payload = request.BodyText()
+            if StringUtils.IsNullOrEmpty(payload)
+                response.Default(400, "Missing bookmarks payload")
+                return true
+            end if
+
+            RegistryUtils.Write(RegistryUtils.BOOKMARKS, payload)
+            response.Default(204, "OK")
             return true
         end function
 
