@@ -1,0 +1,243 @@
+import "pkg:/components/Services/Dash/DashManifest.bs"
+import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/ByteArrayUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+namespace Http
+
+    ' Proxies YouTube live segments so Roku can demux them as DASH.
+    '
+    ' YouTube live fragments (`&sq=N`) are self-initializing: every fragment is
+    ' `ftyp+moov+emsg+moof+mdat`. Standard DASH (and Roku) want the init segment to
+    ' be `ftyp+moov` only and media segments to be `moof+mdat` only; a per-fragment
+    ' moov makes Roku fail with `Cannot seek to video: error -36`. YouTube serves
+    ' no clean init or moof-only media directly (`&range=` -> 400, the HTTP Range
+    ' header is ignored), so this transform is unavoidable.
+    '
+    ' Endpoint (see DashManifest live SegmentTemplate):
+    '   /api/live-seg?itag=<itag>&sq=init   -> ftyp+moov of fragment 0 (init segment)
+    '   /api/live-seg?itag=<itag>&sq=<K>    -> moof+mdat of fragments
+    '                                          [K*GROUP .. K*GROUP+GROUP-1], concatenated
+    ' where GROUP = LIVE_SEGMENT_GROUP (longer DASH segments => slower request
+    ' cadence, which Roku prefers over the native ~2s fragments).
+    '
+    ' NOTE: this router is heavily instrumented with `[LIVE-SEG]` logs for live
+    ' playback debugging. Grep the app log for `LIVE-SEG`.
+    class LiveSegmentRouter extends HttpRouter
+        function new(server as object)
+            super()
+
+            m.videoQueueNode = server.sceneNodes.videoQueue
+            LogInfo("[LIVE-SEG] LiveSegmentRouter constructed")
+        end function
+
+        @get("/api/live-seg")
+        function GetLiveSegment(context as object) as boolean
+            timer = CreateObject("roTimespan")
+            request = context.request
+            response = context.response
+
+            itag = request.query.itag
+            sq = request.query.sq
+
+            LogInfo("[LIVE-SEG] >>> request itag:", itag, "sq:", sq, "fullQuery:", FormatJson(request.query))
+
+            if StringUtils.IsNullOrEmpty(itag) or StringUtils.IsNullOrEmpty(sq)
+                LogError("[LIVE-SEG] missing itag or sq -> 400")
+                response.Default(400, "Missing itag or sq")
+                return true
+            end if
+
+            format = m.FindFormat(itag)
+            if format = invalid or StringUtils.IsNullOrEmpty(format.url)
+                LogError("[LIVE-SEG] no live format url for itag:", itag, "(format invalid or url empty) -> 404")
+                response.Default(404, "No live format url for itag " + itag)
+                return true
+            end if
+
+            LogInfo("[LIVE-SEG] matched format itag:", format.itag, "type:", format.type, "targetDurationSec:", format.targetDurationSec, "urlLen:", Len(ValidString(format.url)))
+            LogDebug("[LIVE-SEG] format.url:", format.url)
+
+            contentType = "video/mp4"
+            if IsString(format.type) and format.type.StartsWith("audio")
+                contentType = "audio/mp4"
+            end if
+            LogInfo("[LIVE-SEG] contentType:", contentType, "GROUP:", LIVE_SEGMENT_GROUP)
+
+            if sq = "init"
+                ' Init segment: fragment 0 reduced to ftyp+moov.
+                LogInfo("[LIVE-SEG] INIT path: fetching fragment 0 for itag", itag)
+                raw = m.FetchFragment(format.url, 0)
+                if raw = invalid
+                    LogError("[LIVE-SEG] INIT fetch failed for itag", itag, "-> 502")
+                    response.Default(502, "Failed to fetch live init segment")
+                    return true
+                end if
+                LogInfo("[LIVE-SEG] INIT raw fragment bytes:", raw.Count(), "boxes:", m.BoxSummary(raw))
+                output = m.ExtractInit(raw)
+                LogInfo("[LIVE-SEG] INIT output bytes:", output.Count(), "boxes:", m.BoxSummary(output))
+            else
+                ' Media DASH segment K: concat GROUP native fragments, each reduced
+                ' to moof+mdat so Roku reads the init segment only once.
+                k = sq.ToInt()
+                firstFrag = k * LIVE_SEGMENT_GROUP
+                LogInfo("[LIVE-SEG] MEDIA path: DASH segment K:", k, "-> youtube fragments", firstFrag, "..", firstFrag + LIVE_SEGMENT_GROUP - 1)
+                output = CreateObject("roByteArray")
+                fetched = 0
+                for i = 0 to LIVE_SEGMENT_GROUP - 1
+                    fragSq = firstFrag + i
+                    LogInfo("[LIVE-SEG]   fetching fragment", i, "of", LIVE_SEGMENT_GROUP, "sq:", fragSq)
+                    raw = m.FetchFragment(format.url, fragSq)
+                    if raw = invalid
+                        if i = 0
+                            LogError("[LIVE-SEG]   first fragment (sq", fragSq, ") failed -> 502")
+                            response.Default(502, "Failed to fetch live media segment")
+                            return true
+                        end if
+                        ' Partial group near the live edge: serve what we have.
+                        LogWarnNoTelemetry("[LIVE-SEG]   fragment", i, "(sq", fragSq, ") failed; serving partial group of", fetched, "fragments")
+                        exit for
+                    end if
+                    media = m.ExtractMedia(raw)
+                    LogInfo("[LIVE-SEG]   fragment sq", fragSq, "rawBytes:", raw.Count(), "boxes:", m.BoxSummary(raw), "-> mediaBytes:", media.Count(), "mediaBoxes:", m.BoxSummary(media))
+                    output.Append(media)
+                    fetched += 1
+                end for
+                LogInfo("[LIVE-SEG] MEDIA assembled", fetched, "fragments, totalBytes:", output.Count(), "outBoxes:", m.BoxSummary(output))
+            end if
+
+            response.http_code = 200
+            response.headers["Content-Type"] = contentType
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
+            response.SetBodyDataBuffer(output)
+            LogInfo("[LIVE-SEG] <<< responding 200 itag:", itag, "sq:", sq, "bytes:", output.Count(), "elapsedMs:", timer.TotalMilliseconds())
+            return true
+        end function
+
+        function FindFormat(itag as string) as dynamic
+            adaptiveFormats = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content", "metadata", "adaptiveFormats"])
+            if not IsArray(adaptiveFormats)
+                LogError("[LIVE-SEG] FindFormat: adaptiveFormats is not an array (metadata missing?)")
+                return invalid
+            end if
+            LogDebug("[LIVE-SEG] FindFormat: scanning", adaptiveFormats.Count(), "formats for itag", itag)
+            for each format in adaptiveFormats
+                if IsString(format.itag) and format.itag = itag
+                    return format
+                end if
+            end for
+            available = []
+            for each format in adaptiveFormats
+                available.Push(format.itag)
+            end for
+            LogError("[LIVE-SEG] FindFormat: itag", itag, "not found. Available:", available.Join(","))
+            return invalid
+        end function
+
+        ' Fetch a single YouTube live fragment (`&sq=N`) into a byte array.
+        ' Returns invalid on failure.
+        function FetchFragment(baseUrl as string, sq as integer) as dynamic
+            fetchTimer = CreateObject("roTimespan")
+            ' Append &sq/&rn to the already-signed format URL. Must NOT use
+            ' SetQueryParams here: it drops the existing query string (sig, n,
+            ' expire, ip, ...), which makes googlevideo return 403.
+            url = UrlUtils.AppendQueryParams(baseUrl, { "sq": `${sq}`, "rn": "0" })
+            tmpPath = `tmp:/live-seg-${StringUtils.RandomId()}.m4s`
+            LogDebug("[LIVE-SEG]     FetchFragment sq:", sq, "tmp:", tmpPath, "url:", url)
+
+            response = HttpClient.Get(url).ToFile(tmpPath).NoCache().Await()
+            statusCode = response.StatusCode()
+            if not response.IsSuccess()
+                LogError("[LIVE-SEG]     FetchFragment sq", sq, "FAILED status:", statusCode, "reason:", response.ErrorMessage(false))
+                DeleteFile(tmpPath)
+                return invalid
+            end if
+
+            bytes = CreateObject("roByteArray")
+            ok = bytes.ReadFile(tmpPath)
+            DeleteFile(tmpPath)
+            if not ok or bytes.Count() = 0
+                LogError("[LIVE-SEG]     FetchFragment sq", sq, "status:", statusCode, "but ReadFile ok:", ok, "count:", bytes.Count())
+                return invalid
+            end if
+            LogDebug("[LIVE-SEG]     FetchFragment sq", sq, "OK status:", statusCode, "bytes:", bytes.Count(), "fetchMs:", fetchTimer.TotalMilliseconds())
+            return bytes
+        end function
+
+        ' Init segment = leading ftyp+moov boxes (drop emsg/moof/mdat).
+        function ExtractInit(bytes as object) as object
+            boxes = m.WalkBoxes(bytes)
+            LogInfo("[LIVE-SEG]   ExtractInit moovEnd:", boxes.moovEnd, "moofStart:", boxes.moofStart, "totalBytes:", bytes.Count())
+            if boxes.moovEnd <= 0
+                LogError("[LIVE-SEG]   ExtractInit: no moov box found; serving raw fragment as init (likely broken)")
+                return bytes
+            end if
+            return ByteArrayUtils.Slice(bytes, 0, boxes.moovEnd)
+        end function
+
+        ' Media segment = moof+mdat (drop the leading ftyp+moov+emsg).
+        function ExtractMedia(bytes as object) as object
+            boxes = m.WalkBoxes(bytes)
+            LogDebug("[LIVE-SEG]   ExtractMedia moovEnd:", boxes.moovEnd, "moofStart:", boxes.moofStart, "totalBytes:", bytes.Count())
+            if boxes.moofStart <= 0
+                LogError("[LIVE-SEG]   ExtractMedia: no moof box found; serving raw fragment as media (likely broken)")
+                return bytes
+            end if
+            return ByteArrayUtils.Slice(bytes, boxes.moofStart)
+        end function
+
+        ' Walk top-level ISO-BMFF boxes from the front, returning the byte offset
+        ' where moov ends and where moof starts. Only the small leading boxes
+        ' (ftyp/moov/emsg) are traversed; the walk stops at moof, so this never
+        ' scans into the large mdat.
+        function WalkBoxes(bytes as object) as object
+            result = { moovEnd: 0, moofStart: 0 }
+            count = bytes.Count()
+            i = 0
+            while i + 8 <= count
+                ' 32-bit big-endian box size. These leading boxes are small, so
+                ' arithmetic (vs. bit-shifts) is overflow-safe here.
+                size = (bytes[i] * 16777216) + (bytes[i + 1] * 65536) + (bytes[i + 2] * 256) + bytes[i + 3]
+                if size <= 0
+                    LogWarnNoTelemetry("[LIVE-SEG]   WalkBoxes: zero/invalid box size at offset", i, "- stopping")
+                    exit while
+                end if
+                boxType = Chr(bytes[i + 4]) + Chr(bytes[i + 5]) + Chr(bytes[i + 6]) + Chr(bytes[i + 7])
+                if boxType = "moov"
+                    result.moovEnd = i + size
+                else if boxType = "moof"
+                    result.moofStart = i
+                    exit while
+                end if
+                i += size
+            end while
+            return result
+        end function
+
+        ' Human-readable top-level box summary like "ftyp(24) moov(608) ..." for
+        ' logging. Caps at 8 boxes so a huge mdat-tail segment stays terse.
+        function BoxSummary(bytes as object) as string
+            parts = []
+            count = bytes.Count()
+            i = 0
+            n = 0
+            while i + 8 <= count and n < 8
+                size = (bytes[i] * 16777216) + (bytes[i + 1] * 65536) + (bytes[i + 2] * 256) + bytes[i + 3]
+                boxType = Chr(bytes[i + 4]) + Chr(bytes[i + 5]) + Chr(bytes[i + 6]) + Chr(bytes[i + 7])
+                parts.Push(`${boxType}(${size})`)
+                if size <= 1
+                    exit while
+                end if
+                i += size
+                n += 1
+            end while
+            return parts.Join(" ")
+        end function
+    end class
+
+end namespace

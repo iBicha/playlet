@@ -35,19 +35,16 @@ namespace InnertubeService
             nextRequest.Send()
         end if
 
-        ' For LIVE videos, we will need to fallback to iOS for HLS streams for now.
-        ' Also, since we might have tracking urls in the player response (if logged in),
-        ' we can keep them to avoid an extra request later.
-        ' TODO:P0 figure out how to get DASH to work for live videos.
-        playbackTrackingUrls = invalid
+        ' Live videos stay on the TV client and play via DASH: iOS no longer
+        ' returns hlsManifestUrl for live (SABR migration), so we build a live DASH
+        ' manifest from the TV response (see DashManifest + LiveSegmentRouter).
         playerResponseJson = invalid
         client = Innertube.ClientType.Tv
         totalPlayerRequests = 0
         while true
-            ' We shouldn't be making more that 3 requests:
-            ' 1. Make request with TV client, but turns out to be live -> fallback to iOS
-            ' 2. Make request, but STS_MISMATCH error -> retry with new STS
-            ' 3. Make request, it either succeeds or fails.
+            ' We shouldn't be making more than 2 requests:
+            ' 1. Make request with TV client.
+            ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
             if totalPlayerRequests > 3
                 LogError("Too many player requests, aborting.")
                 return {
@@ -81,14 +78,6 @@ namespace InnertubeService
             end if
 
             playerResponseJson = playerResponse.Json()
-            notDashSupported = Innertube.IsLiveStream(playerResponseJson)
-            if notDashSupported and client = Innertube.ClientType.Tv
-                LogDebug("Falling back to iOS client for live video.")
-                isLoggedIn = Innertube.ParseIsLoggedIn(playerResponseJson)
-                playbackTrackingUrls = Innertube.ParsePlaybackTrackingUrls(playerResponseJson, isLoggedIn)
-                client = Innertube.ClientType.IOS
-                continue while
-            end if
 
             parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, client, cancellation)
 
@@ -134,13 +123,6 @@ namespace InnertubeService
 
         if StringUtils.IsNullOrEmpty(parsedResponse.videoId)
             parsedResponse["videoId"] = videoId
-        end if
-
-        ' If we did capture tracking urls when we did the TV request, but now we're
-        ' missing them because we switched to iOS, add them back.
-        if playbackTrackingUrls <> invalid and parsedResponse.playbackTrackingUrls = invalid
-            LogDebug("Adding playback tracking URLs from TV player response.")
-            parsedResponse["playbackTrackingUrls"] = playbackTrackingUrls
         end if
 
         return parsedResponse

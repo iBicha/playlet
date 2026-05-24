@@ -13,6 +13,7 @@ namespace Http
             m.videoQueueNode = server.sceneNodes.videoQueue
             m.invidiousNode = server.sceneNodes.invidious
             m.preferencesNode = server.sceneNodes.preferences
+            m.serverPort = server.settings.Port
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
             ' No need to pass the invidious instance here, we will refresh it for
             ' each request to make sure we are using the latest one
@@ -53,6 +54,10 @@ namespace Http
 
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
             m.dashManifest.disableAutoDubbed = ValidBool(m.preferencesNode["playback.disable_auto_dubbed"])
+            ' For live streams, segments are addressed to the /api/live-seg proxy on
+            ' this same web server (the video player reaches it over 127.0.0.1).
+            m.dashManifest.liveSegmentBaseUrl = `http://127.0.0.1:${m.serverPort}`
+            LogInfo("[LIVE-MPD] DashRouter building manifest for v:", v, "liveNow:", metadata.liveNow, "liveSegmentBaseUrl:", m.dashManifest.liveSegmentBaseUrl)
 
             qualityFilter = m.CreateQualityFilter(quality)
             xmlContent = m.dashManifest.FromVideoMetadata(metadata, qualityFilter, ValidString(local) = "true")
