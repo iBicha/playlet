@@ -5,10 +5,10 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 ' Number of native YouTube live fragments (each `targetDurationSec` long) that the
-' /api/live-seg proxy concatenates into a single DASH segment. Roku dislikes the
-' ~2s native request cadence, so we present longer segments. Used by both the
-' manifest (segment duration / refresh timing) and LiveSegmentRouter (which
-' fragments to fetch per DASH segment number).
+' /api/dash/live-seg proxy concatenates into a single DASH segment. Roku dislikes
+' the ~2s native request cadence, so we present longer segments. Used by both the
+' manifest (segment duration / refresh timing) and DashRouter's live-seg handler
+' (which fragments to fetch per DASH segment number).
 const LIVE_SEGMENT_GROUP = 4
 
 class DashManifest
@@ -16,7 +16,7 @@ class DashManifest
     public invidiousInstance as dynamic
     public disableAutoDubbed as boolean
     ' Base URL (scheme://host:port) of Playlet's local web server, so live
-    ' SegmentTemplate URLs can address the /api/live-seg proxy. Set by DashRouter.
+    ' SegmentTemplate URLs can address the /api/dash/live-seg proxy. Set by DashRouter.
     public liveSegmentBaseUrl as string = ""
 
     function new(invidiousInstance as string, disableAutoDubbed = false as boolean)
@@ -108,7 +108,10 @@ class DashManifest
             ' wall-clock against availabilityStartTime, and the duration-based
             ' SegmentTemplate (see GenerateSegmentInformation) auto-extends as the
             ' stream advances. timeShiftBufferDepth exposes the DVR window.
-            segmentSec = m.GetLiveSegmentSec(metadata) * LIVE_SEGMENT_GROUP
+            segmentSec = Cint(m.GetLiveFragmentDurationMs(metadata) * LIVE_SEGMENT_GROUP / 1000.0)
+            if segmentSec < 1
+                segmentSec = 1
+            end if
             dvrWindowSec = ValidInt(metadata.liveDvrWindowSec)
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:isoff-live:2011"
             mpdAttributes["type"] = "dynamic"
@@ -122,7 +125,7 @@ class DashManifest
             else
                 LogWarn("[LIVE-MPD] dvrWindowSec is 0/missing -> NO timeShiftBufferDepth (live seek may fail). metadata.liveDvrWindowSec:", metadata.liveDvrWindowSec)
             end if
-            LogInfo("[LIVE-MPD] live MPD attrs: availabilityStartTime:", metadata.liveAvailabilityStartUtc, "segmentSec(group-adjusted):", segmentSec, "dvrWindowSec:", dvrWindowSec, "liveHeadSeqnum:", metadata.liveHeadSeqnum, "baseUrl:", m.liveSegmentBaseUrl)
+            ' LogInfo("[LIVE-MPD] live MPD attrs: availabilityStartTime:", metadata.liveAvailabilityStartUtc, "segmentSec(group-adjusted):", segmentSec, "dvrWindowSec:", dvrWindowSec, "liveHeadSeqnum:", metadata.liveHeadSeqnum, "baseUrl:", m.liveSegmentBaseUrl)
         else
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:full:2011"
             mpdAttributes["type"] = "static"
@@ -166,12 +169,20 @@ class DashManifest
     end function
 
     ' Representative segment duration for a live stream, in whole seconds.
-    function GetLiveSegmentSec(metadata as object) as integer
-        segmentSec = ValidInt(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "targetDurationSec"]))
-        if segmentSec < 1
-            segmentSec = 2
+    ' Effective per-native-fragment duration (ms) for live. Prefers the value
+    ' derived from the live head (headTime/headSeqnum, set by GetLiveStreamInfo)
+    ' since YouTube's reported targetDurationSec is unreliable for long-running
+    ' streams; falls back to targetDurationSec, then to 2s.
+    function GetLiveFragmentDurationMs(metadata as object) as integer
+        fragMs = ValidInt(metadata.liveFragmentDurationMs)
+        if fragMs > 0
+            return fragMs
         end if
-        return segmentSec
+        targetSec = ValidInt(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "targetDurationSec"]))
+        if targetSec < 1
+            targetSec = 2
+        end if
+        return targetSec * 1000
     end function
 
     function CreateFormatGroupings(formats as object, isPostLiveDvr as boolean, isLive as boolean) as object
@@ -568,27 +579,28 @@ class DashManifest
                 xml.End()
             end if
         else if metadata.liveNow = true
-            ' Live: segments are `&sq=N`, each `targetDurationSec` long, with the live
-            ' edge advancing over time. A duration-based SegmentTemplate (no fixed
-            ' SegmentTimeline) lets the player compute the current segment from
-            ' availabilityStartTime and keep extending as the stream grows.
-            if not IsInt(stream.targetDurationSec) or stream.targetDurationSec < 1
-                xml.Comment(`[ERROR] Live stream missing/invalid targetDurationSec for itag: ${stream.itag}`)
-                return
-            end if
+            ' Live: segments are `&sq=N` with the live edge advancing over time. A
+            ' duration-based SegmentTemplate (no fixed SegmentTimeline) lets the
+            ' player compute the current segment from availabilityStartTime and keep
+            ' extending as the stream grows.
 
             ' Live segments are self-initializing (ftyp+moov+emsg+moof+mdat) and
             ' YouTube serves no clean init or moof-only media, so Roku can't demux
             ' them directly (it reads the init segment once; a per-segment moov
-            ' yields `error -36`). The /api/live-seg proxy transforms them
+            ' yields `error -36`). The /api/dash/live-seg proxy transforms them
             ' (init -> ftyp+moov, media -> moof+mdat) and groups LIVE_SEGMENT_GROUP
             ' native fragments into each DASH segment. The manifest just addresses
             ' the proxy by itag + DASH segment number ($Number$).
-            durationMs = stream.targetDurationSec * LIVE_SEGMENT_GROUP * 1000
-            LogInfo("[LIVE-MPD] SegmentTemplate itag:", stream.itag, "targetDurationSec:", stream.targetDurationSec, "group:", LIVE_SEGMENT_GROUP, "durationMs:", durationMs, "initUrl:", `${m.liveSegmentBaseUrl}/api/live-seg?itag=${stream.itag}&sq=init`)
+            ' Per-fragment duration x GROUP. NOT targetDurationSec (unreliable for
+            ' long streams - see GetLiveFragmentDurationMs); the head-derived value
+            ' keeps the player's wall-clock -> $Number$ -> sq mapping on the live edge.
+            durationMs = m.GetLiveFragmentDurationMs(metadata) * LIVE_SEGMENT_GROUP
+            ' The `v` (video id) lets the proxy cache the per-video format lookup.
+            segBase = `${m.liveSegmentBaseUrl}/api/dash/live-seg?v=${metadata.videoId}&itag=${stream.itag}`
+            ' LogInfo("[LIVE-MPD] SegmentTemplate itag:", stream.itag, "targetDurationSec:", stream.targetDurationSec, "group:", LIVE_SEGMENT_GROUP, "durationMs:", durationMs)
             xml.EmptyNode("SegmentTemplate", {
-                "initialization": `${m.liveSegmentBaseUrl}/api/live-seg?itag=${stream.itag}&sq=init`
-                "media": `${m.liveSegmentBaseUrl}/api/live-seg?itag=${stream.itag}&sq=$Number$`
+                "initialization": `${segBase}&sq=init`
+                "media": `${segBase}&sq=$Number$`
                 "timescale": "1000"
                 "duration": durationMs
                 "startNumber": "0"

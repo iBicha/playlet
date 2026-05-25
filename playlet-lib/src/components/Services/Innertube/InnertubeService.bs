@@ -37,7 +37,7 @@ namespace InnertubeService
 
         ' Live videos stay on the TV client and play via DASH: iOS no longer
         ' returns hlsManifestUrl for live (SABR migration), so we build a live DASH
-        ' manifest from the TV response (see DashManifest + LiveSegmentRouter).
+        ' manifest from the TV response (see DashManifest + DashRouter live-seg proxy).
         playerResponseJson = invalid
         client = Innertube.ClientType.Tv
         totalPlayerRequests = 0
@@ -45,7 +45,7 @@ namespace InnertubeService
             ' We shouldn't be making more than 2 requests:
             ' 1. Make request with TV client.
             ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
-            if totalPlayerRequests > 3
+            if totalPlayerRequests >= 2
                 LogError("Too many player requests, aborting.")
                 return {
                     error: "Too many player requests"

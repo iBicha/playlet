@@ -110,9 +110,9 @@ namespace Innertube
             return parsedResponse
         end if
 
-        if isLive and adaptiveFormats.Count() > 0
-            LogInfo("[LIVE-INFO] post-decipher, sts:", playerRequest.signatureTimestamp, "format[0].itag:", adaptiveFormats[0]["itag"], "url:", adaptiveFormats[0]["url"])
-        end if
+        ' if isLive and adaptiveFormats.Count() > 0
+        '     LogInfo("[LIVE-INFO] post-decipher, sts:", playerRequest.signatureTimestamp, "format[0].itag:", adaptiveFormats[0]["itag"], "url:", adaptiveFormats[0]["url"])
+        ' end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
         isOTF = FormatsHasTypeOTF(adaptiveFormats)
@@ -653,27 +653,6 @@ namespace Innertube
         }
     end function
 
-    function IsLiveStream(payload as object) as boolean
-        if ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isLive"]))
-            return true
-        end if
-
-        if ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isPostLiveDvr"]))
-            return false
-        end if
-
-        adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
-        if FormatsHaveLiveStreamingData(adaptiveFormats)
-            return true
-        end if
-
-        formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
-        if FormatsHaveLiveStreamingData(formats)
-            return true
-        end if
-        return false
-    end function
-
     function FormatsHaveLiveStreamingData(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -780,7 +759,7 @@ namespace Innertube
         end if
 
         maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
-        LogInfo("[LIVE-INFO] GetLiveStreamInfo start. itag:", adaptiveFormats[0]["itag"], "targetDurationSec:", adaptiveFormats[0]["targetDurationSec"], "maxDvrDurationSec:", maxDvrDurationSec, "client:", client)
+        ' LogInfo("[LIVE-INFO] GetLiveStreamInfo start. itag:", adaptiveFormats[0]["itag"], "targetDurationSec:", adaptiveFormats[0]["targetDurationSec"], "maxDvrDurationSec:", maxDvrDurationSec, "client:", client)
 
         queryComponents = UrlUtils.ParseQueryComponents(url)
         queryComponents["rn"] = "0"
@@ -808,7 +787,7 @@ namespace Innertube
         end if
 
         headers = response.Headers()
-        LogInfo("[LIVE-INFO] HEAD response headers:", FormatJson(headers))
+        ' LogInfo("[LIVE-INFO] HEAD response headers:", FormatJson(headers))
 
         if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
             LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Time-Millis / X-Head-Seqnum in headers", url, headers)
@@ -829,7 +808,17 @@ namespace Innertube
         if maxDvrDurationSec > 0
             parsedResponse["liveDvrWindowSec"] = maxDvrDurationSec
         end if
-        LogInfo("[LIVE-INFO] computed headTimeSec:", headTimeSec, "headSeqnum:", headSeqnum, "nowSec:", nowSec, "genesisSec:", genesisSec, "availabilityStartUtc:", parsedResponse["liveAvailabilityStartUtc"], "liveDvrWindowSec:", parsedResponse["liveDvrWindowSec"])
+        ' Effective per-fragment duration, derived from the stream's own counters.
+        ' YouTube's reported targetDurationSec is unreliable for long-running streams
+        ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
+        ' SegmentTemplate so the player requests segments far outside the DVR window
+        ' (404). headTime/headSeqnum is the true average and keeps the manifest's
+        ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
+        ' that availabilityStartTime is built from.
+        if headSeqnum > 0
+            parsedResponse["liveFragmentDurationMs"] = Cint((headTimeSec / headSeqnum) * 1000.0)
+        end if
+        ' LogInfo("[LIVE-INFO] computed headTimeSec:", headTimeSec, "headSeqnum:", headSeqnum, "nowSec:", nowSec, "genesisSec:", genesisSec, "availabilityStartUtc:", parsedResponse["liveAvailabilityStartUtc"], "liveDvrWindowSec:", parsedResponse["liveDvrWindowSec"])
     end function
 
 end namespace
