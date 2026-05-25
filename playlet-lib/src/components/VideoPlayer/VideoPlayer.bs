@@ -3,6 +3,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Navigation/LongPress.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/VideoPlayer/Lounge.bs"
@@ -129,8 +130,10 @@ function OnNodeReady()
 
     m.container.observeFieldScoped("fullscreen", FuncName(OnFullScreenChange))
     m.top.ObserveField("state", FuncName(OnVideoPlayerStateChange))
+    InitializeLongPress(["OK"])
 
     SponsorBlock.SetupSponsorBlock()
+    SetupStatsForNerds()
 end function
 
 function PlayWithContent(contentNode as object)
@@ -421,6 +424,8 @@ function OnClose()
         m.sponsorBlockSegmentsJob.cancel = true
         m.sponsorBlockSegmentsJob = invalid
     end if
+    ClosePlayerOptionsDialog()
+    RemoveStatsForNerds()
 
     parent = m.top.getParent()
     if parent <> invalid
@@ -701,7 +706,165 @@ function HandleOKPress() as boolean
     return handled
 end function
 
+function OnShowPlayerOptions() as void
+    if m.onCloseCalled = true
+        return
+    end if
+
+    if m.container = invalid or m.container.fullscreen <> true
+        return
+    end if
+
+    ClosePlayerOptionsDialog()
+
+    minimizeButtonText = Tr(Locale.VideoPlayer.MinimizePlayer)
+    statsButtonText = Tr(Locale.VideoPlayer.ShowStatsForNerds)
+    if IsStatsForNerdsEnabled()
+        statsButtonText = Tr(Locale.VideoPlayer.HideStatsForNerds)
+    end if
+
+    dialog = DialogUtils.ShowDialogEx({
+        title: Tr(Locale.VideoPlayer.PlayerOptions)
+        message: Tr(Locale.VideoPlayer.PlayerOptionsMessage)
+        buttons: [statsButtonText, minimizeButtonText, Tr(Locale.Buttons.Cancel)]
+    })
+    if dialog = invalid
+        return
+    end if
+
+    m.playerOptionsDialog = dialog
+    dialog.observeFieldScoped("buttonSelected", FuncName(OnPlayerOptionsDialogButtonSelected))
+    dialog.observeFieldScoped("wasClosed", FuncName(OnPlayerOptionsDialogClosed))
+end function
+
+function OnPlayerOptionsDialogButtonSelected(event as object) as void
+    dialog = event.getRoSGNode()
+    ClearPlayerOptionsDialog(dialog)
+
+    if m.onCloseCalled = true
+        return
+    end if
+
+    selectedButton = event.getData()
+    if selectedButton = 0
+        ToggleStatsForNerds()
+    else if selectedButton = 1
+        VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
+    end if
+end function
+
+function OnPlayerOptionsDialogClosed(event as object) as void
+    ClearPlayerOptionsDialog(event.getRoSGNode())
+end function
+
+function ClosePlayerOptionsDialog() as void
+    dialog = m.playerOptionsDialog
+    if dialog = invalid
+        return
+    end if
+
+    ClearPlayerOptionsDialog(dialog)
+    dialog.close = true
+end function
+
+function ClearPlayerOptionsDialog(dialog as object) as void
+    if dialog <> invalid
+        dialog.unobserveFieldScoped("buttonSelected")
+        dialog.unobserveFieldScoped("wasClosed")
+    end if
+
+    if m.playerOptionsDialog <> invalid
+        if dialog = invalid or dialog.isSameNode(m.playerOptionsDialog)
+            m.playerOptionsDialog = invalid
+        end if
+    end if
+end function
+
+function ToggleStatsForNerds() as void
+    if m.onCloseCalled = true
+        return
+    end if
+
+    prefs = m.top.preferences
+    if prefs = invalid
+        LogWarn("Cannot toggle stats overlay: preferences node is invalid")
+        return
+    end if
+
+    enabled = not IsStatsForNerdsEnabled()
+    prefs["playback.stats_for_nerds"] = enabled
+
+    if enabled
+        EnsureStatsForNerds()
+    else
+        RemoveStatsForNerds()
+    end if
+end function
+
+function SetupStatsForNerds() as void
+    if IsStatsForNerdsEnabled()
+        EnsureStatsForNerds()
+    end if
+end function
+
+function IsStatsForNerdsEnabled() as boolean
+    if m.top.preferences = invalid
+        return false
+    end if
+
+    return m.top.preferences["playback.stats_for_nerds"] = true
+end function
+
+function EnsureStatsForNerds() as void
+    if m.onCloseCalled = true
+        return
+    end if
+
+    if m.statsForNerds <> invalid
+        return
+    end if
+
+    statsForNerds = CreateObject("roSGNode", "StatsForNerds")
+    ' Keep the overlay outside the native Video UI so it remains visible when
+    ' Roku's controls fade out.
+    m.top.appendChild(statsForNerds)
+    statsForNerds.video = m.top
+    m.statsForNerds = statsForNerds
+end function
+
+function RemoveStatsForNerds() as void
+    statsForNerds = m.statsForNerds
+    if statsForNerds = invalid
+        return
+    end if
+
+    statsForNerds.dispose = true
+    parent = statsForNerds.getParent()
+    if parent <> invalid
+        parent.RemoveChild(statsForNerds)
+    end if
+    m.statsForNerds = invalid
+end function
+
 function OnKeyEvent(key as string, press as boolean) as boolean
+    ' Let the native Video node receive OK while D-pad scrub is selecting a seek position.
+    if key = RemoteKeys.Ok and m.isSeekingPosition
+        return false
+    end if
+
+    if LongPressHandler(key, press)
+        return true
+    end if
+
+    if key = RemoteKeys.OkLongPress and press
+        OnShowPlayerOptions()
+        return true
+    end if
+
+    if key = RemoteKeys.Ok and not press
+        return HandleOKPress()
+    end if
+
     if press = false
         return false
     end if
@@ -717,10 +880,6 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     if key = RemoteKeys.Back
         m.videoQueue.closePlayer = true
         return true
-    end if
-
-    if key = RemoteKeys.Ok
-        return HandleOKPress()
     end if
 
     if key = RemoteKeys.Left or key = RemoteKeys.Right or key = RemoteKeys.Rewind or key = RemoteKeys.FastForward
