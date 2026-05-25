@@ -98,16 +98,18 @@ namespace Innertube
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
-        if not isLive
-            error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation)
-            if error <> invalid
-                parsedResponse["error"] = error.error
-                if error.DoesExist("errorCode")
-                    parsedResponse["errorCode"] = error.errorCode
-                end if
-                return parsedResponse
+        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation)
+        if error <> invalid
+            parsedResponse["error"] = error.error
+            if error.DoesExist("errorCode")
+                parsedResponse["errorCode"] = error.errorCode
             end if
+            return parsedResponse
         end if
+
+        ' if isLive and adaptiveFormats.Count() > 0
+        '     LogInfo("[LIVE-INFO] post-decipher, sts:", playerRequest.signatureTimestamp, "format[0].itag:", adaptiveFormats[0]["itag"], "url:", adaptiveFormats[0]["url"])
+        ' end if
 
         hasLiveStreamingData = FormatsHaveLiveStreamingData(adaptiveFormats) or FormatsHaveLiveStreamingData(formats)
         isOTF = FormatsHasTypeOTF(adaptiveFormats)
@@ -166,6 +168,11 @@ namespace Innertube
         if isOTF
             LogDebug("Fetching OTF segment info")
             OTFGetSegmentInfo(adaptiveFormats, client, cancellation)
+        end if
+
+        if isLive
+            LogDebug("Fetching live stream info")
+            GetLiveStreamInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, client, cancellation)
         end if
 
         return parsedResponse
@@ -415,6 +422,9 @@ namespace Innertube
         if fmt["targetDurationSec"] <> invalid
             result["targetDurationSec"] = fmt["targetDurationSec"]
         end if
+        if fmt["maxDvrDurationSec"] <> invalid
+            result["maxDvrDurationSec"] = fmt["maxDvrDurationSec"]
+        end if
 
         if ValidString(fmt["type"]) = "FORMAT_STREAM_TYPE_OTF"
             result["isTypeOTF"] = true
@@ -640,27 +650,6 @@ namespace Innertube
         }
     end function
 
-    function IsLiveStream(payload as object) as boolean
-        if ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isLive"]))
-            return true
-        end if
-
-        if ValidBool(ObjectUtils.Dig(payload, ["videoDetails", "isPostLiveDvr"]))
-            return false
-        end if
-
-        adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
-        if FormatsHaveLiveStreamingData(adaptiveFormats)
-            return true
-        end if
-
-        formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
-        if FormatsHaveLiveStreamingData(formats)
-            return true
-        end if
-        return false
-    end function
-
     function FormatsHaveLiveStreamingData(formats as object) as boolean
         if not IsArray(formats)
             return false
@@ -746,6 +735,87 @@ namespace Innertube
         if segmentCount > 0
             parsedResponse["postLiveDvrSegmentCount"] = segmentCount
         end if
+    end function
+
+    ' Live streams come back with no hlsManifestUrl/dashManifestUrl, just
+    ' adaptiveFormats with a `targetDurationSec` and segments addressed by `&sq=N`
+    ' (identical to Post-Live DVR). To build a dynamic DASH manifest we need the
+    ' current live edge (X-Head-Seqnum) and a wall-clock anchor for the DASH
+    ' `availabilityStartTime`. X-Head-Time-Millis is the stream-time of the head
+    ' segment, so genesis = now - headTime.
+    function GetLiveStreamInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
+        if adaptiveFormats.Count() = 0
+            LogWarn("GetLiveStreamInfo: No adaptive formats available")
+            return
+        end if
+
+        url = adaptiveFormats[0]["url"]
+        if StringUtils.IsNullOrEmpty(url)
+            LogWarn("GetLiveStreamInfo: URL is empty")
+            return
+        end if
+
+        maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
+        ' LogInfo("[LIVE-INFO] GetLiveStreamInfo start. itag:", adaptiveFormats[0]["itag"], "targetDurationSec:", adaptiveFormats[0]["targetDurationSec"], "maxDvrDurationSec:", maxDvrDurationSec, "client:", client)
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents["rn"] = "0"
+        queryComponents["sq"] = "0"
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
+        end if
+
+        url = UrlUtils.SetQueryParams(url, queryComponents)
+
+        request = HttpClient.Head(url)
+        requestHeaders = Innertube.CreateHeaders(client)
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
+        request.Headers(requestHeaders)
+
+        request.TryCount(2)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            LogError("Failed to fetch live stream info", response.ErrorMessage())
+            return
+        end if
+
+        headers = response.Headers()
+        ' LogInfo("[LIVE-INFO] HEAD response headers:", FormatJson(headers))
+
+        if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
+            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Time-Millis / X-Head-Seqnum in headers", url, headers)
+            return
+        end if
+
+        ' Work in seconds: wall-clock ms (~1.78e12) overflows a 32-bit integer.
+        headTimeSec = ValidString(headers["X-Head-Time-Millis"]).ToInt() \ 1000
+        headSeqnum = ValidString(headers["X-Head-Seqnum"]).ToInt()
+        nowSec = CreateObject("roDateTime").AsSeconds()
+        genesisSec = nowSec - headTimeSec
+
+        genesisDate = CreateObject("roDateTime")
+        genesisDate.FromSeconds(genesisSec)
+
+        parsedResponse["liveHeadSeqnum"] = headSeqnum
+        parsedResponse["liveAvailabilityStartUtc"] = genesisDate.ToISOString()
+        if maxDvrDurationSec > 0
+            parsedResponse["liveDvrWindowSec"] = maxDvrDurationSec
+        end if
+        ' Effective per-fragment duration, derived from the stream's own counters.
+        ' YouTube's reported targetDurationSec is unreliable for long-running streams
+        ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
+        ' SegmentTemplate so the player requests segments far outside the DVR window
+        ' (404). headTime/headSeqnum is the true average and keeps the manifest's
+        ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
+        ' that availabilityStartTime is built from.
+        if headSeqnum > 0
+            parsedResponse["liveFragmentDurationMs"] = Cint((headTimeSec / headSeqnum) * 1000.0)
+        end if
+        ' LogInfo("[LIVE-INFO] computed headTimeSec:", headTimeSec, "headSeqnum:", headSeqnum, "nowSec:", nowSec, "genesisSec:", genesisSec, "availabilityStartUtc:", parsedResponse["liveAvailabilityStartUtc"], "liveDvrWindowSec:", parsedResponse["liveDvrWindowSec"])
     end function
 
 end namespace
