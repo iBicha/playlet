@@ -232,11 +232,6 @@ class DashManifest
                 colorInfo = `${format.colorInfo.primaries}-${format.colorInfo.transferCharacteristics}-${format.colorInfo.matrixCoefficients}`
             end if
 
-            audioTrackId = ""
-            if IsAssociativeArray(format.audioTrack) and IsString(format.audioTrack.id)
-                audioTrackId = format.audioTrack.id
-            end if
-
             if format.type.startsWith("audio")
                 xtagsInfo = m.GetXtagsInfo(format)
                 format.xtagsInfo = xtagsInfo
@@ -246,6 +241,21 @@ class DashManifest
                 format.isDescriptive = xtagsInfo.isDescriptive
                 format.isSecondary = xtagsInfo.isSecondary
                 format.isOriginal = xtagsInfo.isOriginal
+
+                ' Some sources (e.g. Invidious) don't provide an `audioTrack` object the
+                ' way Innertube does; the language only lives in the URL's xtags. Without
+                ' an audioTrack, every language collapses into a single AdaptationSet and
+                ' the device labels each track "Other". Synthesize a minimal audioTrack
+                ' from xtags so tracks group per language and carry a `lang` attribute the
+                ' device maps to a real name.
+                if not IsAssociativeArray(format.audioTrack) and not StringUtils.IsNullOrEmpty(xtagsInfo.lang)
+                    format.audioTrack = m.SynthesizeAudioTrack(xtagsInfo)
+                end if
+            end if
+
+            audioTrackId = ""
+            if IsAssociativeArray(format.audioTrack) and IsString(format.audioTrack.id)
+                audioTrackId = format.audioTrack.id
             end if
 
             drc = ""
@@ -884,6 +894,25 @@ class DashManifest
         end if
 
         return result
+    end function
+
+    ' Builds a minimal audioTrack for sources that only encode the language in the
+    ' stream URL's xtags (e.g. Invidious), mirroring the shape Innertube provides.
+    ' The id keeps each language + content variant (original/dubbed/...) in its own
+    ' group; languageCode is the base ISO code (e.g. "en" from "en-US") that the
+    ' device maps to a display name. No displayName is set on purpose: without a
+    ' Label, the device derives the name from `lang` ("English") rather than echoing
+    ' the raw code.
+    function SynthesizeAudioTrack(xtagsInfo as object) as object
+        lang = xtagsInfo.lang
+        id = lang
+        if not StringUtils.IsNullOrEmpty(xtagsInfo.acont)
+            id = `${lang}.${xtagsInfo.acont}`
+        end if
+        return {
+            "id": id
+            "languageCode": lang.Tokenize("-")[0]
+        }
     end function
 
     function GetDrmSystemId(drmFamily as dynamic) as dynamic
