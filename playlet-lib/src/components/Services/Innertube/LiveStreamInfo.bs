@@ -1,0 +1,125 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+' Hard ceiling for the exposed DVR window. availabilityStartTime is anchored this
+' far back at most so the player's ms-scale presentation time (now - AST) stays well
+' under INT32_MAX (~24.8 days at timescale=1000). YouTube caps live DVR at 12h.
+const LIVE_MAX_DVR_WINDOW_SEC = 43200
+
+namespace Innertube
+
+    ' Live streams come back with no hlsManifestUrl/dashManifestUrl, just
+    ' adaptiveFormats with a `targetDurationSec` and segments addressed by `&sq=N`
+    ' (identical to Post-Live DVR). To build a dynamic DASH manifest we need the
+    ' current live edge (X-Head-Seqnum) and a wall-clock anchor for the DASH
+    ' `availabilityStartTime`. X-Head-Time-Millis is the stream-time of the head
+    ' segment, so genesis = now - headTime.
+    '
+    ' Backend-agnostic: works off the signed `adaptiveFormats[0].url` alone. The
+    ' innertube path passes its `client`/`cpn` (so the HEAD carries innertube
+    ' headers); the Invidious path passes invalid for both - the url is already
+    ' signed and googlevideo returns the X-Head-* headers regardless.
+    function GetLiveStreamInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as dynamic, cancellation as object) as void
+        if adaptiveFormats.Count() = 0
+            LogWarn("GetLiveStreamInfo: No adaptive formats available")
+            return
+        end if
+
+        url = adaptiveFormats[0]["url"]
+        if StringUtils.IsNullOrEmpty(url)
+            LogWarn("GetLiveStreamInfo: URL is empty")
+            return
+        end if
+
+        maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
+
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents["rn"] = "0"
+        queryComponents["sq"] = "0"
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
+        end if
+
+        url = UrlUtils.SetQueryParams(url, queryComponents)
+
+        request = HttpClient.Head(url)
+        if client <> invalid
+            requestHeaders = Innertube.CreateHeaders(client)
+        else
+            requestHeaders = {}
+        end if
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
+        request.Headers(requestHeaders)
+
+        request.TryCount(2)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        if not response.IsSuccess()
+            LogError("Failed to fetch live stream info", response.ErrorMessage())
+            return
+        end if
+
+        headers = response.Headers()
+
+        if not headers.DoesExist("X-Head-Seqnum")
+            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Seqnum in headers", url, headers)
+            return
+        end if
+        headSeqnum = ValidString(headers["X-Head-Seqnum"]).ToInt()
+
+        ' Head time: NEVER parse X-Head-Time-Millis with .ToInt(). For a long-running
+        ' 24/7 stream (e.g. 76 days = 6.58e9 ms) it overflows BrightScript's 32-bit
+        ' int, corrupting both the genesis anchor AND the derived fragment duration
+        ' (seen as a bogus 327ms vs the real 1000ms). Prefer X-Head-Time-Sec
+        ' (~6.58e6, fits int32, equals X-Head-Seqnum here at 1 fragment/second); if
+        ' only millis is present, ParseJson decodes it as a 64-bit double untruncated.
+        if headers.DoesExist("X-Head-Time-Sec")
+            headTimeSec = ValidString(headers["X-Head-Time-Sec"]).ToInt()
+        else if headers.DoesExist("X-Head-Time-Millis")
+            headTimeSec = Cint(StringUtils.ParseJsonSafe(ValidString(headers["X-Head-Time-Millis"])) / 1000.0)
+        else
+            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Time-Sec / -Millis in headers", url, headers)
+            return
+        end if
+        nowSec = CreateObject("roDateTime").AsSeconds()
+
+        ' Anchor availabilityStartTime to the DVR window, NOT the true stream genesis.
+        ' A 24/7 channel can be live for weeks; with timescale=1000 the player's
+        ' (now - availabilityStartTime) presentation time in ms then exceeds INT32_MAX
+        ' (~24.8 days) and the live-edge segment math wraps - the playhead falls back
+        ' near the period start, hours/days behind real time. Segments older than the
+        ' DVR window 404 anyway, so the window IS the real availability start.
+        ' DashManifest shifts startNumber to match this anchor.
+        windowSec = maxDvrDurationSec
+        if windowSec <= 0 or windowSec > LIVE_MAX_DVR_WINDOW_SEC
+            windowSec = LIVE_MAX_DVR_WINDOW_SEC
+        end if
+        ' A young stream has less history than the DVR window.
+        if headTimeSec > 0 and windowSec > headTimeSec
+            windowSec = headTimeSec
+        end if
+
+        astDate = CreateObject("roDateTime")
+        astDate.FromSeconds(nowSec - windowSec)
+
+        parsedResponse["liveHeadSeqnum"] = headSeqnum
+        parsedResponse["liveAvailabilityStartUtc"] = astDate.ToISOString()
+        parsedResponse["liveDvrWindowSec"] = windowSec
+        ' Effective per-fragment duration, derived from the stream's own counters.
+        ' YouTube's reported targetDurationSec is unreliable for long-running streams
+        ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
+        ' SegmentTemplate so the player requests segments far outside the DVR window
+        ' (404). headTime/headSeqnum is the true average and keeps the manifest's
+        ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
+        ' that availabilityStartTime is built from.
+        if headSeqnum > 0
+            parsedResponse["liveFragmentDurationMs"] = Cint((headTimeSec / headSeqnum) * 1000.0)
+        end if
+    end function
+
+end namespace

@@ -5,6 +5,12 @@ import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
+' How many DASH segments ahead to warm per representation. On a request for segment
+' N we Send (without Await) the next few so their downloads overlap N's await +
+' playback; when the player asks for them the Await is short/instant. Small on
+' purpose to bound concurrent roUrlTransfers (x2 representations).
+const LIVE_PREFETCH_SEGMENTS = 2
+
 namespace Http
 
     class DashRouter extends HttpRouter
@@ -36,6 +42,7 @@ namespace Http
             ' the video changes. The same dig also feeds the live-segment lookups
             ' below, so /api/dash and /api/dash/live-seg share one dig + one copy.
             m.cachedVideoId = invalid
+            m.cachedBackend = invalid
             m.cachedMetadata = invalid
             ' Live-segment caches, (re)built from the same metadata dig:
             m.cachedUrls = {} ' itag -> signed base url
@@ -43,13 +50,27 @@ namespace Http
             m.cachedInitSeqnum = 0 ' live-edge fragment to source the init from
             m.probeByteCount = m.INITIAL_PROBE_BYTE_COUNT ' current box-walk probe; only grows
             m.reportedFailures = {} ' per-video telemetry dedupe (see ReportSegmentFailure)
+            ' Prefetch cache: "itag|nativeSq" -> in-flight StartSegmentFetch entry,
+            ' warmed ahead of the player so awaits hit already-downloading fragments.
+            m.prefetch = {}
+            ' Last itag served per media kind. When the player switches representation
+            ' (ABR video / audio track), the previous itag's warmed entries are evicted
+            ' so they don't leak until the next video change.
+            m.lastVideoItag = invalid
+            m.lastAudioItag = invalid
         end function
 
         ' Returns the cached metadata AA for video id `v`, digging the videoQueue
         ' node (a render-thread rendezvous) only on a cache miss / video change. On a
         ' miss, also (re)builds the live-segment caches from the same copy.
-        function GetMetadata(v as string) as dynamic
-            if m.cachedVideoId = v and IsAssociativeArray(m.cachedMetadata)
+        function GetMetadata(v as string, backend as string) as dynamic
+            ' Key on backend too, not just videoId: switching backends replays the
+            ' same videoId but pushes fresh metadata onto the content node (different
+            ' parser, different live fields). Keyed on videoId alone we'd keep serving
+            ' the previous backend's stale copy. The backend is carried on the request
+            ' query (set when the stream urls are built) so we never read the prefs
+            ' node on this hot path.
+            if m.cachedVideoId = v and m.cachedBackend = backend and IsAssociativeArray(m.cachedMetadata)
                 return m.cachedMetadata
             end if
 
@@ -57,6 +78,7 @@ namespace Http
             if IsAssociativeArray(metadata) and metadata.videoId = v
                 m.cachedMetadata = metadata
                 m.cachedVideoId = v
+                m.cachedBackend = backend
                 m.RebuildLiveCache(metadata)
             end if
             return metadata
@@ -82,7 +104,7 @@ namespace Http
                 return true
             end if
 
-            metadata = m.GetMetadata(v)
+            metadata = m.GetMetadata(v, ValidString(request.query.backend))
             if not IsAssociativeArray(metadata)
                 response.Default(500, "videoQueue.player.content.metadata is invalid")
                 WriteAsciiFile("cachefs:/last_generated_dash.xml", "500 videoQueue.player.content.metadata is invalid")
@@ -99,7 +121,7 @@ namespace Http
             ' For live streams, segments are addressed to the /api/dash/live-seg proxy
             ' on this same web server (the video player reaches it over 127.0.0.1).
             m.dashManifest.liveSegmentBaseUrl = `http://127.0.0.1:${m.serverPort}`
-            ' LogInfo("[LIVE-MPD] DashRouter building manifest for v:", v, "liveNow:", metadata.liveNow, "liveSegmentBaseUrl:", m.dashManifest.liveSegmentBaseUrl)
+            m.dashManifest.liveBackend = ValidString(request.query.backend)
 
             qualityFilter = m.CreateQualityFilter(quality)
             xmlContent = m.dashManifest.FromVideoMetadata(metadata, qualityFilter, ValidString(local) = "true")
@@ -203,11 +225,10 @@ namespace Http
         ' no clean init or moof-only media directly (`&range=` -> 400, the HTTP Range
         ' header is ignored), so this transform is unavoidable.
         '
-        ' Endpoint (see DashManifest live SegmentTemplate):
+        ' Endpoint (see DashManifest live SegmentTemplate); segments map 1:1 to native
+        ' fragments, so the DASH segment number is the native sq:
         '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=init -> ftyp+moov of the live-edge fragment
-        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=<K>  -> moof+mdat of fragments
-        '                                                    [K*GROUP .. K*GROUP+GROUP-1]
-        ' where GROUP = LIVE_SEGMENT_GROUP.
+        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=<N>  -> moof+mdat of fragment N
         '
         ' This is a hot path (called for every audio + video segment, continuously),
         ' so it is written to minimize per-request work: the itag -> url/type lookups
@@ -231,7 +252,7 @@ namespace Http
 
             ' Warm the shared cache for this video (one node dig on a video change;
             ' the manifest request usually warmed it already).
-            m.GetMetadata(v)
+            m.GetMetadata(v, ValidString(request.query.backend))
 
             baseUrl = m.cachedUrls[itag]
             if StringUtils.IsNullOrEmpty(baseUrl)
@@ -256,43 +277,39 @@ namespace Http
                     return true
                 end if
             else
-                ' Media DASH segment K: concat GROUP native fragments, each reduced
-                ' to moof+mdat so Roku reads the init segment only once.
-                '
-                ' Fire all GROUP fragment fetches in parallel (Send), then await +
-                ' transform them in order. Fetching serially here was the live
-                ' bottleneck - segments arrived too slowly and the player dropped to
-                ' lower bitrates. (Same Send()-then-Await() pattern as OTFSegmentInfo.)
-                firstFrag = sq.ToInt() * LIVE_SEGMENT_GROUP
-                pending = []
-                for i = 0 to LIVE_SEGMENT_GROUP - 1
-                    pending.Push(m.StartSegmentFetch(baseUrl, firstFrag + i, v, itag))
-                end for
+                ' Media DASH segment = one native YouTube fragment, reduced to moof+mdat
+                ' so Roku reads the init segment only once. The manifest addresses the
+                ' proxy 1:1, so the DASH segment number is the native sq.
+                nativeSq = sq.ToInt()
 
-                ' Await all (so every temp file is read + deleted), then assemble the
-                ' contiguous prefix. A failed fragment is a gap, so we stop appending
-                ' at the first failure; trailing fragments past the live edge are
-                ' simply dropped (partial group is valid for the live edge).
-                parts = []
-                for each entry in pending
-                    parts.Push(m.AwaitTransformedSegment(entry, false))
-                end for
-
-                output = invalid
-                for each part in parts
-                    if part = invalid
-                        exit for
+                ' Representation switch (ABR video / audio track): the previous itag of
+                ' this kind stops being requested, so evict its warmed fragments now -
+                ' EvictPrefetchOutside is itag-scoped and would never reach them, so
+                ' they'd otherwise leak (temp files + idle transfers) until video change.
+                if m.cachedTypes[itag] = "audio/mp4"
+                    if IsString(m.lastAudioItag) and m.lastAudioItag <> itag
+                        m.EvictPrefetchItag(m.lastAudioItag)
                     end if
-                    if output = invalid
-                        output = part
-                    else
-                        output.Append(part)
+                    m.lastAudioItag = itag
+                else
+                    if IsString(m.lastVideoItag) and m.lastVideoItag <> itag
+                        m.EvictPrefetchItag(m.lastVideoItag)
                     end if
-                end for
+                    m.lastVideoItag = itag
+                end if
 
+                ' Reuse a warmed fetch if present, else start one. Warm the next few
+                ' (Send, no Await) BEFORE blocking here so their downloads overlap this
+                ' fragment's await + playback; then drop entries now outside the window
+                ' (played past, or stranded by a seek) so the cache + temp files stay bounded.
+                entry = m.GetOrStartFetch(baseUrl, nativeSq, v, itag)
+                m.PrefetchAhead(baseUrl, v, itag, nativeSq, LIVE_PREFETCH_SEGMENTS)
+                m.EvictPrefetchOutside(itag, nativeSq + 1, nativeSq + LIVE_PREFETCH_SEGMENTS)
+
+                output = m.AwaitTransformedSegment(entry, false)
                 if output = invalid
                     ' Root-cause telemetry already emitted by AwaitTransformedSegment.
-                    LogErrorNoTelemetry("[LIVE-SEG] first media fragment failed v:", v, "itag:", itag, "sq:", firstFrag, "-> 502")
+                    LogErrorNoTelemetry("[LIVE-SEG] media fragment failed v:", v, "itag:", itag, "sq:", nativeSq, "-> 502")
                     response.Default(502, "Failed to fetch live media segment")
                     return true
                 end if
@@ -310,12 +327,14 @@ namespace Http
         ' an already-dug metadata AA - NO second node dig. Called from GetMetadata on a
         ' video change. Also sweeps orphaned temp files and re-arms the telemetry guard.
         function RebuildLiveCache(metadata as object) as void
+            ' Prefetched fetches from the previous video may still be in flight (they
+            ' outlive the request that started them), so cancel them first - otherwise
+            ' they'd race the sweep below (and keep writing temp files).
+            m.ClearPrefetch()
             ' Video changed: sweep any orphaned segment temp files. Each request
             ' deletes its own temp files on every path, so this is only a safety net
             ' for an unexpected error that skipped a delete - without it, tmp:/
             ' (RAM-backed, never reaped by the OS) could grow across a long session.
-            ' Safe here because the web server handles one request at a time, so no
-            ' live-seg fetch is in flight.
             m.CleanupTempSegments()
             ' Re-arm the per-video telemetry dedupe (see ReportSegmentFailure).
             m.reportedFailures = {}
@@ -373,6 +392,87 @@ namespace Http
             tmpPath = `tmp:/live-seg-${StringUtils.RandomId()}.m4s`
             req = HttpClient.Get(segUrl).ToFile(tmpPath).NoCache().Send()
             return { req: req, tmpPath: tmpPath, sq: sq, v: v, itag: itag, segUrl: segUrl }
+        end function
+
+        ' Return a warmed (prefetched) fetch for this native fragment if present,
+        ' consuming it from the cache; otherwise start a fresh one.
+        function GetOrStartFetch(baseUrl as string, sq as integer, v as string, itag as string) as object
+            key = `${itag}|${sq}`
+            if m.prefetch.DoesExist(key)
+                entry = m.prefetch[key]
+                m.prefetch.Delete(key)
+                return entry
+            end if
+            return m.StartSegmentFetch(baseUrl, sq, v, itag)
+        end function
+
+        ' Send (without awaiting) the next `count` native fragments after `fromSq` so
+        ' their downloads overlap the current segment. Already-warmed ones are left be.
+        function PrefetchAhead(baseUrl as string, v as string, itag as string, fromSq as integer, count as integer) as void
+            for i = 1 to count
+                key = `${itag}|${fromSq + i}`
+                if not m.prefetch.DoesExist(key)
+                    m.prefetch[key] = m.StartSegmentFetch(baseUrl, fromSq + i, v, itag)
+                end if
+            end for
+        end function
+
+        ' Drop warmed fragments for `itag` whose sq is outside [lowSq, highSq] - played
+        ' past or stranded by a seek - cancelling the in-flight transfer and deleting
+        ' its temp file so the cache and tmp:/ stay bounded.
+        function EvictPrefetchOutside(itag as string, lowSq as integer, highSq as integer) as void
+            prefix = `${itag}|`
+            stale = []
+            for each key in m.prefetch
+                if key.StartsWith(prefix)
+                    sq = key.Mid(prefix.Len()).ToInt()
+                    if sq < lowSq or sq > highSq
+                        stale.Push(key)
+                    end if
+                end if
+            end for
+            for each key in stale
+                m.DiscardFetch(m.prefetch[key])
+                m.prefetch.Delete(key)
+            end for
+        end function
+
+        ' Cancel and drop every warmed fragment belonging to `itag` (used when the
+        ' player switches away from a representation).
+        function EvictPrefetchItag(itag as string) as void
+            prefix = `${itag}|`
+            stale = []
+            for each key in m.prefetch
+                if key.StartsWith(prefix)
+                    stale.Push(key)
+                end if
+            end for
+            for each key in stale
+                m.DiscardFetch(m.prefetch[key])
+                m.prefetch.Delete(key)
+            end for
+        end function
+
+        ' Cancel every warmed fetch and clear the cache. Called on a video change
+        ' before the temp-file sweep so in-flight prefetch transfers don't race it.
+        function ClearPrefetch() as void
+            for each key in m.prefetch
+                m.DiscardFetch(m.prefetch[key])
+            end for
+            m.prefetch = {}
+            m.lastVideoItag = invalid
+            m.lastAudioItag = invalid
+        end function
+
+        ' Abort an in-flight fetch and delete its temp file (non-blocking).
+        function DiscardFetch(entry as object) as void
+            if not IsAssociativeArray(entry)
+                return
+            end if
+            if entry.req <> invalid and entry.req.urlTransfer <> invalid
+                entry.req.urlTransfer.AsyncCancel()
+            end if
+            DeleteFile(entry.tmpPath)
         end function
 
         ' Await a fetch started by StartSegmentFetch and return just the bytes Roku

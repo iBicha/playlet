@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
 import "pkg:/components/Services/Innertube/OTFSegmentInfo.bs"
 import "pkg:/source/services/HttpClient.bs"
@@ -735,87 +736,6 @@ namespace Innertube
         if segmentCount > 0
             parsedResponse["postLiveDvrSegmentCount"] = segmentCount
         end if
-    end function
-
-    ' Live streams come back with no hlsManifestUrl/dashManifestUrl, just
-    ' adaptiveFormats with a `targetDurationSec` and segments addressed by `&sq=N`
-    ' (identical to Post-Live DVR). To build a dynamic DASH manifest we need the
-    ' current live edge (X-Head-Seqnum) and a wall-clock anchor for the DASH
-    ' `availabilityStartTime`. X-Head-Time-Millis is the stream-time of the head
-    ' segment, so genesis = now - headTime.
-    function GetLiveStreamInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
-        if adaptiveFormats.Count() = 0
-            LogWarn("GetLiveStreamInfo: No adaptive formats available")
-            return
-        end if
-
-        url = adaptiveFormats[0]["url"]
-        if StringUtils.IsNullOrEmpty(url)
-            LogWarn("GetLiveStreamInfo: URL is empty")
-            return
-        end if
-
-        maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
-        ' LogInfo("[LIVE-INFO] GetLiveStreamInfo start. itag:", adaptiveFormats[0]["itag"], "targetDurationSec:", adaptiveFormats[0]["targetDurationSec"], "maxDvrDurationSec:", maxDvrDurationSec, "client:", client)
-
-        queryComponents = UrlUtils.ParseQueryComponents(url)
-        queryComponents["rn"] = "0"
-        queryComponents["sq"] = "0"
-        if not StringUtils.IsNullOrEmpty(cpn)
-            queryComponents["cpn"] = cpn
-        end if
-
-        url = UrlUtils.SetQueryParams(url, queryComponents)
-
-        request = HttpClient.Head(url)
-        requestHeaders = Innertube.CreateHeaders(client)
-        requestHeaders["origin"] = "https://www.youtube.com"
-        requestHeaders["referer"] = "https://www.youtube.com"
-        requestHeaders["DNT"] = "?1"
-        request.Headers(requestHeaders)
-
-        request.TryCount(2)
-        request.Cancellation(cancellation)
-        response = request.Await()
-
-        if not response.IsSuccess()
-            LogError("Failed to fetch live stream info", response.ErrorMessage())
-            return
-        end if
-
-        headers = response.Headers()
-        ' LogInfo("[LIVE-INFO] HEAD response headers:", FormatJson(headers))
-
-        if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
-            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Time-Millis / X-Head-Seqnum in headers", url, headers)
-            return
-        end if
-
-        ' Work in seconds: wall-clock ms (~1.78e12) overflows a 32-bit integer.
-        headTimeSec = ValidString(headers["X-Head-Time-Millis"]).ToInt() \ 1000
-        headSeqnum = ValidString(headers["X-Head-Seqnum"]).ToInt()
-        nowSec = CreateObject("roDateTime").AsSeconds()
-        genesisSec = nowSec - headTimeSec
-
-        genesisDate = CreateObject("roDateTime")
-        genesisDate.FromSeconds(genesisSec)
-
-        parsedResponse["liveHeadSeqnum"] = headSeqnum
-        parsedResponse["liveAvailabilityStartUtc"] = genesisDate.ToISOString()
-        if maxDvrDurationSec > 0
-            parsedResponse["liveDvrWindowSec"] = maxDvrDurationSec
-        end if
-        ' Effective per-fragment duration, derived from the stream's own counters.
-        ' YouTube's reported targetDurationSec is unreliable for long-running streams
-        ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
-        ' SegmentTemplate so the player requests segments far outside the DVR window
-        ' (404). headTime/headSeqnum is the true average and keeps the manifest's
-        ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
-        ' that availabilityStartTime is built from.
-        if headSeqnum > 0
-            parsedResponse["liveFragmentDurationMs"] = Cint((headTimeSec / headSeqnum) * 1000.0)
-        end if
-        ' LogInfo("[LIVE-INFO] computed headTimeSec:", headTimeSec, "headSeqnum:", headSeqnum, "nowSec:", nowSec, "genesisSec:", genesisSec, "availabilityStartUtc:", parsedResponse["liveAvailabilityStartUtc"], "liveDvrWindowSec:", parsedResponse["liveDvrWindowSec"])
     end function
 
 end namespace

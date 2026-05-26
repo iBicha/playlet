@@ -1,5 +1,6 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/VideoFeed/PaginationType.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
@@ -162,7 +163,20 @@ namespace Invidious
                 }
             end if
 
-            return response.Json()
+            metadata = response.Json()
+            ' Live videos need the same X-Head-* enrichment the innertube path does
+            ' (liveHeadSeqnum / liveAvailabilityStartUtc / liveDvrWindowSec / ...),
+            ' or the generated dynamic DASH manifest has no availabilityStartTime and
+            ' Roku fails with "availabilityStartTime not available for live stream".
+            ' The Invidious adaptiveFormats urls are already signed googlevideo urls,
+            ' so the shared helper works with no client/cpn. parser is set so the
+            ' manifest's diagnostic comment reflects the real source.
+            if IsAssociativeArray(metadata) and ValidBool(metadata.liveNow) and IsArray(metadata.adaptiveFormats)
+                metadata["parser"] = "invidious"
+                Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, invalid, invalid, cancellation)
+            end if
+
+            return metadata
         end function
 
         function GetPlaylist(playlistId as string, index = 0 as integer, continuation = "" as string, cancellation = invalid as object) as object
