@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Live stream videos
+- Live stream videos for Playlet backend, attempt with Invidious
 - Audio track names when using Invidious
 
 ## [0.45.0] - 2026-05-25
