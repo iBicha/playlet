@@ -35,9 +35,14 @@ namespace Innertube
 
         maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
 
+        ' HEAD the base url with NO `sq`: that queries the stream's live edge and
+        ' returns the X-Head-* headers (X-Head-Seqnum / X-Head-Time-Sec). Pinning
+        ' `sq=0` instead makes googlevideo answer about segment 0 specifically, and for
+        ' some streams (observed targetDurationSec=5) it then omits X-Head-* entirely
+        ' (only X-Sequence-Num/X-Walltime-Ms) - which left availabilityStartTime unset
+        ' and Roku failed with "availabilityStartTime not available for live stream".
         queryComponents = UrlUtils.ParseQueryComponents(url)
         queryComponents["rn"] = "0"
-        queryComponents["sq"] = "0"
         if not StringUtils.IsNullOrEmpty(cpn)
             queryComponents["cpn"] = cpn
         end if
@@ -59,15 +64,15 @@ namespace Innertube
         request.Cancellation(cancellation)
         response = request.Await()
 
-        if not response.IsSuccess()
-            LogError("Failed to fetch live stream info", response.ErrorMessage())
-            return
-        end if
-
+        ' Do NOT gate on HTTP status. A no-sq HEAD that queries the live edge can come
+        ' back non-2xx yet still carry the X-Head-* headers we need (observed: one
+        ' stream returns 500, another 200; both include them). Read the headers
+        ' regardless and only bail if they're genuinely absent (e.g. a network error
+        ' with no response at all).
         headers = response.Headers()
 
         if not headers.DoesExist("X-Head-Seqnum")
-            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Seqnum in headers", url, headers)
+            LogErrorNoTelemetry("[LIVE-INFO] No X-Head-Seqnum in response (HTTP " + ValidInt(response.StatusCode()).ToStr() + ")", url, headers)
             return
         end if
         headSeqnum = ValidString(headers["X-Head-Seqnum"]).ToInt()
