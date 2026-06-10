@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Video player refactored into a new interface, with pause and minimize buttons. This would allow for an easier integration of other features
+
 ### Fixed
 
 - Live stream videos for Playlet backend, attempt with Invidious
 - Audio track names when using Invidious
 - Small leak in video player
+
+### Changed
+
+- Pressing down when video is full screen no longer minimizes the video, there's a dedicated button for it now
 
 ## [0.45.0] - 2026-05-25
 
