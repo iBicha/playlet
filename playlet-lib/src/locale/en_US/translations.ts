@@ -965,6 +965,10 @@
         <translation>Press Options (*) for full screen</translation>
     </message>
     <message>
+        <source>Rewind live TV</source>
+        <translation>Rewind live TV</translation>
+    </message>
+    <message>
         <source>Video load error</source>
         <translation>Video load error</translation>
     </message>

@@ -1,0 +1,252 @@
+' Unit tests for PlayerCoordinatorLogic: the remote-key-to-command map, the OK/Select 4-cell, and the
+' buffering-spinner gate. Pure functions, so they run on the main thread with no device.
+
+import "pkg:/components/VideoPlayerDev/PlayerCoordinatorLogic.bs"
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+
+namespace Tests
+
+    @suite
+    class PlayerCoordinatorLogicTests extends Rooibos.BaseTestSuite
+
+        ' =========================================================================================
+        ' KeyToCommand — the ECP key -> transport Command map
+        ' =========================================================================================
+        @describe("KeyToCommand")
+
+        @it("maps every transport key to its own command")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Left), TransportController.Command.Left)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Right), TransportController.Command.Right)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.FastForward), TransportController.Command.Fwd)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Rewind), TransportController.Command.Rev)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Replay), TransportController.Command.Replay)
+        end function
+
+        @it("Rewind is the reverse scan ladder, not the Left step")
+        function _()
+            m.assertTrue(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Rewind) <> TransportController.Command.Left)
+            m.assertTrue(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.FastForward) <> TransportController.Command.Right)
+        end function
+
+        @it("returns Command.None for non-transport keys")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Ok), TransportController.Command.None)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Back), TransportController.Command.None)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand(RemoteKeys.Down), TransportController.Command.None)
+            m.assertEqual(PlayerCoordinatorLogic.KeyToCommand("bogus"), TransportController.Command.None)
+        end function
+
+        ' =========================================================================================
+        ' OkActionInIdle — the OK/Select 4-cell (VOD) + the live chrome toggle
+        ' =========================================================================================
+        @describe("OkActionInIdle")
+
+        @it("VOD playing + chrome shown -> pause")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("playing", true, false), PlayerCoordinatorLogic.OkAction.Pause)
+        end function
+
+        @it("VOD playing + chrome hidden -> reveal (no pause)")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("playing", false, false), PlayerCoordinatorLogic.OkAction.Reveal)
+        end function
+
+        @it("VOD paused + chrome shown -> resume")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("paused", true, false), PlayerCoordinatorLogic.OkAction.Resume)
+        end function
+
+        @it("VOD paused + chrome hidden -> reveal (stays paused)")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("paused", false, false), PlayerCoordinatorLogic.OkAction.Reveal)
+        end function
+
+        @it("live always toggles chrome, never pauses (regardless of play state / chrome)")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("playing", true, true), PlayerCoordinatorLogic.OkAction.ToggleChrome)
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("playing", false, true), PlayerCoordinatorLogic.OkAction.ToggleChrome)
+            m.assertEqual(PlayerCoordinatorLogic.OkActionInIdle("paused", true, true), PlayerCoordinatorLogic.OkAction.ToggleChrome)
+        end function
+
+        ' =========================================================================================
+        ' ShouldShowBuffering — mid-stream spinner gate (firstFrame AND idle AND fullscreen)
+        ' =========================================================================================
+        @describe("ShouldShowBuffering")
+
+        @it("shows only past the first frame, while idle, and fullscreen")
+        function _()
+            m.assertTrue(PlayerCoordinatorLogic.ShouldShowBuffering(true, TransportController.Mode.Idle, true))
+        end function
+
+        @it("never before the first frame (that is the loading overlay)")
+        function _()
+            m.assertFalse(PlayerCoordinatorLogic.ShouldShowBuffering(false, TransportController.Mode.Idle, true))
+        end function
+
+        @it("never during an active transport (the bif covers a seek-rebuffer)")
+        function _()
+            m.assertFalse(PlayerCoordinatorLogic.ShouldShowBuffering(true, TransportController.Mode.Scrub, true))
+            m.assertFalse(PlayerCoordinatorLogic.ShouldShowBuffering(true, TransportController.Mode.Scan, true))
+        end function
+
+        @it("never while minimized (no UI in PiP)")
+        function _()
+            m.assertFalse(PlayerCoordinatorLogic.ShouldShowBuffering(true, TransportController.Mode.Idle, false))
+        end function
+
+        ' =========================================================================================
+        ' TransportSafetyAction — the TOTAL device-seam freeze decision (P-total: defined for every device state)
+        ' =========================================================================================
+        @describe("TransportSafetyAction (total device-seam guard)")
+
+        @it("the guard decision is DEFINED and correct over the FULL axis cross-product (state x transport x live x eof)")
+        function _()
+            ' the full Roku Video.state enum — including the ones the old guard ignored (none/paused/stopping/
+            ' stopped) — crossed with the live and at-end axes. Only playing-under-a-transport ever acts, and it
+            ' finishes (instead of freezing) exactly when VOD has both the device AND the cursor at the end.
+            states = ["none", "buffering", "playing", "paused", "finished", "error", "stopping", "stopped"]
+            durationMs = 210000
+            endMs = 209000 ' within FINISH_EPSILON_MS of the duration
+            midMs = 60000
+            for each s in states
+                for each inT in [true, false]
+                    for each isLive in [false, true]
+                        for each posAtEnd in [false, true]
+                            for each curAtEnd in [false, true]
+                                if posAtEnd
+                                    posMs = endMs
+                                else
+                                    posMs = midMs
+                                end if
+                                if curAtEnd
+                                    curMs = endMs
+                                else
+                                    curMs = midMs
+                                end if
+                                expected = PlayerCoordinatorLogic.SafetyAction.None
+                                if inT and s = "playing"
+                                    if not isLive and posAtEnd and curAtEnd
+                                        expected = PlayerCoordinatorLogic.SafetyAction.FinishEof
+                                    else
+                                        expected = PlayerCoordinatorLogic.SafetyAction.Freeze
+                                    end if
+                                end if
+                                got = PlayerCoordinatorLogic.TransportSafetyAction(s, inT, isLive, posMs, curMs, durationMs)
+                                m.assertEqual(got, expected, "state=" + s + " inT=" + inT.ToStr() + " live=" + isLive.ToStr() + " posEnd=" + posAtEnd.ToStr() + " curEnd=" + curAtEnd.ToStr())
+                            end for
+                        end for
+                    end for
+                end for
+            end for
+        end function
+
+        @it("an unmodeled / unexpected device state under a transport is a safe no-op, never an undefined freeze")
+        function _()
+            ' the wedge's failure mode: a state the guard did not enumerate must NOT trigger a spurious freeze.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("buffering", true, false, 60000, 60000, 210000), PlayerCoordinatorLogic.SafetyAction.None)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("some_future_state", true, false, 60000, 60000, 210000), PlayerCoordinatorLogic.SafetyAction.None)
+        end function
+
+        @it("VOD playing at the end under a transport whose cursor is ALSO at the end -> FinishEof, not Freeze")
+        function _()
+            ' both the device and the cursor within the 2s epsilon of duration -> finish.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.FinishEof)
+            ' cursor rewound away from the end -> the user is heading backwards: keep the freeze.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 100000, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' device not at the end -> freeze as usual.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 60000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' LIVE has no EOF: always freeze.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 209000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' unknown duration -> no EOF concept -> freeze.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 0), PlayerCoordinatorLogic.SafetyAction.Freeze)
+        end function
+
+        ' =========================================================================================
+        ' NextButtonIndex — moving focus along the button row
+        ' =========================================================================================
+        @describe("button row navigation")
+
+        @it("Left/Right move the focused button and clamp at the ends")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(0, RemoteKeys.Right, 2), 1)
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(1, RemoteKeys.Left, 2), 0)
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(0, RemoteKeys.Left, 2), 0) ' clamp at the left end
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(1, RemoteKeys.Right, 2), 1) ' clamp at the right end (count 2)
+            ' a larger row still clamps correctly (the count is a parameter, not a constant)
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(2, RemoteKeys.Right, 4), 3)
+            m.assertEqual(PlayerCoordinatorLogic.NextButtonIndex(3, RemoteKeys.Right, 4), 3)
+        end function
+
+        @it("Up/Down move focus between the bar and the buttons, no wrap")
+        function _()
+            buttons = PlayerCoordinatorLogic.FocusTarget.Buttons
+            bar = PlayerCoordinatorLogic.FocusTarget.Bar
+            m.assertEqual(PlayerCoordinatorLogic.NextFocusTarget(buttons, RemoteKeys.Down), bar)
+            m.assertEqual(PlayerCoordinatorLogic.NextFocusTarget(bar, RemoteKeys.Up), buttons)
+            m.assertEqual(PlayerCoordinatorLogic.NextFocusTarget(buttons, RemoteKeys.Up), buttons) ' already the top tier
+            m.assertEqual(PlayerCoordinatorLogic.NextFocusTarget(bar, RemoteKeys.Down), bar) ' already the bottom tier
+        end function
+
+        ' =========================================================================================
+        ' PickThumbnailTileSet / TileSetIntervalMs — read the native Video.thumbnailTiles tile-set
+        ' =========================================================================================
+        @describe("PickThumbnailTileSet / TileSetIntervalMs")
+
+        @it("picks the first valid native tile-set")
+        function _()
+            ts = PlayerCoordinatorLogic.PickThumbnailTileSet(m.sampleThumbnailTiles())
+            m.assertEqual(ts.htiles, 5)
+            m.assertEqual(ts.vtiles, 5)
+            m.assertEqual(ts.tiles.Count(), 6)
+            m.assertEqual(ts.tiles[0][0], "https://x/M0.jpg")
+        end function
+
+        @it("computes the per-thumbnail interval (per-sheet duration / tiles-per-sheet)")
+        function _()
+            ts = PlayerCoordinatorLogic.PickThumbnailTileSet(m.sampleThumbnailTiles())
+            m.assertEqual(PlayerCoordinatorLogic.TileSetIntervalMs(ts), 5000) ' 125s / 25 tiles = 5s
+        end function
+
+        @it("returns invalid when there is no tile-set")
+        function _()
+            m.assertInvalid(PlayerCoordinatorLogic.PickThumbnailTileSet(invalid))
+            m.assertInvalid(PlayerCoordinatorLogic.PickThumbnailTileSet({}))
+        end function
+
+        @it("returns invalid for a degenerate tile-set (no per-sheet duration, empty grid)")
+        function _()
+            noDuration = m.sampleThumbnailTiles()
+            noDuration.set[0].duration = 0
+            m.assertInvalid(PlayerCoordinatorLogic.PickThumbnailTileSet(noDuration))
+            noGrid = m.sampleThumbnailTiles()
+            noGrid.set[0].htiles = 0
+            m.assertInvalid(PlayerCoordinatorLogic.PickThumbnailTileSet(noGrid))
+        end function
+
+        ' a tile-set shaped like the OS's Video.thumbnailTiles (one descriptor key -> [tileSet]).
+        function sampleThumbnailTiles() as object
+            return {
+                set: [{
+                    duration: 125 ' seconds covered by ONE 5x5 sheet
+                    final_time: 634.566
+                    htiles: 5
+                    vtiles: 5
+                    width: 160
+                    height: 90
+                    tiles: [
+                        ["https://x/M0.jpg", 0, ""]
+                        ["https://x/M1.jpg", 125, ""]
+                        ["https://x/M2.jpg", 250, ""]
+                        ["https://x/M3.jpg", 375, ""]
+                        ["https://x/M4.jpg", 500, ""]
+                        ["https://x/M5.jpg", 625, ""]
+                    ]
+                }]
+            }
+        end function
+
+    end class
+
+end namespace

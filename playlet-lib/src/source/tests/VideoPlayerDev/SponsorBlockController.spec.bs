@@ -1,0 +1,202 @@
+' SponsorBlockController unit suite — the pure SponsorBlock decision logic in isolation. No real job: seed the
+' segments array directly + a fake `top` (for duration) and assert the find/skip/chapter decisions. The
+' notification + job plumbing live in the coordinator; manual-skip is tested via the stash + position guard.
+
+import "pkg:/components/VideoPlayerDev/SponsorBlockController.bs"
+
+namespace Tests
+
+    @suite
+    class SponsorBlockControllerTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' a fake Video node: only `duration` (seconds) + `seekMode` are read/written by the controller.
+            m.fakeTop = { duration: 282.0, seekMode: "default" }
+            m.sb = new SponsorBlockController.Controller({
+                jobQueue: invalid
+                preferences: invalid
+                notifications: invalid
+                top: m.fakeTop
+            })
+            ' Despacito-like segments: music_offtopic [0,21.808] manual, sponsor [100,110] auto, music_offtopic
+            ' [249.38,281.521] manual. Sorted by start.
+            m.segments = [
+                { start: 0.0, end: 21.808, option: "manual_skip", title: "Music: Non-Music Section", shortTitle: "Non-Music", showNotification: true, UUID: "seg-a", category: "music_offtopic" }
+                { start: 100.0, end: 110.0, option: "auto_skip", title: "Sponsor", shortTitle: "Sponsor", showNotification: false, UUID: "seg-b", category: "sponsor" }
+                { start: 249.38, end: 281.521, option: "manual_skip", title: "Music: Non-Music Section", shortTitle: "Non-Music", showNotification: true, UUID: "seg-c", category: "music_offtopic" }
+            ]
+            ' seed the controller as if the job had returned (the enable gate + stored segments).
+            m.sb.enabled = true
+            m.sb.segments = m.segments
+        end function
+
+        @describe("find segment by time")
+
+        @it("finds the segment containing the time")
+        function _()
+            seg = SponsorBlockController.FindSegmentByTime(m.segments, 12.0)
+            m.assertEqual(seg.UUID, "seg-a")
+            seg = SponsorBlockController.FindSegmentByTime(m.segments, 105.0)
+            m.assertEqual(seg.UUID, "seg-b")
+        end function
+
+        @it("returns invalid between segments")
+        function _()
+            m.assertInvalid(SponsorBlockController.FindSegmentByTime(m.segments, 50.0))
+            m.assertInvalid(SponsorBlockController.FindSegmentByTime(m.segments, 200.0))
+        end function
+
+        @it("includes the segment boundaries")
+        function _()
+            m.assertEqual(SponsorBlockController.FindSegmentByTime(m.segments, 0.0).UUID, "seg-a")
+            m.assertEqual(SponsorBlockController.FindSegmentByTime(m.segments, 21.808).UUID, "seg-a")
+        end function
+
+        @describe("skip target")
+
+        @it("returns the segment end (ms) as the seek target")
+        function _()
+            seg = m.segments[1] ' [100,110] auto
+            result = SponsorBlockController.SkipTargetForSegment(seg, 102.0, m.fakeTop.duration)
+            m.assertEqual(result.skipSeekMs, 110000)
+        end function
+
+        @it("returns finish when the segment ends within 2s of the video end")
+        function _()
+            ' [249.38,281.521], duration 282 -> end within 2s of duration -> finish.
+            seg = m.segments[2]
+            result = SponsorBlockController.SkipTargetForSegment(seg, 250.0, m.fakeTop.duration)
+            m.assertTrue(result.finish = true)
+        end function
+
+        @it("returns invalid when the skip distance is under 2s")
+        function _()
+            seg = m.segments[1] ' [100,110]
+            result = SponsorBlockController.SkipTargetForSegment(seg, 109.0, m.fakeTop.duration)
+            m.assertInvalid(result)
+        end function
+
+        @it("clamps the segment end to the video duration")
+        function _()
+            m.fakeTop.duration = 105.0
+            seg = m.segments[1] ' [100,110] -> clamped to 105 == duration -> within 2s -> finish
+            result = SponsorBlockController.SkipTargetForSegment(seg, 101.0, m.fakeTop.duration)
+            m.assertTrue(result.finish = true)
+        end function
+
+        @describe("OnPosition auto-skip")
+
+        @it("returns a skip seek target while inside an auto-skip segment")
+        function _()
+            result = m.sb.OnPosition(105000) ' 105s, inside [100,110] auto
+            m.assertEqual(result.skipSeekMs, 110000)
+        end function
+
+        @it("returns invalid inside a manual-skip segment + stashes it for OK")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            result = m.sb.OnPosition(5000) ' inside [0,21.808] manual
+            m.assertInvalid(result)
+            m.assertEqual(m.sb.manualSkipSegment.UUID, "seg-a")
+        end function
+
+        @it("TrySkip returns the stashed manual segment's end while still inside it")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000) ' stash [0,21.808]
+            target = m.sb.TrySkip(6000) ' still inside -> seek to 21.808s = 21808ms
+            m.assertEqual(target, 21808)
+        end function
+
+        @it("TrySkip returns -1 with nothing stashed")
+        function _()
+            m.assertEqual(m.sb.TrySkip(6000), -1)
+        end function
+
+        @it("returns invalid outside any segment")
+        function _()
+            m.assertInvalid(m.sb.OnPosition(50000))
+        end function
+
+        @it("returns invalid when disabled")
+        function _()
+            m.sb.enabled = false
+            m.assertInvalid(m.sb.OnPosition(105000))
+        end function
+
+        @describe("manual notice dismissal (Back)")
+
+        @it("DismissManual removes the armed notice and suppresses re-arm while inside the segment")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000) ' arm + show the manual notice for [0,21.808]
+            m.assertTrue(m.sb.DismissManual())
+            m.assertInvalid(m.sb.manualSkipSegment)
+            ' still inside the segment: the notice must NOT re-arm/re-show on the next position ticks.
+            m.assertInvalid(m.sb.OnPosition(6000))
+            m.assertInvalid(m.sb.manualSkipSegment)
+            m.assertEqual(m.sb.TrySkip(7000), -1)
+        end function
+
+        @it("DismissManual is a no-op without an armed notice")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.assertFalse(m.sb.DismissManual())
+        end function
+
+        @it("leaving the segment clears the dismissal, so a later re-entry re-arms the notice")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000)
+            m.assertTrue(m.sb.DismissManual())
+            m.sb.OnPosition(50000) ' outside any segment -> the dismissal is forgotten
+            m.sb.OnPosition(7000) ' back inside -> armed again
+            m.assertEqual(m.sb.manualSkipSegment.UUID, "seg-a")
+        end function
+
+        @describe("chapter text")
+
+        @it("returns the segment title while the cursor is inside a segment")
+        function _()
+            m.assertEqual(m.sb.ChapterTextForCursor(12000), "Music: Non-Music Section")
+        end function
+
+        @it("returns empty between segments")
+        function _()
+            m.assertEqual(m.sb.ChapterTextForCursor(50000), "")
+        end function
+
+        @it("returns empty when disabled")
+        function _()
+            m.sb.enabled = false
+            m.assertEqual(m.sb.ChapterTextForCursor(12000), "")
+        end function
+
+        @describe("content-ready gate")
+
+        @it("returns invalid on live")
+        function _()
+            sb = new SponsorBlockController.Controller({ jobQueue: invalid, preferences: { "sponsorblock.enabled": true }, notifications: invalid, top: m.fakeTop })
+            m.assertInvalid(sb.OnContentReady({ videoId: "x", lengthSeconds: 100 }, true))
+        end function
+
+        @it("returns invalid when the pref is off")
+        function _()
+            sb = new SponsorBlockController.Controller({ jobQueue: invalid, preferences: { "sponsorblock.enabled": false }, notifications: invalid, top: m.fakeTop })
+            m.assertInvalid(sb.OnContentReady({ videoId: "x", lengthSeconds: 100 }, false))
+        end function
+
+        @it("returns the job input when enabled + VOD")
+        function _()
+            prefs = { "sponsorblock.enabled": true, "sponsorblock.show_notifications": true, "sponsorblock.categories": {} }
+            sb = new SponsorBlockController.Controller({ jobQueue: invalid, preferences: prefs, notifications: invalid, top: m.fakeTop })
+            input = sb.OnContentReady({ videoId: "abc", lengthSeconds: 282 }, false)
+            m.assertNotInvalid(input)
+            m.assertEqual(input.videoId, "abc")
+            m.assertEqual(input.lengthSeconds, 282)
+            m.assertTrue(sb.enabled)
+        end function
+
+    end class
+
+end namespace

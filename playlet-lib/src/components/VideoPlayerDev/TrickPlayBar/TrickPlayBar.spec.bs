@@ -1,0 +1,259 @@
+' TrickPlayBar @SGNode suite — instantiates JUST the bar (no Video node, no coordinator), sets its scalar
+' INPUT fields, and asserts the rendered child fields: fill clip width, playhead translation, M:SS labels,
+' the raised handle while a transport is active, the glyph swap, and the live layout (Rewind live TV / offset
+' / ● LIVE swap). clippingRect reads back as {x,y,width,height} on the render thread.
+
+namespace Tests
+
+    @SGNode("TrickPlayBar")
+    @suite
+    class TrickPlayBarTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' reset to a VOD at rest: 200s video, position 0, idle.
+            m.top.isLive = false
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.durationMs = 200000
+            m.top.positionMs = 0
+            m.top.cursorMs = 0
+            m.top.glyph = TransportController.Glyph.None
+            m.top.atLiveEdge = true
+            m.top.liveOffsetMs = 0
+        end function
+
+        @describe("TrickPlayBar — VOD projection")
+
+        @it("fills the track to progress and places the playhead at the fill end")
+        function _()
+            m.top.positionMs = 100000 ' 50% of 200s
+            fill = m.top.findNode("trackFill")
+            clip = fill.clippingRect
+            ' fillW = 0.5 * 1144 = 572
+            m.assertEqual(clip.width, 572.0)
+            ph = m.top.findNode("playhead")
+            m.assertEqual(ph.translation[0], 566.0) ' fillW - 6
+        end function
+
+        @it("uses the cursor (not position) and raises the handle while scrubbing")
+        function _()
+            m.top.positionMs = 0
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 100000 ' the bar must follow the cursor, not the frozen position
+            fill = m.top.findNode("trackFill")
+            m.assertEqual(fill.clippingRect.width, 572.0)
+            handle = m.top.findNode("handle")
+            m.assertEqual(handle.translation[1], -54.0) ' raised
+        end function
+
+        @it("rests the handle at 22 when idle")
+        function _()
+            m.top.transportMode = TransportController.Mode.Idle
+            handle = m.top.findNode("handle")
+            m.assertEqual(handle.translation[1], 22.0)
+        end function
+
+        @it("animates the playhead (the visible cursor) when the bar tier's focus changes")
+        function _()
+            ' the focus indicator is the CURSOR swelling, not the bar-centre handle (which is off the cursor and
+            ' never read as one — user bug). The swell is the scale animation, played forward on focus and
+            ' reversed on blur; the dot itself stays centred on fillW = 572 throughout.
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.positionMs = 100000 ' 50% of 200s -> fillW 572
+            ph = m.top.findNode("playhead")
+            anim = m.top.findNode("playheadFocus")
+            interp = m.top.findNode("playheadFocusScale")
+            m.top.focused = false
+            anim.control = "stop"
+            m.assertEqual(ph.translation[0], 566.0) ' 572 - 6, regardless of focus
+            m.top.focused = true
+            m.assertEqual(anim.control, "start")
+            m.assertFalse(interp.reverse) ' forward = grow
+            m.assertEqual(ph.translation[0], 566.0) ' focus scales about the centre, never moves the dot
+            ' the resting handle stays put (it is no longer the focus indicator).
+            m.assertEqual(m.top.findNode("handle").width, 50.0)
+            m.top.focused = false ' restore the default (the suite shares one node across tests)
+            m.assertTrue(interp.reverse) ' blur reverses = shrink
+        end function
+
+        @it("keeps the playhead grown while SCRUBBING (the bar is still the focused control)")
+        function _()
+            ' regression: the focus-grow must NOT shrink mid-seek — the bar tier still holds focus while you
+            ' scrub, and a Repaint (cursor move) must not touch the scale animation.
+            m.top.focused = true
+            anim = m.top.findNode("playheadFocus")
+            interp = m.top.findNode("playheadFocusScale")
+            m.top.positionMs = 0
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 100000 ' the bar follows the cursor (50%) -> fillW 572
+            m.assertEqual(anim.control, "start")
+            m.assertFalse(interp.reverse) ' still grown while scrubbing (no shrink issued by the repaints)
+            m.assertEqual(m.top.findNode("playhead").translation[0], 566.0) ' 572 - 6, tracking the cursor
+            m.assertEqual(m.top.findNode("handle").translation[1], -54.0) ' the handle is still raised for the bif
+            m.top.focused = false ' restore (shared node)
+            m.top.transportMode = TransportController.Mode.Idle
+        end function
+
+        @it("formats current/remaining as M:SS")
+        function _()
+            m.top.positionMs = 65000 ' 1:05
+            m.assertEqual(m.top.findNode("currentLabel").text, "01:05")
+            m.assertEqual(m.top.findNode("remainingLabel").text, "02:15") ' 135s left
+        end function
+
+        @describe("TrickPlayBar — glyph swap (handle child)")
+
+        @it("swaps the scanGlyph uri for skipAhead and hides on none")
+        function _()
+            m.top.glyph = TransportController.Glyph.SkipAhead
+            sg = m.top.findNode("scanGlyph")
+            m.assertTrue(sg.visible)
+            m.assertTrue(sg.uri.EndsWith("icon_skipAhead.png"))
+            m.top.glyph = TransportController.Glyph.Ffx3
+            m.assertTrue(sg.uri.EndsWith("icon_FFx3.png"))
+            m.top.glyph = TransportController.Glyph.None
+            m.assertFalse(sg.visible)
+        end function
+
+        @it("shows the InstantReplay icon in idle, riding the resting handle (stock {547,22})")
+        function _()
+            m.top.transportMode = TransportController.Mode.Idle ' replay returns to idle but flashes the icon
+            m.top.cursorMs = 40000 ' a replay -20s seek -> Repaint runs idle, handle at rest
+            m.top.glyph = TransportController.Glyph.Replay
+            sg = m.top.findNode("scanGlyph")
+            m.assertTrue(sg.visible)
+            m.assertTrue(sg.uri.EndsWith("icon_replay.png"))
+            handle = m.top.findNode("handle")
+            m.assertEqual(handle.translation[1], 22.0) ' rest, NOT raised (icon sits in the resting handle)
+            ' toast expiry (glyph -> none) just hides the icon; handle stays at rest
+            m.top.glyph = TransportController.Glyph.None
+            m.assertFalse(sg.visible)
+            m.assertEqual(handle.translation[1], 22.0)
+        end function
+
+        @describe("TrickPlayBar — LIVE projection")
+
+        @it("BEHIND the edge: fill/playhead are PROPORTIONAL to cursor within the DVR window + offset label")
+        function _()
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.top.atLiveEdge = false
+            ' cursor 90% of the way to the effective edge (cursor 9000, offset 1000 -> effEdge 10000)
+            m.top.cursorMs = 9000
+            m.top.liveOffsetMs = 1000
+            fill = m.top.findNode("trackFill")
+            m.assertTrue(Abs(fill.clippingRect.x - 0.9 * 1136.8679) < 0.5) ' proportional, not pinned
+            m.assertTrue(Abs(m.top.findNode("playhead").translation[0] - (0.9 * 1136.8679 - 6)) < 0.5)
+            m.assertEqual(m.top.findNode("currentLabel").text, Tr(Locale.VideoPlayer.RewindLiveTv))
+            m.assertEqual(m.top.findNode("remainingLabel").text, "0:01")
+            m.assertFalse(m.top.findNode("bullet").visible)
+            m.assertFalse(m.top.findNode("liveLabel").visible)
+        end function
+
+        @it("a NON-rewindable live stream (buffer-sized DVR window) drops the rewind label")
+        function _()
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.canRewind = false
+            m.assertEqual(m.top.findNode("currentLabel").text, "")
+            ' rewindable again (e.g. next content) -> the label returns
+            m.top.canRewind = true
+            m.assertEqual(m.top.findNode("currentLabel").text, Tr(Locale.VideoPlayer.RewindLiveTv))
+        end function
+
+        @it("AT the edge: frac=1 -> playhead at 1130.87 (the exact at-edge stock pin) + ● LIVE")
+        function _()
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.atLiveEdge = true
+            m.top.cursorMs = 43200000 ' at the edge: offset 0 -> frac 1
+            m.top.liveOffsetMs = 0
+            fill = m.top.findNode("trackFill")
+            m.assertEqual(fill.clippingRect.x, 1136.8679) ' frac 1 -> at-edge max
+            m.assertEqual(m.top.findNode("playhead").translation[0], 1130.8679)
+            m.assertTrue(m.top.findNode("bullet").visible) ' ● LIVE
+            m.assertTrue(m.top.findNode("liveLabel").visible)
+        end function
+
+        @it("1hr back on a 12h stream moves the playhead ~1/12 of the bar (proportional, user A/B)")
+        function _()
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.top.atLiveEdge = false
+            m.top.cursorMs = 39600000 ' 11h
+            m.top.liveOffsetMs = 3600000 ' 1h behind -> effEdge 43.2M, frac = 11/12
+            playheadX = m.top.findNode("playhead").translation[0]
+            atEdgeX = 1130.8679
+            ' moved back ~1/12 of the 1136.87-wide travel from the edge
+            moved = atEdgeX - playheadX
+            m.assertTrue(moved > 85 and moved < 105) ' ~1136.87/12 ≈ 95px
+        end function
+
+        @it("shows the ● LIVE badge only at the edge")
+        function _()
+            m.top.isLive = true
+            m.top.atLiveEdge = true
+            m.top.liveOffsetMs = 0
+            m.assertTrue(m.top.findNode("bullet").visible)
+            m.assertTrue(m.top.findNode("liveLabel").visible)
+            m.assertEqual(m.top.findNode("remainingLabel").text, "")
+            ' the badge styling: red bullet + bold size-30 LIVE. blendColor reads back as a signed 32-bit int.
+            m.AssertBlend(m.top.findNode("bullet").blendColor, &hD53E5AFF)
+            m.assertEqual(m.top.findNode("liveLabel").text, Tr("LIVE"))
+            ' the badge is right-aligned to the track end whatever the language ("EN DIRECT" >> "LIVE").
+            lbl = m.top.findNode("liveLabel")
+            m.assertTrue(Abs((lbl.translation[0] + lbl.boundingRect().width) - 1144) < 2, "badge right edge pinned to the track end")
+            m.assertTrue(m.top.findNode("bullet").translation[0] < lbl.translation[0], "bullet sits left of the text")
+        end function
+
+        @it("forceLiveBadge shows ● LIVE even when behind the edge (reveal latch, bug 6)")
+        function _()
+            m.top.isLive = true
+            m.top.atLiveEdge = false
+            m.top.liveOffsetMs = 17000
+            ' the reveal latch forces the badge briefly even though we're behind the edge
+            m.top.forceLiveBadge = true
+            m.assertTrue(m.top.findNode("bullet").visible)
+            m.assertTrue(m.top.findNode("liveLabel").visible)
+            m.assertEqual(m.top.findNode("remainingLabel").text, "")
+            ' releasing the latch swaps to the offset
+            m.top.forceLiveBadge = false
+            m.assertFalse(m.top.findNode("bullet").visible)
+            m.assertEqual(m.top.findNode("remainingLabel").text, "0:17")
+        end function
+
+        @it("grows the playhead on the LIVE bar too when the bar tier has focus (behind the edge, idle)")
+        function _()
+            ' the focus-grow is the same code on both bars, but live is half the player — exercise it here on an
+            ' idle-behind-the-edge state (after a pause/commit-behind) where the cursor sits at a non-pinned x.
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.Idle ' idle (not raised) so the playhead can grow
+            m.top.atLiveEdge = false
+            m.top.cursorMs = 9000
+            m.top.liveOffsetMs = 1000 ' effEdge 10000 -> frac 0.9 -> clipStart 1023.18
+            anim = m.top.findNode("playheadFocus")
+            interp = m.top.findNode("playheadFocusScale")
+            m.top.focused = false
+            anim.control = "stop"
+            m.top.focused = true
+            m.assertEqual(anim.control, "start") ' the cursor swells on the live bar as well
+            m.assertFalse(interp.reverse)
+            m.top.focused = false ' restore (the suite shares one node across tests)
+        end function
+
+        @describe("TrickPlayBar — SponsorBlock fill tint")
+
+        @it("applies the SB fill blend over the captured red")
+        function _()
+            m.top.sbFillBlend = "#FF000080"
+            m.AssertBlend(m.top.findNode("trackFill").blendColor, &hFF000080)
+        end function
+
+        ' blendColor reads back as a signed 32-bit Integer; coerce the expected hex to the same Integer type.
+        function AssertBlend(actual as dynamic, expectedHex as longinteger) as void
+            expected% = (expectedHex and &hFFFFFFFF)
+            m.assertEqual(actual, expected%)
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,74 @@
+<component name="TrickPlayBar" extends="Group">
+    <!-- A projection of the shared scalar input fields; no outputs. Every input field is observed in code
+         (not onChange) and a change repaints. The scanGlyph is a child of the handle so it paints in front of
+         the bif. Left label = "Rewind live TV" while the stream is rewindable (canRewind); right label =
+         offset M:SS when behind, or "● LIVE" at the edge. -->
+    <interface>
+        <field id="transportMode" type="integer" value="0" /> <!-- selects cursor vs position + raises the handle -->
+        <field id="positionMs" type="integer" value="0" />    <!-- real Video position (used when idle) -->
+        <field id="durationMs" type="integer" value="0" />
+        <field id="cursorMs" type="integer" value="0" />      <!-- transport cursor (used when active) -->
+        <field id="isLive" type="boolean" value="false" />
+        <field id="canRewind" type="boolean" value="true" /> <!-- live only: false (buffer-sized DVR window) drops the rewind label -->
+        <field id="liveOffsetMs" type="integer" value="0" /> <!-- edge - cursor; the right-label M:SS -->
+        <field id="atLiveEdge" type="boolean" value="true" /> <!-- swaps "● LIVE" <-> offset -->
+
+        <field id="glyph" type="integer" value="0" />
+        <field id="forceLiveBadge" type="boolean" value="false" />
+        <field id="focused" type="boolean" value="false" />
+
+        <!-- SponsorBlock (off by default): track image is aliased; fill tint and chapter label drive code/alias. -->
+        <field id="sbBarUri" type="uri" alias="trackBg.uri" />
+        <field id="sbFillBlend" type="color" />
+        <field id="chapterText" type="string" alias="chapterLabel.text" />
+    </interface>
+    <children>
+        <Poster id="trackBg"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/osd_sliderControl_small.9.png"
+            width="1144" height="12" opacity="0.3" loadDisplayMode="noScale" />
+        <!-- same asset tinted red, clipped to progress width in code. -->
+        <Poster id="trackFill"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/osd_sliderControl_small.9.png"
+            width="1144" height="12" blendColor="0xFF1C30FF" clippingRect="[0,0,0,12]" loadDisplayMode="noScale" />
+        <!-- the cursor: a 12px dot that swells half-again while the bar tier holds focus. PositionPlayhead
+             moves it; the grow/shrink animations scale it about its center. -->
+        <Poster id="playhead"
+            uri="pkg:/images/icons/player/white-circle.png"
+            width="12" height="12" scaleRotateCenter="[6, 6]" />
+        <!-- played forward on focus, reversed (interpolator.reverse) on blur. -->
+        <Animation id="playheadFocus" duration="0.1">
+            <Vector2DFieldInterpolator id="playheadFocusScale"
+                key="[ 0.0, 1.0 ]"
+                keyValue="[ [ 1.0, 1.0 ], [ 1.5, 1.5 ] ]"
+                fieldToInterp="playhead.scale" />
+        </Animation>
+        <!-- handle: pinned at bar-center. {547,22} rest, {547,-54} active. -->
+        <Poster id="handle"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/videoProgressBarHandle.9.png"
+            translation="[547, 22]" width="50" height="30" loadDisplayMode="noScale">
+            <Poster id="scanGlyph" visible="false" width="50" height="30" loadDisplayMode="noScale" />
+        </Poster>
+        <!-- left label. VOD: counts up (short). LIVE: the translated "Rewind live TV" — width is generous so
+             no language clips (e.g. the French string); left-aligned, so the extra width paints nothing. -->
+        <Label id="currentLabel" translation="[0, 24]" width="700" height="24"
+            color="0xFEFEFEFF" horizAlign="left" vertAlign="top">
+            <Font role="font" uri="font:SystemFontFile" size="24" />
+        </Label>
+        <!-- right label. VOD: counts down. LIVE: offset M:SS (hidden at edge). -->
+        <Label id="remainingLabel" translation="[1024, 24]" width="120" height="24"
+            color="0xFEFEFEFF" horizAlign="right" vertAlign="top">
+            <Font role="font" uri="font:SystemFontFile" size="24" />
+        </Label>
+        <!-- LIVE bullet: shown only at the edge. -->
+        <Poster id="bullet" visible="false"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/icon_inline_unselected_bullet.webp"
+            translation="[1056, 24]" blendColor="0xD53E5AFF" loadDisplayMode="noScale" />
+        <!-- LIVE badge: shown only at the edge. -->
+        <Label id="liveLabel" visible="false" translation="[1080, 24]" height="30"
+            text="LIVE" color="0xFEFEFEFF" horizAlign="left" vertAlign="top">
+            <Font role="font" uri="font:BoldSystemFontFile" size="30" />
+        </Label>
+        <Label id="chapterLabel" translation="[111, 25]" width="350" height="25"
+            color="0xFEFEFEFF" horizAlign="center" vertAlign="center" font="font:SmallestSystemFont" />
+    </children>
+</component>

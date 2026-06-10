@@ -1,0 +1,53 @@
+import "pkg:/source/utils/Types.bs"
+
+' Round icon button: a pure projection of its focused/toggleState input fields. No focus or key handling —
+' the coordinator owns both via virtual focus. Gaining focus (and the `nudge` pulse) plays a subtle scale
+' pulse so the eye finds the highlighted button.
+
+function Init()
+    m.background = m.top.findNode("background")
+    m.icon = m.top.findNode("icon")
+    m.icon2 = m.top.findNode("icon2")
+    m.anchor = m.top.findNode("anchor")
+    m.nudgeAnim = m.top.findNode("nudgeAnim")
+    ' scale about the button center so the pulse grows evenly.
+    m.anchor.scaleRotateCenter = [m.background.width / 2, m.background.height / 2]
+
+    m.top.ObserveField("focused", FuncName(OnFocused))
+    m.top.ObserveField("toggleState", FuncName(Repaint))
+    m.top.ObserveField("nudge", FuncName(OnNudge))
+    Repaint()
+end function
+
+function OnFocused() as void
+    Repaint()
+    if m.top.focused
+        Pulse()
+    end if
+end function
+
+function OnNudge() as void
+    Pulse()
+end function
+
+' stop-then-start so a rapid second pulse restarts instead of being swallowed mid-flight.
+function Pulse() as void
+    m.nudgeAnim.control = "stop"
+    m.nudgeAnim.control = "start"
+end function
+
+function Repaint() as void
+    focused = m.top.focused
+    if focused
+        m.background.blendColor = m.top.focusedBackgroundColor
+        iconColor = m.top.focusedIconColor
+    else
+        m.background.blendColor = m.top.backgroundColor
+        iconColor = m.top.iconColor
+    end if
+    m.icon.blendColor = iconColor
+    m.icon2.blendColor = iconColor
+
+    m.icon.visible = m.top.toggleState
+    m.icon2.visible = not m.top.toggleState
+end function

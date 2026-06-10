@@ -1,0 +1,92 @@
+' Pins the test mock's node tree to the real component's. VideoPlayerDevMock.xml is a hand-mirrored copy of
+' VideoPlayerDev.xml (same child ids so the coordinator's findNode()s resolve); silent drift between the two
+' weakens every seam test built on the mock. This suite parses both XMLs from pkg and asserts:
+'   - every real child id exists in the mock (minus the documented omissions) and vice versa;
+'   - same-id duration attributes (Timers/Animations) match.
+' Element TYPES may differ (the mock substitutes simpler nodes with the same field surface, e.g. Label for
+' ScrollingLabel), so type parity is intentionally not checked.
+
+import "pkg:/source/utils/Types.bs"
+
+namespace Tests
+
+    @suite
+    class VideoPlayerDevMockParityTests extends Rooibos.BaseTestSuite
+
+        ' ids of REAL children the mock intentionally omits (currently none — the mock mirrors everything,
+        ' including the PiP minimize animation, so OnFullScreenChange is runnable at the seam).
+        function MockOmissions() as object
+            return {}
+        end function
+
+        ' Parse a component XML from pkg and index its <children> subtree: id -> { duration } ("" if absent).
+        function ChildIndex(path as string) as object
+            text = ReadAsciiFile(path)
+            xml = CreateObject("roXMLElement")
+            parsed = (text <> "") and xml.Parse(text)
+            index = {}
+            if parsed
+                for each section in xml.GetChildElements()
+                    if LCase(section.GetName()) = "children"
+                        m.Collect(section, index)
+                    end if
+                end for
+            end if
+            return { parsed: parsed, index: index }
+        end function
+
+        function Collect(el as object, index as object) as void
+            kids = el.GetChildElements()
+            if kids = invalid
+                return
+            end if
+            for each kid in kids
+                attrs = kid.GetAttributes()
+                id = ValidString(attrs.id)
+                if id <> ""
+                    index[id] = { duration: ValidString(attrs.duration) }
+                end if
+                m.Collect(kid, index)
+            end for
+        end function
+
+        @describe("mock parity")
+
+        @it("the mock mirrors the real component's children (ids + timer/animation durations)")
+        function _()
+            real = m.ChildIndex("pkg:/components/VideoPlayerDev/VideoPlayerDev.xml")
+            mock = m.ChildIndex("pkg:/components/VideoPlayerDev/tests/VideoPlayerDevMock.xml")
+            m.assertTrue(real.parsed, "VideoPlayerDev.xml read + parsed")
+            m.assertTrue(mock.parsed, "VideoPlayerDevMock.xml read + parsed")
+            m.assertTrue(real.index.Count() > 10, "real children found (sanity: the walker isn't vacuous)")
+
+            omissions = m.MockOmissions()
+            for each id in real.index
+                if not omissions.DoesExist(id)
+                    m.assertTrue(mock.index.DoesExist(id), "mock is missing child id '" + id + "' — mirror it (or add a documented omission)")
+                end if
+            end for
+            for each id in mock.index
+                m.assertTrue(real.index.DoesExist(id), "mock child id '" + id + "' no longer exists in VideoPlayerDev.xml")
+            end for
+
+            ' durations (Timers/Animations) must match where either side declares one.
+            for each id in mock.index
+                if real.index.DoesExist(id)
+                    realDur = real.index[id].duration
+                    mockDur = mock.index[id].duration
+                    if realDur <> "" or mockDur <> ""
+                        m.assertEqual(mockDur, realDur, "duration drift on '" + id + "'")
+                    end if
+                end if
+            end for
+
+            ' the omission allowlist can't rot: each entry must still exist in the real file.
+            for each id in omissions
+                m.assertTrue(real.index.DoesExist(id), "stale omission '" + id + "' — it left VideoPlayerDev.xml")
+            end for
+        end function
+
+    end class
+
+end namespace

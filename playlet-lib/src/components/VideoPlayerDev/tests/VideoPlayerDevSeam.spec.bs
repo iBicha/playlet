@@ -1,0 +1,306 @@
+' Device-seam conformance: drives the REAL coordinator (via VideoPlayerDevMock — a Group whose device fields are
+' inert and spec-driven) through scripted device-state sequences the real Roku Video won't produce on command.
+' This is the harness that would have caught the reported wedge: the existing INV-D* are blind to it (during the
+' wedge state="buffering", so "transport => state<>playing" was SATISFIED). The NEW property is P-seam.
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+
+namespace Tests
+
+    @SGNode("VideoPlayerDevMock")
+    @suite
+    class VideoPlayerDevSeamTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.top.callFunc("TestSetup")
+            ' first frame: one state->playing opens the brain's ready-gate (transport input accepted).
+            m.top.callFunc("TestSetState", VideoState.Playing)
+        end function
+
+        function Snap() as object
+            return m.top.callFunc("TestSnapshot")
+        end function
+
+        @describe("device seam")
+
+        @it("mock stands up the real coordinator (Init + OnNodeReady ran against the faked device)")
+        function _()
+            snap = m.Snap()
+            m.assertEqual(snap.transportMode, TransportController.Mode.Idle)
+            m.assertFalse(snap.seekSettling)
+        end function
+
+        ' P-SEAM: the coordinator must NOT pause the device while a play-through seek it issued is still settling.
+        ' This is the wedge's root: the old code slammed control=pause on the in-flight seek -> buffering<->paused
+        ' forever. It fails on the old code at the "rescrub while settling" step; passes on the new (deferred).
+        @it("commit -> immediate re-scrub does NOT pause the still-settling seek; freezes cleanly only once it reaches playing")
+        function _()
+            ' enter scrub (normal freeze: no seek in flight yet).
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.top.callFunc("TestSetState", VideoState.Paused) ' the scrub froze the device
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.Scrub)
+            m.assertEqual(mid.control, VideoControl.Pause) ' a normal scrub DOES freeze (no settling seek)
+
+            ' commit -> the brain emits resume+seek and marks seekSettling (a play-through seek is now in flight).
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            afterCommit = m.Snap()
+            m.assertTrue(afterCommit.seekSettling, "commit must mark a play-through seek settling")
+            m.assertEqual(afterCommit.transportMode, TransportController.Mode.Idle)
+
+            ' the device is still resolving the seek...
+            m.top.callFunc("TestSetState", VideoState.Buffering)
+
+            ' ...and the user IMMEDIATELY re-scrubs. THE PROPERTY: the coordinator must DEFER the freeze, NOT pause.
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            settling = m.Snap()
+            m.assertEqual(settling.transportMode, TransportController.Mode.Scrub)
+            m.assertTrue(settling.seekSettling, "the seek is still in flight")
+            m.assertNotEqual(settling.control, VideoControl.Pause, "P-SEAM VIOLATION: paused the device mid-seek (the wedge) — the freeze was not deferred")
+
+            ' the seek finally lands -> the device reaches playing -> now the guard freezes cleanly.
+            m.top.callFunc("TestSetState", VideoState.Playing)
+            settled = m.Snap()
+            m.assertFalse(settled.seekSettling, "reaching playing clears the settling flag")
+            m.assertEqual(settled.control, VideoControl.Pause, "after the seek settles, the transport freezes the playing video")
+        end function
+
+        ' P-TOTAL at the seam: a transport must hold INV-D1 across EVERY device state, including the ones the real
+        ' device rarely produces. Only a PLAYING device under a transport gets re-paused; nothing else is touched.
+        @it("under a transport, only a playing device is re-frozen; every other device state is a safe no-op")
+        function _()
+            ' get into a frozen scrub.
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            states = [VideoState.Buffering, VideoState.Paused, VideoState.Playing, VideoState.None, VideoState.Stopping, VideoState.Stopped]
+            for each s in states
+                m.top.callFunc("TestSetState", s)
+                snap = m.Snap()
+                m.assertEqual(snap.transportMode, TransportController.Mode.Scrub, "still scrubbing through device state " + s)
+                if s = VideoState.Playing
+                    m.assertEqual(snap.control, VideoControl.Pause, "a playing device under a transport is re-frozen (INV-D1)")
+                end if
+            end for
+        end function
+
+        ' An external resume (the linked phone via Lounge) under an active transport must TAKE OVER: VPD never
+        ' resumes under a transport itself, so a resume here is the phone's. It cancels the scrub and plays.
+        @it("an external Lounge resume under a transport takes over: cancels the scrub and lets it play")
+        function _()
+            ' enter scrub -> the brain freezes the device (control=pause).
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.top.callFunc("TestSetState", VideoState.Paused)
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.Scrub)
+            m.assertEqual(mid.control, VideoControl.Pause)
+
+            ' the phone seeks + resumes: Lounge sets control=resume directly on the player node.
+            m.top.callFunc("TestSetControl", VideoControl.Resume)
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Idle, "the external resume cancels the transport")
+            m.assertEqual(after.control, VideoControl.Resume, "the video plays (the phone action wins)")
+            m.assertTrue(after.autoplay, "autoplay restored so a settling seek won't re-freeze the takeover")
+        end function
+
+        @it("the error dialog displays every captured error field, not just the category")
+        function _()
+            ' Real Roku Video error captured on device (an http stream failure, 502 manifest).
+            errStr = "reader pick stream error:HTTP error:Transfer error: HTTP response code said error response code:(502):502:extra:content_id:24:err_clip_idx:0:etype:buffer:program_id:"
+            snap = m.top.callFunc("TestPlaybackErrorDialog", {
+                videoId: "dQw4w9WgXcQ"
+                errorMsg: "There was an error in the HTTP response.  This could mean that malformed HTTP headers or an HTTP error code was returned."
+                errorCode: -1
+                errorStr: errStr
+                ' the stream list is exhausted (no next url) -> dialog, not retry.
+                errorInfo: { category: "http", source: "buffer:reader", clipid: 24, ignored: false, dbgmsg: errStr }
+            })
+
+            body = snap.message
+            m.assertTrue(body.Instr("errorMsg: There was an error in the HTTP response") >= 0, "dialog dropped errorMsg")
+            m.assertTrue(body.Instr("errorCode: -1") >= 0, "dialog dropped errorCode")
+            m.assertTrue(body.Instr("errorStr: reader pick stream error") >= 0, "dialog dropped errorStr")
+            m.assertTrue(body.Instr("category: http") >= 0, "dialog dropped errorInfo.category")
+            m.assertTrue(body.Instr("source: buffer:reader") >= 0, "dialog dropped errorInfo.source")
+            m.assertTrue(body.Instr("clipid: 24") >= 0, "dialog dropped errorInfo.clipid")
+            m.assertTrue(body.Instr("ignored: false") >= 0, "dialog dropped errorInfo.ignored")
+            m.assertTrue(body.Instr("dbgmsg: reader pick stream error") >= 0, "dialog dropped errorInfo.dbgmsg")
+            m.assertTrue(snap.title.Instr("dQw4w9WgXcQ") >= 0, "dialog title dropped the videoId")
+        end function
+
+        ' Up/Down reveal the chrome when it is hidden in idle (they otherwise do nothing).
+        @it("Up reveals the chrome when it is hidden in idle")
+        function _()
+            m.assertFalse(m.Snap().chromeShown) ' starts hidden after setup
+            m.top.callFunc("TestKey", RemoteKeys.Up, true)
+            m.assertTrue(m.Snap().chromeShown, "Up revealed the chrome")
+        end function
+
+        ' The button tier remembers its highlighted button across a buttons->bar->buttons round-trip; only a
+        ' fresh reveal (the row was hidden) resets the highlight to play/pause.
+        @it("the button tier keeps its focused button across a bar round-trip; a fresh reveal resets it")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier, play/pause focused
+            snap = m.Snap()
+            m.assertTrue(snap.chromeShown)
+            m.assertEqual(snap.focusedButton, 0)
+            ' highlight minimize, drop to the bar, come back up: still minimize.
+            m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            m.assertEqual(m.Snap().focusedButton, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Down, true)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true)
+            m.assertEqual(m.Snap().focusedButton, 1, "the highlight survives the round-trip")
+            ' hide the chrome (scrub from the bar tier, then commit) -> the NEXT reveal starts at play/pause.
+            m.top.callFunc("TestKey", RemoteKeys.Down, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' commit -> chrome hides
+            m.assertFalse(m.Snap().chromeShown)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' fresh reveal
+            m.assertEqual(m.Snap().focusedButton, 0, "a fresh reveal resets the highlight")
+        end function
+
+        ' A keep-playing seek issued while PAUSED must preserve the pause: the device auto-resumes on any seek
+        ' (autoplayAfterSeek only governs rebuffer-resume per the Video docs), so the coordinator re-pauses on
+        ' the playing edge the auto-resume produces.
+        @it("a keep-playing seek issued while paused re-pauses when the device auto-resumes")
+        function _()
+            ' pause from idle.
+            m.top.callFunc("TestKey", RemoteKeys.Play, true)
+            m.top.callFunc("TestSetState", VideoState.Paused)
+            m.assertEqual(m.Snap().control, VideoControl.Pause)
+            ' InstantReplay from paused idle = a keep-playing seek (no control, just a seek).
+            m.top.callFunc("TestKey", RemoteKeys.Replay, true)
+            ' scrub the control to a neutral value so the assertion below can only pass via the re-pause.
+            m.top.callFunc("TestSetControl", VideoControl.None)
+            ' the seek lands and the device auto-resumes...
+            m.top.callFunc("TestSetState", VideoState.Playing)
+            ' ...and the coordinator restores the pause.
+            m.assertEqual(m.Snap().control, VideoControl.Pause, "the paused state survives the keep-playing seek")
+        end function
+
+        ' Committing a scrub at the very end finishes playback (PlayNext/close) instead of seeking into the
+        ' last instants and fighting the device's EOF auto-resume (the residual re-pause loop).
+        @it("a commit at the end of content finishes playback instead of seeking")
+        function _()
+            m.top.duration = 100
+            m.top.position = 95
+            ' two Right presses: snap 95s -> 94s grid, then 96s -> 98s = duration - epsilon -> at the end.
+            m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            m.top.callFunc("TestKey", RemoteKeys.Right, false)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            m.top.callFunc("TestKey", RemoteKeys.Right, false)
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' commit at the end -> finish
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Idle)
+            m.assertTrue(m.top.videoQueue.closePlayer, "no next video -> the finish closed the player")
+        end function
+
+        ' Play always means play/pause: it must NOT activate whatever button happens to be highlighted.
+        @it("Play toggles play/pause even while a non-play button is highlighted")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
+            m.assertEqual(m.Snap().focusedButton, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Play, true) ' must pause, not minimize
+            snap = m.Snap()
+            m.assertEqual(snap.control, VideoControl.Pause, "Play paused the (playing) video")
+            m.assertEqual(snap.focusedButton, 1, "the highlight is untouched")
+        end function
+
+        ' The coordinator twin of the brain's unmodeled-axis meta-test: every m.* field on the coordinator must
+        ' be consciously classified here. A NEW coordinator field fails this until someone decides what it is —
+        ' a state axis needs transition coverage, a flag needs its consuming path tested.
+        @it("every coordinator m.* field is consciously classified (no unmodeled coordinator axis)")
+        function _()
+            classified = {}
+            ' bound deps (AutoBind interface aliases) + the test stub's own copies.
+            for each name in ["container", "jobQueue", "preferences", "invidious", "videoQueue", "loungeService", "notifications", "appController", "webServer", "innertube"]
+                classified[name] = "dep"
+            end for
+            ' controllers (plain .bs class instances).
+            for each name in ["transport", "sponsorblock"]
+                classified[name] = "controller"
+            end for
+            ' cached child nodes / timers / animations / reusable helpers (structure, not state).
+            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime"]
+                classified[name] = "node"
+            end for
+            ' in-flight job handles.
+            for each name in ["videoContentJob", "sponsorBlockSegmentsJob", "markVideoWatchedJob"]
+                classified[name] = "job"
+            end for
+            ' STATE AXES — discrete coordinator state; each needs its transitions covered by a seam test.
+            for each name in ["chromeMode", "focusTarget", "focusedButton", "armedTimerId"]
+                classified[name] = "axis"
+            end for
+            ' flags / scratch — one-shot latches and counters with a single consuming path.
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds"]
+                classified[name] = "flag"
+            end for
+            ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden
+            ' filtering) so an unexpected newcomer (a Rooibos upgrade, a new library memo) fails this test and
+            ' demands a conscious classification. Presence is optional: these depend on the environment and on
+            ' which tests ran before this one (e.g. DialogUtils' memo appears only after the error-dialog test).
+            for each name in ["top", "global", "testrunner", "testsuite", "scene", "_devicedisplaywidth", "__globalstubs", "__promises__deviceinfo"]
+                classified[name] = "infra"
+            end for
+
+            keys = m.top.callFunc("TestCoordinatorFields")
+            m.assertTrue(keys.Count() >= 30, "reflection found only " + keys.Count().ToStr() + " fields — the walk may be vacuous")
+            unknown = []
+            for each key in keys
+                if not classified.DoesExist(key)
+                    unknown.Push(key)
+                end if
+            end for
+            m.assertTrue(unknown.Count() = 0, "UNMODELED coordinator field(s) " + FormatJson(unknown) + " — classify them in this meta-test (axis fields need transition coverage)")
+            ' reverse: no classified COORDINATOR field has rotted away (infra entries are optional-presence).
+            seen = {}
+            for each key in keys
+                seen[key] = true
+            end for
+            for each name in classified
+                if classified[name] <> "infra"
+                    m.assertTrue(seen.DoesExist(name), "stale classified field '" + name + "' is no longer on the coordinator")
+                end if
+            end for
+        end function
+
+        ' The PiP-toggle-after-close crash (captured on device): OnClose drops m.sponsorblock, so a leaked
+        ' container observer makes the next fullscreen flip crash OnFullScreenChange (&hf3 on SetVisible). The
+        ' fix is unobserve-on-close + the onCloseCalled guard; a regression CRASHES this test. Kept LAST in the
+        ' suite: OnClose detaches the node from its parent.
+        @it("a closed player ignores container fullscreen flips (the PiP-toggle-after-close crash)")
+        function _()
+            container = m.top.container
+            ' sanity: pre-close the observer is live — a minimize hides all player UI.
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal the chrome
+            m.assertTrue(m.Snap().chromeShown)
+            container.fullscreen = false
+            m.assertFalse(m.Snap().chromeShown, "minimize hides the chrome now")
+            container.fullscreen = true
+            ' close the player (what the queue does when replacing the video), then throw every signal a dead
+            ' player might still receive at it: fullscreen flips (the * key), device edges from the async stop,
+            ' a stray control/seek write, late thumbnails, a second close. OnClose unobserves them all.
+            m.top.close = true
+            container.fullscreen = false
+            container.fullscreen = true
+            m.top.callFunc("TestSetState", VideoState.Buffering)
+            m.top.callFunc("TestSetState", VideoState.Playing)
+            m.top.callFunc("TestSetState", VideoState.Stopped)
+            m.top.callFunc("TestSetControl", VideoControl.Resume)
+            m.top.position = 12.0
+            m.top.duration = 99.0
+            m.top.seek = 5.0
+            m.top.thumbnailTiles = { x: [{ htiles: 1 }] }
+            m.top.close = true
+            m.assertTrue(true, "no crash: the closed player ignored all post-close traffic")
+        end function
+
+    end class
+
+end namespace

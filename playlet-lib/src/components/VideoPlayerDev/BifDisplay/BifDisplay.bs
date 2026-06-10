@@ -1,0 +1,191 @@
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Scrub filmstrip: five thumbnail tiles tracking the transport cursor. Visibility derives from transportMode
+' (shown while scrubbing/scanning/live-rewinding, hidden when idle). Reads the OS's native Video.thumbnailTiles
+' tile-set directly: htiles/vtiles grid, tiles[i][0] sheet urls, duration (seconds per sheet), final_time
+' (total). Per cursor move only each tile's clippingRect/uri/translation changes; the grid dimensions are set
+' once per tile-set.
+
+function Init()
+    m.top.translation = [0, 430]
+
+    m.tiles = [
+        m.top.findNode("bifTileL2")
+        m.top.findNode("bifTileL1")
+        m.top.findNode("bifTileC")
+        m.top.findNode("bifTileR1")
+        m.top.findNode("bifTileR2")
+    ]
+    ' Dim panels behind the 4 side tiles (center slot has the frame, not a panel). They hide with their tile at
+    ' the storyboard edges; with no tile-set (live) the whole filmstrip hides.
+    m.sidePanels = [
+        m.top.findNode("bifSideL2")
+        m.top.findNode("bifSideL1")
+        invalid
+        m.top.findNode("bifSideR1")
+        m.top.findNode("bifSideR2")
+    ]
+    ' Center decorations (glyph-legibility gradient over the center tile + frame); hidden along with the
+    ' tiles when there is no tile-set. The bifBackdrop is NOT here: it must stay up for the whole transport
+    ' (the black behind a live rewind too), so only the component's transportMode visibility governs it.
+    m.centerDecor = [m.top.findNode("bifCenterGradient"), m.top.findNode("bifFrame")]
+    ' Per-slot box {x,y,w,h}: center tile is magnified (304x171), the four sides are 250x141.
+    m.slots = [
+        { x: -36, y: 42, w: 250, h: 141 }
+        { x: 226, y: 42, w: 250, h: 141 }
+        { x: 488, y: 12, w: 304, h: 171 }
+        { x: 804, y: 42, w: 250, h: 141 }
+        { x: 1066, y: 42, w: 250, h: 141 }
+    ]
+
+    ' Native tile-set + the rendering constants derived from it (set once per tile-set in OnTileSet).
+    m.tileSet = invalid
+    m.cols = 0
+    m.rows = 0
+    m.tilesPerSheet = 0
+    m.intervalMs = 0 ' ms per thumbnail
+    m.tileCount = 0 ' total thumbnails
+    ' L2..R2 tile offsets from the center tile; hoisted to avoid reallocating per render tick.
+    m.offsets = [-2, -1, 0, 1, 2]
+    ' Per-slot sheet-index cache (-1 = unset) so a tile's uri is re-pointed only when its sheet changes.
+    m.tileSheet = [-1, -1, -1, -1, -1]
+    m.top.visible = false
+
+    m.top.ObserveField("transportMode", FuncName(OnTransportMode))
+    m.top.ObserveField("cursorMs", FuncName(OnCursor))
+    m.top.ObserveField("tileSet", FuncName(OnTileSet))
+end function
+
+function OnTransportMode() as void
+    mode = m.top.transportMode
+    m.top.visible = (mode = TransportController.Mode.Scrub) or (mode = TransportController.Mode.Scan) or (mode = TransportController.Mode.LiveDvr)
+    if m.top.visible
+        RenderTiles(m.top.cursorMs)
+    end if
+end function
+
+function OnCursor() as void
+    if m.top.visible
+        RenderTiles(m.top.cursorMs)
+    end if
+end function
+
+' Cache the rendering constants derived from the native tile-set, or clear it when there is none.
+function OnTileSet() as void
+    ts = m.top.tileSet
+    ' IsAssociativeArray first so the field reads below are never a dot on invalid (and short-circuits).
+    if IsAssociativeArray(ts) and ValidInt(ts.htiles) > 0 and ValidInt(ts.vtiles) > 0 and IsArray(ts.tiles) and ts.tiles.Count() > 0 and IsNumber(ts.duration) and ts.duration > 0
+        m.tileSet = ts
+        m.cols = ValidInt(ts.htiles)
+        m.rows = ValidInt(ts.vtiles)
+        m.tilesPerSheet = m.cols * m.rows
+        m.intervalMs = Int(ts.duration * 1000.0 / m.tilesPerSheet)
+        if IsNumber(ts.final_time) and ts.final_time > 0 and m.intervalMs > 0
+            m.tileCount = Int(ts.final_time * 1000.0 / m.intervalMs) + 1
+        else
+            m.tileCount = ts.tiles.Count() * m.tilesPerSheet
+        end if
+        ApplyTileDimensions()
+    else
+        m.tileSet = invalid
+    end if
+    if m.top.visible
+        RenderTiles(m.top.cursorMs)
+    end if
+end function
+
+' Each tile Poster is the full sheet scaled to (grid x slot size); clippingRect picks one cell. The grid is
+' constant per tile-set, so set the poster dimensions once here. Also resets the sheet-index cache.
+function ApplyTileDimensions() as void
+    for i = 0 to 4
+        poster = m.tiles[i]
+        slot = m.slots[i]
+        if poster <> invalid and slot <> invalid
+            poster.width = m.cols * slot.w
+            poster.height = m.rows * slot.h
+        end if
+        m.tileSheet[i] = -1
+    end for
+end function
+
+' Point each of the 5 slots at the tile-set cell for cursor (center) +/- tiles. With no tile-set (live) the
+' whole filmstrip hides so no empty box is drawn; the container stays visible (the transport-active oracle).
+function RenderTiles(cursorMs as integer) as void
+    if m.tileSet = invalid or m.intervalMs <= 0
+        for i = 0 to 4
+            poster = m.tiles[i]
+            if poster <> invalid
+                poster.uri = ""
+                poster.visible = false
+                m.tileSheet[i] = -1
+            end if
+            SetSidePanel(i, false)
+        end for
+        SetCenterDecor(false)
+        return
+    end if
+    SetCenterDecor(true)
+
+    sheets = m.tileSet.tiles
+    centerTile = Int(cursorMs / m.intervalMs)
+    for i = 0 to 4
+        poster = m.tiles[i]
+        slot = m.slots[i]
+        if poster = invalid or slot = invalid
+            continue for
+        end if
+        tile = centerTile + m.offsets[i]
+        if tile < 0 or (m.tileCount > 0 and tile >= m.tileCount)
+            ' Off either end of the storyboard: hide the tile and its panel (no empty box past first/last frame).
+            poster.uri = ""
+            poster.visible = false
+            SetSidePanel(i, false)
+            m.tileSheet[i] = -1
+            continue for
+        end if
+        poster.visible = true
+        SetSidePanel(i, true)
+        sheetIndex = tile \ m.tilesPerSheet
+        cell = tile mod m.tilesPerSheet
+        col = cell mod m.cols
+        row = cell \ m.cols
+        cellX = col * slot.w
+        cellY = row * slot.h
+        ' Re-point the sheet uri (a texture load) only when the sheet actually changes.
+        if sheetIndex <> m.tileSheet[i]
+            poster.uri = SheetUrl(sheets, sheetIndex)
+            m.tileSheet[i] = sheetIndex
+        end if
+        poster.translation = [slot.x - cellX, slot.y - cellY]
+        poster.clippingRect = [cellX, cellY, slot.w, slot.h]
+    end for
+end function
+
+' The sheet image url at sheetIndex (the native tiles[sheetIndex][0]), or "" if out of range.
+function SheetUrl(sheets as object, sheetIndex as integer) as string
+    if IsArray(sheets) and sheetIndex >= 0 and sheetIndex < sheets.Count()
+        sheet = sheets[sheetIndex]
+        if IsArray(sheet) and sheet.Count() > 0
+            return ValidString(sheet[0])
+        end if
+    end if
+    return ""
+end function
+
+' Show/hide the dim side panel for a slot (center slot has no panel -> invalid, skipped).
+function SetSidePanel(i as integer, visible as boolean) as void
+    panel = m.sidePanels[i]
+    if panel <> invalid
+        panel.visible = visible
+    end if
+end function
+
+' Show/hide the center gradient backing + frame.
+function SetCenterDecor(visible as boolean) as void
+    for each node in m.centerDecor
+        if node <> invalid
+            node.visible = visible
+        end if
+    end for
+end function

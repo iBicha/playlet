@@ -1,0 +1,59 @@
+' VideoPlayerButton @SGNode suite — instantiates just the button, sets its scalar input fields, and asserts
+' the rendered child Posters. Pure projection: toggleState picks the icon, focused tints the circle + icon.
+
+namespace Tests
+
+    @SGNode("VideoPlayerButton")
+    @suite
+    class VideoPlayerButtonTests extends Rooibos.BaseTestSuite
+
+        @describe("icon toggle")
+
+        @it("toggleState picks which of the two icons shows")
+        function _()
+            m.top.toggleState = true
+            m.assertTrue(m.top.findNode("icon").visible)
+            m.assertFalse(m.top.findNode("icon2").visible)
+            m.top.toggleState = false
+            m.assertFalse(m.top.findNode("icon").visible)
+            m.assertTrue(m.top.findNode("icon2").visible)
+        end function
+
+        @describe("focus tint")
+
+        @it("resting uses the dark circle + light icon; focus inverts to light circle + dark icon")
+        function _()
+            m.top.focused = false
+            m.assertEqual(m.top.findNode("background").blendColor, m.top.backgroundColor)
+            m.assertEqual(m.top.findNode("icon").blendColor, m.top.iconColor)
+
+            m.top.focused = true
+            m.assertEqual(m.top.findNode("background").blendColor, m.top.focusedBackgroundColor)
+            m.assertEqual(m.top.findNode("icon").blendColor, m.top.focusedIconColor)
+        end function
+
+        @describe("scale pulse")
+
+        @it("gaining focus starts the pulse; losing it does not")
+        function _()
+            anim = m.top.findNode("nudgeAnim")
+            m.top.focused = false
+            anim.control = "stop"
+            m.top.focused = true
+            m.assertEqual(anim.control, "start")
+            anim.control = "stop"
+            m.top.focused = false
+            m.assertEqual(anim.control, "stop")
+        end function
+
+        @it("a nudge starts the pulse without a focus change")
+        function _()
+            anim = m.top.findNode("nudgeAnim")
+            anim.control = "stop"
+            m.top.nudge = true
+            m.assertEqual(anim.control, "start")
+        end function
+
+    end class
+
+end namespace

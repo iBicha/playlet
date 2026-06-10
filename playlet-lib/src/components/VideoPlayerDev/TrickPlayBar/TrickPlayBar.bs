@@ -1,0 +1,224 @@
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Pure projection of the shared scalar fields onto either the VOD bar or the LIVE bar; decides nothing.
+' Every input field is observed in Init and repaints on change, except glyph, focused and the SponsorBlock
+' tint, which update only their own piece.
+
+const GLYPH_ASSET_BASE = "/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/"
+
+function Init()
+    m.trackFill = m.top.findNode("trackFill")
+    m.playhead = m.top.findNode("playhead")
+    m.playheadFocus = m.top.findNode("playheadFocus")
+    m.playheadFocusScale = m.top.findNode("playheadFocusScale")
+    m.handle = m.top.findNode("handle")
+    m.scanGlyph = m.top.findNode("scanGlyph")
+    m.currentLabel = m.top.findNode("currentLabel")
+    m.remainingLabel = m.top.findNode("remainingLabel")
+    m.bullet = m.top.findNode("bullet")
+    m.liveLabel = m.top.findNode("liveLabel")
+
+    ' translated once: code-assigned strings don't get the automatic XML lookup.
+    m.rewindLiveText = Tr(Locale.VideoPlayer.RewindLiveTv)
+    ' the ● LIVE badge is right-aligned to the track end on first show (the translated text width varies by
+    ' language — "EN DIRECT" is far wider than "LIVE"); measured lazily, once.
+    m.liveBadgeLaidOut = false
+
+    for each field in ["transportMode", "positionMs", "durationMs", "cursorMs", "isLive", "canRewind", "liveOffsetMs", "atLiveEdge", "forceLiveBadge"]
+        m.top.ObserveField(field, FuncName(Repaint))
+    end for
+    m.top.ObserveField("focused", FuncName(OnFocusChange))
+    m.top.ObserveField("glyph", FuncName(OnGlyph))
+    m.top.ObserveField("sbFillBlend", FuncName(OnSbFillBlend))
+
+    Repaint()
+end function
+
+function Repaint() as void
+    if m.top.isLive
+        RenderLiveBar()
+    else
+        RenderVodBar()
+    end if
+end function
+
+' --- VOD ------------------------------------------------------------------------------------------------
+function RenderVodBar() as void
+    transportActive = (m.top.transportMode <> TransportController.Mode.Idle)
+    if transportActive
+        displayMs = m.top.cursorMs
+    else
+        displayMs = m.top.positionMs
+    end if
+    durationMs = m.top.durationMs
+
+    progress = 0.0
+    if durationMs > 0
+        progress = displayMs / durationMs
+    end if
+    if progress < 0
+        progress = 0
+    else if progress > 1
+        progress = 1
+    end if
+    fillW = progress * 1144
+
+    m.trackFill.clippingRect = [0, 0, fillW, 12]
+    PositionPlayhead(fillW)
+    m.currentLabel.text = FormatBarTime(displayMs / 1000.0)
+    m.remainingLabel.text = FormatBarTime((durationMs - displayMs) / 1000.0)
+
+    ' Raise the handle while scrubbing so the scanGlyph sits at screen-center over the center tile; rest it
+    ' low otherwise (the idle InstantReplay icon rides the resting handle).
+    PositionHandle(transportActive)
+
+    m.bullet.visible = false
+    m.liveLabel.visible = false
+end function
+
+' --- LIVE -----------------------------------------------------------------------------------------------
+function RenderLiveBar() as void
+    transportActive = (m.top.transportMode = TransportController.Mode.LiveDvr)
+
+    showBadge = m.top.atLiveEdge or m.top.forceLiveBadge
+
+    ' Fill + playhead are proportional to the cursor's place in the DVR window [0, effEdge], where
+    ' effEdge = cursor + offset; at the edge the playhead sits at the right end and the fill clips rightward.
+    effEdge = m.top.cursorMs + m.top.liveOffsetMs
+    frac = 1.0
+    if effEdge > 0
+        frac = m.top.cursorMs / (effEdge * 1.0)
+    end if
+    if frac < 0
+        frac = 0
+    else if frac > 1
+        frac = 1
+    end if
+    ' 1136.8679 = the stock OS live bar's at-edge fill clip x, captured from the real player
+    ' (trackFill clippingRect={1136.8679, 0, 1144, 12}): the fill stops ~7px short of the 1144 track end,
+    ' under the resting playhead cap.
+    clipStart = frac * 1136.8679
+    m.trackFill.clippingRect = [clipStart, 0, 1144, 12]
+    PositionPlayhead(clipStart)
+
+    ' Handle raised for the bif while rewinding, resting at the edge otherwise.
+    PositionHandle(transportActive)
+
+    ' the rewind hint only when the stream actually rewinds (a buffer-sized DVR window doesn't count).
+    if m.top.canRewind
+        m.currentLabel.text = m.rewindLiveText
+    else
+        m.currentLabel.text = ""
+    end if
+
+    if showBadge
+        m.remainingLabel.text = ""
+        m.bullet.visible = true
+        m.liveLabel.visible = true
+        ' pin the badge's RIGHT edge to the track end (1144), bullet 24px left of the text — the same formula
+        ' reproduces the captured stock English layout (LIVE ~64px wide -> label at 1080, bullet at 1056).
+        if not m.liveBadgeLaidOut
+            m.liveBadgeLaidOut = true
+            labelW = m.liveLabel.boundingRect().width
+            m.liveLabel.translation = [1144 - labelW, 24]
+            m.bullet.translation = [1144 - labelW - 24, 24]
+        end if
+    else
+        m.remainingLabel.text = FormatBarTime(m.top.liveOffsetMs / 1000.0)
+        m.bullet.visible = false
+        m.liveLabel.visible = false
+    end if
+end function
+
+' Raise (screen-center, under the bif) or rest (low) the handle that carries the scanGlyph. The focus
+' indicator is NOT here — the handle sits at bar-centre, not on the cursor; PositionPlayhead grows the
+' visible cursor instead.
+function PositionHandle(raised as boolean) as void
+    if raised
+        m.handle.translation = [547, -54]
+    else
+        m.handle.translation = [547, 22]
+    end if
+end function
+
+' Place the playhead dot centred on `centerX` (the fill end = the cursor). Only the translation tracks here;
+' the focus grow/shrink is the scale animation (OnFocusChange), which scales about the dot's centre so the
+' two never fight.
+function PositionPlayhead(centerX as float) as void
+    m.playhead.translation = [centerX - 6, 0]
+end function
+
+' The enlarged cursor IS the bar-tier focus indicator: swell half-again on focus, settle back on blur
+' (the same animation, reversed). stop-then-start so a flip mid-flight restarts in the new direction.
+function OnFocusChange() as void
+    m.playheadFocusScale.reverse = not m.top.focused
+    m.playheadFocus.control = "stop"
+    m.playheadFocus.control = "start"
+end function
+
+' --- glyph swap (handle child) --------------------------------------------------------------------------
+function OnGlyph() as void
+    name = GlyphAssetName(m.top.glyph)
+    if name = ""
+        m.scanGlyph.visible = false
+    else
+        m.scanGlyph.uri = GLYPH_ASSET_BASE + name + ".png"
+        m.scanGlyph.visible = true
+    end if
+end function
+
+function GlyphAssetName(glyph as integer) as string
+    if glyph = TransportController.Glyph.SkipBack
+        return "icon_skipBack"
+    else if glyph = TransportController.Glyph.SkipAhead
+        return "icon_skipAhead"
+    else if glyph = TransportController.Glyph.Ffx1
+        return "icon_FFx1"
+    else if glyph = TransportController.Glyph.Ffx2
+        return "icon_FFx2"
+    else if glyph = TransportController.Glyph.Ffx3
+        return "icon_FFx3"
+    else if glyph = TransportController.Glyph.Rwx1
+        return "icon_RWx1"
+    else if glyph = TransportController.Glyph.Rwx2
+        return "icon_RWx2"
+    else if glyph = TransportController.Glyph.Rwx3
+        return "icon_RWx3"
+    else if glyph = TransportController.Glyph.Replay
+        return "icon_replay"
+    end if
+    return ""
+end function
+
+' --- SponsorBlock fill tint -----------------------------------------------------------------------------
+' A SponsorBlock tint overrides the red fill; an empty (fully transparent) value keeps the red.
+function OnSbFillBlend() as void
+    blend = m.top.sbFillBlend
+    if blend <> invalid and (blend and 255) <> 0
+        m.trackFill.blendColor = blend
+    end if
+end function
+
+' --- time format ----------------------------------------------------------------------------------------
+' under 1min -> "0:SS"; else "MM:SS"; "H:MM:SS" when >= 1hr.
+function FormatBarTime(seconds as dynamic) as string
+    if seconds = invalid
+        return "0:00"
+    end if
+    secs = Int(seconds)
+    if secs < 0
+        secs = 0
+    end if
+    h = secs \ 3600
+    mn = (secs \ 60) mod 60
+    s = (secs mod 60).ToStr("%02d")
+    if h > 0
+        return h.ToStr() + ":" + mn.ToStr("%02d") + ":" + s
+    end if
+    if mn = 0
+        return "0:" + s
+    end if
+    return mn.ToStr("%02d") + ":" + s
+end function

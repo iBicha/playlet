@@ -1,0 +1,844 @@
+' Pure-logic "brain" of the video player transport.
+'
+' The coordinator (VideoPlayerDev) holds one instance in m.transport, forwards device signals to its methods,
+' and reads its scalar OUTPUT fields to drive the Video node + the renderers. Renders nothing and owns no Timer:
+' it publishes a timer SCHEDULE (timerCmd) the coordinator mirrors onto a real Timer and calls Tick(timerId) when
+' it fires; in tests Tick() is called directly (no device, no clock), which makes tick-driven behaviour testable.
+' All finite state is an int enum; the only AA crossing per event is the small `videoIntent` (control + seek).
+'
+' LIVE model: the edge comes from OnLiveEdge — the coordinator computes it from the wall clock anchored at the
+' manifest's availabilityStartTime (which Playlet itself generates), so it advances continuously: through
+' pauses, rebuffers and startup. atLiveEdge is a pure derivation (offset <= jitter band) and the latency
+' baseline is just the smallest (edge - position) ever observed — no fall-behind heuristics.
+
+namespace TransportController
+
+    enum Mode
+        Idle = 0 ' normal playback
+        Scrub = 1 ' VOD step-seek (Left/Right): frozen, cursor steps the storyboard grid
+        Scan = 2 ' VOD free-run ladder (Fwd/Rev)
+        LiveDvr = 3 ' live rewind/forward inside the DVR window
+    end enum
+
+    enum Glyph
+        None = 0
+        SkipBack = 1
+        SkipAhead = 2
+        Ffx1 = 3
+        Ffx2 = 4
+        Ffx3 = 5
+        Rwx1 = 6
+        Rwx2 = 7
+        Rwx3 = 8
+        Replay = 9 ' transient icon shown in idle, auto-cleared by the toast timer
+    end enum
+
+    enum Command
+        None = 0
+        Left = 1 ' VOD scrub back / live rewind -5s
+        Right = 2 ' VOD scrub ahead / live forward +5s
+        Rev = 3 ' VOD scan reverse / live rewind
+        Fwd = 4 ' VOD scan forward / live continuous forward preview
+        Replay = 5 ' InstantReplay -20s
+        Commit = 6 ' Select/OK or Play: seek-to-cursor + resume (when a transport is active)
+    end enum
+
+    enum Control
+        None = 0
+        Pause = 1
+        Resume = 2
+    end enum
+
+    enum Timer
+        None = 0
+        ScrubRepeat = 1 ' hold-to-repeat for scrub (typematic)
+        Scan = 2 ' free-run ladder / live forward-preview cadence
+        ReplayToast = 4 ' one-shot: clears the transient InstantReplay icon after REPLAY_TOAST_MS
+    end enum
+
+    enum TimerAction
+        None = 0
+        Arm = 1
+        stop = 2
+    end enum
+
+    const SCRUB_REPEAT_INITIAL_MS = 510
+    const SCRUB_REPEAT_MS = 120
+    const SCAN_LEVEL_MIN = 1
+    const SCAN_LEVEL_MAX = 3
+    const LIVE_DVR_STEP_MS = 5000
+    const LIVE_EDGE_SEEK_MS = 999999000 ' seek target that means "jump to the live edge"
+    ' Live scan base scales with DVR window length: base = effectiveEdge / DIVISOR, floored at the storyboard
+    ' interval so short DVRs are unchanged. 4000 -> ~10.8s base on a 12h DVR -> L3 ~65s/tick.
+    const LIVE_SCAN_BASE_DIVISOR = 4000
+    const REPLAY_BACK_MS = 20000
+    ' A VOD commit landing within this of the duration means "watched to the end" -> finish (PlayNext/close),
+    ' not a seek into the last instants (which just re-buffers and fights the device's EOF auto-resume).
+    ' Matches the SponsorBlock finish rule (SkipTargetForSegment).
+    const FINISH_EPSILON_MS = 2000
+    ' Live streams whose DVR window is under this are treated as NOT rewindable (a ~30s window is just the
+    ' buffer): the rewind/scan/replay commands are ignored and the bar drops the "Rewind live TV" label.
+    const LIVE_REWIND_MIN_WINDOW_MS = 60000
+    const REPLAY_TOAST_MS = 700 ' how long the transient InstantReplay icon stays before it self-clears
+    ' "● LIVE" shows while the offset is within this jitter band of the inherent latency; beyond it the bar
+    ' shows the time-behind. The clock-anchored edge advances smoothly, so this only needs to absorb position
+    ' notification granularity (~1s) plus a little buffering slack.
+    const LIVE_EDGE_ATEDGE_MS = 3000
+
+    ' The transport state machine.
+    class Controller
+        ' ---- content facts (set once at contentReady) ----
+        isLive as boolean = false
+        private hasStoryboards as boolean = false
+        private storyboardStepMs as integer = 2000 ' VOD per-tap step + scan base (storyboard L2 interval)
+        ' Live DVR window length (0 = unknown). The generated DASH anchors t=0 to the window start, so the
+        ' rewind floor is edge - window once the session outlives the window (content below it has expired).
+        private dvrWindowMs as integer = 0
+
+        ' ---- inputs pushed by the coordinator (OnPosition / OnDuration / OnReady) ----
+        positionMs as integer = 0
+        durationMs as integer = 0
+        private ready as boolean = false ' drop all transport input until first frame
+
+        ' ---- OUTPUT CONTRACT (read by the coordinator + renderers) ----
+        transportMode as integer = 0 ' Mode.Idle
+        cursorMs as integer = 0
+        glyph as integer = 0 ' Glyph.None
+        scanLevel as integer = 0
+        liveOffsetMs as integer = 0
+        atLiveEdge as boolean = true
+
+        ' The one AA crossing to the coordinator {control, hasSeek, seekMs, seq}, drained via TakeVideoIntent.
+        private videoIntent as object = invalid
+        private intentSeq as integer = 0
+
+        ' commitSeq / exitSeq / finishSeq — pulse counters the coordinator compares to its last-seen value.
+        ' finishSeq pulses when a VOD commit lands at the very end (-> the coordinator finishes playback).
+        commitSeq as integer = 0
+        exitSeq as integer = 0
+        finishSeq as integer = 0
+
+        ' timerCmd — the timer schedule the coordinator mirrors onto a real Timer node.
+        private timerCmdAction as integer = 0 ' TimerAction.None
+        private timerCmdId as integer = 0 ' Timer.None
+        private timerCmdDelayMs as integer = 0
+        private timerCmdRepeat as boolean = false
+
+        ' ---- private scratch ----
+        scanDir as integer = 0
+        scrubHeldDir as integer = 0
+        edgeMs as integer = 0 ' the live edge, fed by OnLiveEdge (the coordinator's wall-clock computation)
+        ' Inherent live latency: the smallest CONFIRMED (edge - position) observed this content — the closest
+        ' we have ever been IS how close this stream can get. The offset reads relative to it, so steady
+        ' playback shows ~0 / "● LIVE" whatever the buffer latency is. -1 until learned. Confirmation = two
+        ' consecutive samples agreeing within the jitter band: a single glitched near-edge sample (e.g. the
+        ' initial jump-to-live seek echoing an optimistic position) must not poison the floor for the session.
+        liveMinGapMs as integer = -1
+        private liveMinCandidateMs as integer = -1
+        replayPending as boolean = false ' an InstantReplay seek is in flight (position hasn't reached it yet)
+        private replayTargetMs as integer = 0 ' the last InstantReplay target; spamming replay accumulates from THIS
+        ' A keep-playing/resume seek is in flight and has NOT yet reached "playing". While true, a new transport
+        ' must NOT slam control=pause: a pause landing mid-seek wedges the Video (buffering<->paused, esp. near
+        ' EOF). Set on every non-pause seek emit; cleared by MarkSeekSettled when the device reaches playing.
+        seekSettling as boolean = false
+
+        ' ------------------------------------------------------------------------------------------------
+        ' Content / live inputs
+        ' ------------------------------------------------------------------------------------------------
+        function SetContent(isLive as boolean, storyboardStepMs as integer, hasStoryboards as boolean) as void
+            m.isLive = isLive
+            m.hasStoryboards = hasStoryboards
+            if storyboardStepMs > 0
+                m.storyboardStepMs = storyboardStepMs
+            end if
+            m.dvrWindowMs = 0 ' new content -> unknown window until SetLiveDvrWindow
+            m.edgeMs = 0
+            m.liveMinGapMs = -1 ' new content -> re-learn the inherent latency
+            m.liveMinCandidateMs = -1
+            m.atLiveEdge = true
+            m.replayPending = false ' new content -> no replay seek in flight
+            m.replayTargetMs = 0
+        end function
+
+        ' Live DVR window length (ms); 0/negative = unknown (the rewind floor stays at 0).
+        function SetLiveDvrWindow(windowMs as integer) as void
+            if windowMs > 0
+                m.dvrWindowMs = windowMs
+            else
+                m.dvrWindowMs = 0
+            end if
+        end function
+
+        ' Whether this live stream is rewindable at all. The DVR window we receive is the same value the
+        ' generated DASH advertises as timeShiftBufferDepth, so this IS the manifest's signal: a tiny window
+        ' (~30s) is just the buffer, not a rewind feature. Unknown (0) assumes rewindable.
+        function CanRewindLive() as boolean
+            if not m.isLive
+                return false
+            end if
+            if m.dvrWindowMs <= 0
+                return true
+            end if
+            return m.dvrWindowMs >= TransportController.LIVE_REWIND_MIN_WINDOW_MS
+        end function
+
+        ' The rewind FLOOR: the oldest still-available position. t=0 is the window start at manifest build
+        ' time, so as the session outlives the window the floor advances (edge - window); 0 while unknown or
+        ' while the stream is younger than its window.
+        function LiveFloorMs() as integer
+            if m.dvrWindowMs <= 0
+                return 0
+            end if
+            floor = m.edgeMs - m.dvrWindowMs
+            if floor < 0
+                return 0
+            end if
+            return floor
+        end function
+
+        ' Storyboards arrive late (the native Video.thumbnailTiles field populates after the manifest loads),
+        ' so the coordinator updates the scrub step + bif gate here without the live-edge / replay resets that
+        ' SetContent does for new content.
+        function UpdateStoryboards(storyboardStepMs as integer, hasStoryboards as boolean) as void
+            m.hasStoryboards = hasStoryboards
+            if storyboardStepMs > 0
+                m.storyboardStepMs = storyboardStepMs
+            end if
+        end function
+
+        function OnReady() as void
+            m.ready = true
+        end function
+
+        ' Called when the Video reaches state="playing": the in-flight play-through seek has landed, so a later
+        ' transport may freeze immediately again.
+        function MarkSeekSettled() as void
+            m.seekSettling = false
+        end function
+
+
+        ' Last real Video position. While idle the cursor tracks it; while a transport is active the machine owns
+        ' the cursor. Drops the live-edge seek sentinel echo (see OnDuration).
+        function OnPosition(ms as integer) as void
+            if m.isLive and ms >= TransportController.LIVE_EDGE_SEEK_MS
+                return
+            end if
+            m.positionMs = ms
+            ' a pending InstantReplay seek has landed once position reaches its target -> stop accumulating.
+            if m.replayPending and Abs(ms - m.replayTargetMs) < 3000
+                m.replayPending = false
+            end if
+            if m.isLive
+                ' position can never be ahead of the edge; a sample beyond it corrects the edge.
+                if ms > m.edgeMs
+                    m.edgeMs = ms
+                end if
+                ' learn the inherent latency: the smallest gap CONFIRMED by two consecutive agreeing samples.
+                ' Position events only flow while PLAYING, so a paused/frozen video never pollutes the floor,
+                ' and the confirmation rejects one-off glitches (an optimistic sample at the seek landing).
+                gap = m.edgeMs - ms
+                if m.liveMinGapMs < 0 or gap < m.liveMinGapMs
+                    if m.liveMinCandidateMs >= 0 and Abs(gap - m.liveMinCandidateMs) <= TransportController.LIVE_EDGE_ATEDGE_MS
+                        m.liveMinGapMs = gap
+                        m.liveMinCandidateMs = -1
+                    else
+                        m.liveMinCandidateMs = gap
+                    end if
+                else
+                    m.liveMinCandidateMs = -1 ' the dip didn't persist -> a glitch, discarded
+                end if
+            end if
+            if m.transportMode = TransportController.Mode.Idle
+                m.cursorMs = ms
+                if m.isLive
+                    m.RecomputeLive()
+                end if
+            end if
+        end function
+
+        ' VOD length. On live the device's `duration` is IGNORED — it freezes during pause and snaps on resume;
+        ' the edge comes from OnLiveEdge instead (clock-anchored, continuous). durationMs therefore stays 0 on
+        ' live, which also keeps the VOD-only end-of-content commit rule inert there.
+        function OnDuration(ms as integer) as void
+            if m.isLive
+                return
+            end if
+            m.durationMs = ms
+            m.ClampIdleCursor()
+        end function
+
+        ' The live edge (ms on the manifest timeline), computed by the coordinator from the wall clock anchored
+        ' at the manifest's availabilityStartTime and pushed ~1/s. Advances through pauses, rebuffers and
+        ' startup — the offset/badge math needs no event-pattern heuristics on top.
+        function OnLiveEdge(ms as integer) as void
+            if not m.isLive or ms <= 0 or ms >= TransportController.LIVE_EDGE_SEEK_MS
+                return
+            end if
+            m.edgeMs = ms
+            m.ClampIdleCursor() ' a re-anchor can regress past a stale in-flight seek cursor
+            if m.transportMode = TransportController.Mode.Idle or m.transportMode = TransportController.Mode.LiveDvr
+                m.RecomputeLive()
+            end if
+        end function
+
+        ' Re-clamp a stale idle cursor when the duration/edge moves BELOW it: after a replay/skip the cursor
+        ' holds the seek target until the next OnPosition lands, and a duration that regresses in that window
+        ' (a live-edge glitch, a shorter retry manifest) would leave the cursor outside the playable range
+        ' (INV-B1). Transports clamp on every step, so only the idle cursor needs this.
+        function ClampIdleCursor() as void
+            if m.transportMode <> TransportController.Mode.Idle
+                return
+            end if
+            hi = m.durationMs
+            if m.isLive
+                hi = m.edgeMs
+            end if
+            if hi > 0 and m.cursorMs > hi
+                m.cursorMs = hi
+            end if
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' Key -> command entry
+        ' ------------------------------------------------------------------------------------------------
+        function HandleKey(command as integer, isDown as boolean) as void
+            if not m.ready
+                return
+            end if
+            if not isDown
+                ' keyUp: only scrub-style hold-release reacts; scan latches; everything else ignores keyUp.
+                isScrubKey = (command = TransportController.Command.Left or command = TransportController.Command.Right)
+                if m.transportMode = TransportController.Mode.Scrub and isScrubKey
+                    m.scrubHeldDir = 0
+                    m.glyph = TransportController.Glyph.None
+                    m.StopTimer(TransportController.Timer.ScrubRepeat)
+                else if m.transportMode = TransportController.Mode.LiveDvr and m.scrubHeldDir <> 0 and isScrubKey
+                    ' live rewind/forward-step is VOD-scrub-shaped: releasing the key stops the hold-repeat
+                    ' (the offset keeps counting up on its own — the coordinator's clock feeds OnLiveEdge).
+                    m.scrubHeldDir = 0
+                    m.glyph = TransportController.Glyph.None
+                    m.StopTimer(TransportController.Timer.ScrubRepeat)
+                end if
+                return
+            end if
+            m.HandleCommand(command)
+        end function
+
+        function HandleCommand(command as integer) as void
+            if not m.ready
+                return
+            end if
+            ' any non-replay command breaks the InstantReplay accumulation chain.
+            if command <> TransportController.Command.Replay
+                m.replayPending = false
+            end if
+            if command = TransportController.Command.Commit
+                m.Commit()
+                return
+            end if
+            if command = TransportController.Command.Replay
+                m.Replay()
+                return
+            end if
+            if m.isLive
+                ' a non-rewindable live stream (DVR window is just the buffer) takes no transport input.
+                if not m.CanRewindLive()
+                    return
+                end if
+                if command = TransportController.Command.Left
+                    m.LiveStep(-1)
+                else if command = TransportController.Command.Right
+                    m.LiveStep(1)
+                else if command = TransportController.Command.Rev
+                    m.EnterLiveScan(-1)
+                else if command = TransportController.Command.Fwd
+                    m.EnterLiveScan(1)
+                end if
+                return
+            end if
+            if command = TransportController.Command.Left
+                m.EnterScrub(-1)
+            else if command = TransportController.Command.Right
+                m.EnterScrub(1)
+            else if command = TransportController.Command.Fwd
+                m.EnterScan(1)
+            else if command = TransportController.Command.Rev
+                m.EnterScan(-1)
+            end if
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' SCRUB (VOD Left/Right) — first tap freezes + snaps the cursor to the grid; hold repeats.
+        ' ------------------------------------------------------------------------------------------------
+        function EnterScrub(dir as integer) as void
+            firstEnter = (m.transportMode <> TransportController.Mode.Scrub)
+            if firstEnter
+                if m.transportMode = TransportController.Mode.Idle
+                    m.FreezeForTransport() ' the video FREEZES (deferred if a play-through seek is still settling)
+                    m.cursorMs = m.SnapToGrid(m.positionMs, m.storyboardStepMs)
+                end if
+                m.transportMode = TransportController.Mode.Scrub
+                m.scanLevel = 0
+                m.scanDir = 0
+                m.StopTimer(TransportController.Timer.Scan)
+            end if
+            m.scrubHeldDir = dir
+            if dir < 0
+                m.glyph = TransportController.Glyph.SkipBack
+            else
+                m.glyph = TransportController.Glyph.SkipAhead
+            end if
+            m.ScrubStep(dir)
+            m.ArmTimer(TransportController.Timer.ScrubRepeat, TransportController.SCRUB_REPEAT_INITIAL_MS, false)
+        end function
+
+        function ScrubStep(dir as integer) as void
+            m.cursorMs = m.Clamp(m.cursorMs + dir * m.storyboardStepMs, 0, m.durationMs)
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' SCAN (VOD Fwd/Rev) — free-run ladder; same-dir tap climbs (wraps L3->L1); opposite flips to L1.
+        ' ------------------------------------------------------------------------------------------------
+        function EnterScan(dir as integer) as void
+            if m.transportMode <> TransportController.Mode.Scan
+                if m.transportMode = TransportController.Mode.Idle
+                    m.FreezeForTransport()
+                    m.cursorMs = m.positionMs
+                end if
+                m.transportMode = TransportController.Mode.Scan
+                m.scrubHeldDir = 0
+                m.StopTimer(TransportController.Timer.ScrubRepeat)
+                m.scanDir = 0
+                m.scanLevel = 0
+            end if
+            m.AdvanceLadder(dir)
+            m.ArmTimer(TransportController.Timer.Scan, m.ScanCadenceMs(m.scanLevel), true)
+        end function
+
+        ' Shared 3-level ladder climb (VOD scan AND live scan). Same-dir tap climbs L1->2->3 and wraps to L1; a
+        ' new/opposite direction resets to L1. Caller owns mode + cursor seeding + the timer.
+        function AdvanceLadder(dir as integer) as void
+            if m.scanDir <> dir or m.scanLevel < TransportController.SCAN_LEVEL_MIN
+                m.scanDir = dir
+                m.scanLevel = TransportController.SCAN_LEVEL_MIN
+            else
+                m.scanLevel = (m.scanLevel mod TransportController.SCAN_LEVEL_MAX) + 1
+            end if
+            m.glyph = m.ScanGlyph(m.scanDir, m.scanLevel)
+        end function
+
+        function ScanTick() as void
+            jump = m.ScanJumpMs(m.scanLevel)
+            ' clamp + HOLD at the ends — does NOT auto-commit; further ticks re-clamp to the same value.
+            m.cursorMs = m.Clamp(m.cursorMs + m.scanDir * jump, 0, m.durationMs)
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' LIVE DVR — Left/Rev = frozen VOD-scrub-shaped rewind (FREEZE, step -5s, hold repeats, NO per-press
+        ' seek); Right = +5s toward the edge (reaching it auto-resumes); Fwd = continuous forward preview that
+        ' auto-resumes at the edge. Offset = (edge - cursor) - baseline, counts up while frozen.
+        ' ------------------------------------------------------------------------------------------------
+        function EnterLiveDvr() as boolean
+            if m.transportMode = TransportController.Mode.LiveDvr
+                return false
+            end if
+            m.cursorMs = m.positionMs
+            m.transportMode = TransportController.Mode.LiveDvr
+            m.scanLevel = 0
+            m.scanDir = 0
+            m.RecomputeLive()
+            return true
+        end function
+
+        function LiveStep(dir as integer) as void
+            fresh = m.EnterLiveDvr()
+            m.scanDir = 0 ' leaving the Rev/Fwd ladder sub-mode (re-arming scrubRepeat replaces its scan timer)
+            m.scanLevel = 0
+            m.scrubHeldDir = dir
+            if dir < 0
+                m.glyph = TransportController.Glyph.SkipBack
+            else
+                m.glyph = TransportController.Glyph.SkipAhead
+            end if
+            ' the freeze is the ONLY intent emitted (and only on a fresh enter) — never a per-press seek.
+            if fresh
+                m.EmitIntent(TransportController.Control.Pause, false, 0)
+            end if
+            ' step once; if a forward step already reached the edge this commits + auto-resumes (no repeat).
+            if m.LiveHoldStep(dir)
+                m.ArmTimer(TransportController.Timer.ScrubRepeat, TransportController.SCRUB_REPEAT_INITIAL_MS, false)
+            end if
+        end function
+
+        function LiveHoldStep(dir as integer) as boolean
+            target = m.cursorMs + dir * TransportController.LIVE_DVR_STEP_MS
+            if dir > 0 and target >= m.LiveEdgeMs()
+                m.CommitToLiveEdge()
+                return false
+            end if
+            m.cursorMs = m.Clamp(target, m.LiveFloorMs(), m.LiveEdgeMs())
+            m.RecomputeLive() ' atLiveEdge derives from the new offset
+            return true
+        end function
+
+        ' Live Rev/Fwd 3-level scan ladder (mirrors the VOD scan; the mode stays liveDvr). FREEZE on a fresh enter;
+        ' the forward ladder auto-resumes when it reaches the edge, the reverse ladder clamps at the DVR floor.
+        function EnterLiveScan(dir as integer) as void
+            fresh = m.EnterLiveDvr()
+            if fresh
+                m.EmitIntent(TransportController.Control.Pause, false, 0) ' freeze; the scan previews, never seeks per tick
+            end if
+            m.scrubHeldDir = 0 ' leaving the Left/Right step sub-mode
+            m.AdvanceLadder(dir)
+            m.RecomputeLive()
+            m.ArmTimer(TransportController.Timer.Scan, m.ScanCadenceMs(m.scanLevel), true)
+        end function
+
+        ' One ladder tick inside the DVR window. Never seeks mid-scan (preview only); the forward ladder reaching
+        ' the edge is the single seek + resume, the seek otherwise waits for a commit.
+        function LiveScanTick() as void
+            jump = m.ScanJumpMs(m.scanLevel)
+            target = m.cursorMs + m.scanDir * jump
+            if m.scanDir > 0 and target >= m.LiveEdgeMs()
+                m.CommitToLiveEdge()
+                return
+            end if
+            m.cursorMs = m.Clamp(target, m.LiveFloorMs(), m.LiveEdgeMs())
+            m.RecomputeLive()
+        end function
+
+        ' The live auto-resume: one seek to the edge + resume + back to idle.
+        function CommitToLiveEdge() as void
+            m.ResetToIdle()
+            m.cursorMs = m.LiveEdgeMs() ' park the cursor where the offset reads 0 until the seek lands
+            m.RecomputeLive()
+            m.EmitIntent(TransportController.Control.Resume, true, TransportController.LIVE_EDGE_SEEK_MS)
+            m.commitSeq = m.commitSeq + 1
+        end function
+
+        ' The EFFECTIVE live edge: raw edge minus the latency baseline (where the offset reads 0 / "● LIVE").
+        ' Forward commit + cursor clamp use THIS so the offset-hits-0 point and the auto-commit point COINCIDE —
+        ' no dead-zone seeking forward past the visible edge.
+        function LiveEdgeMs() as integer
+            gap = m.liveMinGapMs
+            if gap < 0
+                gap = 0
+            end if
+            e = m.edgeMs - gap
+            if e < 0
+                e = 0
+            end if
+            return e
+        end function
+
+        ' Recompute the live outputs from first principles — no stateful detection. The offset is how far the
+        ' cursor sits behind the edge beyond the stream's inherent latency (liveMinGapMs), and "at the edge" is
+        ' simply that offset being inside the jitter band. Pause, rebuffer, rewind, startup: all just make the
+        ' offset what it really is.
+        function RecomputeLive() as void
+            raw = m.edgeMs - m.cursorMs
+            if raw < 0
+                raw = 0
+            end if
+            gap = m.liveMinGapMs
+            if gap < 0
+                ' latency not learned yet: reference the live POSITION gap, so resting reads 0 and a rewind
+                ' still reads how far the cursor sits behind the position.
+                gap = m.edgeMs - m.positionMs
+                if gap < 0
+                    gap = 0
+                end if
+            end if
+            offset = raw - gap
+            if offset < 0
+                offset = 0
+            end if
+            m.liveOffsetMs = offset
+            m.atLiveEdge = (offset <= TransportController.LIVE_EDGE_ATEDGE_MS)
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' COMMIT (Select/OK or Play while a transport is active) — seek to cursor + resume + idle. No
+        ' imperative teardown: the bif/glyph self-hide because transportMode -> idle.
+        ' ------------------------------------------------------------------------------------------------
+        function Commit() as void
+            mode = m.transportMode
+            if mode = TransportController.Mode.Idle
+                return ' the coordinator handles OK/Play in idle (chrome/pause toggle)
+            end if
+            if mode = TransportController.Mode.LiveDvr
+                ' live commit: resume PLAYING from the rewound cursor (still behind), NOT a jump to the edge —
+                ' only an edge-reaching forward step/scan jumps to the edge (CommitToLiveEdge).
+                if m.cursorMs >= m.LiveEdgeMs()
+                    m.CommitToLiveEdge()
+                    return
+                end if
+                target = m.cursorMs
+                m.ResetToIdle() ' resets cursor to positionMs; restore it below so the offset stays behind
+                m.cursorMs = target
+                m.RecomputeLive()
+                m.EmitIntent(TransportController.Control.Resume, true, target)
+                m.commitSeq = m.commitSeq + 1
+                return
+            end if
+            ' VOD commit at the very end = watched to the end: finish (the coordinator runs PlayNext/close)
+            ' instead of seeking into the last instants, which only re-buffers and then fights the device's
+            ' EOF auto-resume (the guard would re-pause it forever).
+            target = m.cursorMs
+            if m.durationMs > 0 and target >= m.durationMs - TransportController.FINISH_EPSILON_MS
+                m.ResetToIdle()
+                m.finishSeq = m.finishSeq + 1
+                return
+            end if
+            ' VOD scrub/scan commit. Optimistically advance positionMs to the target so the now-idle bar (which
+            ' reads positionMs) shows the committed position immediately — no snap-back while the seek is in flight.
+            m.positionMs = target
+            m.ResetToIdle() ' sets cursorMs = positionMs = target
+            m.EmitIntent(TransportController.Control.Resume, true, target)
+            m.commitSeq = m.commitSeq + 1
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' INSTANT REPLAY (-20s) — a one-shot seek, KEEP PLAYING. On live it jumps back into the DVR window
+        ' (badge swaps "● LIVE" -> offset); on VOD it just seeks -20s.
+        ' ------------------------------------------------------------------------------------------------
+        function Replay() as void
+            ' InstantReplay works from ANY state. From a transport (frozen) it cancels it and RESUMES from
+            ' cursor-20s; from idle it just seeks -20s and keeps the play state. Reference is the cursor (= position
+            ' while idle). A non-rewindable live stream takes no replay either.
+            if m.isLive and not m.CanRewindLive()
+                return
+            end if
+            wasTransport = (m.transportMode <> TransportController.Mode.Idle)
+            ' spamming InstantReplay must ACCUMULATE: while a prior replay seek is still in flight, base off the
+            ' LAST target so each press goes another -20s, not off the stale position (all presses landing together).
+            if m.replayPending
+                base = m.replayTargetMs
+            else if wasTransport
+                base = m.cursorMs ' was frozen -> resume from where the cursor sits
+            else
+                base = m.positionMs
+            end if
+            control = TransportController.Control.None ' from idle: keep playing, no state change
+            if wasTransport
+                control = TransportController.Control.Resume ' was frozen -> resume playing at the new point
+            end if
+            m.ResetToIdle()
+            if m.isLive
+                target = m.Clamp(base - TransportController.REPLAY_BACK_MS, m.LiveFloorMs(), m.edgeMs)
+                m.cursorMs = target
+                m.RecomputeLive() ' the new offset derives the badge
+            else
+                target = m.Clamp(base - TransportController.REPLAY_BACK_MS, 0, m.durationMs)
+                m.cursorMs = target
+            end if
+            m.EmitIntent(control, true, target) ' seek; resume if it was frozen, else keep playing
+            m.replayTargetMs = target ' remember it so a rapid second press accumulates from here
+            m.replayPending = true
+            ' transient InstantReplay icon: shown in idle (renderer keys off glyph, not mode); toast timer clears it.
+            m.glyph = TransportController.Glyph.Replay
+            m.ArmTimer(TransportController.Timer.ReplayToast, TransportController.REPLAY_TOAST_MS, false)
+        end function
+
+        ' Flip back to idle + clear scratch/outputs. Renderers self-hide off the mode flip.
+        function ResetToIdle() as void
+            m.transportMode = TransportController.Mode.Idle
+            m.glyph = TransportController.Glyph.None
+            m.scanLevel = 0
+            m.scanDir = 0
+            m.scrubHeldDir = 0
+            m.StopTimer(TransportController.Timer.ScrubRepeat)
+            m.StopTimer(TransportController.Timer.Scan)
+            m.cursorMs = m.positionMs
+        end function
+
+        ' Back while a transport is active: reset + pulse exit so the coordinator routes it (close).
+        function Cancel() as void
+            m.ResetToIdle()
+            m.exitSeq = m.exitSeq + 1
+        end function
+
+        ' Minimize (Down): reset to idle WITHOUT a seek/resume/exit pulse. The play/pause state is left exactly as
+        ' it was (no videoIntent emitted).
+        function ResetTransport() as void
+            m.ResetToIdle()
+        end function
+
+        ' An EXTERNAL authority (SponsorBlock skip) seeks while a transport may be active. Route it THROUGH the
+        ' brain so the device never diverges: reset to idle and emit the seek as a normal intent. keepPlaying
+        ' preserves the current play state (control=none); else resume.
+        function ForceIdleSeek(targetMs as integer, keepPlaying as boolean) as void
+            m.ResetToIdle()
+            control = TransportController.Control.Resume
+            if keepPlaying
+                control = TransportController.Control.None
+            end if
+            m.EmitIntent(control, true, targetMs)
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' Tick — the coordinator calls this when the Timer named `timerId` fires.
+        ' ------------------------------------------------------------------------------------------------
+        function Tick(timerId as integer) as void
+            if timerId = TransportController.Timer.ScrubRepeat
+                if m.transportMode = TransportController.Mode.Scrub and m.scrubHeldDir <> 0
+                    m.ScrubStep(m.scrubHeldDir)
+                    m.ArmTimer(TransportController.Timer.ScrubRepeat, TransportController.SCRUB_REPEAT_MS, false)
+                else if m.transportMode = TransportController.Mode.LiveDvr and m.scrubHeldDir <> 0
+                    if m.LiveHoldStep(m.scrubHeldDir)
+                        m.ArmTimer(TransportController.Timer.ScrubRepeat, TransportController.SCRUB_REPEAT_MS, false)
+                    end if
+                end if
+                return
+            end if
+            if timerId = TransportController.Timer.Scan
+                if m.transportMode = TransportController.Mode.Scan
+                    m.ScanTick()
+                else if m.transportMode = TransportController.Mode.LiveDvr
+                    m.LiveScanTick()
+                end if
+                return
+            end if
+            if timerId = TransportController.Timer.ReplayToast
+                ' clear the transient InstantReplay icon — but only if a new transport hasn't claimed the glyph.
+                if m.transportMode = TransportController.Mode.Idle and m.glyph = TransportController.Glyph.Replay
+                    m.glyph = TransportController.Glyph.None
+                end if
+                return
+            end if
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' Output consumers — the coordinator drains these once per its own notification.
+        ' ------------------------------------------------------------------------------------------------
+        function TakeVideoIntent() as object
+            intent = m.videoIntent
+            m.videoIntent = invalid
+            return intent
+        end function
+
+        function TakeTimerCmd() as object
+            if m.timerCmdAction = TransportController.TimerAction.None
+                return invalid
+            end if
+            cmd = {
+                action: m.timerCmdAction
+                id: m.timerCmdId
+                delayMs: m.timerCmdDelayMs
+                repeat: m.timerCmdRepeat
+            }
+            m.timerCmdAction = TransportController.TimerAction.None
+            return cmd
+        end function
+
+        ' ------------------------------------------------------------------------------------------------
+        ' Private emit/timer/math helpers
+        ' ------------------------------------------------------------------------------------------------
+        ' Emit the freeze pause for a transport ENTER from idle, UNLESS a play-through seek is still settling.
+        ' Pausing mid-seek wedges the Video (buffering<->paused, esp. near EOF); instead let that seek reach
+        ' "playing", where the coordinator freezes cleanly.
+        function FreezeForTransport() as void
+            if not m.seekSettling
+                m.EmitIntent(TransportController.Control.Pause, false, 0)
+            end if
+        end function
+
+        function EmitIntent(control as integer, hasSeek as boolean, seekMs as integer) as void
+            m.intentSeq = m.intentSeq + 1
+            m.videoIntent = {
+                control: control
+                hasSeek: hasSeek
+                seekMs: seekMs
+                seq: m.intentSeq
+            }
+            ' a non-pause seek is in flight toward "playing" -> mark it settling so a transport entered before it
+            ' lands defers its freeze. A pause+seek is already paused and can't wedge, so it skips the guard.
+            if hasSeek and control <> TransportController.Control.Pause
+                m.seekSettling = true
+            end if
+        end function
+
+        function ArmTimer(id as integer, delayMs as integer, repeat as boolean) as void
+            m.timerCmdAction = TransportController.TimerAction.Arm
+            m.timerCmdId = id
+            m.timerCmdDelayMs = delayMs
+            m.timerCmdRepeat = repeat
+        end function
+
+        function StopTimer(id as integer) as void
+            m.timerCmdAction = TransportController.TimerAction.Stop
+            m.timerCmdId = id
+            m.timerCmdDelayMs = 0
+            m.timerCmdRepeat = false
+        end function
+
+        function Clamp(value as integer, lo as integer, hi as integer) as integer
+            if value < lo
+                return lo
+            end if
+            if hi >= lo and value > hi
+                return hi
+            end if
+            return value
+        end function
+
+        ' Snap a position down to the storyboard grid (the cursor enters scrub on an even step boundary).
+        function SnapToGrid(ms as integer, stepMs as integer) as integer
+            if stepMs <= 0
+                return ms
+            end if
+            return (ms \ stepMs) * stepMs
+        end function
+
+        function ScanJumpMs(level as integer) as integer
+            ' base = the storyboard tile interval; on LIVE it also scales with the DVR window (effectiveEdge /
+            ' DIVISOR), floored at the storyboard interval. Levels multiply 1:3:6.
+            base = m.storyboardStepMs
+            if m.isLive
+                ' scale with the REWINDABLE span (edge - floor), not the absolute timeline position.
+                windowBase = (m.LiveEdgeMs() - m.LiveFloorMs()) \ TransportController.LIVE_SCAN_BASE_DIVISOR
+                if windowBase > base
+                    base = windowBase
+                end if
+            end if
+            mult = 1
+            if level = 2
+                mult = 3
+            else if level >= 3
+                mult = 6
+            end if
+            return base * mult
+        end function
+
+        function ScanCadenceMs(level as integer) as integer
+            if level = 2
+                return 330
+            end if
+            if level >= 3
+                return 260
+            end if
+            return 600
+        end function
+
+        function ScanGlyph(dir as integer, level as integer) as integer
+            if dir > 0
+                if level >= 3
+                    return TransportController.Glyph.Ffx3
+                end if
+                if level = 2
+                    return TransportController.Glyph.Ffx2
+                end if
+                return TransportController.Glyph.Ffx1
+            end if
+            if level >= 3
+                return TransportController.Glyph.Rwx3
+            end if
+            if level = 2
+                return TransportController.Glyph.Rwx2
+            end if
+            return TransportController.Glyph.Rwx1
+        end function
+
+    end class
+
+end namespace

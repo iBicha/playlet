@@ -1,0 +1,85 @@
+' ButtonRow @SGNode suite — instantiates just the row, sets its scalar input fields, and asserts the derived
+' visibility + the virtual-focus highlight on the child buttons (no coordinator, no Video node).
+
+namespace Tests
+
+    @SGNode("ButtonRow")
+    @suite
+    class ButtonRowTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.rowFocused = false
+            m.top.focusedIndex = 0
+            m.top.playing = true
+        end function
+
+        @describe("visibility + layout")
+
+        @it("visible at idle (the chrome group's opacity fade does the chrome-gating)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Idle
+            m.assertTrue(m.top.visible)
+        end function
+
+        @it("hidden during a transport (gets out of the way of seeking)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.assertFalse(m.top.visible)
+        end function
+
+        @it("exposes its button count and auto-positions the clusters (centered + right-aligned)")
+        function _()
+            m.assertEqual(m.top.buttonCount, 2)
+            ' one 42px button per cluster: centered on 640 -> x=619; right-aligned to 1212 -> x=1170. Pins the
+            ' ClusterWidth math so a drift in BUTTON_WIDTH/itemSpacings can't silently de-center.
+            m.assertEqual(m.top.findNode("CenterCluster").translation[0], 619.0)
+            m.assertEqual(m.top.findNode("RightCluster").translation[0], 1170.0)
+        end function
+
+        @describe("virtual-focus highlight")
+
+        @it("no button is focused until the row holds focus")
+        function _()
+            m.top.rowFocused = false
+            m.assertFalse(m.top.findNode("PlayPauseButton").focused)
+            m.assertFalse(m.top.findNode("MinimizeButton").focused)
+        end function
+
+        @it("the focused button follows focusedIndex while the row holds focus")
+        function _()
+            m.top.rowFocused = true
+            m.top.focusedIndex = 0
+            m.assertTrue(m.top.findNode("PlayPauseButton").focused)
+            m.assertFalse(m.top.findNode("MinimizeButton").focused)
+            m.top.focusedIndex = 1
+            m.assertFalse(m.top.findNode("PlayPauseButton").focused)
+            m.assertTrue(m.top.findNode("MinimizeButton").focused)
+        end function
+
+        @describe("nudge")
+
+        @it("nudge pulses the focused button's animation")
+        function _()
+            m.top.rowFocused = true
+            m.top.focusedIndex = 1
+            anim = m.top.findNode("MinimizeButton").findNode("nudgeAnim")
+            anim.control = "stop"
+            m.top.nudge = true
+            m.assertEqual(anim.control, "start")
+        end function
+
+        @describe("play/pause icon tracks the play state")
+
+        @it("shows the pause icon while playing, the play icon while paused")
+        function _()
+            ' toggleState=false shows icon2 (pause); =true shows icon (play).
+            m.top.playing = true
+            m.assertFalse(m.top.findNode("PlayPauseButton").toggleState)
+            m.top.playing = false
+            m.assertTrue(m.top.findNode("PlayPauseButton").toggleState)
+        end function
+
+    end class
+
+end namespace

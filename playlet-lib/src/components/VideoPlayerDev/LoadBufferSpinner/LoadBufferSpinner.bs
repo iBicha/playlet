@@ -1,0 +1,46 @@
+import "pkg:/source/utils/Types.bs"
+
+' Renders purely from `mode`:
+'   none      -> hidden, spinner stopped.
+'   loading   -> title/secondary-title overlay + spinner (first load).
+'   buffering -> spinner alone (mid-stream rebuffer).
+
+enum SpinnerMode
+    None = 0
+    Loading = 1
+    Buffering = 2
+end enum
+
+function Init()
+    m.loadingGroup = m.top.findNode("loadingTitleArea")
+    m.spinner = m.top.findNode("spinner")
+    ' blendColor lives on the BusySpinner's poster child, not the spinner node.
+    if m.spinner <> invalid and m.spinner.poster <> invalid
+        m.spinner.poster.blendColor = "#FF1C30FF"
+    end if
+    m.top.ObserveField("mode", FuncName(OnMode))
+    OnMode()
+end function
+
+function OnMode() as void
+    mode = m.top.mode
+    if mode = SpinnerMode.Loading
+        m.loadingGroup.visible = true
+        ShowSpinner(true)
+    else if mode = SpinnerMode.Buffering
+        m.loadingGroup.visible = false
+        ShowSpinner(true)
+    else
+        m.loadingGroup.visible = false
+        ShowSpinner(false)
+    end if
+end function
+
+function ShowSpinner(on as boolean) as void
+    m.spinner.visible = on
+    if on
+        m.spinner.control = "start"
+    else
+        m.spinner.control = "stop"
+    end if
+end function

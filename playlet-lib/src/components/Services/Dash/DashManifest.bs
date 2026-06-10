@@ -779,8 +779,11 @@ class DashManifest
             storyboardWidthInPixels = tileWidthInPixels * storyboardWidth
             storyboardHeightInPixels = tileHeightInPixels * storyboardHeight
 
-            ' Bandwidth is kind of a guess...
-            bandwidth = ((storyboardWidthInPixels * storyboardHeightInPixels * 0.5) / duration)
+            ' The OS exposes the image representation with the LOWEST @bandwidth in Video.thumbnailTiles
+            ' (ties resolve by document order), so a size-derived estimate would hand apps the blurriest
+            ' level. Declare the same value for every level instead: the tie makes the first-written set win,
+            ' and this loop writes the sharpest first - that ordering is load-bearing.
+            bandwidth = 1000
 
             if xml.Node("AdaptationSet", {
                     "id": `${id}`
