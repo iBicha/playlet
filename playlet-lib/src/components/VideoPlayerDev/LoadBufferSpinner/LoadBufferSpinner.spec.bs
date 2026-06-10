@@ -1,0 +1,60 @@
+' LoadBufferSpinner @SGNode suite — instantiates JUST the spinner, sets `mode` (+ title/secondaryTitle), and asserts
+' the right subtree renders: loading = title overlay + spinning spinner; buffering = spinner alone (no title);
+' none = everything hidden + spinner stopped.
+
+namespace Tests
+
+    @SGNode("LoadBufferSpinner")
+    @suite
+    class LoadBufferSpinnerTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.top.mode = SpinnerMode.None
+        end function
+
+        @describe("LoadBufferSpinner — mode projection")
+
+        @it("loading shows the title overlay + the spinner")
+        function _()
+            m.top.title = "Rick Astley"
+            m.top.secondaryTitle = "RickAstleyVEVO"
+            m.top.mode = SpinnerMode.Loading
+            m.assertTrue(m.top.findNode("loadingTitleArea").visible)
+            spinner = m.top.findNode("spinner")
+            m.assertTrue(spinner.visible)
+            m.assertEqual(spinner.control, "start")
+            ' title/secondary title pass through (aliased).
+            m.assertEqual(m.top.findNode("loadingTitleLabel").text, "Rick Astley")
+            m.assertEqual(m.top.findNode("loadingSecondaryTitleLabel").text, "RickAstleyVEVO")
+        end function
+
+        @it("buffering shows the spinner alone (no title overlay)")
+        function _()
+            m.top.mode = SpinnerMode.Buffering
+            m.assertFalse(m.top.findNode("loadingTitleArea").visible)
+            spinner = m.top.findNode("spinner")
+            m.assertTrue(spinner.visible)
+            m.assertEqual(spinner.control, "start")
+        end function
+
+        @it("none hides everything and stops the spinner")
+        function _()
+            m.top.mode = SpinnerMode.Loading ' show first
+            m.top.mode = SpinnerMode.None
+            m.assertFalse(m.top.findNode("loadingTitleArea").visible)
+            spinner = m.top.findNode("spinner")
+            m.assertFalse(spinner.visible)
+            m.assertEqual(spinner.control, "stop")
+        end function
+
+        @it("tints the spinner red")
+        function _()
+            spinner = m.top.findNode("spinner")
+            ' blendColor reads back as a signed 32-bit Integer; coerce expected to the same Integer type.
+            expected% = (&hFF1C30FF and &hFFFFFFFF)
+            m.assertEqual(spinner.poster.blendColor, expected%)
+        end function
+
+    end class
+
+end namespace

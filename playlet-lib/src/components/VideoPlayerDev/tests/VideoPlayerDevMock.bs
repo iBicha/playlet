@@ -1,0 +1,158 @@
+' TEST-ONLY. Imports the REAL coordinator handlers and runs them against a faked (Group) device. Init() is the
+' per-component one-liner (calls the shared Initialize); OnNodeReady is invoked by TestSetup with stub deps (no
+' AutoBind). The spec drives the device via the Test* interface functions (callFunc reaches only interface funcs).
+import "pkg:/components/VideoPlayerDev/VideoPlayerDev.bs"
+
+function Init()
+    ' intentionally empty: Initialize runs in TestSetup (at test time, when the global logger is ready), NOT at
+    ' Rooibos node-creation time where the logger global isn't set up yet.
+end function
+
+' getHttpAgent — Initialize does `m.top.getHttpAgent().AddHeader(...)`; a Group has no such method. No-op stub.
+function getHttpAgent() as object
+    return {
+        AddHeader: function(name as string, value as string)
+        end function
+    }
+end function
+
+' TestSetup — stand up the deps the coordinator's OnNodeReady needs (no AutoBind), then run it so the device
+' observers (state/position/duration) and the SponsorBlock/error controllers are wired exactly as in production.
+function TestSetup() as void
+    ' the coordinator logs; the logger-plugin reads m.global.logger.logLevel on every Log* call. The test app doesn't
+    ' always set that global (it isn't in an isolated/@only run), so ensure it exists before any coordinator code.
+    if m.global.logger = invalid
+        m.global.addField("logger", "node", false)
+        m.global.logger = CreateObject("roSGNode", "Logger")
+    end if
+
+    ' ReportVideoError -> LogTelemetryEvent writes m.global.telemetry.LogEvent; stub it so the error path runs.
+    if m.global.telemetry = invalid
+        m.global.addField("telemetry", "node", false)
+        telemetry = CreateObject("roSGNode", "Node")
+        telemetry.addField("LogEvent", "assocarray", false)
+        telemetry.addField("LogWarn", "string", false)
+        m.global.telemetry = telemetry
+    end if
+
+    Initialize() ' the real coordinator init body (m.transport, findNode children, timer observers, getHttpAgent)
+
+    container = createObject("roSGNode", "Node")
+    container.addField("fullscreen", "boolean", false)
+    container.fullscreen = true
+    m.top.container = container
+
+    m.top.jobQueue = createObject("roSGNode", "Node")
+    m.top.notifications = createObject("roSGNode", "Node")
+    m.top.preferences = createObject("roSGNode", "Node")
+    m.top.invidious = createObject("roSGNode", "Node")
+    ' the queue stub carries the fields the finish/close paths touch (VideoQueueUtils.PlayNext reads hasNext;
+    ' ClosePlayer writes closePlayer — the spec asserts it).
+    videoQueue = createObject("roSGNode", "Node")
+    videoQueue.addField("hasNext", "boolean", false)
+    videoQueue.addField("closePlayer", "boolean", false)
+    m.top.videoQueue = videoQueue
+    m.top.loungeService = createObject("roSGNode", "Node")
+    m.top.appController = createObject("roSGNode", "Node")
+    m.top.webServer = createObject("roSGNode", "Node")
+    m.top.innertube = createObject("roSGNode", "Node")
+
+    ' AutoBind aliases bound interface fields onto m.<name>; do it manually here (coordinator + Lounge read m.*).
+    m.container = m.top.container
+    m.jobQueue = m.top.jobQueue
+    m.preferences = m.top.preferences
+    m.invidious = m.top.invidious
+    m.videoQueue = m.top.videoQueue
+    m.loungeService = m.top.loungeService
+    m.notifications = m.top.notifications
+    m.appController = m.top.appController
+    m.webServer = m.top.webServer
+    m.innertube = m.top.innertube
+
+    OnNodeReady()
+end function
+
+' TestKey — drive a remote key through the REAL OnKeyEvent (scrub/scan/commit/etc).
+function TestKey(key as string, down as boolean) as boolean
+    return OnKeyEvent(key, down)
+end function
+
+' TestSetState — set the faked device state; alwaysNotify fires the REAL OnVideoState observer.
+function TestSetState(newState as string) as void
+    m.top.state = newState
+end function
+
+' TestSetControl — set the faked device control externally (simulates a Lounge/phone command) -> fires the
+' REAL OnControlChange observer.
+function TestSetControl(value as string) as void
+    m.top.control = value
+end function
+
+' TestPlaybackErrorDialog — seed the error fields, drive OnVideoError down the dialog path, return the dialog's
+' message + title.
+function TestPlaybackErrorDialog(errorFields as object) as object
+    content = CreateObject("roSGNode", "ContentNode")
+    content.addField("videoId", "string", false)
+    content.addField("playletStreamUrls", "array", false)
+    content.addField("playletStreamUrlIndex", "integer", false)
+    content.setFields({
+        videoId: errorFields.videoId
+        url: "http://stream"
+        playletStreamUrls: []
+        playletStreamUrlIndex: 0
+    })
+    m.top.content = content
+
+    m.top.errorMsg = errorFields.errorMsg
+    m.top.errorCode = errorFields.errorCode
+    m.top.errorStr = errorFields.errorStr
+    m.top.errorInfo = errorFields.errorInfo
+
+    OnVideoError()
+
+    dialog = m.errorDialogNode
+    if dialog = invalid
+        return { message: "<no dialog shown>", title: "" }
+    end if
+    message = dialog.message
+    if type(message) = "roArray"
+        message = message.Join(Chr(10)) ' ShowTimedDialogButtons tokenizes the body into a per-line array
+    end if
+    result = { message: message, title: dialog.title }
+
+    ' tear down without firing the close-response (it hits the stub videoQueue).
+    dialog.unobserveFieldScoped("wasClosed")
+    m.top.getScene().dialog = invalid
+    m.errorDialogNode = invalid
+    return result
+end function
+
+' TestCoordinatorFields — every non-function key on the coordinator's m, for the unmodeled-axis meta-test
+' (the coordinator twin of the brain's reflection test). Call AFTER TestSetup so Initialize/OnNodeReady have
+' populated m. The ONLY filtering here is the two DYNAMICALLY-named runtime families ("__delay_<uuid>" and
+' "__promises__promise-<uuid>"), which cannot be pinned by name; everything else — node infrastructure,
+' Rooibos members, library memos, stable "__" keys like __globalstubs — is returned and pinned EXPLICITLY by
+' the spec's catalog, so an unexpected newcomer surfaces as a conscious classification, never a silent filter.
+function TestCoordinatorFields() as object
+    keys = []
+    for each key in m
+        if type(m[key]) <> "Function" and type(m[key]) <> "roFunction" and Left(key, 8) <> "__delay_" and Left(key, 20) <> "__promises__promise-"
+            keys.Push(key)
+        end if
+    end for
+    return keys
+end function
+
+' TestSnapshot — read the seam state the spec asserts on (brain + the device control the coordinator wrote).
+function TestSnapshot() as object
+    return {
+        transportMode: m.transport.transportMode
+        seekSettling: m.transport.seekSettling
+        control: m.top.control
+        autoplay: m.top.autoplayAfterSeek
+        bifVisible: m.bifDisplay.visible
+        chromeShown: (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
+        focusTarget: m.focusTarget
+        focusedButton: m.focusedButton
+    }
+end function

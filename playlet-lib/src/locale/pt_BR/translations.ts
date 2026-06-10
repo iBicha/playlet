@@ -1260,5 +1260,9 @@
         <source>Select keyboard language</source>
         <translation>Selecionar idioma do teclado</translation>
     </message>
+    <message>
+        <source>Rewind live TV</source>
+        <translation>Retroceder TV ao vivo</translation>
+    </message>
 </context>
 </TS>

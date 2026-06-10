@@ -1,0 +1,42 @@
+<component name="BifDisplay" extends="Group">
+    <!-- Scrub filmstrip: five thumbnail tiles centered on the transport cursor. Projects input fields onto
+         the cached child Posters (flip visible / set clippingRect+uri+translation) — never create or destroy
+         a node. Center tile is 304x171, sides 250x141; magnification is via clippingRect only. -->
+    <interface>
+        <field id="transportMode" type="integer" value="0" />
+        <field id="cursorMs" type="integer" value="0" />
+        <!-- The native Video.thumbnailTiles tile-set the coordinator selected (htiles/vtiles/tiles/duration/
+             final_time); invalid on live / before tiles load. -->
+        <field id="tileSet" type="assocarray" />
+    </interface>
+    <children>
+        <!-- Full-screen black backdrop. The stock player's video plane goes black during a transport (the
+             core drops the decoded frame in scan mode); this player pauses the video instead, so the paused
+             frame would otherwise stay visible behind the filmstrip. Living inside this component ties its
+             visibility to the filmstrip's transportMode rule; the translation cancels the component's
+             [0, 430] offset. The title/bar stay readable because they paint after BifDisplay in the Chrome. -->
+        <Rectangle id="bifBackdrop" translation="[0, -430]" width="1280" height="720" color="0x000000FF" />
+        <!-- Dim side panels paint first (behind the tiles): VOD storyboard tiles cover them; on live (empty
+             tiles) they show through as the filmstrip structure. -->
+        <Poster id="bifSideL2" translation="[-36, 42]" width="250" height="141" opacity="0.15"
+            uri="/RokuOS/Artwork/SceneGraph/GenevaTheme/Base/FHD/imageFootprint.9.png" loadDisplayMode="noScale" />
+        <Poster id="bifSideL1" translation="[226, 42]" width="250" height="141" opacity="0.15"
+            uri="/RokuOS/Artwork/SceneGraph/GenevaTheme/Base/FHD/imageFootprint.9.png" loadDisplayMode="noScale" />
+        <Poster id="bifSideR1" translation="[804, 42]" width="250" height="141" opacity="0.15"
+            uri="/RokuOS/Artwork/SceneGraph/GenevaTheme/Base/FHD/imageFootprint.9.png" loadDisplayMode="noScale" />
+        <Poster id="bifSideR2" translation="[1066, 42]" width="250" height="141" opacity="0.15"
+            uri="/RokuOS/Artwork/SceneGraph/GenevaTheme/Base/FHD/imageFootprint.9.png" loadDisplayMode="noScale" />
+        <!-- Storyboard tiles, oversized + clippingRect picks the cell; center has a gradient overlay + frame. -->
+        <Poster id="bifTileL2" loadDisplayMode="scaleToFill" />
+        <Poster id="bifTileL1" loadDisplayMode="scaleToFill" />
+        <Poster id="bifTileC" loadDisplayMode="scaleToFill" />
+        <!-- ABOVE the center tile (the stock layering): keeps the white scan glyph legible over a bright
+             frame. The glyph itself rides the TrickPlayBar handle, a later Chrome sibling. -->
+        <Poster id="bifCenterGradient" translation="[488, 12]" width="304" height="171"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/PauseGradientThumbnail.9.png" loadDisplayMode="noScale" />
+        <Poster id="bifFrame" translation="[476, 0]" width="328" height="196"
+            uri="/RokuOS/Artwork/SceneGraph/GenevaTheme/Base/FHD/focus_grid.9.png" loadDisplayMode="noScale" />
+        <Poster id="bifTileR1" loadDisplayMode="scaleToFill" />
+        <Poster id="bifTileR2" loadDisplayMode="scaleToFill" />
+    </children>
+</component>

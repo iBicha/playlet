@@ -1,0 +1,309 @@
+' Completeness suite for the transport brain — the answer to "are ALL transitions accounted for?".
+' Where TransportController.spec.bs is example-by-example, this drives the WHOLE finite state x input space
+' (exhaustive) and random input sequences (seeded fuzz, with shrinking to a minimal repro), asserting
+' PlayerInvariants.CheckBrain after EVERY step. A regression that produces a contradictory brain state is
+' caught here and located by INV id + a short repro, not chased.
+
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/source/tests/VideoPlayerDev/PlayerInvariants.bs"
+
+namespace Tests
+
+    @suite
+    class TransportControllerCompletenessTests extends Rooibos.BaseTestSuite
+
+        ' ---------- brain builders / snapshot ----------
+
+        ' a fresh brain at rest (idle, ready) with realistic content facts. windowMs = the live DVR window
+        ' (0 = unknown), the axis that decides the rewind floor and live rewindability.
+        function Fresh(isLive as boolean, windowMs = 0 as integer) as object
+            t = new TransportController.Controller()
+            t.SetContent(isLive, 2000, true)
+            t.SetLiveDvrWindow(windowMs)
+            t.OnReady()
+            if isLive
+                t.OnLiveEdge(600000) ' clock-anchored live edge
+            else
+                t.OnDuration(600000) ' 10min VOD
+            end if
+            t.OnPosition(120000) ' 2:00
+            return t
+        end function
+
+        ' the content variants the exhaustive matrix + fuzz sweep: VOD, live with an unknown window, live with
+        ' a buffer-sized (non-rewindable) window, and live with a real window (active rewind floor).
+        function Variants() as object
+            return [
+                { isLive: false, windowMs: 0, tag: " [vod] " }
+                { isLive: true, windowMs: 0, tag: " [live] " }
+                { isLive: true, windowMs: 30000, tag: " [live no-dvr] " }
+                { isLive: true, windowMs: 90000, tag: " [live windowed] " }
+            ]
+        end function
+
+        ' the brain's output fields in the shape PlayerInvariants.CheckBrain expects.
+        function Snap(t as object) as object
+            return {
+                transportMode: t.transportMode
+                glyph: t.glyph
+                scanLevel: t.scanLevel
+                scanDir: t.scanDir
+                scrubHeldDir: t.scrubHeldDir
+                cursorMs: t.cursorMs
+                positionMs: t.positionMs
+                durationMs: t.durationMs
+                edgeMs: t.edgeMs
+                liveOffsetMs: t.liveOffsetMs
+                atLiveEdge: t.atLiveEdge
+                isLive: t.isLive
+                replayPending: t.replayPending
+            }
+        end function
+
+        function AssertInv(t as object, where as string) as void
+            r = PlayerInvariants.CheckBrain(m.Snap(t))
+            m.assertTrue(r.ok, r.failed + " violated after " + where)
+        end function
+
+        ' reachable-state labels — each built by DRIVING the brain (only reachable states are tested). On live
+        ' the same label reaches a live mode (left -> liveDvr step, fwd -> liveDvr ladder).
+        function Labels() as object
+            return ["idle", "scrub", "scrubHeld", "scan1", "scan2", "replay"]
+        end function
+
+        function Build(label as string, isLive as boolean, windowMs = 0 as integer) as object
+            t = m.Fresh(isLive, windowMs)
+            if label = "scrub"
+                t.HandleKey(TransportController.Command.Left, true)
+                t.HandleKey(TransportController.Command.Left, false) ' release -> frozen, glyph cleared
+            else if label = "scrubHeld"
+                t.HandleKey(TransportController.Command.Left, true) ' held
+            else if label = "scan1"
+                t.HandleCommand(TransportController.Command.Fwd)
+            else if label = "scan2"
+                t.HandleCommand(TransportController.Command.Fwd)
+                t.HandleCommand(TransportController.Command.Fwd)
+            else if label = "replay"
+                t.HandleCommand(TransportController.Command.Replay)
+            end if
+            return t
+        end function
+
+        ' ---------- exhaustive (state x input) matrix ----------
+
+        @describe("transport completeness")
+
+        @it("every (reachable state x input) preserves the brain invariants")
+        function _()
+            cmds = [TransportController.Command.Left, TransportController.Command.Right, TransportController.Command.Rev, TransportController.Command.Fwd, TransportController.Command.Replay, TransportController.Command.Commit]
+            ticks = [TransportController.Timer.ScrubRepeat, TransportController.Timer.Scan, TransportController.Timer.ReplayToast]
+            positions = [0, 120000, 300000]
+            durations = [300000, 600000, 900000]
+            for each v in m.Variants()
+                tag = v.tag
+                for each label in m.Labels()
+                    ' the built state itself must be consistent.
+                    m.AssertInv(m.Build(label, v.isLive, v.windowMs), label + tag + "(built)")
+                    for each cmd in cmds
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.HandleCommand(cmd)
+                        m.AssertInv(t, label + tag + "+cmd=" + cmd.ToStr())
+                    end for
+                    for each upKey in [TransportController.Command.Left, TransportController.Command.Right]
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.HandleKey(upKey, false)
+                        m.AssertInv(t, label + tag + "+keyUp=" + upKey.ToStr())
+                    end for
+                    ' live edge events: a 1s heartbeat step, a big jump (resume catch-up), and a regression
+                    ' (a fallback re-anchor) — every state must absorb each of them.
+                    for each delta in [1000, 50000, -30000]
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.OnLiveEdge(t.edgeMs + delta)
+                        m.AssertInv(t, label + tag + "+edge" + delta.ToStr())
+                    end for
+                    for each tid in ticks
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.Tick(tid)
+                        m.AssertInv(t, label + tag + "+tick=" + tid.ToStr())
+                    end for
+                    for each p in positions
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.OnPosition(p)
+                        m.AssertInv(t, label + tag + "+pos=" + p.ToStr())
+                    end for
+                    for each d in durations
+                        ' on live, a large d is an abrupt edge jump past the built position -> exercises the idle
+                        ' fall-behind detection (atLiveEdge clears, the offset grows) under the invariant check.
+                        t = m.Build(label, v.isLive, v.windowMs)
+                        t.OnDuration(d)
+                        m.AssertInv(t, label + tag + "+dur=" + d.ToStr())
+                    end for
+                end for
+            end for
+        end function
+
+        ' ---------- seeded fuzz with shrink ----------
+
+        ' a 16-bit LCG (ZX-Spectrum constants): s*25173 < 2^31 so it never overflows Integer; deterministic +
+        ' reproducible (NOT Rnd, which is clock-seeded). Token = s mod 13 -> one input.
+        function Lcg(s as integer) as integer
+            return (s * 25173 + 13849) and 65535
+        end function
+
+        function GenSeq(seed as integer, n as integer) as object
+            seq = []
+            s = seed
+            for i = 0 to n - 1
+                s = m.Lcg(s)
+                seq.Push(s mod 13)
+            end for
+            return seq
+        end function
+
+        function ApplyToken(t as object, tok as integer) as void
+            if tok = 0
+                t.HandleKey(TransportController.Command.Left, true)
+            else if tok = 1
+                t.HandleKey(TransportController.Command.Right, true)
+            else if tok = 2
+                t.HandleKey(TransportController.Command.Rev, true)
+            else if tok = 3
+                t.HandleKey(TransportController.Command.Fwd, true)
+            else if tok = 4
+                t.HandleCommand(TransportController.Command.Replay)
+            else if tok = 5
+                t.HandleCommand(TransportController.Command.Commit)
+            else if tok = 6
+                t.HandleKey(TransportController.Command.Left, false)
+            else if tok = 7
+                t.HandleKey(TransportController.Command.Right, false)
+            else if tok = 8
+                t.Tick(TransportController.Timer.ScrubRepeat)
+            else if tok = 9
+                t.Tick(TransportController.Timer.Scan)
+            else if tok = 10
+                t.OnLiveEdge(t.edgeMs + 7000) ' the live heartbeat / a resume catch-up step
+            else if tok = 11
+                t.Tick(TransportController.Timer.ReplayToast)
+            else if tok = 12
+                t.OnLiveEdge(t.edgeMs + 50000) ' a big edge jump (long pause's catch-up)
+            end if
+        end function
+
+        ' replay a token sequence; return the index of the first invariant failure, or -1 if none.
+        function ReplaySeq(seq as object, v as object) as integer
+            t = m.Fresh(v.isLive, v.windowMs)
+            for i = 0 to seq.Count() - 1
+                m.ApplyToken(t, seq[i])
+                if not PlayerInvariants.CheckBrain(m.Snap(t)).ok
+                    return i
+                end if
+            end for
+            return -1
+        end function
+
+        ' shrink to the shortest failing prefix (a minimal repro, not a 150-step trace).
+        function Shrink(seq as object, failAt as integer, v as object) as object
+            for k = 0 to failAt
+                prefix = []
+                for j = 0 to k
+                    prefix.Push(seq[j])
+                end for
+                if m.ReplaySeq(prefix, v) >= 0
+                    return prefix
+                end if
+            end for
+            return seq
+        end function
+
+        @it("invariants hold after every step of seeded random input sequences (shrinkable)")
+        function _()
+            for each seed in [1, 2, 7, 42, 1337]
+                for each v in m.Variants()
+                    seq = m.GenSeq(seed, 150)
+                    failAt = m.ReplaySeq(seq, v)
+                    if failAt >= 0
+                        minSeq = m.Shrink(seq, failAt, v)
+                        m.fail("seed=" + seed.ToStr() + v.tag + "failed; minimal repro (" + minSeq.Count().ToStr() + " tokens): " + FormatJson(minSeq))
+                    end if
+                end for
+            end for
+        end function
+
+        ' ---------- meta: CheckBrain actually enforces each catalogued invariant ----------
+
+        @it("CheckBrain passes a good snapshot and catches each break by its INV id")
+        function _()
+            good = {
+                transportMode: TransportController.Mode.Idle, glyph: TransportController.Glyph.None
+                scanLevel: 0, scanDir: 0, scrubHeldDir: 0, cursorMs: 1000, positionMs: 1000
+                durationMs: 600000, edgeMs: 0, liveOffsetMs: 0, atLiveEdge: true, isLive: false, replayPending: false
+            }
+            m.assertTrue(PlayerInvariants.CheckBrain(good).ok, "good snapshot should pass")
+
+            m.assertEqual(m.Break(good, "cursorMs", -1).failed, "INV-B1")
+            m.assertEqual(m.Break(good, "cursorMs", 700000).failed, "INV-B1") ' > duration
+            m.assertEqual(m.Break(good, "liveOffsetMs", -1).failed, "INV-B3")
+            m.assertEqual(m.Break(good, "glyph", TransportController.Glyph.Ffx1).failed, "INV-B4") ' ffx illegal in idle
+            m.assertEqual(m.Break(good, "scanDir", 2).failed, "INV-B5")
+            m.assertEqual(m.Break(good, "scanLevel", 1).failed, "INV-B5") ' level>=1 but mode=idle
+            m.assertEqual(m.Break(good, "scrubHeldDir", 5).failed, "INV-B8")
+
+            ' INV-B6 needs BOTH held scratch non-zero.
+            bleed = {}
+            bleed.Append(good)
+            bleed.scrubHeldDir = 1
+            bleed.scanDir = 1
+            m.assertEqual(PlayerInvariants.CheckBrain(bleed).failed, "INV-B6")
+
+            ' the catalogued id set is pinned (the VideoPlayerDev README must match BrainIds).
+            m.assertEqual(PlayerInvariants.BrainIds(), ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8"])
+        end function
+
+        ' ---------- meta: the model accounts for EVERY mutable brain field (no unmodeled axis) ----------
+
+        @it("the completeness model accounts for every mutable brain field (catches an unmodeled axis)")
+        function _()
+            ' Guards the headline fear: a NEW brain field (a new FSM axis) added without being modeled. A BS class
+            ' is an AA, so we reflect over the instance and require every non-method field to be consciously
+            ' classified. A new field fails this until someone decides where it belongs — it forces the decision,
+            ' it cannot prove the decision correct (the irreducible model-faithfulness limit).
+            t = new TransportController.Controller()
+
+            ' FSM AXES — discrete state the exhaustive matrix enumerates + the invariants constrain.
+            axes = ["transportMode", "glyph", "scanLevel", "scanDir", "scrubHeldDir", "atLiveEdge", "isLive", "ready", "hasStoryboards", "replayPending", "seekSettling"]
+            ' CONTINUOUS — equivalence-classed by the guard predicates (cursor/edge/duration compares), not enumerated.
+            continuous = ["cursorMs", "positionMs", "durationMs", "edgeMs", "liveOffsetMs", "storyboardStepMs", "replayTargetMs", "dvrWindowMs", "liveMinGapMs", "liveMinCandidateMs"]
+            ' OUTPUT / IO scratch — drained by the coordinator, not state the FSM branches on.
+            io = ["videoIntent", "intentSeq", "commitSeq", "exitSeq", "finishSeq", "timerCmdAction", "timerCmdId", "timerCmdDelayMs", "timerCmdRepeat"]
+
+            accounted = {}
+            for each name in axes : accounted[name] = "axis" : end for
+            for each name in continuous : accounted[name] = "continuous" : end for
+            for each name in io : accounted[name] = "io" : end for
+
+            found = 0
+            for each key in t
+                if type(t[key]) <> "Function" and type(t[key]) <> "roFunction" and Left(key, 2) <> "__"
+                    found = found + 1
+                    m.assertTrue(accounted.DoesExist(key), "UNMODELED brain field '" + key + "' — classify it (axis/continuous/io) in this meta-test + add an invariant if it is an axis")
+                end if
+            end for
+            m.assertTrue(found >= 20, "reflection found only " + found.ToStr() + " fields — class iteration may not expose fields; the meta-test would pass vacuously")
+
+            ' reverse: nothing we claim to account for has rotted away.
+            for each name in accounted
+                m.assertTrue(t.DoesExist(name), "stale accounted field '" + name + "' is no longer on the brain")
+            end for
+        end function
+
+        function Break(good as object, key as string, val as dynamic) as object
+            s = {}
+            s.Append(good)
+            s[key] = val
+            return PlayerInvariants.CheckBrain(s)
+        end function
+
+    end class
+
+end namespace

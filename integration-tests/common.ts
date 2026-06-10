@@ -30,19 +30,17 @@ export function setupEnvironment(appId = AppId.DEV) {
     })
 }
 
-function getEnvVars(requiredVars = undefined) {
-    let envVars = process.env;
+function getEnvVars(requiredVars: string[] = []): Record<string, string> {
+    let envVars: Record<string, string | undefined> = { ...process.env };
     if (fs.existsSync(envFile)) {
         const envConfig = dotenv.parse(fs.readFileSync(envFile));
         envVars = { ...envVars, ...envConfig };
     }
-    if (requiredVars) {
-        const missingVars = requiredVars.filter((key) => !envVars[key]);
-        if (missingVars.length) {
-            throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
-        }
+    const missingVars = requiredVars.filter((key) => !envVars[key]);
+    if (missingVars.length) {
+        throw new Error(`Missing environment variables: ${missingVars.join(', ')}`);
     }
-
-    return envVars;
+    // every required var is validated present above; absent optional keys are simply not read.
+    return envVars as Record<string, string>;
 }
 

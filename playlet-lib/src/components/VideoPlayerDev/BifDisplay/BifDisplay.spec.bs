@@ -1,0 +1,205 @@
+' BifDisplay @SGNode suite — instantiates JUST the BifDisplay (no Video node, no coordinator), sets its
+' scalar INPUT fields, and asserts the rendered child Posters. Proves the keystone: `visible` is derived
+' from `transportMode` alone, and the tiles clip to the cursor.
+
+namespace Tests
+
+    @SGNode("BifDisplay")
+    @suite
+    class BifDisplayTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' reset to idle each test; a sane VOD tile-set shaped like native Video.thumbnailTiles: 5x5 grid,
+            ' 50s/sheet (2s/thumbnail), 5 sheets, final_time 218s -> 110 thumbnails.
+            m.top.transportMode = TransportController.Mode.Idle
+            m.top.tileSet = {
+                htiles: 5
+                vtiles: 5
+                duration: 50.0
+                final_time: 218.0
+                tiles: [
+                    ["https://example.com/sb/L2/M0.jpg", 0, ""]
+                    ["https://example.com/sb/L2/M1.jpg", 50, ""]
+                    ["https://example.com/sb/L2/M2.jpg", 100, ""]
+                    ["https://example.com/sb/L2/M3.jpg", 150, ""]
+                    ["https://example.com/sb/L2/M4.jpg", 200, ""]
+                ]
+            }
+            m.top.cursorMs = 0
+        end function
+
+        @describe("BifDisplay — the keystone: visibility from transportMode")
+
+        @it("is hidden in idle")
+        function _()
+            m.top.transportMode = TransportController.Mode.Idle
+            m.assertFalse(m.top.visible)
+        end function
+
+        @it("is visible in scrub")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.assertTrue(m.top.visible)
+        end function
+
+        @it("is visible in scan")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scan
+            m.assertTrue(m.top.visible)
+        end function
+
+        @it("is visible in liveDvr")
+        function _()
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.assertTrue(m.top.visible)
+        end function
+
+        @it("self-hides when transport commits back to idle (no external hide call)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.assertTrue(m.top.visible)
+            m.top.transportMode = TransportController.Mode.Idle
+            m.assertFalse(m.top.visible)
+        end function
+
+        @describe("BifDisplay — tile clipping tracks the cursor (VOD)")
+
+        @it("clips the center tile to 304x171 for a cursor")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 20000 ' centerTile = 10 ; cell 10 -> col 0, row 2 on a 5x5 sheet
+            centerTile = m.top.findNode("bifTileC")
+            clip = centerTile.clippingRect ' read back as {x,y,width,height} (Float) on the render thread
+            m.assertEqual(clip.width, 304.0)
+            m.assertEqual(clip.height, 171.0)
+            ' cell 10 on a 5-wide sheet: col 0, row 2 -> cellX=0, cellY=2*171=342
+            m.assertEqual(clip.x, 0.0)
+            m.assertEqual(clip.y, 342.0)
+            m.assertNotEqual(centerTile.uri, "")
+        end function
+
+        @it("clips a side tile to 250x141")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 20000
+            sideTile = m.top.findNode("bifTileR1") ' centerTile+1 = 11 ; col 1, row 2
+            clip = sideTile.clippingRect
+            m.assertEqual(clip.width, 250.0)
+            m.assertEqual(clip.height, 141.0)
+            m.assertEqual(clip.x, 250.0) ' col 1 -> cellX = 250
+            m.assertEqual(clip.y, 282.0) ' row 2 -> cellY = 2*141
+        end function
+
+        @it("at the START edge HIDES the two left tiles (first frame sits in the middle)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 0 ' centerTile 0 -> L2 (-2), L1 (-1) are out of range
+            m.assertFalse(m.top.findNode("bifTileL2").visible) ' not a blank box -> hidden
+            m.assertFalse(m.top.findNode("bifTileL1").visible)
+            m.assertTrue(m.top.findNode("bifTileC").visible) ' the first frame, in the middle
+            m.assertTrue(m.top.findNode("bifTileR1").visible)
+            m.assertTrue(m.top.findNode("bifTileR2").visible)
+            m.assertEqual(m.top.findNode("bifTileL2").uri, "")
+            m.assertNotEqual(m.top.findNode("bifTileC").uri, "")
+            ' the dim side panels hide WITH their out-of-range tiles (no empty box at the start edge).
+            m.assertFalse(m.top.findNode("bifSideL2").visible)
+            m.assertFalse(m.top.findNode("bifSideL1").visible)
+            m.assertTrue(m.top.findNode("bifSideR1").visible)
+        end function
+
+        @it("at the END edge HIDES the two right tiles (last frame sits in the middle)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            ' count 110 -> last tile index 109; put the cursor on it (centerTile 109)
+            m.top.cursorMs = 109 * 2000
+            m.assertTrue(m.top.findNode("bifTileL2").visible) ' 107
+            m.assertTrue(m.top.findNode("bifTileL1").visible) ' 108
+            m.assertTrue(m.top.findNode("bifTileC").visible) ' 109 = last, in the middle
+            m.assertFalse(m.top.findNode("bifTileR1").visible) ' 110 -> out of range, hidden
+            m.assertFalse(m.top.findNode("bifTileR2").visible) ' 111 -> out of range, hidden
+        end function
+
+        @it("re-shows a previously-culled tile once the cursor moves back in range")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 0 ' L2/L1 culled (hidden)
+            m.assertFalse(m.top.findNode("bifTileL1").visible)
+            m.top.cursorMs = 20000 ' centerTile 10 -> all five in range again
+            m.assertTrue(m.top.findNode("bifTileL1").visible)
+            m.assertNotEqual(m.top.findNode("bifTileL1").uri, "")
+        end function
+
+        @describe("BifDisplay — live = nothing to show")
+
+        @it("hides the tiles, panels, and center decorations when there is no storyboard (live) — no empty filmstrip")
+        function _()
+            m.top.tileSet = invalid ' live has no storyboards
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.assertTrue(m.top.visible) ' the container stays visible (the transport-active oracle)
+            m.assertFalse(m.top.findNode("bifTileC").visible)
+            m.assertFalse(m.top.findNode("bifSideL2").visible)
+            m.assertFalse(m.top.findNode("bifFrame").visible)
+            m.assertFalse(m.top.findNode("bifCenterGradient").visible)
+        end function
+
+        @describe("BifDisplay — black backdrop (the stock scan blanks the video plane; we paint it)")
+
+        @it("is a child of the filmstrip covering the full screen, so its visibility IS the filmstrip's")
+        function _()
+            backdrop = m.top.findNode("bifBackdrop")
+            m.assertTrue(m.top.isSameNode(backdrop.getParent())) ' tied to BifDisplay visibility structurally
+            ' [0,-430] cancels the component's [0,430] offset -> covers the screen origin at 1280x720.
+            m.assertEqual(backdrop.translation[0], 0.0)
+            m.assertEqual(backdrop.translation[1], -430.0)
+            m.assertEqual(backdrop.width, 1280.0)
+            m.assertEqual(backdrop.height, 720.0)
+        end function
+
+        @it("stays up with no tile-set (live rewind shows black, even with no tiles to show)")
+        function _()
+            m.top.tileSet = invalid
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.assertTrue(m.top.findNode("bifBackdrop").visible) ' NOT culled with the tiles/decor
+        end function
+
+        @it("stays up at the storyboard edges (tile culling never touches it)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 0 ' L2/L1 culled
+            m.assertTrue(m.top.findNode("bifBackdrop").visible)
+            m.top.cursorMs = 109 * 2000 ' R1/R2 culled
+            m.assertTrue(m.top.findNode("bifBackdrop").visible)
+        end function
+
+        @describe("BifDisplay — center gradient layering (glyph legibility)")
+
+        @it("paints ABOVE the center tile (a gradient behind an opaque tile is invisible — the original bug)")
+        function _()
+            children = m.top.getChildren(-1, 0)
+            tileIndex = -1
+            gradientIndex = -1
+            backdropIndex = -1
+            for i = 0 to children.Count() - 1
+                id = children[i].id
+                if id = "bifTileC"
+                    tileIndex = i
+                else if id = "bifCenterGradient"
+                    gradientIndex = i
+                else if id = "bifBackdrop"
+                    backdropIndex = i
+                end if
+            end for
+            m.assertTrue(gradientIndex > tileIndex, "gradient must be a later sibling than the center tile")
+            m.assertEqual(backdropIndex, 0, "backdrop must be the first child (under the tiles)")
+        end function
+
+        @it("shows with the tiles while scrubbing (it is center decor, not transport furniture)")
+        function _()
+            m.top.transportMode = TransportController.Mode.Scrub
+            m.top.cursorMs = 20000
+            m.assertTrue(m.top.findNode("bifCenterGradient").visible)
+        end function
+
+    end class
+
+end namespace

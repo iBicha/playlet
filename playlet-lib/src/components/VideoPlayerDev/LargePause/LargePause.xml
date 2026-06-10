@@ -1,0 +1,30 @@
+<component name="LargePause" extends="Group">
+    <!-- `trigger` fires only on an explicit pause-from-playing, so the poster never appears on a scrub/scan
+         freeze, resume, buffering, or seek. Scale animates alongside opacity via paired interpolators
+         (scale = 0.75 + 0.25*opacity), so the sequence runs on the render thread with no per-frame code.
+         Poster is 80x80 at {600,320} with scaleRotateCenter {40,40}, giving a visual center of {640,360}.
+         Sits outside the chrome group (pause-gated, not chrome-gated). -->
+    <interface>
+        <field id="trigger" type="boolean" alwaysNotify="true" /> <!-- play the show sequence -->
+        <field id="cancel" type="boolean" alwaysNotify="true" />  <!-- abort and hide immediately -->
+        <field id="phase" type="integer" value="0" />             <!-- read-only: none/scaleIn/hold/shrinkOut -->
+        <field id="advance" type="boolean" alwaysNotify="true" /> <!-- test hook: step the phase one stage -->
+    </interface>
+    <children>
+        <Animation id="scaleIn" duration="0.5" easeFunction="outQuart">
+            <FloatFieldInterpolator id="scaleInOpacity" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="poster.opacity" />
+            <Vector2DFieldInterpolator id="scaleInScale" key="[0.0, 1.0]" keyValue="[[0.75,0.75],[1.0,1.0]]" fieldToInterp="poster.scale" />
+        </Animation>
+        <!-- Not a symmetric reverse of scaleIn: 0.3s linear, not 0.5s outQuart. -->
+        <Animation id="shrinkOut" duration="0.3" easeFunction="linear">
+            <FloatFieldInterpolator id="shrinkOutOpacity" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="poster.opacity" />
+            <Vector2DFieldInterpolator id="shrinkOutScale" key="[0.0, 1.0]" keyValue="[[1.0,1.0],[0.75,0.75]]" fieldToInterp="poster.scale" />
+        </Animation>
+        <Timer id="hold" duration="1.0" repeat="false" />
+
+        <Poster id="poster" visible="false" opacity="0"
+            uri="/RokuOS/Artwork/SceneGraph/FixedTheme/Base/FHD/LargePause.png"
+            width="80" height="80" translation="[600, 320]" scaleRotateCenter="[40, 40]"
+            scale="[0.75, 0.75]" blendColor="0xFFFFFFFF" loadDisplayMode="noScale" />
+    </children>
+</component>

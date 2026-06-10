@@ -1,0 +1,100 @@
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+
+' Pure invariant predicates for the transport brain. The catalog (with rationale) is the VideoPlayerDev README.
+'
+' Two tiers exist; this module is tier one:
+'   INV-B*  brain-level — a pure function of the brain's OUTPUT fields. Checkable off-device, so the exhaustive
+'           + fuzz transport tests run CheckBrain after EVERY step. THIS module.
+'   INV-D*  device-seam — needs the live Video.state (which the brain has no field for), so they live in the
+'           e2e harness (assertPlayerInvariants). The bug class "video playing while a transport is active"
+'           is an INV-D — inexpressible here.
+'
+' CheckBrain takes a plain AA SNAPSHOT of the brain's fields (not the Controller instance) so the predicate
+' stays decoupled and trivially constructible in a test. Returns { ok, failed } — failed = the INV id that
+' broke, or "" when ok.
+
+namespace PlayerInvariants
+
+    ' Snapshot keys: transportMode, glyph, scanLevel, scanDir, scrubHeldDir, cursorMs, positionMs, durationMs,
+    ' edgeMs, liveOffsetMs, atLiveEdge, isLive, replayPending.
+    function CheckBrain(s as object) as object
+        hi = s.durationMs
+        if s.isLive
+            hi = s.edgeMs
+        end if
+
+        ' INV-B1 — the cursor stays within [0, hi] (hi = duration on VOD, the live edge on live).
+        if s.cursorMs < 0
+            return Fail("INV-B1")
+        end if
+        if hi > 0 and s.cursorMs > hi
+            return Fail("INV-B1")
+        end if
+
+        ' INV-B3 — the live offset is never negative.
+        if s.liveOffsetMs < 0
+            return Fail("INV-B3")
+        end if
+
+        ' INV-B5 — scan ladder scratch is bounded; a non-zero level implies an active scan/live-ladder mode.
+        if s.scanDir < -1 or s.scanDir > 1
+            return Fail("INV-B5")
+        end if
+        if s.scanLevel < 0 or s.scanLevel > TransportController.SCAN_LEVEL_MAX
+            return Fail("INV-B5")
+        end if
+        if s.scanLevel >= 1 and s.transportMode <> TransportController.Mode.Scan and s.transportMode <> TransportController.Mode.LiveDvr
+            return Fail("INV-B5")
+        end if
+
+        ' INV-B8 — the held scrub direction is bounded.
+        if s.scrubHeldDir < -1 or s.scrubHeldDir > 1
+            return Fail("INV-B8")
+        end if
+
+        ' INV-B6 — at most one held input: the step (scrubHeldDir) and ladder (scanDir) scratch never bleed.
+        if s.scrubHeldDir <> 0 and s.scanDir <> 0
+            return Fail("INV-B6")
+        end if
+
+        ' INV-B4 — the glyph is legal for the current mode.
+        if not GlyphOkForMode(s.transportMode, s.glyph)
+            return Fail("INV-B4")
+        end if
+
+        ' (INV-B7 "idle => cursor==position" is intentionally NOT enforced: after a replay/SB seek the cursor
+        ' legitimately differs from positionMs until the next OnPosition lands, and the idle bar reads
+        ' positionMs anyway — so it's a harmless transient, not a safety property. See the VideoPlayerDev README.)
+
+        return { ok: true, failed: "" }
+    end function
+
+    function Fail(id as string) as object
+        return { ok: false, failed: id }
+    end function
+
+    ' Glyph ↔ mode: idle shows nothing or the transient replay icon; scrub shows the step glyphs; scan shows
+    ' the ffx/rwx ladder; live can be in either step (skip) or ladder (ffx/rwx) sub-mode, or none mid-release.
+    function GlyphOkForMode(mode as integer, glyph as integer) as boolean
+        if mode = TransportController.Mode.Idle
+            return glyph = TransportController.Glyph.None or glyph = TransportController.Glyph.Replay
+        else if mode = TransportController.Mode.Scrub
+            return glyph = TransportController.Glyph.None or glyph = TransportController.Glyph.SkipBack or glyph = TransportController.Glyph.SkipAhead
+        else if mode = TransportController.Mode.Scan
+            return glyph >= TransportController.Glyph.Ffx1 and glyph <= TransportController.Glyph.Rwx3
+        else if mode = TransportController.Mode.LiveDvr
+            if glyph = TransportController.Glyph.None or glyph = TransportController.Glyph.SkipBack or glyph = TransportController.Glyph.SkipAhead
+                return true
+            end if
+            return glyph >= TransportController.Glyph.Ffx1 and glyph <= TransportController.Glyph.Rwx3
+        end if
+        return false
+    end function
+
+    ' The brain INV ids this module enforces — the meta-test pins this set against the VideoPlayerDev README so a
+    ' catalog row can't be added without an implementation (or vice-versa).
+    function BrainIds() as object
+        return ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8"]
+    end function
+
+end namespace

@@ -1,0 +1,90 @@
+<component name="VideoPlayerDevMock" extends="Group">
+    <!-- TEST-ONLY (under tests/ -> excluded from the lib build). A controllable stand-in for the coordinator: it
+         extends Group (NOT Video), so the device fields (state/control/seek/autoplayAfterSeek) are INERT — the
+         spec drives `state` to simulate ANY device behaviour (incl. adversarial: buffering<->paused, spurious
+         playing) and inspects control/seek. It imports the REAL coordinator (VideoPlayerDev.bs), so the
+         actual OnVideoState/ApplyTransport/EnforceTransportFreeze run; only the device is faked. Children mirror
+         VideoPlayerDev so Initialize's findNode()s resolve. getHttpAgent + the Test* drivers are in the .bs. -->
+    <interface>
+        <!-- device (Video) fields the coordinator reads/writes; inert on a Group, driven by the spec. -->
+        <field id="state" type="string" value="none" alwaysNotify="true" />
+        <field id="control" type="string" />
+        <field id="seek" type="float" alwaysNotify="true" />
+        <field id="position" type="float" alwaysNotify="true" />
+        <field id="duration" type="float" />
+        <field id="autoplayAfterSeek" type="boolean" value="true" />
+        <field id="content" type="node" />
+        <field id="thumbnailTiles" type="assocarray" />
+        <field id="playbackSpeed" type="float" value="1.0" />
+        <field id="enableUI" type="boolean" value="true" />
+        <field id="asyncStopSemantics" type="boolean" />
+        <field id="notificationInterval" type="float" />
+        <field id="width" type="float" />
+        <field id="height" type="float" />
+        <field id="errorCode" type="integer" />
+        <field id="errorMsg" type="string" />
+        <field id="errorStr" type="string" />
+        <field id="errorInfo" type="assocarray" />
+        <!-- AutoBind deps + layout (set by TestSetup; NOT bound). -->
+        <field id="appController" type="node" />
+        <field id="jobQueue" type="node" />
+        <field id="container" type="node" />
+        <field id="notifications" type="node" />
+        <field id="videoQueue" type="node" />
+        <field id="preferences" type="node" />
+        <field id="innertube" type="node" />
+        <field id="invidious" type="node" />
+        <field id="webServer" type="node" />
+        <field id="loungeService" type="node" />
+        <field id="previousPlayer" type="node" />
+        <field id="minRect" type="rect2D" value="[834,460,426,240]" />
+        <field id="maxRect" type="rect2D" value="[0,0,1280,720]" />
+        <field id="close" type="boolean" alwaysNotify="true" />
+        <!-- the Video-only method Initialize calls, plus the spec's drivers (callFunc reaches only interface funcs). -->
+        <function name="getHttpAgent" />
+        <function name="TestSetup" />
+        <function name="TestKey" />
+        <function name="TestSetState" />
+        <function name="TestSnapshot" />
+        <function name="TestSetControl" />
+        <function name="TestPlaybackErrorDialog" />
+        <function name="TestCoordinatorFields" />
+    </interface>
+    <children>
+        <Timer id="autoHide" duration="5" repeat="false" />
+        <Timer id="transportTimer" duration="0.6" repeat="false" />
+        <Timer id="liveBadgeHold" duration="1.6" repeat="false" />
+        <Timer id="fullScreenHintTimer" duration="1" repeat="false" />
+        <Timer id="liveEdgeClock" duration="1" repeat="true" />
+        <Animation id="chromeFadeIn" duration="0.5" easeFunction="linear">
+            <FloatFieldInterpolator id="chromeFadeInInterp" key="[0.0, 1.0]" keyValue="[0.0, 1.0]" fieldToInterp="Chrome.opacity" />
+        </Animation>
+        <Animation id="chromeFadeOut" duration="0.3" easeFunction="linear">
+            <FloatFieldInterpolator id="chromeFadeOutInterp" key="[0.0, 1.0]" keyValue="[1.0, 0.0]" fieldToInterp="Chrome.opacity" />
+        </Animation>
+        <!-- The PiP minimize animation, mirrored so OnFullScreenChange is runnable at the seam. The
+             interpolators target the root "VideoPlayer" id, which doesn't exist here — starting the anim just
+             logs "Failed to update interpolator field" warnings, which is harmless in tests. -->
+        <Animation id="minimize" duration="0.3" easeFunction="outcubic" optional="true">
+            <FloatFieldInterpolator id="widthInterpolator" key="[0.0, 0.5, 1.0]" keyValue="[1280, 853, 426]" fieldToInterp="VideoPlayer.width" />
+            <FloatFieldInterpolator id="heightInterpolator" key="[0.0, 0.5, 1.0]" keyValue="[720, 480, 240]" fieldToInterp="VideoPlayer.height" />
+            <Vector2DFieldInterpolator id="translationInterpolator" key="[0.0, 0.5, 1.0]" keyValue="[[0,0],[417,230],[834,460]]" fieldToInterp="VideoPlayer.translation" />
+        </Animation>
+        <Rectangle id="fullScreenHint" height="26" color="0x000000" opacity="0.8" visible="false">
+            <Label id="fullScreenHintLabel" height="26" />
+        </Rectangle>
+        <Group id="Chrome" opacity="0" visible="false">
+            <Poster id="pauseGradient" width="1280" height="720" />
+            <BifDisplay id="bifDisplay" />
+            <Group id="titleArea">
+                <Label id="titleLabel" />
+                <Label id="secondaryTitleLabel" />
+                <Clock id="clock" />
+            </Group>
+            <TrickPlayBar id="trickPlayBar" />
+            <ButtonRow id="buttonRow" />
+        </Group>
+        <LoadBufferSpinner id="spinner" />
+        <LargePause id="largePause" />
+    </children>
+</component>

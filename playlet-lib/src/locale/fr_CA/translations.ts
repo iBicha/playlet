@@ -837,6 +837,10 @@
         <translation>Appuyez sur Options (*) pour plein écran</translation>
     </message>
     <message>
+        <source>Rewind live TV</source>
+        <translation>Retour en arrière pour TV en direct</translation>
+    </message>
+    <message>
         <source>Video load error</source>
         <translation>Erreur de chargement de la vidéo</translation>
     </message>

@@ -1,0 +1,70 @@
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Trackbar track spans x=68..1212: right cluster right-aligns to 1212, center cluster centers on 640.
+const ROW_Y = 560
+const BUTTON_WIDTH = 42
+const BUTTON_SPACING = 20
+const SCREEN_CENTER_X = 640
+const TRACKBAR_RIGHT_X = 1212
+
+function Init()
+    ' Focus order MUST match PlayerCoordinatorLogic.PlayerButton (playPause=0, minimize=1).
+    m.buttons = [
+        m.top.findNode("PlayPauseButton")
+        m.top.findNode("MinimizeButton")
+    ]
+    m.centerCluster = m.top.findNode("CenterCluster")
+    m.rightCluster = m.top.findNode("RightCluster")
+    LayoutClusters()
+    m.top.buttonCount = m.buttons.Count() ' coordinator reads this to clamp focus
+
+    for each field in ["transportMode", "rowFocused", "focusedIndex", "playing"]
+        m.top.ObserveField(field, FuncName(Repaint))
+    end for
+    m.top.ObserveField("nudge", FuncName(OnNudge))
+    Repaint()
+end function
+
+' Forward the nudge to the focused button (an out-of-range focusedIndex indexes to invalid -> no-op).
+function OnNudge() as void
+    button = m.buttons[m.top.focusedIndex]
+    if button <> invalid
+        button.nudge = true
+    end if
+end function
+
+' Position the buttons inside each cluster and the clusters on screen, all from child count, so adding a
+' button auto-positions without hardcoded offsets.
+function LayoutClusters() as void
+    LayoutButtons(m.centerCluster)
+    LayoutButtons(m.rightCluster)
+    m.centerCluster.translation = [SCREEN_CENTER_X - ClusterWidth(m.centerCluster) / 2, ROW_Y]
+    m.rightCluster.translation = [TRACKBAR_RIGHT_X - ClusterWidth(m.rightCluster), ROW_Y]
+end function
+
+function LayoutButtons(cluster as object) as void
+    for i = 0 to cluster.getChildCount() - 1
+        cluster.getChild(i).translation = [i * (BUTTON_WIDTH + BUTTON_SPACING), 0]
+    end for
+end function
+
+function ClusterWidth(cluster as object) as integer
+    n = cluster.getChildCount()
+    if n <= 0
+        return 0
+    end if
+    return n * BUTTON_WIDTH + (n - 1) * BUTTON_SPACING
+end function
+
+function Repaint() as void
+    ' Hide the row while a transport is active so it's out of the way during seeking. Chrome show/hide
+    ' fades the parent group, so visible=true with a hidden parent stays unpainted.
+    m.top.visible = (m.top.transportMode = TransportController.Mode.Idle)
+
+    m.buttons[0].toggleState = not m.top.playing ' toggleState false = play icon, true = pause icon
+
+    for i = 0 to m.buttons.Count() - 1
+        m.buttons[i].focused = m.top.rowFocused and i = m.top.focusedIndex
+    end for
+end function
