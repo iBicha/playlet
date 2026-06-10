@@ -118,7 +118,7 @@ function checkFileHash(file, hash) {
 
 async function generateImage(inputImage, options, rootDir) {
     const opts = {
-        launch: { executablePath },
+        launch: { executablePath: await executablePath() },
         ...options
     };
     opts.outputFilePath = path.join(rootDir, opts.outputFilePath);

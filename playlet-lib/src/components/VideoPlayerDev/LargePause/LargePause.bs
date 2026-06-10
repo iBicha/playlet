@@ -1,0 +1,107 @@
+import "pkg:/source/utils/Types.bs"
+
+' Center pause poster. Sequence: scaleIn (0.5s) -> hold (1.0s) -> shrinkOut (0.3s) -> hidden.
+' `advance` is a test hook: pulse it to step one phase without waiting on the real animation/timer durations.
+
+enum LargePausePhase
+    None = 0
+    ScaleIn = 1
+    Hold = 2
+    ShrinkOut = 3
+end enum
+
+function Init()
+    m.poster = m.top.findNode("poster")
+    m.scaleIn = m.top.findNode("scaleIn")
+    m.shrinkOut = m.top.findNode("shrinkOut")
+    m.hold = m.top.findNode("hold")
+
+    ' Gate on the animation/timer completion signal before advancing the phase.
+    m.scaleIn.ObserveField("state", FuncName(OnScaleInAnimState))
+    m.shrinkOut.ObserveField("state", FuncName(OnShrinkOutAnimState))
+    m.hold.ObserveField("fire", FuncName(OnHoldFire))
+
+    m.top.ObserveField("trigger", FuncName(OnTrigger))
+    m.top.ObserveField("cancel", FuncName(OnCancel))
+    m.top.ObserveField("advance", FuncName(OnAdvance))
+
+    m.top.phase = LargePausePhase.None
+end function
+
+function OnTrigger() as void
+    if not m.top.trigger
+        return
+    end if
+    StopAnims()
+    m.poster.opacity = 0
+    m.poster.scale = [0.75, 0.75]
+    m.poster.visible = true
+    m.top.phase = LargePausePhase.ScaleIn
+    m.scaleIn.control = "start"
+end function
+
+function OnCancel() as void
+    if not m.top.cancel
+        return
+    end if
+    Hide()
+end function
+
+function OnAdvance() as void
+    if m.top.phase = LargePausePhase.ScaleIn
+        OnScaleInState()
+    else if m.top.phase = LargePausePhase.Hold
+        OnHoldFire()
+    else if m.top.phase = LargePausePhase.ShrinkOut
+        OnShrinkOutState()
+    end if
+end function
+
+function OnScaleInAnimState() as void
+    if m.scaleIn.state = "stopped"
+        OnScaleInState()
+    end if
+end function
+
+function OnShrinkOutAnimState() as void
+    if m.shrinkOut.state = "stopped"
+        OnShrinkOutState()
+    end if
+end function
+
+function OnScaleInState() as void
+    if m.top.phase <> LargePausePhase.ScaleIn
+        return
+    end if
+    m.top.phase = LargePausePhase.Hold
+    m.hold.control = "start"
+end function
+
+function OnHoldFire() as void
+    if m.top.phase <> LargePausePhase.Hold
+        return
+    end if
+    m.top.phase = LargePausePhase.ShrinkOut
+    m.shrinkOut.control = "start"
+end function
+
+function OnShrinkOutState() as void
+    if m.top.phase <> LargePausePhase.ShrinkOut
+        return
+    end if
+    Hide()
+end function
+
+function Hide() as void
+    StopAnims()
+    m.hold.control = "stop"
+    m.poster.opacity = 0
+    m.poster.scale = [0.75, 0.75]
+    m.poster.visible = false
+    m.top.phase = LargePausePhase.None
+end function
+
+function StopAnims() as void
+    m.scaleIn.control = "stop"
+    m.shrinkOut.control = "stop"
+end function

@@ -8,5 +8,9 @@
             <source>Select keyboard language</source>
             <translation>Seleziona la lingua della tastiera</translation>
         </message>
+        <message>
+            <source>Rewind live TV</source>
+            <translation>Riavvolgi la TV in diretta</translation>
+        </message>
     </context>
 </TS>

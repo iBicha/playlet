@@ -1380,5 +1380,9 @@
         <source>Enable Diagnostics</source>
         <translation>Diagnostische Datenerhebung aktivieren</translation>
     </message>
+    <message>
+        <source>Rewind live TV</source>
+        <translation>Live-TV zurückspulen</translation>
+    </message>
 </context>
 </TS>

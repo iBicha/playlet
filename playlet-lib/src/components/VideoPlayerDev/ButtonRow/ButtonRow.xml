@@ -1,0 +1,37 @@
+<component name="ButtonRow" extends="Group">
+    <!-- Virtual focus: the coordinator keeps real focus on the Video node and tells this row which button is
+         highlighted (focusedIndex) and whether the row has focus (rowFocused). `visible` is gated on idle so the
+         row rides the parent Chrome group's opacity fade instead of popping.
+
+         CenterCluster is centered on screen, RightCluster is right-aligned; each is a plain Group whose
+         buttons + position are laid out in code from its child count. (Not a LayoutGroup: it re-aligns a child
+         whenever its bounding rect changes, which pins the scale pulse's corner and makes it grow off-center.)
+
+         To add a button, do all four or focus/activation breaks:
+           1. drop a VideoPlayerButton into a cluster (xml below);
+           2. add it (in focus order) to m.buttons in ButtonRow.bs (buttonCount updates automatically);
+           3. add a PlayerCoordinatorLogic.PlayerButton enum value (the index);
+           4. add an `else if index = PlayerButton.x` case to ActivateButton in VideoPlayerDev.bs. -->
+    <interface>
+        <field id="transportMode" type="integer" value="0" />
+        <field id="rowFocused" type="boolean" value="false" />
+        <field id="focusedIndex" type="integer" value="0" />
+        <field id="playing" type="boolean" value="true" /> <!-- selects the play vs pause icon -->
+        <field id="buttonCount" type="integer" value="0" /> <!-- read-only: set in Init from m.buttons -->
+        <!-- pulse the focused button's scale nudge (a Left/Right that couldn't move focus). -->
+        <field id="nudge" type="boolean" alwaysNotify="true" />
+    </interface>
+    <children>
+        <!-- play/pause, centered on screen (x=640). -->
+        <Group id="CenterCluster">
+            <VideoPlayerButton id="PlayPauseButton"
+                iconUri="pkg:/images/icons/player/play.png"
+                iconUri2="pkg:/images/icons/player/pause.png" />
+        </Group>
+        <!-- minimize, right-aligned to the trackbar's right edge (x=1212). -->
+        <Group id="RightCluster">
+            <VideoPlayerButton id="MinimizeButton"
+                iconUri="pkg:/images/icons/player/minimize.png" />
+        </Group>
+    </children>
+</component>

@@ -1,0 +1,162 @@
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Pure decisions for the video player: the remote-key-to-command map, the OK/Select action, and the
+' buffering-spinner gate. None of these touch a node, so they are plain functions of their inputs; the player
+' applies the results to the Video node, the chrome, and the renderers.
+
+namespace PlayerCoordinatorLogic
+
+    ' What an OK/Select press does while no transport is active. Live toggles the HUD without pausing; VOD
+    ' depends on both the play state and whether the HUD is already shown.
+    enum OkAction
+        Reveal = 0 ' show the HUD; leave playback as-is
+        Pause = 1 ' pause, show the large pause poster, keep the HUD up
+        Resume = 2 ' resume, hide the pause poster, hide the HUD
+        ToggleChrome = 3 ' live: toggle the HUD, never pause
+    end enum
+
+    enum SafetyAction
+        None = 0
+        Freeze = 1 ' the video is advancing under a transport -> the coordinator must re-pause it
+        FinishEof = 2 ' VOD played to the end under a transport also sitting at the end -> finish, don't re-pause forever
+    end enum
+
+    ' The buttons in the row above the trackbar, in focus order (the index). The COUNT is owned by ButtonRow
+    ' (m.buttons / its buttonCount field) — there is no separate count constant to keep in sync.
+    enum PlayerButton
+        PlayPause = 0
+        Minimize = 1
+    end enum
+
+    ' The two focus targets above/at the trackbar: the bar itself (Left/Right scrub, the cursor grows) and the
+    ' button row above it (Left/Right move between buttons). Up/Down move between the two tiers.
+    enum FocusTarget
+        Bar = 0
+        Buttons = 1
+    end enum
+
+    ' The transport command for a remote key, or Command.None for a key the player handles itself.
+    function KeyToCommand(key as string) as integer
+        if key = RemoteKeys.Left
+            return TransportController.Command.Left
+        else if key = RemoteKeys.Right
+            return TransportController.Command.Right
+        else if key = RemoteKeys.FastForward
+            return TransportController.Command.Fwd
+        else if key = RemoteKeys.Rewind
+            return TransportController.Command.Rev
+        else if key = RemoteKeys.Replay
+            return TransportController.Command.Replay
+        end if
+        return TransportController.Command.None
+    end function
+
+    ' The OK/Select outcome while idle. chromeShown means the HUD is shown or fading in.
+    function OkActionInIdle(state as string, chromeShown as boolean, isLive as boolean) as integer
+        if isLive
+            return OkAction.ToggleChrome
+        end if
+        if state = VideoState.Playing
+            if chromeShown
+                return OkAction.Pause
+            end if
+            return OkAction.Reveal
+        end if
+        if chromeShown
+            return OkAction.Resume
+        end if
+        return OkAction.Reveal
+    end function
+
+    ' The mid-stream buffering spinner shows only after the first frame, while idle, and while fullscreen.
+    function ShouldShowBuffering(firstFrameSeen as boolean, transportMode as integer, fullscreen as boolean) as boolean
+        return firstFrameSeen and transportMode = TransportController.Mode.Idle and fullscreen
+    end function
+
+    ' Only a video actively PLAYING under a transport must be re-paused. Every other state is already
+    ' not-advancing or owned elsewhere: buffering = a seek/rebuffer the bif covers; paused = the desired frozen
+    ' state; none/stopping/stopped = teardown; finished/error = handled in their own OnVideoState branches.
+    ' EXCEPTION: VOD playing at the very end while the transport cursor is ALSO at the end — the device refuses
+    ' to stay paused at EOF (the freeze would loop forever), and the user is at the end anyway: finish instead.
+    ' A cursor rewound away from the end keeps the freeze (the user is heading backwards).
+    function TransportSafetyAction(deviceState as string, inTransport as boolean, isLive as boolean, positionMs as integer, cursorMs as integer, durationMs as integer) as integer
+        if not inTransport or deviceState <> VideoState.Playing
+            return SafetyAction.None
+        end if
+        atEof = durationMs > 0 and positionMs >= durationMs - TransportController.FINISH_EPSILON_MS
+        cursorAtEof = cursorMs >= durationMs - TransportController.FINISH_EPSILON_MS
+        if not isLive and atEof and cursorAtEof
+            return SafetyAction.FinishEof
+        end if
+        return SafetyAction.Freeze
+    end function
+
+    ' Clamp a button index into [0, count).
+    function ClampButtonIndex(index as integer, count as integer) as integer
+        if index < 0
+            return 0
+        end if
+        if index >= count
+            return count - 1
+        end if
+        return index
+    end function
+
+    ' The focused button after a Left/Right press, clamped at the ends (no wrap). count = the row's button count.
+    function NextButtonIndex(current as integer, key as string, count as integer) as integer
+        if key = RemoteKeys.Left
+            return ClampButtonIndex(current - 1, count)
+        else if key = RemoteKeys.Right
+            return ClampButtonIndex(current + 1, count)
+        end if
+        return ClampButtonIndex(current, count)
+    end function
+
+    ' Move focus between the tiers: Down goes buttons -> bar; Up goes bar -> buttons. No wrap (the buttons are
+    ' the top tier, the bar the bottom).
+    function NextFocusTarget(current as integer, key as string) as integer
+        if key = RemoteKeys.Down and current = FocusTarget.Buttons
+            return FocusTarget.Bar
+        else if key = RemoteKeys.Up and current = FocusTarget.Bar
+            return FocusTarget.Buttons
+        end if
+        return current
+    end function
+
+    ' Pick the first usable tile-set from the OS's native Video.thumbnailTiles field, or invalid. thumbnailTiles
+    ' is documented (Video node docs) as {tile_id: [tile_set, ...]}; a tile_set carries htiles/vtiles (grid),
+    ' tiles (sheet array, tiles[i][0] = sheet url), duration (seconds per sheet), and final_time (total seconds).
+    ' BifDisplay reads those native fields directly; the coordinator uses TileSetIntervalMs for the scrub step.
+    function PickThumbnailTileSet(tiles as object) as object
+        if not IsAssociativeArray(tiles)
+            return invalid
+        end if
+        for each key in tiles
+            entry = tiles[key]
+            if IsArray(entry) and entry.Count() > 0 and IsAssociativeArray(entry[0])
+                tileSet = entry[0]
+                if ValidInt(tileSet.htiles) > 0 and ValidInt(tileSet.vtiles) > 0 and IsArray(tileSet.tiles) and tileSet.tiles.Count() > 0 and IsNumber(tileSet.duration) and tileSet.duration > 0
+                    return tileSet
+                end if
+            end if
+        end for
+        return invalid
+    end function
+
+    ' Milliseconds covered by one thumbnail in a tile-set: per-sheet duration / thumbnails-per-sheet. 0 if
+    ' degenerate. (duration is a Double on-device; read raw + coerce arithmetically, not via ValidDouble.)
+    function TileSetIntervalMs(tileSet as object) as integer
+        if not IsAssociativeArray(tileSet)
+            return 0
+        end if
+        tilesPerSheet = ValidInt(tileSet.htiles) * ValidInt(tileSet.vtiles)
+        if tilesPerSheet <= 0 or not IsNumber(tileSet.duration) or tileSet.duration <= 0
+            return 0
+        end if
+        return Int(tileSet.duration * 1000.0 / tilesPerSheet)
+    end function
+
+end namespace

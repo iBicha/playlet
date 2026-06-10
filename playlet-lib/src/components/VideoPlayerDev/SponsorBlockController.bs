@@ -1,0 +1,266 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/components/Services/SponsorBlock/Notifications/SponsorBlockNotificationUtils.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+' SponsorBlock brain for the video player: gate the fetch, store segments, drive auto/manual skips + the
+' chapter label, and report skipped segments to the SponsorBlock service. The fetched segments stay in this
+' instance (never copied onto a node field). The coordinator owns the segments-job callback and applies the
+' seeks this returns.
+
+namespace SponsorBlockController
+
+    ' Bar fill tint (semi-transparent black over the red fill) pushed onto the trickplay bar when segments arrive.
+    const BAR_FILL_BLEND = &hFF000080
+
+    ' TrySkip returns this for "the segment is at the video end -> finish" (vs a seek ms).
+    const FINISH_SENTINEL = -2
+
+    class Controller
+        ' deps the coordinator owns; top = the Video node (seekMode + duration).
+        private jobQueue as object = invalid
+        private preferences as object = invalid
+        private notifications as object = invalid
+        private top as object = invalid
+
+        ' segment state — stays here, never copied onto a field.
+        private segments as object = invalid
+        private enabled as boolean = false
+        private manualSkipSegment as object = invalid
+        ' a manual notice the user dismissed with Back: don't re-arm/re-show it while still inside this segment.
+        private dismissedSegmentId as string = ""
+        private sponsorSkipEventJob as object = invalid
+
+        function new(deps as object)
+            m.jobQueue = deps.jobQueue
+            m.preferences = deps.preferences
+            m.notifications = deps.notifications
+            m.top = deps.top
+        end function
+
+        ' Content-job success: enable + return the SponsorBlockSegmentsJob input, or invalid. Gated on the
+        ' pref + not-live + valid metadata.
+        function OnContentReady(metadata as object, isLive as boolean) as object
+            m.enabled = false
+            if isLive
+                return invalid
+            end if
+            if m.preferences = invalid or m.preferences["sponsorblock.enabled"] <> true
+                return invalid
+            end if
+            if not IsAssociativeArray(metadata)
+                return invalid
+            end if
+            m.enabled = true
+            return {
+                videoId: metadata.videoId
+                lengthSeconds: metadata.lengthSeconds
+                showNotifications: m.preferences["sponsorblock.show_notifications"]
+                categories: m.preferences["sponsorblock.categories"]
+            }
+        end function
+
+        ' Store the segments and set seekMode=accurate on the Video node.
+        function OnSegmentsJobDone(event as object) as void
+            info = event.getInfo()
+            if not info.success
+                return
+            end if
+            segments = info.data.skipSegments
+            if segments = invalid or segments.Count() = 0
+                return
+            end if
+            m.segments = segments
+            if m.top <> invalid
+                m.top.seekMode = "accurate"
+            end if
+            LogDebug("segments ready:", segments.Count())
+        end function
+
+        ' The real position (ms) while idle. Returns { skipSeekMs } (auto-skip), { finish: true } (segment at
+        ' the video end), or invalid. A manual segment only shows the notification + stashes for the next OK
+        ' (TrySkip). Reports the skip to the service on an actual auto-skip.
+        function OnPosition(positionMs as integer) as object
+            if not m.enabled or m.segments = invalid
+                return invalid
+            end if
+            positionS = positionMs / 1000.0
+            segment = SponsorBlockController.FindSegmentByTime(m.segments, positionS)
+            if segment = invalid
+                ' left the segment: a Back-dismissal only suppresses the current pass — re-entering later re-arms.
+                m.dismissedSegmentId = ""
+                return invalid
+            end if
+
+            if segment.showNotification and Abs(segment.end - positionS) >= 1 and segment.UUID <> m.dismissedSegmentId
+                SponsorBlock.ShowNotifcation(m.notifications, segment)
+                if segment.option = SponsorBlock.SegmentAction.ManualSkip
+                    m.manualSkipSegment = segment
+                    return invalid
+                end if
+            end if
+
+            if segment.option = SponsorBlock.SegmentAction.AutoSkip
+                result = SponsorBlockController.SkipTargetForSegment(segment, positionS, m.Duration())
+                if result <> invalid
+                    m.SendSegmentViewed(segment.UUID)
+                end if
+                return result
+            end if
+            return invalid
+        end function
+
+        ' The OK routing calls this first. Returns the seek target (ms) for the stashed manual segment if the
+        ' position is still inside it (FINISH_SENTINEL at the video end), else -1. Reports the skip on success.
+        function TrySkip(positionMs as integer) as integer
+            segment = m.manualSkipSegment
+            if segment = invalid
+                return -1
+            end if
+            m.manualSkipSegment = invalid
+
+            notification = SponsorBlock.GetCurrentNotification(m.notifications)
+            if notification = invalid or notification.segmentId <> segment.UUID
+                return -1
+            end if
+
+            positionS = positionMs / 1000.0
+            if positionS < segment.start or segment.end < positionS
+                return -1
+            end if
+
+            result = SponsorBlockController.SkipTargetForSegment(segment, positionS, m.Duration())
+            SponsorBlock.RemoveNotifcation(m.notifications)
+            if result = invalid
+                return -1
+            end if
+            m.SendSegmentViewed(segment.UUID)
+            if result.finish = true
+                return SponsorBlockController.FINISH_SENTINEL
+            end if
+            return result.skipSeekMs
+        end function
+
+        ' Back while the manual-skip notice is up: dismiss the notice without skipping (and without it
+        ' re-arming until the position leaves the segment). Returns true if a notice was dismissed — the
+        ' caller then swallows the Back instead of acting on the player.
+        function DismissManual() as boolean
+            segment = m.manualSkipSegment
+            if segment = invalid
+                return false
+            end if
+            notification = SponsorBlock.GetCurrentNotification(m.notifications)
+            if notification = invalid or notification.segmentId <> segment.UUID
+                return false
+            end if
+            m.manualSkipSegment = invalid
+            m.dismissedSegmentId = ValidString(segment.UUID)
+            SponsorBlock.RemoveNotifcation(m.notifications)
+            return true
+        end function
+
+        ' The chapter label text for a cursor (ms): the segment title inside a segment, else "".
+        function ChapterTextForCursor(cursorMs as integer) as string
+            if not m.enabled or m.segments = invalid
+                return ""
+            end if
+            segment = SponsorBlockController.FindSegmentByTime(m.segments, cursorMs / 1000.0)
+            if segment = invalid
+                return ""
+            end if
+            return ValidString(segment.title)
+        end function
+
+        function HasSegments() as boolean
+            return m.enabled and m.segments <> invalid and m.segments.Count() > 0
+        end function
+
+        ' Show/hide the SponsorBlock notification overlay (hidden while the player is minimized).
+        function SetVisible(visible as boolean) as void
+            if m.notifications <> invalid
+                SponsorBlock.SetVisible(m.notifications, visible)
+            end if
+        end function
+
+        ' Reset on close / new content.
+        function Clear() as void
+            if m.notifications <> invalid
+                SponsorBlock.RemoveNotifcation(m.notifications)
+            end if
+            m.segments = invalid
+            m.manualSkipSegment = invalid
+            m.dismissedSegmentId = ""
+            m.enabled = false
+        end function
+
+        ' Drop every held node ref on close so the controller — and the player node it points at — can free.
+        function Dispose() as void
+            m.Clear()
+            ' a skip can fire just before close and must still report — release the ref, don't cancel the in-flight job.
+            m.sponsorSkipEventJob = invalid
+            m.top = invalid
+            m.jobQueue = invalid
+            m.preferences = invalid
+            m.notifications = invalid
+        end function
+
+        ' Report a skipped segment to the SponsorBlock service (fire-and-forget).
+        function SendSegmentViewed(segmentId as string) as void
+            if m.jobQueue = invalid
+                return
+            end if
+            if m.sponsorSkipEventJob <> invalid
+                m.sponsorSkipEventJob.cancel = true
+            end if
+            m.sponsorSkipEventJob = JobSystem.CreateCallback()
+            JobSystem.QueueJob(m.jobQueue, Jobs.SponsorBlockSegmentViewedJob, { segmentId: segmentId }, m.sponsorSkipEventJob)
+        end function
+
+        function Duration() as float
+            if m.top <> invalid
+                return m.top.duration
+            end if
+            return 0.0
+        end function
+
+    end class
+
+    ' Binary search for the segment containing `time` (seconds); segments are sorted by start. May miss
+    ' overlapping segments (acceptable — they are rare).
+    function FindSegmentByTime(segments as object, time as dynamic) as dynamic
+        low = 0
+        high = segments.Count() - 1
+        while low <= high
+            middle = (low + high) \ 2
+            segment = segments[middle]
+            if time < segment.start
+                high = middle - 1
+            else if time > segment.end
+                low = middle + 1
+            else
+                return segment
+            end if
+        end while
+        return invalid
+    end function
+
+    ' The seek decision for a segment at `positionS` (seconds): { skipSeekMs } | { finish: true } (segment at
+    ' the video end) | invalid (too short — a skip would just rebuffer). `duration` clamps a segment end past
+    ' the video end.
+    function SkipTargetForSegment(segment as object, positionS as dynamic, duration as dynamic) as object
+        segmentEnd = segment.end
+        if duration > 0 and segmentEnd > duration
+            segmentEnd = duration
+        end if
+        if Abs(segmentEnd - positionS) < 2
+            return invalid
+        end if
+        if duration > 0 and Abs(segmentEnd - duration) < 2
+            return { finish: true }
+        end if
+        return { skipSeekMs: Int(segmentEnd * 1000) }
+    end function
+
+end namespace

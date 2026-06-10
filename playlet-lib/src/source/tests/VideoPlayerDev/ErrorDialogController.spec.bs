@@ -1,0 +1,95 @@
+' ErrorDialogController unit suite — the pure error decision logic in isolation. No node, no dialog: seed a
+' fake content AA + error info and assert the retry-vs-dialog decision + the next-stream-URL advance.
+
+import "pkg:/components/VideoPlayerDev/ErrorDialogController.bs"
+
+namespace Tests
+
+    @suite
+    class ErrorDialogControllerTests extends Rooibos.BaseTestSuite
+
+        @describe("next stream url")
+
+        @it("advances the index and returns the next non-empty url")
+        function _()
+            content = { playletStreamUrls: ["a", "b", "c"], playletStreamUrlIndex: 0, url: "a" }
+            url = ErrorDialogController.NextStreamUrl(content)
+            m.assertEqual(url, "b")
+            m.assertEqual(content.playletStreamUrlIndex, 1)
+            m.assertEqual(content.url, "b")
+        end function
+
+        @it("returns invalid at the last url")
+        function _()
+            content = { playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 1, url: "b" }
+            m.assertInvalid(ErrorDialogController.NextStreamUrl(content))
+            m.assertEqual(content.playletStreamUrlIndex, 1)
+        end function
+
+        @it("returns invalid when the next url is empty")
+        function _()
+            content = { playletStreamUrls: ["a", ""], playletStreamUrlIndex: 0, url: "a" }
+            m.assertInvalid(ErrorDialogController.NextStreamUrl(content))
+        end function
+
+        @it("returns invalid when there are no stream urls")
+        function _()
+            content = { playletStreamUrlIndex: 0, url: "a" }
+            m.assertInvalid(ErrorDialogController.NextStreamUrl(content))
+        end function
+
+        @describe("content-job failure")
+
+        @it("returns a dialog action with the load-error title")
+        function _()
+            content = { videoId: "vid123" }
+            d = ErrorDialogController.DecideContentJobFailure(content, "This video is unavailable")
+            m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
+            m.assertEqual(d.title, Tr(Locale.VideoPlayer.VideoLoadError))
+            m.assertTrue(d.message.Instr("vid123") >= 0)
+            m.assertTrue(d.message.Instr("unavailable") >= 0)
+        end function
+
+        @describe("playback error decision")
+
+        @it("retries the next stream url on an http error before playing")
+        function _()
+            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
+            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, false)
+            m.assertEqual(d.action, ErrorDialogController.Action.Retry)
+            m.assertEqual(d.nextUrl, "b")
+            m.assertEqual(content.url, "b")
+        end function
+
+        @it("retries on a mediaerror category")
+        function _()
+            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
+            d = ErrorDialogController.DecideVideoError(content, { category: "mediaerror" }, false)
+            m.assertEqual(d.action, ErrorDialogController.Action.Retry)
+            m.assertEqual(d.nextUrl, "b")
+        end function
+
+        @it("shows a dialog when no next url exists")
+        function _()
+            content = { videoId: "v", playletStreamUrls: ["a"], playletStreamUrlIndex: 0, url: "a" }
+            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, false)
+            m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
+        end function
+
+        @it("shows a dialog once the stream has already played (no stream-swap)")
+        function _()
+            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
+            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, true)
+            m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
+        end function
+
+        @it("shows a dialog for a non-stream error category")
+        function _()
+            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
+            d = ErrorDialogController.DecideVideoError(content, { category: "drm" }, false)
+            m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
+        end function
+
+    end class
+
+end namespace

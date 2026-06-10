@@ -1,0 +1,75 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Pure error decisions for the video player: retry the next stream URL vs. show the error dialog. No node,
+' no state — the coordinator owns the dialog node and applies the retry.
+
+namespace ErrorDialogController
+
+    enum Action
+        Dialog = 0
+        Retry = 1
+    end enum
+
+    ' A content-job failure means no stream loaded at all -> always a dialog.
+    function DecideContentJobFailure(content as object, error as dynamic) as object
+        videoId = ""
+        if content <> invalid
+            videoId = ValidString(content.videoId)
+        end if
+        message = Tr(Locale.VideoPlayer.VideoLoadErrorMessage).Replace("%1", videoId)
+        errStr = ValidString(error)
+        if errStr <> ""
+            message = message + `\n` + errStr
+        end if
+        return {
+            action: ErrorDialogController.Action.Dialog
+            title: Tr(Locale.VideoPlayer.VideoLoadError)
+            message: message
+        }
+    end function
+
+    ' A Video state=error. Retry the next stream URL only before the first successful play, only for a
+    ' stream/format error (http / mediaerror), and only if a next URL exists; otherwise a dialog. On retry the
+    ' coordinator re-applies the initial seek (SeekToInitialPosition).
+    function DecideVideoError(content as object, errorInfo as object, videoPlayedSuccessfully as boolean) as object
+        if not videoPlayedSuccessfully and content <> invalid and IsAssociativeArray(errorInfo)
+            category = ValidString(errorInfo.category)
+            if category = "http" or category = "mediaerror"
+                nextUrl = ErrorDialogController.NextStreamUrl(content)
+                if nextUrl <> invalid
+                    return {
+                        action: ErrorDialogController.Action.Retry
+                        nextUrl: nextUrl
+                    }
+                end if
+            end if
+        end if
+
+        return {
+            action: ErrorDialogController.Action.Dialog
+        }
+    end function
+
+    ' Advance content.playletStreamUrlIndex to the next non-empty stream URL (also sets content.url), or
+    ' invalid if there is none. Mutates the content node in place.
+    function NextStreamUrl(content as object) as dynamic
+        urls = content.playletStreamUrls
+        if not IsArray(urls)
+            return invalid
+        end if
+        nextIndex = ValidInt(content.playletStreamUrlIndex) + 1
+        if nextIndex >= urls.Count()
+            return invalid
+        end if
+        nextUrl = urls[nextIndex]
+        if StringUtils.IsNullOrEmpty(nextUrl)
+            return invalid
+        end if
+        content.playletStreamUrlIndex = nextIndex
+        content.url = nextUrl
+        return nextUrl
+    end function
+
+end namespace

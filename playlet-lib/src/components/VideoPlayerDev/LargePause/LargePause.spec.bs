@@ -1,0 +1,71 @@
+' LargePause @SGNode suite — instantiates JUST the poster (no coordinator), pulses `trigger`/`cancel`, and
+' steps the phase SM by calling the exposed handlers directly (the Tick() philosophy — no real anim/timer
+' seconds). Asserts the phase sequence + visible + the interpolator ENDPOINTS (scale 0.75<->1.0, opacity
+' 0<->1) — NOT live interpolated values (those run on the render thread in real seconds).
+
+namespace Tests
+
+    @SGNode("LargePause")
+    @suite
+    class LargePauseTests extends Rooibos.BaseTestSuite
+
+        @describe("LargePause — show sequence")
+
+        @it("trigger starts the scaleIn phase and makes the poster visible")
+        function _()
+            m.top.trigger = true
+            m.assertEqual(m.top.phase, LargePausePhase.ScaleIn)
+            m.assertTrue(m.top.findNode("poster").visible)
+        end function
+
+        @it("steps scaleIn -> hold -> shrinkOut -> none and hides at the end")
+        function _()
+            m.top.trigger = true
+            m.assertEqual(m.top.phase, LargePausePhase.ScaleIn)
+            m.top.advance = true ' scaleIn complete -> hold
+            m.assertEqual(m.top.phase, LargePausePhase.Hold)
+            m.top.advance = true ' hold elapsed -> shrinkOut
+            m.assertEqual(m.top.phase, LargePausePhase.ShrinkOut)
+            m.top.advance = true ' shrinkOut complete -> none
+            m.assertEqual(m.top.phase, LargePausePhase.None)
+            m.assertFalse(m.top.findNode("poster").visible)
+        end function
+
+        @it("cancel aborts and hides immediately from any phase")
+        function _()
+            m.top.trigger = true
+            m.top.advance = true ' now in hold
+            m.assertEqual(m.top.phase, LargePausePhase.Hold)
+            m.top.cancel = true
+            m.assertEqual(m.top.phase, LargePausePhase.None)
+            m.assertFalse(m.top.findNode("poster").visible)
+        end function
+
+        @describe("LargePause — paired scale/opacity interpolator endpoints")
+
+        @it("scaleIn animates opacity 0->1 with scale 0.75->1.0 (paired, no per-frame code)")
+        function _()
+            scaleIn = m.top.findNode("scaleIn")
+            op = scaleIn.getChild(0) ' scaleInOpacity
+            sc = scaleIn.getChild(1) ' scaleInScale
+            m.assertEqual(op.keyValue[0], 0.0)
+            m.assertEqual(op.keyValue[1], 1.0)
+            ' scale endpoints 0.75 -> 1.0 (= 0.75 + 0.25*opacity at both ends).
+            m.assertEqual(sc.keyValue[0][0], 0.75)
+            m.assertEqual(sc.keyValue[1][0], 1.0)
+        end function
+
+        @it("shrinkOut reverses opacity 1->0 with scale 1.0->0.75")
+        function _()
+            shrinkOut = m.top.findNode("shrinkOut")
+            op = shrinkOut.getChild(0)
+            sc = shrinkOut.getChild(1)
+            m.assertEqual(op.keyValue[0], 1.0)
+            m.assertEqual(op.keyValue[1], 0.0)
+            m.assertEqual(sc.keyValue[0][0], 1.0)
+            m.assertEqual(sc.keyValue[1][0], 0.75)
+        end function
+
+    end class
+
+end namespace
