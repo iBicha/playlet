@@ -138,6 +138,58 @@ namespace Tests
             m.assertTrue(m.Snap().chromeShown, "Up revealed the chrome")
         end function
 
+        ' The "● LIVE" reveal hold: an idle live reveal flashes the badge briefly (forceLiveBadge) before the
+        ' label swaps to the time-behind-edge — but any live transport must show the TIME immediately (the user
+        ' seeks by it), so a transport-key reveal never starts the hold and a scrub mid-hold releases it.
+        @it("an idle live reveal holds ● LIVE until the hold timer fires")
+        function _()
+            m.top.callFunc("TestSetLive", 43200000) ' 12h stream at the edge
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' idle live reveal (chrome toggle, no pause)
+            snap = m.Snap()
+            m.assertTrue(snap.chromeShown)
+            m.assertTrue(snap.forceLiveBadge, "the reveal forces the badge for the hold window")
+            m.top.callFunc("TestFireLiveBadgeHold")
+            m.assertFalse(m.Snap().forceLiveBadge, "the hold releases -> the offset label may show")
+        end function
+
+        @it("a live scrub from HIDDEN reveals with the time immediately (no ● LIVE hold)")
+        function _()
+            m.top.callFunc("TestSetLive", 43200000)
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' rewind from hidden -> transport-key reveal
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            snap = m.Snap()
+            m.assertEqual(snap.transportMode, TransportController.Mode.LiveDvr, "Left entered the live rewind")
+            m.assertTrue(snap.chromeShown)
+            m.assertFalse(snap.forceLiveBadge, "no hold on a transport reveal — the offset must be readable at once")
+        end function
+
+        @it("a live SCAN from hidden (Rev) shows the time immediately — atLiveEdge alone must not keep the badge")
+        function _()
+            ' a scan's cursor hasn't moved on the press (it moves on the first timer tick), so atLiveEdge is
+            ' still true at entry — the bar must suppress the badge for the active transport, not wait a tick.
+            m.top.callFunc("TestSetLive", 43200000)
+            m.top.callFunc("TestKey", RemoteKeys.Rewind, true)
+            m.top.callFunc("TestKey", RemoteKeys.Rewind, false)
+            snap = m.Snap()
+            m.assertEqual(snap.transportMode, TransportController.Mode.LiveDvr, "Rev entered the live scan")
+            m.assertTrue(snap.chromeShown)
+            m.assertFalse(snap.liveBadgeShown, "the ● LIVE badge is gone on the very first press")
+            m.assertEqual(snap.barRemainingText, "0:00", "the offset is readable immediately (counts up from 0:00)")
+        end function
+
+        @it("a live scrub started DURING the reveal hold releases the badge immediately")
+        function _()
+            m.top.callFunc("TestSetLive", 43200000)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' reveal -> hold running
+            m.assertTrue(m.Snap().forceLiveBadge)
+            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons tier -> bar tier
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' scrub back while the hold is still running
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            snap = m.Snap()
+            m.assertEqual(snap.transportMode, TransportController.Mode.LiveDvr)
+            m.assertFalse(snap.forceLiveBadge, "the transport releases the hold — time shows, not ● LIVE")
+        end function
+
         ' The button tier remembers its highlighted button across a buttons->bar->buttons round-trip; only a
         ' fresh reveal (the row was hidden) resets the highlight to play/pause.
         @it("the button tier keeps its focused button across a bar round-trip; a fresh reveal resets it")
@@ -238,7 +290,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden

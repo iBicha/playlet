@@ -882,16 +882,40 @@ namespace Tests
         @it("a pause just IS falling behind: the edge clock keeps counting while the device emits nothing")
         function _()
             t = m.Live() ' at the edge, min-gap 0
-            ' device paused: no position/duration events — only the coordinator's 1s edge heartbeat.
+            ' device paused: no position/duration events — only the coordinator's 1s edge heartbeat. The first
+            ' seconds sit inside the leave-hysteresis band (indistinguishable from position-notification lag),
+            ' so the badge holds; the offset is already counting the truth underneath.
             t.OnLiveEdge(304000)
             m.assertEqual(t.liveOffsetMs, 4000)
-            m.assertFalse(t.atLiveEdge) ' past the jitter band -> the badge swaps to the offset
+            m.assertTrue(t.atLiveEdge) ' within the leave band -> still ● LIVE (no flicker on transient lag)
             t.OnLiveEdge(312000)
             m.assertEqual(t.liveOffsetMs, 12000) ' counts up in real time WHILE paused (the reveal shows truth)
+            m.assertFalse(t.atLiveEdge) ' sustained fall-behind passed the leave band -> the offset shows
             ' resume where it paused: the offset keeps reading the true gap.
             t.OnPosition(300000)
             m.assertFalse(t.atLiveEdge)
             m.assertEqual(t.liveOffsetMs, 12000)
+        end function
+
+        @it("transient position lag at the edge does NOT flap the badge; re-entry from behind is tight (user flicker)")
+        function _()
+            ' observed on device: idle at the edge, position notifications lag the clock edge by ~4s in bursts
+            ' -> "● LIVE" <-> "0:04" flapping. Once AT the edge, only a sustained fall-behind (past the leave
+            ' band) drops the badge; from BEHIND, re-entry still takes the tight band so a deliberate 5s-behind
+            ' commit reads the time, never the badge.
+            t = m.Live() ' at the edge, min-gap 0
+            t.OnLiveEdge(304000) ' position stalls 4s: inside the leave band
+            m.assertTrue(t.atLiveEdge)
+            t.OnPosition(304000) ' the burst catches up -> offset back to 0
+            m.assertTrue(t.atLiveEdge)
+            m.assertEqual(t.liveOffsetMs, 0)
+            t.OnLiveEdge(311000) ' sustained stall: 7s passes the leave band
+            m.assertFalse(t.atLiveEdge)
+            t.OnPosition(306000) ' still 5s behind: OUTSIDE the tight band -> stays on the offset (no re-flap)
+            m.assertFalse(t.atLiveEdge)
+            m.assertEqual(t.liveOffsetMs, 5000)
+            t.OnPosition(310000) ' rejoined within the tight band -> ● LIVE again
+            m.assertTrue(t.atLiveEdge)
         end function
 
         @it("a resume that rejoins the edge recovers ● LIVE")

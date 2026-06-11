@@ -88,6 +88,22 @@ function TestSetControl(value as string) as void
     m.top.control = value
 end function
 
+' TestSetLive — flip the loaded content to a rewindable live stream with a known edge: what
+' OnVideoContentJobDone does for real live content (SetContent + DVR window + bar fields), minus the job.
+function TestSetLive(edgeMs as integer) as void
+    m.transport.SetContent(true, 2000, false)
+    m.transport.SetLiveDvrWindow(4 * 3600 * 1000) ' 4h window -> rewindable
+    m.trickPlayBar.isLive = true
+    m.trickPlayBar.canRewind = m.transport.CanRewindLive()
+    m.transport.OnLiveEdge(edgeMs)
+    m.transport.OnPosition(edgeMs)
+end function
+
+' TestFireLiveBadgeHold — fire the liveBadgeHold timer's handler now (the spec can't wait out the real timer).
+function TestFireLiveBadgeHold() as void
+    OnLiveBadgeHoldFire()
+end function
+
 ' TestPlaybackErrorDialog — seed the error fields, drive OnVideoError down the dialog path, return the dialog's
 ' message + title.
 function TestPlaybackErrorDialog(errorFields as object) as object
@@ -154,5 +170,8 @@ function TestSnapshot() as object
         chromeShown: (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton
+        forceLiveBadge: m.trickPlayBar.forceLiveBadge
+        liveBadgeShown: m.trickPlayBar.findNode("liveLabel").visible
+        barRemainingText: m.trickPlayBar.findNode("remainingLabel").text
     }
 end function

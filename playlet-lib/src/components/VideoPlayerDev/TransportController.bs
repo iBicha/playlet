@@ -84,6 +84,10 @@ namespace TransportController
     ' shows the time-behind. The clock-anchored edge advances smoothly, so this only needs to absorb position
     ' notification granularity (~1s) plus a little buffering slack.
     const LIVE_EDGE_ATEDGE_MS = 3000
+    ' Leaving the edge while passively TRACKING (idle playback) takes a wider band: position notifications lag
+    ' the clock-driven edge in bursts (segment fetches, brief stalls), and flipping the badge to "0:04" and
+    ' back on every burst reads as flicker. User actions (rewind/seek/commit) keep the tight band.
+    const LIVE_EDGE_ATEDGE_LEAVE_MS = 6000
 
     ' The transport state machine.
     class Controller
@@ -251,7 +255,7 @@ namespace TransportController
             if m.transportMode = TransportController.Mode.Idle
                 m.cursorMs = ms
                 if m.isLive
-                    m.RecomputeLive()
+                    m.RecomputeLive(true) ' passive tracking tick -> badge leave-hysteresis
                 end if
             end if
         end function
@@ -276,8 +280,10 @@ namespace TransportController
             end if
             m.edgeMs = ms
             m.ClampIdleCursor() ' a re-anchor can regress past a stale in-flight seek cursor
-            if m.transportMode = TransportController.Mode.Idle or m.transportMode = TransportController.Mode.LiveDvr
-                m.RecomputeLive()
+            if m.transportMode = TransportController.Mode.Idle
+                m.RecomputeLive(true) ' passive tracking tick -> badge leave-hysteresis
+            else if m.transportMode = TransportController.Mode.LiveDvr
+                m.RecomputeLive() ' user-owned cursor -> tight band
             end if
         end function
 
@@ -535,7 +541,9 @@ namespace TransportController
         ' cursor sits behind the edge beyond the stream's inherent latency (liveMinGapMs), and "at the edge" is
         ' simply that offset being inside the jitter band. Pause, rebuffer, rewind, startup: all just make the
         ' offset what it really is.
-        function RecomputeLive() as void
+        ' tracking=true (the idle 1/s position/edge ticks) adds leave-hysteresis on the badge: once at the
+        ' edge, only a sustained fall-behind drops it. Re-entry, and every user action, stays on the tight band.
+        function RecomputeLive(tracking = false as boolean) as void
             raw = m.edgeMs - m.cursorMs
             if raw < 0
                 raw = 0
@@ -554,7 +562,11 @@ namespace TransportController
                 offset = 0
             end if
             m.liveOffsetMs = offset
-            m.atLiveEdge = (offset <= TransportController.LIVE_EDGE_ATEDGE_MS)
+            threshold = TransportController.LIVE_EDGE_ATEDGE_MS
+            if tracking and m.atLiveEdge
+                threshold = TransportController.LIVE_EDGE_ATEDGE_LEAVE_MS
+            end if
+            m.atLiveEdge = (offset <= threshold)
         end function
 
         ' ------------------------------------------------------------------------------------------------

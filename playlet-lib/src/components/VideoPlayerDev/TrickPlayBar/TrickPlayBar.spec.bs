@@ -221,6 +221,26 @@ namespace Tests
             m.assertEqual(m.top.findNode("remainingLabel").text, "0:17")
         end function
 
+        @it("an active live transport shows the TIME, never the badge — even at the edge or latched")
+        function _()
+            ' the user seeks BY the offset: on the very first press (a scan hasn't moved the cursor yet, so
+            ' atLiveEdge is still true; a reveal latch may still be running) the label must already be the time.
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.top.atLiveEdge = true
+            m.top.forceLiveBadge = true
+            m.top.cursorMs = 43200000
+            m.top.liveOffsetMs = 0
+            m.assertFalse(m.top.findNode("bullet").visible)
+            m.assertFalse(m.top.findNode("liveLabel").visible)
+            m.assertEqual(m.top.findNode("remainingLabel").text, "0:00")
+            ' committing back to idle at the edge restores the badge
+            m.top.forceLiveBadge = false
+            m.top.transportMode = TransportController.Mode.Idle
+            m.assertTrue(m.top.findNode("bullet").visible)
+            m.assertTrue(m.top.findNode("liveLabel").visible)
+        end function
+
         @it("grows the playhead on the LIVE bar too when the bar tier has focus (behind the edge, idle)")
         function _()
             ' the focus-grow is the same code on both bars, but live is half the player — exercise it here on an

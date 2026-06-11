@@ -61,6 +61,7 @@ function Initialize()
     m.videoPlayedSuccessfully = false ' true once the stream has actually played (gates error-retry)
 
     m.chromeMode = ChromeMode.Hidden
+    m.liveBadgeHoldActive = false ' the "● LIVE" reveal hold is running
     m.firstFrameSeen = false
     m.showFullScreenHint = false
     m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons
@@ -238,6 +239,12 @@ function ApplyTransport() as void
     ' so here mode<>idle while the chrome is still hidden — gating on chromeVisible alone would drop the first
     ' seek frame until the next tick.
     mode = m.transport.transportMode
+
+    ' a live transport seeks by the offset: release the "● LIVE" reveal hold so the time is readable at once.
+    if mode <> TransportController.Mode.Idle
+        CancelLiveBadgeHold()
+    end if
+
     chromeVisible = (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
     if mode <> TransportController.Mode.Idle or chromeVisible
         PushTransportToRenderers()
@@ -606,9 +613,10 @@ function ShowChrome(instant = false as boolean) as void
             m.chromeMode = ChromeMode.FadingIn
             m.chromeFadeIn.control = "start"
         end if
-        ' flash "● LIVE" briefly on a live reveal, then let the label swap to the offset M:SS when behind the
-        ' edge (signals "this is live"). Label only — the playhead is proportional to the real cursor position.
-        if m.transport.isLive
+        ' flash "● LIVE" briefly on an IDLE live reveal, then let the label swap to the offset M:SS when behind
+        ' the edge (signals "this is live"). Label only — the playhead is proportional to the real cursor
+        ' position. A transport-key reveal skips the hold: the user is seeking by the offset.
+        if m.transport.isLive and m.transport.transportMode = TransportController.Mode.Idle
             StartLiveBadgeHold()
         end if
     end if
@@ -624,15 +632,28 @@ function ShowChrome(instant = false as boolean) as void
     ArmAutoHide()
 end function
 
-' Force the bar to show "● LIVE" for ~0.6s after a live reveal, then release so it swaps to the offset M:SS
+' Force the bar to show "● LIVE" briefly after a live reveal, then release so it swaps to the offset M:SS
 ' when behind the edge.
 function StartLiveBadgeHold() as void
+    m.liveBadgeHoldActive = true
     m.trickPlayBar.forceLiveBadge = true
     m.liveBadgeHold.control = "stop"
     m.liveBadgeHold.control = "start"
 end function
 
 function OnLiveBadgeHoldFire() as void
+    m.liveBadgeHoldActive = false
+    m.trickPlayBar.forceLiveBadge = false
+end function
+
+' Release the hold early (a transport started mid-hold). Guarded so the per-drain call from ApplyTransport
+' is free when no hold is running.
+function CancelLiveBadgeHold() as void
+    if not m.liveBadgeHoldActive
+        return
+    end if
+    m.liveBadgeHoldActive = false
+    m.liveBadgeHold.control = "stop"
     m.trickPlayBar.forceLiveBadge = false
 end function
 
