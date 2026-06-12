@@ -37,6 +37,13 @@ function TestSetup() as void
 
     Initialize() ' the real coordinator init body (m.transport, findNode children, timer observers, getHttpAgent)
 
+    ' count ButtonRow nudge pulses (the field is a sticky alwaysNotify boolean, so the count — not the value —
+    ' is what tells the spec whether a given press pulsed). Scoped + unobserve-first: the suite node is shared
+    ' across tests, so a plain ObserveField here would stack one counter observer per TestSetup call.
+    m.top.nudgeCount = 0
+    m.buttonRow.unobserveFieldScoped("nudge")
+    m.buttonRow.observeFieldScoped("nudge", FuncName(OnTestNudge))
+
     container = createObject("roSGNode", "Node")
     container.addField("fullscreen", "boolean", false)
     container.fullscreen = true
@@ -70,6 +77,10 @@ function TestSetup() as void
     m.innertube = m.top.innertube
 
     OnNodeReady()
+end function
+
+function OnTestNudge() as void
+    m.top.nudgeCount += 1
 end function
 
 ' TestKey — drive a remote key through the REAL OnKeyEvent (scrub/scan/commit/etc).
@@ -170,6 +181,7 @@ function TestSnapshot() as object
         chromeShown: (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton
+        nudgeCount: m.top.nudgeCount
         forceLiveBadge: m.trickPlayBar.forceLiveBadge
         liveBadgeShown: m.trickPlayBar.findNode("liveLabel").visible
         barRemainingText: m.trickPlayBar.findNode("remainingLabel").text

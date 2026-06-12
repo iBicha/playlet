@@ -337,11 +337,15 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     ' BAR tier takes Up (back to the buttons) and lets the transport keys through. Rev/Fwd/Replay are not owned
     ' by the buttons, so they fall through to the transport and move focus to the bar.
     if press and CanFocusInteract()
-        ' Up/Down move between the two tiers; a no-op at the ends is still consumed.
+        ' Up/Down move between the two tiers; a no-op at the ends is still consumed — Up at the top tier
+        ' (the buttons) pulses the focused button so the press visibly lands somewhere.
         if key = RemoteKeys.Up or key = RemoteKeys.Down
             newTarget = PlayerCoordinatorLogic.NextFocusTarget(m.focusTarget, key)
             if newTarget <> m.focusTarget
                 SetFocusTarget(newTarget)
+            else if m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons
+                m.buttonRow.nudge = true
+                ArmAutoHide()
             end if
             return true
         end if

@@ -2,6 +2,7 @@
 ' inert and spec-driven) through scripted device-state sequences the real Roku Video won't produce on command.
 ' This is the harness that would have caught the reported wedge: the existing INV-D* are blind to it (during the
 ' wedge state="buffering", so "transport => state<>playing" was SATISFIED). The NEW property is P-seam.
+import "pkg:/components/VideoPlayerDev/PlayerCoordinatorLogic.bs"
 import "pkg:/components/VideoPlayerDev/TransportController.bs"
 import "pkg:/components/VideoPlayerDev/VideoNode.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
@@ -212,6 +213,56 @@ namespace Tests
             m.assertFalse(m.Snap().chromeShown)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' fresh reveal
             m.assertEqual(m.Snap().focusedButton, 0, "a fresh reveal resets the highlight")
+        end function
+
+        ' Up at the top tier (the buttons) has nowhere to go; the press must still visibly land — it pulses
+        ' (nudges) the focused button instead of being swallowed.
+        @it("Up at the buttons tier nudges the focused button instead of moving focus")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
+            before = m.Snap()
+            m.assertEqual(before.focusTarget, PlayerCoordinatorLogic.FocusTarget.Buttons)
+            m.assertEqual(before.nudgeCount, 0, "the reveal itself does not nudge")
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' nowhere to go up
+            after = m.Snap()
+            m.assertEqual(after.nudgeCount, 1, "the no-op Up pulsed the focused button")
+            m.assertEqual(after.focusTarget, PlayerCoordinatorLogic.FocusTarget.Buttons, "focus stays on the buttons")
+            m.assertEqual(after.focusedButton, before.focusedButton, "the highlight is untouched")
+        end function
+
+        ' A press that GOES somewhere must not nudge: Left/Right inside the row, Up/Down between the tiers.
+        @it("a press that moves focus does not nudge")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier, play/pause
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> minimize
+            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' minimize -> play/pause
+            m.assertEqual(m.Snap().nudgeCount, 0, "every press moved focus; none may pulse")
+        end function
+
+        ' Left/Right clamped at the row's ends pulse the focused button (the original nudge path, at the seam).
+        @it("Left/Right clamped at the row ends nudge the focused button")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> play/pause (leftmost)
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' clamped at the left end
+            m.assertEqual(m.Snap().nudgeCount, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> minimize (rightmost)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' clamped at the right end
+            snap = m.Snap()
+            m.assertEqual(snap.nudgeCount, 2)
+            m.assertEqual(snap.focusedButton, 1, "the clamp held the highlight at the end")
+        end function
+
+        ' Down at the bar tier (the bottom) is also a no-op, but the bar is not a button: consumed, no nudge.
+        @it("Down at the bar tier is consumed without a nudge")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
+            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' nowhere to go down
+            snap = m.Snap()
+            m.assertEqual(snap.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar, "focus stays on the bar")
+            m.assertEqual(snap.nudgeCount, 0)
         end function
 
         ' A keep-playing seek issued while PAUSED must preserve the pause: the device auto-resumes on any seek
