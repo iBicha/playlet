@@ -1,17 +1,29 @@
 <script lang="ts">
   import { PlayletApi } from "lib/Api/PlayletApi";
-  import { translate, userPreferencesStore } from "lib/Stores";
+  import { playletStateStore, translate, userPreferencesStore } from "lib/Stores";
 
   const textSizes = ["text-2xl", "text-lg", "text-base", "text-sm", "text-xs"];
-  const qualityLabels = {
-    auto: "Auto",
-    "1080p": "1080p",
-    "720p": "720p",
-    "480p": "480p",
-    "360p": "360p",
-    "240p": "240p",
-    "144p": "144p",
-  };
+
+  function makeQualityLabels(canDecodeAv1: boolean) {
+    return {
+      auto: "Auto",
+      ...(canDecodeAv1 ? { "2160p": "2160p", "1440p": "1440p" } : {}),
+      "1080p": "1080p",
+      "720p": "720p",
+      "480p": "480p",
+      "360p": "360p",
+      "240p": "240p",
+      "144p": "144p",
+    };
+  }
+
+  let qualityLabels = makeQualityLabels(false);
+
+  playletStateStore.subscribe((state) => {
+    qualityLabels = makeQualityLabels(
+      (state.device || {})["can_decode_av1"] === true
+    );
+  });
 
   export let displayText: string = "";
   export let key: string = "";

@@ -1,5 +1,6 @@
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
+import "pkg:/source/utils/CodecCapabilities.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
@@ -19,10 +20,46 @@ function Init()
     m.saveButton.observeField("buttonSelected", FuncName(OnSaveButtonSelected))
     m.closeButton.observeField("buttonSelected", FuncName(Close))
 
-    m.lastCheckedState = [false, false, false, false, false, false, false]
+    AddHighQualityOptions()
+
+    m.lastCheckedState = NewCheckedState(false, false)
     m.checkList.observeField("checkedState", FuncName(OnCheckedStateChange))
 
     SetButtonPositions()
+end function
+
+' 1440p/2160p exist on YouTube only as AV1 (mp4) and VP9 (webm) streams, and the
+' player only plays fragmented MP4 in DASH, so the options only work with an AV1 decoder.
+function AddHighQualityOptions() as void
+    if not CodecCapabilities.CanDecodeAv1()
+        return
+    end if
+
+    content = m.checkList.content
+    for each quality in ["1440p", "2160p"]
+        node = CreateObject("roSGNode", "ContentNode")
+        node.id = quality
+        node.title = quality
+        content.insertChild(node, 1)
+    end for
+end function
+
+function NewCheckedState(autoChecked as boolean, othersChecked as boolean) as object
+    checkedState = [autoChecked]
+    count = m.checkList.content.getChildCount()
+    for i = 1 to count - 1
+        checkedState.push(othersChecked)
+    end for
+    return checkedState
+end function
+
+function AllQualitiesValue() as string
+    values = []
+    checkboxes = m.checkList.content.getChildren(-1, 0)
+    for i = 1 to checkboxes.Count() - 1
+        values.push(checkboxes[i].id)
+    end for
+    return values.Join(",")
 end function
 
 function SetButtonPositions()
@@ -99,16 +136,16 @@ function OnCheckedStateChange() as void
 
     if autoChanged
         if hasAuto
-            checkedState = [true, false, false, false, false, false, false]
+            checkedState = NewCheckedState(true, false)
             m.lastCheckedState = checkedState
             m.checkList.checkedState = checkedState
             m.top.value = "auto"
             return
         else
-            checkedState = [false, true, true, true, true, true, true]
+            checkedState = NewCheckedState(false, true)
             m.lastCheckedState = checkedState
             m.checkList.checkedState = checkedState
-            m.top.value = "1080p,720p,480p,360p,240p,144p"
+            m.top.value = AllQualitiesValue()
             return
         end if
     end if
@@ -128,7 +165,7 @@ function OnCheckedStateChange() as void
     end for
 
     if values.Count() = 0
-        checkedState = [true, false, false, false, false, false, false]
+        checkedState = NewCheckedState(true, false)
         m.lastCheckedState = checkedState
         m.checkList.checkedState = checkedState
         m.top.value = "auto"

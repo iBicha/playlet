@@ -1,5 +1,6 @@
 import "pkg:/components/Web/WebServer/Http/HttpUtils.bs"
 import "pkg:/source/services/XmlObject.bs"
+import "pkg:/source/utils/CodecCapabilities.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
@@ -14,6 +15,7 @@ class DashManifest
     ' Backend the metadata came from, echoed onto every live-seg URL so the
     ' DashRouter cache keys on it without reading the prefs node. Set by DashRouter.
     public liveBackend as string = ""
+    private canDecodeAv1Cache as dynamic
 
     function new(invidiousInstance as string, disableAutoDubbed = false as boolean)
         m.invidiousInstance = invidiousInstance
@@ -64,8 +66,11 @@ class DashManifest
         videoGroups = groupings.video
 
         filteredVideoGroups = m.FilterVideoGroups(videoGroups, qualityFilter)
-        if filteredVideoGroups.Count() = 0 and videoGroups.Count() > 0
-            LogWarnNoTelemetry("No video streams found using quality filter:", qualityFilter, "Falling back to all video streams")
+        ' The player skips video sets it can't play (webm container, undecodable codec).
+        ' A filter that leaves only such sets - e.g. 2160p-only when the 4K streams are
+        ' VP9/webm - would play audio with no video, so fall back to all streams.
+        if not m.HasPlayableVideoGroup(filteredVideoGroups) and videoGroups.Count() > 0
+            LogWarnNoTelemetry("No playable video streams using quality filter:", qualityFilter, "Falling back to all video streams")
             filteredVideoGroups = videoGroups
         end if
 
@@ -329,6 +334,30 @@ class DashManifest
             end if
         end for
         return filteredGroups
+    end function
+
+    function HasPlayableVideoGroup(videoGroups as object) as boolean
+        for each group in videoGroups
+            mimeType = ValidString(group[0].type)
+            ' DASH chunks must be fragmented MP4: the player never picks webm sets.
+            if not mimeType.startsWith("video/mp4")
+                continue for
+            end if
+            if mimeType.inStr("avc1") <> -1
+                return true
+            end if
+            if mimeType.inStr("av01") <> -1 and m.CanDecodeAv1()
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    function CanDecodeAv1() as boolean
+        if m.canDecodeAv1Cache = invalid
+            m.canDecodeAv1Cache = CodecCapabilities.CanDecodeAv1()
+        end if
+        return m.canDecodeAv1Cache
     end function
 
     function IsVideoFormatIncluded(stream as object, qualityFilter as object) as boolean
