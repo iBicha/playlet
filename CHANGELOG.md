@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Not all 4k supporting devices - only with AV1 support (usually newer devices)
   - Not all 4k videos are playable, only AV1 encoded videos
 
+### Fixed
+
+- Missing video durations in channel pages, when using Playlet backend
+
 ## [0.46.0] - 2026-06-12
 
 ### Added

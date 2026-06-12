@@ -1103,6 +1103,32 @@ namespace Innertube
         return invalid
     end function
 
+    ' The badge overlay has two shapes: thumbnailOverlayBadgeViewModel.thumbnailBadges (older, still
+    ' used on playlist/podcast/album lockups) and thumbnailBottomOverlayViewModel.badges (video lockups)
+    function GetThumbnailBadgeText(thumbnailViewModel as object) as string
+        overlays = ObjectUtils.Dig(thumbnailViewModel, ["overlays"])
+        if not IsArray(overlays)
+            return ""
+        end if
+
+        for each overlay in overlays
+            badges = ObjectUtils.Dig(overlay, ["thumbnailBottomOverlayViewModel", "badges"])
+            if not IsArray(badges)
+                badges = ObjectUtils.Dig(overlay, ["thumbnailOverlayBadgeViewModel", "thumbnailBadges"])
+            end if
+            if IsArray(badges)
+                for each badge in badges
+                    text = ValidString(ObjectUtils.Dig(badge, ["thumbnailBadgeViewModel", "text"]))
+                    if text <> ""
+                        return text
+                    end if
+                end for
+            end if
+        end for
+
+        return ""
+    end function
+
     function LockupViewModelTypeVideo(nodeData as object, context as object) as object
         videoId = nodeData["contentId"]
         if not IsString(videoId)
@@ -1124,7 +1150,7 @@ namespace Innertube
             end if
         end if
 
-        lengthText = ValidString(ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"]))
+        lengthText = GetThumbnailBadgeText(thumbnailViewModel)
 
         authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
 
@@ -1155,7 +1181,7 @@ namespace Innertube
             "authorId": authorId
             "lines": lines
             "videoThumbnails": videoThumbnails
-            "videoCountText": lengthText
+            "lengthText": lengthText
         }
 
         PushFeedItem(video, context)
@@ -1234,7 +1260,7 @@ namespace Innertube
         title = ObjectUtils.Dig(metadata, ["title", "content"])
         thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
         thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
-        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+        videoCountText = GetThumbnailBadgeText(thumbnailViewModel)
 
         author = invalid
         authorId = invalid
@@ -1283,7 +1309,7 @@ namespace Innertube
         title = ObjectUtils.Dig(metadata, ["title", "content"])
         thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
         thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
-        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+        videoCountText = GetThumbnailBadgeText(thumbnailViewModel)
 
         author = invalid
         authorId = invalid
@@ -1318,7 +1344,7 @@ namespace Innertube
         title = ObjectUtils.Dig(metadata, ["title", "content"])
         thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
         thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
-        videoCountText = ObjectUtils.Dig(thumbnailViewModel, ["overlays", 0, "thumbnailOverlayBadgeViewModel", "thumbnailBadges", 0, "thumbnailBadgeViewModel", "text"])
+        videoCountText = GetThumbnailBadgeText(thumbnailViewModel)
 
         author = invalid
         authorId = invalid
