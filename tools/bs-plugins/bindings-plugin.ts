@@ -13,6 +13,7 @@ import {
 import path from "path";
 import { SGNode, SGScript } from "brighterscript/dist/parser/SGTypes";
 import { RawCodeStatement } from "./Classes/RawCodeStatement";
+import { exitOnCriticalErrors } from './critical-exit';
 
 
 const bindings_function_name = 'InitializeBindings';
@@ -198,5 +199,5 @@ export class BindingsPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new BindingsPlugin();
+    return exitOnCriticalErrors(new BindingsPlugin());
 };

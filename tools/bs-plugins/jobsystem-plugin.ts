@@ -11,6 +11,7 @@ import {
     DiagnosticSeverity,
 } from 'brighterscript';
 import path from 'path';
+import { exitOnCriticalErrors } from './critical-exit';
 
 export class JobSystemPlugin implements CompilerPlugin {
     public name = 'JobSystemPlugin';
@@ -115,5 +116,5 @@ export class JobSystemPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new JobSystemPlugin();
+    return exitOnCriticalErrors(new JobSystemPlugin());
 };

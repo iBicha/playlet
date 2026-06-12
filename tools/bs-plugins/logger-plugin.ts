@@ -16,6 +16,7 @@ import {
     isBrsFile,
 } from 'brighterscript';
 import path from 'path';
+import { exitOnCriticalErrors } from './critical-exit';
 
 const loggingFilePath = path.join('source', 'utils', 'Logging.bs');
 const logFunctions = {
@@ -250,5 +251,5 @@ function ${newFunctionName}(${args.join(', ')}) as void
 }
 
 export default () => {
-    return new LoggerPlugin();
+    return exitOnCriticalErrors(new LoggerPlugin());
 };

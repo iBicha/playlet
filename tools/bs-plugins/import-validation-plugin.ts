@@ -11,6 +11,7 @@ import {
 } from 'brighterscript';
 import { existsSync } from 'fs-extra';
 import path from 'path';
+import { exitOnCriticalErrors } from './critical-exit';
 
 export class ImportValidationPlugin implements CompilerPlugin {
     public name = 'ImportValidationPlugin';
@@ -45,5 +46,5 @@ export class ImportValidationPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new ImportValidationPlugin();
+    return exitOnCriticalErrors(new ImportValidationPlugin());
 };

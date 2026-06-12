@@ -18,6 +18,7 @@ import {
 } from 'brighterscript';
 import path from 'path';
 import fs from 'fs';
+import { exitOnCriticalErrors } from './critical-exit';
 
 function copyDirSync(src: string, dest: string): void {
     fs.mkdirSync(dest, { recursive: true });
@@ -82,5 +83,5 @@ export class OdcPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new OdcPlugin();
+    return exitOnCriticalErrors(new OdcPlugin());
 };

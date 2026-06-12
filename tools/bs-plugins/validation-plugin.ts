@@ -9,6 +9,7 @@ import {
     Range,
     isBrsFile
 } from 'brighterscript';
+import { exitOnCriticalErrors } from './critical-exit';
 
 type Validation = {
     code: number | string | undefined;
@@ -76,5 +77,5 @@ export class ValidationPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new ValidationPlugin();
+    return exitOnCriticalErrors(new ValidationPlugin());
 };

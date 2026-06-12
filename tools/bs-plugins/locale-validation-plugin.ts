@@ -27,6 +27,7 @@ import { globSync } from 'glob';
 import { SGNode } from "brighterscript/dist/parser/SGTypes";
 import json5 from 'json5';
 import YAML from "yaml";
+import { exitOnCriticalErrors } from './critical-exit';
 
 const translatableXmlAttributes = ["text", "title", "short_title", "primaryTitle", "displayText", "description"];
 
@@ -417,5 +418,5 @@ export class LocaleValidationPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new LocaleValidationPlugin();
+    return exitOnCriticalErrors(new LocaleValidationPlugin());
 };

@@ -15,6 +15,7 @@ import {
 } from 'brighterscript';
 import path from 'path';
 import fs from 'fs';
+import { exitOnCriticalErrors } from './critical-exit';
 const ip = require('ip');
 
 export class ManifestEditPlugin implements CompilerPlugin {
@@ -76,5 +77,5 @@ export class ManifestEditPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new ManifestEditPlugin();
+    return exitOnCriticalErrors(new ManifestEditPlugin());
 };

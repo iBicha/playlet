@@ -17,6 +17,7 @@ import {
 } from 'brighterscript';
 
 import { RawCodeStatement } from './Classes/RawCodeStatement';
+import { exitOnCriticalErrors } from './critical-exit';
 
 // The plugin processes the file that includes the Init function, not the file that includes the @oninit functions
 // This is because the modifications will be made to the Init function.
@@ -209,5 +210,5 @@ export class OnInitPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new OnInitPlugin();
+    return exitOnCriticalErrors(new OnInitPlugin());
 };

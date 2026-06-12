@@ -16,6 +16,7 @@ import {
     isBrsFile
 } from "brighterscript";
 import { RawCodeStatement } from "./Classes/RawCodeStatement";
+import { exitOnCriticalErrors } from './critical-exit';
 
 const annotationNames = ['all', 'get', 'post', 'put', 'delete', 'patch', 'head', 'options'];
 const httpRouterBaseClass = 'HttpRouter';
@@ -155,5 +156,5 @@ export class WebServerPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new WebServerPlugin();
+    return exitOnCriticalErrors(new WebServerPlugin());
 };

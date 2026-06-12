@@ -13,6 +13,7 @@ import { SGChildren, SGComponent, SGInterface, SGScript } from 'brighterscript/d
 import { globSync } from 'glob';
 import fs from 'fs-extra'
 import path from 'path';
+import { exitOnCriticalErrors } from './critical-exit';
 
 export class ComponentIncludesPlugin implements CompilerPlugin {
     public name = 'ComponentIncludesPlugin';
@@ -160,5 +161,5 @@ export class ComponentIncludesPlugin implements CompilerPlugin {
 }
 
 export default () => {
-    return new ComponentIncludesPlugin();
+    return exitOnCriticalErrors(new ComponentIncludesPlugin());
 };

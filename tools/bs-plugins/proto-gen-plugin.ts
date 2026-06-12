@@ -9,6 +9,7 @@ import { globSync } from 'glob';
 import path from 'path';
 import md5 from 'crypto-js/md5';
 import { Formatter, Runner } from 'brighterscript-formatter';
+import { exitOnCriticalErrors } from './critical-exit';
 const protobufSchema = require('protocol-buffers-schema')
 
 export class ProtoGenPlugin implements CompilerPlugin {
@@ -275,5 +276,5 @@ end function`;
 }
 
 export default () => {
-  return new ProtoGenPlugin();
+  return exitOnCriticalErrors(new ProtoGenPlugin());
 };
