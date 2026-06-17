@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing video durations in channel pages, when using Playlet backend
+- Captions on some videos (from TV broadcasts) displaying vertically instead of horizontally
 
 ## [0.46.0] - 2026-06-12
 
