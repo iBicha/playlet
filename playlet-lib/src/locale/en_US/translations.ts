@@ -1061,12 +1061,12 @@
         <translation>Endcards/Credits</translation>
     </message>
     <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Preview/Recap/Hook</translation>
-    </message>
-    <message>
         <source>Preview/Recap</source>
         <translation>Preview/Recap</translation>
+    </message>
+    <message>
+        <source>Hook/Greetings</source>
+        <translation>Hook/Greetings</translation>
     </message>
     <message>
         <source>Filler Tangent/Jokes</source>

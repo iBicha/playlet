@@ -178,6 +178,16 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
         isDirty = true
     end if
 
+    if userPrefs.__version = 6
+        ' Hook was split out of Preview. Existing users inherit their Preview setting.
+        categories = userPrefs["sponsorblock.categories"]
+        if IsAssociativeArray(categories) and not categories.DoesExist("hook") and IsAssociativeArray(categories["preview"])
+            categories["hook"] = { option: categories["preview"].option }
+        end if
+        userPrefs.__version = 7
+        isDirty = true
+    end if
+
     ' TODO:P2 handle case where saved preferences version is higher than current version (e.g. user downgraded)
 
     #if DEBUG

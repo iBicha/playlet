@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Playlet already supported 4K videos. This adds a support check, and quality selectors in the settings, for the devices that support it.
   - Not all 4k supporting devices - only with AV1 support (usually newer devices)
   - Not all 4k videos are playable, only AV1 encoded videos
+- SponsorBlock "Hook/Greetings" category
 
 ### Fixed
 

@@ -29,6 +29,15 @@ export class ManifestEditPlugin implements CompilerPlugin {
     private originalManifestContent?: string;
 
     beforeProgramCreate(builder: ProgramBuilder) {
+        // The language server loads this plugin too (VS Code + bsc-lsp), and its revalidate cycle would
+        // restore a stale cached copy of the manifest over genuine build edits. The LSP builds no-emit
+        // with showDiagnosticsInConsole off (it reports over the protocol); builds and bslint leave it
+        // on. So that flag marks the analysis-only editor pass — skip the manifest rewrite there.
+        // @ts-ignore
+        if (builder.options.showDiagnosticsInConsole === false) {
+            return;
+        }
+
         const manifestPath = path.join(builder.options.rootDir!, "manifest")
         let originalManifestContent = fs.readFileSync(manifestPath, { encoding: 'utf8', flag: 'r' })
 
