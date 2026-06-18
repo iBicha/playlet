@@ -373,6 +373,19 @@ namespace Tests
             end for
         end function
 
+        ' PiP captions (regression: subtitles stopped after shrink->grow). With enableUI=false the OS leaves
+        ' captions blank after a PiP restore; minimize must suppress and restore must release — the
+        ' suppress->release refresh re-engages OS caption rendering.
+        @it("PiP minimize suppresses captions; restore releases them")
+        function _()
+            container = m.top.container
+            m.assertFalse(m.Snap().suppressCaptions, "captions shown while fullscreen")
+            container.fullscreen = false
+            m.assertTrue(m.Snap().suppressCaptions, "captions suppressed while minimized")
+            container.fullscreen = true
+            m.assertFalse(m.Snap().suppressCaptions, "captions released on restore")
+        end function
+
         ' The PiP-toggle-after-close crash (captured on device): OnClose drops m.sponsorblock, so a leaked
         ' container observer makes the next fullscreen flip crash OnFullScreenChange (&hf3 on SetVisible). The
         ' fix is unobserve-on-close + the onCloseCalled guard; a regression CRASHES this test. Kept LAST in the
