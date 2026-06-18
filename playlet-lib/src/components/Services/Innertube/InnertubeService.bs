@@ -38,6 +38,7 @@ namespace InnertubeService
         playerResponseJson = invalid
         client = Innertube.ClientType.Tv
         totalPlayerRequests = 0
+        triedReloadRefresh = false
         while true
             ' We shouldn't be making more than 2 requests:
             ' 1. Make request with TV client.
@@ -85,6 +86,11 @@ namespace InnertubeService
             if parsedResponse.errorCode <> invalid
                 if parsedResponse.errorCode = "STS_MISMATCH"
                     LogInfo("STS_MISMATCH error, retrying...")
+                    continue while
+                else if parsedResponse.errorCode = "RELOAD_PAGE" and not triedReloadRefresh
+                    triedReloadRefresh = true
+                    LogInfo("RELOAD_PAGE: clearing stale STS cache and retrying...")
+                    DeleteFile("tmp:/sts_cache.json")
                     continue while
                 else if parsedResponse.errorCode = "MISSING_FORMAT_FIELD"
                     useServerDrivenAbr = `${ObjectUtils.Dig(playerResponseJson, ["playerConfig", "mediaCommonConfig", "useServerDrivenAbr"])}`

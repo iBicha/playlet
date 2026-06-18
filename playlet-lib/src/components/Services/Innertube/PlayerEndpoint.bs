@@ -77,6 +77,9 @@ namespace Innertube
         error = ParsePlayerResponseForError(payload, playerRequest)
         if error <> ""
             parsedResponse["error"] = error
+            if PlayerResponseRequiresPageReload(payload)
+                parsedResponse["errorCode"] = "RELOAD_PAGE"
+            end if
             return parsedResponse
         end if
 
@@ -229,6 +232,11 @@ namespace Innertube
         end if
 
         return errorLines.Join(`\n`)
+    end function
+
+    function PlayerResponseRequiresPageReload(payload as object) as boolean
+        signal = ObjectUtils.Dig(payload, ["playabilityStatus", "errorScreen", "playerErrorMessageRenderer", "proceedButton", "buttonRenderer", "command", "signalAction", "signal"])
+        return IsString(signal) and signal = "RELOAD_PAGE"
     end function
 
     function ParseStoryboards(payload as object, lengthSeconds as integer) as object
