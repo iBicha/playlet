@@ -417,6 +417,35 @@ namespace Tests
             m.assertTrue(true, "no crash: the closed player ignored all post-close traffic")
         end function
 
+        ' Crash #1 (store: the dominant OnPosition crash, &hf3 ERR_RO3 "interface not a member"): a finish
+        ' triggered from WITHIN a position tick re-enters teardown synchronously — EnforceTransportFreeze ->
+        ' FinishEof -> OnPlaybackFinished -> ClosePlayer -> the queue sets player.close -> OnClose drops
+        ' m.sponsorblock — then OnPosition continues to `m.sponsorblock.OnPosition()` and derefs the dropped
+        ' controller. (`m.sponsorblock` is a field, so the invalid deref is &hf3, not &hec.) The OLD code crashes
+        ' here; the onCloseCalled re-check after EnforceTransportFreeze bails. Kept LAST: OnClose detaches the node.
+        @it("a finish during a position tick must not deref the dropped sponsorblock (the OnPosition ERR_RO3 crash)")
+        function _()
+            m.top.callFunc("TestWireQueueClose") ' the stub queue now closes the player on closePlayer, as the real one does
+            m.top.duration = 100
+            m.top.position = 90
+            ' scrub the cursor to the end (atEof) while the actual position is NOT yet at the end.
+            for i = 0 to 8
+                m.top.callFunc("TestKey", RemoteKeys.Right, true)
+                m.top.callFunc("TestKey", RemoteKeys.Right, false)
+            end for
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub)
+            ' the device is PLAYING under the active transport (the INV-D1 anomaly EnforceTransportFreeze guards).
+            ' Position is not yet at EOF, so this is a normal re-freeze — NOT a finish.
+            m.top.callFunc("TestSetState", VideoState.Playing)
+            m.assertFalse(m.Snap().onCloseCalled, "not finished yet — the position is not at EOF")
+            ' NOW a position tick lands at the end -> OnPosition -> EnforceTransportFreeze -> FinishEof ->
+            ' OnPlaybackFinished -> ClosePlayer -> (re-entrant) OnClose drops m.sponsorblock -> OnPosition then
+            ' derefs the dropped controller. The old code faults here (&hf3); the fix bails first.
+            m.top.position = 99
+            ' reaching here means OnPosition survived the re-entrant teardown.
+            m.assertTrue(m.Snap().onCloseCalled, "the finish closed the player from within the position tick")
+        end function
+
     end class
 
 end namespace

@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Subtitles no longer stop displaying after shrinking the video to picture-in-picture and restoring it
+- Fixed a video player crash that could occur near the end of a video
+- Fixed a startup crash caused by corrupted saved-profiles data in the registry
+- Fixed a crash that could occur when the video player failed to start playback
 
 ## [0.47.0] - 2026-06-18
 

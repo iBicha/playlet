@@ -837,6 +837,12 @@ function OnPosition(event as object) as void
     ApplyTransport()
     EnforceTransportFreeze() ' OnPosition only fires while playing, so it catches a transport auto-resumed with no state-change edge.
 
+    ' EnforceTransportFreeze can finish playback (FinishEof at the end of content under a transport), which
+    ' synchronously closes the player and drops m.sponsorblock. A closed player must run no more of the tick.
+    if m.onCloseCalled = true
+        return
+    end if
+
     ' SponsorBlock auto-skip off the real position (the controller decides; we apply the seek / finish).
     sb = m.sponsorblock.OnPosition(posMs)
     if sb <> invalid
