@@ -913,12 +913,12 @@
         <translation>Écrans de fin/Crédits</translation>
     </message>
     <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Aperçu/Récapitulatif/Accroche</translation>
-    </message>
-    <message>
         <source>Preview/Recap</source>
         <translation>Aperçu/Récapitulatif</translation>
+    </message>
+    <message>
+        <source>Hook/Greetings</source>
+        <translation>Accroche/Salutations</translation>
     </message>
     <message>
         <source>Filler Tangent/Jokes</source>

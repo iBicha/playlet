@@ -789,16 +789,16 @@
         <translation>Cards finais/Créditos</translation>
     </message>
     <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Pré-visualização/Recapitulação/Gancho</translation>
-    </message>
-    <message>
         <source>Intermission/Intro Animation</source>
         <translation>Intermissão/Animação de introdução</translation>
     </message>
     <message>
         <source>Preview/Recap</source>
         <translation>Pré-visualização/Recapitulação</translation>
+    </message>
+    <message>
+        <source>Hook/Greetings</source>
+        <translation>Gancho/Saudações</translation>
     </message>
     <message>
         <source>Filler Tangent/Jokes</source>

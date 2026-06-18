@@ -625,6 +625,10 @@
         <translation>Vista previa/Resumen</translation>
     </message>
     <message>
+        <source>Hook/Greetings</source>
+        <translation>Gancho/Saludos</translation>
+    </message>
+    <message>
         <source>Added to queue</source>
         <translation>Añadir a la cola</translation>
     </message>
@@ -1127,10 +1131,6 @@
     <message>
         <source>Endcards/Credits</source>
         <translation>Tarjeta final/Créditos</translation>
-    </message>
-    <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Vista previa/Resumen/Gancho</translation>
     </message>
     <message>
         <source>Press and hold Options (*) to open the queue</source>

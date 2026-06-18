@@ -336,7 +336,15 @@ namespace Innertube
             ' vtt has "align:start position:0%" on auto-generated captions
             ' srt has large spacing between lines on auto-generated captions
             ' ttml has default styling, with smaller font than the default size
-            queryComponents["fmt"] = "ttml"
+            ' CEA-608 broadcast channels (CC1-CC4) encode their paint-on reveal as
+            ' per-segment timed spans; Roku's ttml renderer stacks each span on its own
+            ' line (vertical text). vtt expresses the same timing inline, so it wraps.
+            captionName = queryComponents["name"]
+            if captionName = "CC1" or captionName = "CC2" or captionName = "CC3" or captionName = "CC4"
+                queryComponents["fmt"] = "vtt"
+            else
+                queryComponents["fmt"] = "ttml"
+            end if
             baseUrl = UrlUtils.SetQueryParams(baseUrl, queryComponents)
 
             languageCode = track["languageCode"]

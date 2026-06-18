@@ -24,14 +24,18 @@ function LoadProfilesFromRegistry()
 
     ' Step 1: Load user profiles from registry
     userProfiles = RegistryUtils.Read(RegistryUtils.USER_PROFILES)
+    if userProfiles <> invalid
+        userProfiles = StringUtils.ParseJsonSafe(userProfiles)
+        if userProfiles = invalid
+            LogError("user_profiles registry value is corrupt (unparseable); resetting to empty")
+        end if
+    end if
 
     if userProfiles = invalid
         userProfiles = {
             profiles: []
             currentProfile: invalid
         }
-    else
-        userProfiles = StringUtils.ParseJsonSafe(userProfiles)
     end if
 
     ' Step 2: Migrate existing profiles to new format (if needed)

@@ -48,6 +48,10 @@ function OnPlay() as void
     end if
 
     player = CreateVideoPlayer()
+    if player = invalid
+        m.top.nowPlaying = invalid
+        return
+    end if
     player@.PlayWithContent(videoNode)
     m.top.player = player
     m.top.nowPlaying = videoNode
@@ -364,6 +368,10 @@ function CreateVideoPlayer() as object
 
     container = m.top.videoContainer
     videoPlayer = container.createChild(playerComponent)
+    if videoPlayer = invalid
+        LogError("createChild returned invalid for", playerComponent, "- cannot start playback")
+        return invalid
+    end if
     videoPlayer.id = "VideoPlayer"
     videoPlayer.previousPlayer = m.previousPlayer
     ' without this, the queue pins every last-closed player for the app's lifetime.

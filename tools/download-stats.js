@@ -64,6 +64,7 @@ const imap = new Imap({
 
 const searchAsync = promisify(imap.search).bind(imap);
 const openBoxAsync = promisify(imap.openBox).bind(imap);
+const moveAsync = promisify(imap.move).bind(imap);
 
 async function getAttachementAsync(from, subject, since) {
     return new Promise(async (resolve, reject) => {
@@ -116,36 +117,16 @@ async function getAttachementAsync(from, subject, since) {
 }
 
 async function moveToTrash(from, subject, since) {
-    return new Promise(async (resolve, reject) => {
-        const results = await searchAsync([['FROM', from], ['SUBJECT', subject], ['SINCE', since]]);
-        const fetch = imap.fetch(results, { bodies: '' });
-
-        fetch.on('message', function (msg, seqno) {
-            console.log('Processing message #%d', seqno);
-
-            msg.on('attributes', attributes => {
-                imap.move([attributes.uid], '[Gmail]/Trash', function (err) {
-                    if (err) {
-                        console.error(err);
-                        reject(err);
-                    } else {
-                        console.log('Moved message #%d to Trash', seqno);
-                    }
-                });
-            });
-
-            msg.once('error', err => reject(err));
-
-            msg.once('end', function () {
-                console.log('Finished processing message #%d', seqno);
-            });
-        });
-
-        fetch.once('end', function () {
-            console.log('All messages processed');
-            resolve();
-        });
-    });
+    // imap.search returns UIDs (UID SEARCH), so move them directly with a single
+    // UID MOVE command. Moving inside an active imap.fetch loop expunges messages
+    // from INBOX mid-fetch, which desyncs sequence numbers and hangs the connection.
+    const uids = await searchAsync([['FROM', from], ['SUBJECT', subject], ['SINCE', since]]);
+    if (uids.length === 0) {
+        console.log('No messages to move to Trash for subject "%s"', subject);
+        return;
+    }
+    await moveAsync(uids, '[Gmail]/Trash');
+    console.log('Moved %d message(s) to Trash for subject "%s"', uids.length, subject);
 }
 
 const timeout = setTimeout(() => {
@@ -183,11 +164,10 @@ imap.once('ready', async () => {
 
         writeMarkDownFile(images);
 
-        // TODO:P0 deleting emails hangs the process, so it's disabled for now
-        // await moveToTrash('bdp_noreply@data.roku.com', 'App Health', yesterdayString);
-        // await moveToTrash('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString);
-        // await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
-        // await moveToTrash('bdp_noreply@data.roku.com', 'App Stability', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'App Health', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
+        await moveToTrash('bdp_noreply@data.roku.com', 'App Stability', yesterdayString);
 
         imap.end();
     } catch (error) {

@@ -7,16 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Subtitles no longer stop displaying after shrinking the video to picture-in-picture and restoring it
+- Fixed a video player crash that could occur near the end of a video
+- Fixed a startup crash caused by corrupted saved-profiles data in the registry
+- Fixed a crash that could occur when the video player failed to start playback
+
+## [0.47.0] - 2026-06-18
+
 ### Added
 
 - Support for 4K video
   - Playlet already supported 4K videos. This adds a support check, and quality selectors in the settings, for the devices that support it.
   - Not all 4k supporting devices - only with AV1 support (usually newer devices)
   - Not all 4k videos are playable, only AV1 encoded videos
+- SponsorBlock "Hook/Greetings" category
 
 ### Fixed
 
 - Missing video durations in channel pages, when using Playlet backend
+- Captions on some videos (from TV broadcasts) displaying vertically instead of horizontally
 
 ## [0.46.0] - 2026-06-12
 

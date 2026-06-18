@@ -721,12 +721,12 @@
         <translation>Endcard/Abspann</translation>
     </message>
     <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Vorschau/Rückschau/Hook</translation>
-    </message>
-    <message>
         <source>Preview/Recap</source>
         <translation>Vorschau/Rückschau</translation>
+    </message>
+    <message>
+        <source>Hook/Greetings</source>
+        <translation>Hook/Begrüßungen</translation>
     </message>
     <message>
         <source>Filler</source>

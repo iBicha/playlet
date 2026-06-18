@@ -175,10 +175,12 @@ function TestSnapshot() as object
     return {
         transportMode: m.transport.transportMode
         seekSettling: m.transport.seekSettling
+        onCloseCalled: m.onCloseCalled = true
         control: m.top.control
         autoplay: m.top.autoplayAfterSeek
         bifVisible: m.bifDisplay.visible
         chromeShown: (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
+        suppressCaptions: m.top.suppressCaptions
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton
         nudgeCount: m.top.nudgeCount
@@ -186,4 +188,17 @@ function TestSnapshot() as object
         liveBadgeShown: m.trickPlayBar.findNode("liveLabel").visible
         barRemainingText: m.trickPlayBar.findNode("remainingLabel").text
     }
+end function
+
+' TestWireQueueClose — make the stub videoQueue close the player when ClosePlayer writes closePlayer, mirroring
+' the real VideoQueue.OnClosePlayer (which sets player.close = true). Opt-in: only the finish-during-tick
+' re-entrancy spec needs the full synchronous teardown chain wired up.
+function TestWireQueueClose() as void
+    m.videoQueue.observeFieldScoped("closePlayer", FuncName(OnTestQueueClose))
+end function
+
+function OnTestQueueClose() as void
+    if m.videoQueue.closePlayer
+        m.top.close = true
+    end if
 end function

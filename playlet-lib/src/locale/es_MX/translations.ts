@@ -1201,8 +1201,8 @@
         <translation>Avance/Resumen</translation>
     </message>
     <message>
-        <source>Preview/Recap/Hook</source>
-        <translation>Avance/Resumen/Gancho</translation>
+        <source>Hook/Greetings</source>
+        <translation>Gancho/Saludos</translation>
     </message>
     <message>
         <source>Sponsor</source>

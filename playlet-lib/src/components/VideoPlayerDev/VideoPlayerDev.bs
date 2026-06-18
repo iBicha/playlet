@@ -837,6 +837,12 @@ function OnPosition(event as object) as void
     ApplyTransport()
     EnforceTransportFreeze() ' OnPosition only fires while playing, so it catches a transport auto-resumed with no state-change edge.
 
+    ' EnforceTransportFreeze can finish playback (FinishEof at the end of content under a transport), which
+    ' synchronously closes the player and drops m.sponsorblock. A closed player must run no more of the tick.
+    if m.onCloseCalled = true
+        return
+    end if
+
     ' SponsorBlock auto-skip off the real position (the controller decides; we apply the seek / finish).
     sb = m.sponsorblock.OnPosition(posMs)
     if sb <> invalid
@@ -937,6 +943,8 @@ function OnFullScreenChange() as void
     LogDebug("fullscreen ->", fullscreen)
     ' the SponsorBlock notification rides with the player: hidden while minimized, shown when full.
     m.sponsorblock.SetVisible(fullscreen)
+    ' after a PiP restore the OS leaves captions blank while enableUI=false (resizing alone doesn't); suppress on minimize, release on restore to re-engage them.
+    m.top.suppressCaptions = not fullscreen
     ' minimized: no player UI at all. Reset any active transport (the bif/glyph clear; the underlying play/pause
     ' stays as-is) and hide chrome/spinner/pause now. Fires for the minimize button, external minimize, and a
     ' video that starts minimized.
