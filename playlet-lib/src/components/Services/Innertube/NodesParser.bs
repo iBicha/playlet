@@ -88,6 +88,7 @@ namespace Innertube
             "feedFilterChipBarRenderer": ParseFeedFilterChipBarRenderer
             "chipBarViewModel": ParseChipBarViewModel
             "continuationItemRenderer": ParseContinuationItemRenderer
+            "continuationItemViewModel": ParseContinuationItemViewModel
             "appendContinuationItemsAction": ParseAppendContinuationItemsAction
             "reloadContinuationItemsCommand": ParseReloadContinuationItemsCommand
             "gridContinuation": ParseGridContinuation
@@ -1845,6 +1846,19 @@ namespace Innertube
 
         if sortOptions.Count() > 0
             context.currentFeed.sortOptions = sortOptions
+        end if
+
+        return invalid
+    end function
+
+    function ParseContinuationItemViewModel(nodeData as object, context as object) as object
+        if not StringUtils.IsNullOrEmpty(context.currentFeed.continuation)
+            return invalid
+        end if
+
+        continuation = ObjectUtils.Dig(nodeData, ["continuationCommand", "innertubeCommand", "continuationCommand", "token"])
+        if IsString(continuation)
+            context.currentFeed.continuation = continuation
         end if
 
         return invalid
