@@ -1,0 +1,29 @@
+namespace Tests
+
+    @suite
+    class AppManagerTests extends Rooibos.BaseTestSuite
+
+        @describe("AppManager")
+
+        @it("captures the device's last exit info onto the scene")
+        function _()
+            manager = CreateObject("roAppManager")
+            scene = {}
+            AppManager.CaptureLastExitInfo(scene)
+
+            if FindMemberFunction(manager, "GetLastExitInfo") = invalid
+                ' Roku OS < 13: nothing to capture
+                m.assertInvalid(scene.lastExitInfo)
+            else
+                info = scene.lastExitInfo
+                m.assertAAHasKeys(info, ["exit_code", "timestamp", "app_state", "console_log"])
+                m.assertTrue(info.exit_code.StartsWith("EXIT_"), "exit_code should be an EXIT_* string")
+                m.assertTrue(Len(info.timestamp) > 0, "timestamp should be a non-empty string")
+                m.assertTrue(Len(info.app_state) > 0, "app_state should be a non-empty string")
+                m.assertTrue(GetInterface(info.console_log, "ifString") <> invalid, "console_log should be a string")
+            end if
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,93 @@
+#const DEBUG_THROW_ON_UNKNOWN_EXIT_CODE = true
+
+import "pkg:/components/Telemetry/Sentry.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/Types.bs"
+
+function ReportLastExitCrash() as void
+    scene = m.top.getScene()
+    if scene = invalid or not scene.hasField("lastExitInfo")
+        return
+    end if
+
+    lastExitInfo = scene.lastExitInfo
+    scene.lastExitInfo = invalid
+    if not IsAssociativeArray(lastExitInfo)
+        return
+    end if
+
+    crashExitCodes = {
+        "EXIT_BRIGHTSCRIPT_CRASH": true
+        "EXIT_BRIGHTSCRIPT_STOP": true
+        "EXIT_BRIGHTSCRIPT_UNK_FUNC": true
+        "EXIT_BRIGHTSCRIPT_TIMEOUT": true
+        "EXIT_OUT_OF_MEMORY": true
+        "EXIT_CHANNEL_MEM_LIMIT_FG": true
+        "EXIT_CHANNEL_MEM_LIMIT_BG": true
+        "EXIT_SYSTEM_KILL": true
+        "EXIT_GRAPHICS_NOT_RELEASED": true
+        "EXIT_DECODER_NOT_RELEASED": true
+        "EXIT_RUNNING_AFTER_SUSPEND": true
+        "EXIT_NOT_RESUMED": true
+        "EXIT_SIGNAL_TIMEOUT": true
+        "EXIT_APP_ERROR": true
+        "EXIT_UNKNOWN": false
+        "EXIT_POWER_MODE": false
+        "EXIT_DIAL_DELETE": false
+        "EXIT_IDLE_AUTO_EXIT": false
+        "EXIT_USER_KILL": false
+        "EXIT_USER_NAV": false
+        "EXIT_AM_LOWRESOURCE": false
+        "EXIT_UNLOADED": false
+        "EXIT_GUEST_MODE_ENABLED": false
+        "EXIT_GUEST_MODE_DISABLED": false
+        "EXIT_GUEST_CHECKOUT": false
+        "EXIT_OS_UPDATE": false
+        "EXIT_CHANNEL_UPDATE": false
+        "EXIT_CHANNEL_SIDELOAD": false
+        "EXIT_CHANNEL_RESTART": false
+        "EXIT_TILE_HIDDEN": false
+        "EXIT_SETTINGS_UPDATE": false
+        "EXIT_ADDON_DEPENDENCY": false
+        "EXIT_SOFTFAIL": false
+    }
+    exitCode = ValidString(lastExitInfo.exit_code)
+
+    #if DEBUG_THROW_ON_UNKNOWN_EXIT_CODE
+        #if DEBUG
+            if not crashExitCodes.DoesExist(exitCode)
+                throw "Unhandled exit code: " + exitCode
+            end if
+        #end if
+    #end if
+
+    if crashExitCodes[exitCode] = false
+        return
+    end if
+
+    message = `[FATAL][LastExit] App crashed: ${exitCode}`
+    for each key in lastExitInfo
+        message += `\n${key}: ${ToString(lastExitInfo[key])}`
+    end for
+    message = RedactAuthHeaders(message)
+
+    Sentry.SendEvents([{
+        level: "fatal"
+        message: message
+        timestamp: ValidString(lastExitInfo.timestamp)
+        fingerprint: [exitCode]
+        release: m.release
+        dist: m.dist
+        tags: m.tags
+        userId: m.userId
+    }])
+end function
+
+function RedactAuthHeaders(text as string) as string
+    authRegex = /Authorization: [^\r\n]*/i
+    matches = authRegex.MatchAll(text)
+    for each match in matches
+        text = text.Replace(match[0], "Authorization: <REDACTED>")
+    end for
+    return text
+end function

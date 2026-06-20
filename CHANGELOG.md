@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Attempt to fix the "The page needs to be reloaded" error by refreshing the signature timestamp automatically
 - Playlists with more than one page of videos no longer stop loading after the first ~100 videos
+- Report previous-run crashes to diagnostics
 
 ## [0.47.1] - 2026-06-18
 
