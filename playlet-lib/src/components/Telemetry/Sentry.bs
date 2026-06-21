@@ -67,14 +67,13 @@ namespace Sentry
             hasAttachments = IsArray(event.attachments) and event.attachments.Count() > 0
 
             if (not SUPPORTS_ATTACHMENTS) and hasAttachments
-                message += `\nAttachments: (${event.attachments.Count()} files)`
+                extra = {}
                 for each attachment in event.attachments
-                    message += `\nAttachment: ${attachment.filename} (${attachment.content_type})\n${attachment.data}`
+                    extra[attachment.filename] = `content_type:${attachment.content_type}\n${attachment.data}`
                 end for
-                message += `\nEnd of attachments.`
+                eventPayload.extra = extra
             end if
 
-            ' TODO:P1 compress if message is larger than 8192
             eventPayload.logentry = {
                 formatted: message
             }
