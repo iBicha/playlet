@@ -8,6 +8,7 @@ namespace Innertube
         Web = "WEB"
         IOS = "IOS"
         Tv = "TV"
+        TvDowngraded = "TV_DOWNGRADED"
     end enum
 
     function CreateHeaders(client as Innertube.ClientType) as object
@@ -35,6 +36,14 @@ namespace Innertube
                 "x-youtube-client-name": INNERTUBE_TV_CLIENT_NAME
                 "x-youtube-client-version": INNERTUBE_TV_CLIENT_VERSION
             }
+        else if client = ClientType.TvDowngraded
+            return {
+                "accept": "*/*"
+                "accept-language": "*"
+                "user-agent": INNERTUBE_TV_USER_AGENT
+                "x-youtube-client-name": INNERTUBE_TV_CLIENT_NAME
+                "x-youtube-client-version": INNERTUBE_TV_CLIENT_VERSION_DOWNGRADED
+            }
         else
             throw "Invalid client type"
         end if
@@ -46,8 +55,8 @@ namespace Innertube
             contextClient = CreateContextClientWeb(deviceInfo)
         else if client = ClientType.IOS
             contextClient = CreateContextClientIOS(deviceInfo)
-        else if client = ClientType.Tv
-            contextClient = CreateContextClientTv(deviceInfo)
+        else if client = ClientType.Tv or client = ClientType.TvDowngraded
+            contextClient = CreateContextClientTv(deviceInfo, client)
         else
             throw "Invalid client type"
         end if
@@ -58,8 +67,8 @@ namespace Innertube
         accessToken = OptionUtils.Get(options, "accessToken")
         videoId = OptionUtils.Get(options, "videoId")
 
-        useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
-        useCtt = client = Innertube.ClientType.TV and IsAssociativeArray(credentialTransferToken) and not StringUtils.IsNullOrEmpty(videoId)
+        useAccessToken = (client = ClientType.Tv or client = ClientType.TvDowngraded) and not StringUtils.IsNullOrEmpty(accessToken)
+        useCtt = (client = ClientType.Tv or client = ClientType.TvDowngraded) and IsAssociativeArray(credentialTransferToken) and not StringUtils.IsNullOrEmpty(videoId)
 
         context = {
             "client": contextClient
@@ -154,7 +163,11 @@ namespace Innertube
         }
     end function
 
-    function CreateContextClientTv(deviceInfo as object) as object
+    function CreateContextClientTv(deviceInfo as object, client as Innertube.ClientType) as object
+        tvClientVersion = INNERTUBE_TV_CLIENT_VERSION
+        if client = ClientType.TvDowngraded
+            tvClientVersion = INNERTUBE_TV_CLIENT_VERSION_DOWNGRADED
+        end if
         return {
             "hl": GetCurrentLocale(deviceInfo)
             "gl": GetContentRegion(deviceInfo)
@@ -163,7 +176,7 @@ namespace Innertube
             "deviceModel": INNERTUBE_TV_DEVICE_MODEL
             "userAgent": INNERTUBE_TV_USER_AGENT
             "clientName": "TVHTML5"
-            "clientVersion": INNERTUBE_TV_CLIENT_VERSION
+            "clientVersion": tvClientVersion
             "osName": INNERTUBE_TV_OS_NAME
             "osVersion": INNERTUBE_TV_OS_VERSION
             "originalUrl": "https://www.youtube.com/tv"

@@ -16,13 +16,13 @@ namespace Innertube
         accessToken = OptionUtils.Get(options, "accessToken")
         cpn = InnertubeService.CreateClientPlaybackNonce()
 
-        useAccessToken = client = Innertube.ClientType.TV and not StringUtils.IsNullOrEmpty(accessToken)
+        useAccessToken = (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded) and not StringUtils.IsNullOrEmpty(accessToken)
 
         deviceInfo = CreateObject("roDeviceInfo")
 
         context = Innertube.CreateContext(client, deviceInfo, options)
 
-        if client = Innertube.ClientType.TV
+        if client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded
             referer = "https://www.youtube.com/tv#/watch?v=" + videoId
         else
             referer = "https://www.youtube.com/watch?v=" + videoId
@@ -102,7 +102,7 @@ namespace Innertube
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
-        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation)
+        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation, client)
         if error <> invalid
             parsedResponse["error"] = error.error
             if error.DoesExist("errorCode")
@@ -499,7 +499,7 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object) as object
+    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object, client = invalid as dynamic) as object
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
             return invalid
@@ -581,7 +581,7 @@ namespace Innertube
         for i = 0 to decipheredFormats.Count() - 1
             fmt = formats[i]
             decipheredFmt = decipheredFormats[i]
-            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"])
+            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"], client)
         end for
 
         decipheredAdaptiveFormats = json["adaptiveFormats"]
@@ -595,7 +595,7 @@ namespace Innertube
         for i = 0 to decipheredAdaptiveFormats.Count() - 1
             fmt = adaptiveFormats[i]
             decipheredFmt = decipheredAdaptiveFormats[i]
-            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"])
+            fmt["url"] = ResetUrlClientVersion(decipheredFmt["url"], client)
         end for
         return invalid
     end function
@@ -603,7 +603,7 @@ namespace Innertube
     ' YouTube.js sets cver to hardcoded values that might be different from
     ' What's used in Playlet. There's no indication that this makes a difference,
     ' but it makes sense to keep it consistent.
-    function ResetUrlClientVersion(url as dynamic) as dynamic
+    function ResetUrlClientVersion(url as dynamic, requestClient = invalid as dynamic) as dynamic
         if StringUtils.IsNullOrEmpty(url)
             return url
         end if
@@ -611,7 +611,11 @@ namespace Innertube
         queryComponents = UrlUtils.ParseQueryComponents(url)
         client = ValidString(queryComponents["c"])
         if client = "TVHTML5"
-            queryComponents["cver"] = INNERTUBE_TV_CLIENT_VERSION
+            if requestClient = Innertube.ClientType.TvDowngraded
+                queryComponents["cver"] = INNERTUBE_TV_CLIENT_VERSION_DOWNGRADED
+            else
+                queryComponents["cver"] = INNERTUBE_TV_CLIENT_VERSION
+            end if
         else if client = "IOS"
             queryComponents["cver"] = INNERTUBE_IOS_CLIENT_VERSION
         else if client = "WEB"

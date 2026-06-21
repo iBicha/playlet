@@ -9,6 +9,7 @@ import "pkg:/components/Services/Innertube/ResolveUrlEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchFilters.bs"
 import "pkg:/components/Services/Innertube/SubscriptionEndpoint.bs"
+import "pkg:/components/Services/Innertube/TvClientDowngradeExperiment.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
@@ -36,14 +37,18 @@ namespace InnertubeService
         end if
 
         playerResponseJson = invalid
-        client = Innertube.ClientType.Tv
+        client = Innertube.Experiment.InitialPlayerClient()
         totalPlayerRequests = 0
         triedReloadRefresh = false
+        downgradeRetryAttempted = false
+        downgradeRetryArm = invalid
+        downgradeOutcomeReported = false
         while true
-            ' We shouldn't be making more than 2 requests:
+            ' We shouldn't be making more than 3 requests:
             ' 1. Make request with TV client.
             ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
-            if totalPlayerRequests >= 2
+            ' 3. useServerDrivenAbr -> retry with control/treatment client version to recover format URLs.
+            if totalPlayerRequests >= 3
                 LogError("Too many player requests, aborting.")
                 return {
                     error: "Too many player requests"
@@ -51,7 +56,7 @@ namespace InnertubeService
             end if
             totalPlayerRequests += 1
             playerRequest = Innertube.CreatePlayerRequest(client, options)
-            if not StringUtils.IsNullOrEmpty(accessToken) and client = Innertube.ClientType.Tv
+            if not StringUtils.IsNullOrEmpty(accessToken) and (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded)
                 playerRequest.Header("Authorization", "Bearer " + accessToken)
             end if
             playerRequest.Cancellation(cancellation)
@@ -68,6 +73,10 @@ namespace InnertubeService
             end if
 
             if not playerResponse.IsSuccess()
+                if downgradeRetryArm <> invalid and not downgradeOutcomeReported
+                    downgradeOutcomeReported = true
+                    Innertube.Experiment.ReportDowngradeOutcome(downgradeRetryArm, Innertube.Experiment.DowngradeOutcome.RetryFailed, videoId, playerRequest, playerResponse)
+                end if
                 parsedResponse = {
                     error: playerResponse.ErrorMessage()
                 }
@@ -76,6 +85,24 @@ namespace InnertubeService
             end if
 
             playerResponseJson = playerResponse.Json()
+
+            if not downgradeRetryAttempted
+                downgradePlan = Innertube.Experiment.PlanTvClientDowngradeRetry(playerResponseJson)
+                if downgradePlan <> invalid
+                    downgradeRetryAttempted = true
+                    downgradeRetryArm = downgradePlan.arm
+                    client = downgradePlan.client
+                    LogInfo("[DOWNGRADE-RETRY] trigger arm=", downgradeRetryArm, " client=", client, " videoId=", videoId)
+                    continue while
+                end if
+            else if downgradeRetryArm <> invalid and not downgradeOutcomeReported
+                downgradeOutcomeReported = true
+                outcome = Innertube.Experiment.DowngradeOutcome.NotRecovered
+                if Innertube.Experiment.ResponseHasUsableAdaptive(playerResponseJson)
+                    outcome = Innertube.Experiment.DowngradeOutcome.Recovered
+                end if
+                Innertube.Experiment.ReportDowngradeOutcome(downgradeRetryArm, outcome, videoId, playerRequest, playerResponse)
+            end if
 
             parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, client, cancellation)
 
