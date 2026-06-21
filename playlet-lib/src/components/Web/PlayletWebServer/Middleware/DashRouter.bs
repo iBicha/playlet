@@ -10,6 +10,27 @@ import "pkg:/source/utils/Types.bs"
 ' playback; when the player asks for them the Await is short/instant. Small on
 ' purpose to bound concurrent roUrlTransfers (x2 representations).
 const LIVE_PREFETCH_SEGMENTS = 2
+' Bounded retry of transient segment failures before surfacing a 502 (one 502 on an
+' init segment kills that bitrate). Retried: 204 (sq past the live edge), reset/error
+' (-7/-10001), 5xx. Not retried: timeout (status 0 = slow/hung; a refetch would abandon
+' a progressing download) and 4xx (signature/availability). Per-attempt timeout left at
+' HttpClient's default; the Roku Video node's ~30s segment timeout bounds the freeze.
+const LIVE_SEG_MAX_ATTEMPTS = 3
+' Pause between attempts only on an empty (204) fragment (not yet produced), so the
+' refetch doesn't busy-loop the edge. Small: the web server is single-threaded.
+const LIVE_SEG_RETRY_BACKOFF_MS = 300
+
+' Why a live-segment fetch failed. The string values double as the telemetry message
+' and fingerprint (see ReportSegmentFailure), so they must stay stable - changing one
+' forks its Bugsink issue and orphans the history.
+enum LiveSegFailure
+    NoFormatUrl = "no live format url"
+    FormatsNotArray = "adaptiveFormats not an array"
+    FetchFailed = "fragment fetch failed"
+    EmptyFragment = "empty fragment file"
+    NoMoov = "no moov in fragment"
+    NoMoof = "no moof in fragment"
+end enum
 
 namespace Http
 
@@ -58,6 +79,13 @@ namespace Http
             ' so they don't leak until the next video change.
             m.lastVideoItag = invalid
             m.lastAudioItag = invalid
+            ' itag -> transformed init bytes (ftyp+moov). moov is constant per
+            ' representation, so fetch once and serve later init requests from memory.
+            ' Cleared per video in RebuildLiveCache.
+            m.cachedInit = {}
+            ' Highest native sq requested; sources the init from a current fragment (the
+            ' load-time live edge ages out of the DVR window over a long session).
+            m.lastSeenSq = 0
         end function
 
         ' Returns the cached metadata AA for video id `v`, digging the videoQueue
@@ -257,30 +285,38 @@ namespace Http
             baseUrl = m.cachedUrls[itag]
             if StringUtils.IsNullOrEmpty(baseUrl)
                 LogErrorNoTelemetry("[LIVE-SEG] no live format url for v:", v, "itag:", itag, "-> 404")
-                m.ReportSegmentFailure("no live format url", { v: v, itag: itag, sq: sq })
+                m.ReportSegmentFailure(LiveSegFailure.NoFormatUrl, { v: v, itag: itag, sq: sq })
                 response.Default(404, "No live format url for itag " + itag)
                 return true
             end if
 
             if sq = "init"
-                ' Init segment: ftyp+moov. We must NOT use fragment 0 - for a
-                ' long-running live stream (e.g. a 24/7 channel up for weeks) sq=0 is
-                ' far outside the DVR window and googlevideo 404s it. Every live
-                ' fragment is self-initializing with an identical moov (constant
-                ' codec config), so we source the init from the live-edge fragment
-                ' (cachedInitSeqnum), which is always within the DVR window.
-                output = m.AwaitTransformedSegment(m.StartSegmentFetch(baseUrl, m.cachedInitSeqnum, v, itag), true)
+                ' ftyp+moov, served from the per-itag cache after the first fetch.
+                output = m.cachedInit[itag]
                 if output = invalid
-                    ' Root-cause telemetry already emitted by AwaitTransformedSegment.
-                    LogErrorNoTelemetry("[LIVE-SEG] INIT fetch failed v:", v, "itag:", itag, "-> 502")
-                    response.Default(502, "Failed to fetch live init segment")
-                    return true
+                    ' Source from a current fragment: sq=0 is outside the DVR window (404)
+                    ' and the load-time edge ages out, so prefer lastSeenSq; fall back to
+                    ' the load-time seqnum only before any media segment is served.
+                    initSq = m.cachedInitSeqnum
+                    if m.lastSeenSq > 0
+                        initSq = m.lastSeenSq
+                    end if
+                    output = m.AwaitSegmentWithRetry(baseUrl, initSq, v, itag, true, invalid)
+                    if output = invalid
+                        LogErrorNoTelemetry("[LIVE-SEG] INIT fetch failed v:", v, "itag:", itag, "-> 502")
+                        response.Default(502, "Failed to fetch live init segment")
+                        return true
+                    end if
+                    m.cachedInit[itag] = output
                 end if
             else
                 ' Media DASH segment = one native YouTube fragment, reduced to moof+mdat
                 ' so Roku reads the init segment only once. The manifest addresses the
                 ' proxy 1:1, so the DASH segment number is the native sq.
                 nativeSq = sq.ToInt()
+                if nativeSq > m.lastSeenSq
+                    m.lastSeenSq = nativeSq
+                end if
 
                 ' Representation switch (ABR video / audio track): the previous itag of
                 ' this kind stops being requested, so evict its warmed fragments now -
@@ -306,9 +342,8 @@ namespace Http
                 m.PrefetchAhead(baseUrl, v, itag, nativeSq, LIVE_PREFETCH_SEGMENTS)
                 m.EvictPrefetchOutside(itag, nativeSq + 1, nativeSq + LIVE_PREFETCH_SEGMENTS)
 
-                output = m.AwaitTransformedSegment(entry, false)
+                output = m.AwaitSegmentWithRetry(baseUrl, nativeSq, v, itag, false, entry)
                 if output = invalid
-                    ' Root-cause telemetry already emitted by AwaitTransformedSegment.
                     LogErrorNoTelemetry("[LIVE-SEG] media fragment failed v:", v, "itag:", itag, "sq:", nativeSq, "-> 502")
                     response.Default(502, "Failed to fetch live media segment")
                     return true
@@ -338,6 +373,9 @@ namespace Http
             m.CleanupTempSegments()
             ' Re-arm the per-video telemetry dedupe (see ReportSegmentFailure).
             m.reportedFailures = {}
+            ' Init bytes and the sq high-water mark belong to the previous video.
+            m.cachedInit = {}
+            m.lastSeenSq = 0
 
             urls = {}
             types = {}
@@ -355,7 +393,7 @@ namespace Http
                 end for
             else
                 LogErrorNoTelemetry("[LIVE-SEG] RebuildLiveCache: adaptiveFormats not an array for v:", metadata.videoId)
-                m.ReportSegmentFailure("adaptiveFormats not an array", { v: ValidString(metadata.videoId) })
+                m.ReportSegmentFailure(LiveSegFailure.FormatsNotArray, { v: ValidString(metadata.videoId) })
             end if
 
             m.cachedUrls = urls
@@ -475,22 +513,65 @@ namespace Http
             DeleteFile(entry.tmpPath)
         end function
 
-        ' Await a fetch started by StartSegmentFetch and return just the bytes Roku
-        ' needs:
-        '   wantInit = true  -> ftyp+moov  (init segment)
-        '   wantInit = false -> moof+mdat  (media segment)
-        ' Reads only the required byte range from the temp file and always deletes
-        ' it. Returns invalid on failure.
-        function AwaitTransformedSegment(entry as object, wantInit as boolean) as dynamic
+        ' Await `entry` (invalid -> fetch from scratch), transform to the bytes Roku
+        ' needs (wantInit: true -> ftyp+moov, false -> moof+mdat), and retry transient
+        ' failures up to LIVE_SEG_MAX_ATTEMPTS before giving up (invalid). Each retry
+        ' discards the entry and starts a fresh fetch for the same sq - rides an edge
+        ' blip AND un-poisons a prefetched 204 (warmed before the edge produced it).
+        ' Telemetry fires once, on give-up.
+        function AwaitSegmentWithRetry(baseUrl as string, sq as integer, v as string, itag as string, wantInit as boolean, entry as object) as dynamic
+            if entry = invalid
+                entry = m.StartSegmentFetch(baseUrl, sq, v, itag)
+            end if
+
+            attempt = 1
+            while true
+                result = m.AttemptSegment(entry, wantInit)
+                if result.ok
+                    return result.bytes
+                end if
+
+                if (not result.retryable) or attempt >= LIVE_SEG_MAX_ATTEMPTS
+                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, segUrl: entry.segUrl, response: result.response })
+                    return invalid
+                end if
+
+                ' Empty (204) = sq not produced yet: drop the warmed siblings (also fetched
+                ' too early) so they refetch fresh, and pause so the refetch doesn't
+                ' busy-loop the edge. Network/5xx already spent time in the await -> no pause.
+                if result.reason = LiveSegFailure.EmptyFragment
+                    if not wantInit
+                        m.EvictPrefetchItag(itag)
+                    end if
+                    sleep(LIVE_SEG_RETRY_BACKOFF_MS)
+                end if
+                LogWarnNoTelemetry("[LIVE-SEG] retry sq", sq, "itag", itag, "(", result.reason, ") attempt", attempt + 1, "of", LIVE_SEG_MAX_ATTEMPTS)
+
+                attempt += 1
+                entry = m.StartSegmentFetch(baseUrl, sq, v, itag)
+            end while
+
+            return invalid
+        end function
+
+        ' One fetch+transform attempt. Reads only the needed byte range from the temp
+        ' file and always deletes it. Returns:
+        '   { ok: true, bytes }                        - the transformed segment bytes
+        '   { ok: false, retryable, reason, response } - failed; `retryable` separates
+        '     fast transient errors (204/empty, reset/-10001, 5xx) from ones a refetch
+        '     won't fix: a plain timeout (slow/hung), 4xx, or a malformed box.
+        function AttemptSegment(entry as object, wantInit as boolean) as object
             tmpPath = entry.tmpPath
             sq = entry.sq
 
             response = entry.req.Await()
             if not response.IsSuccess()
-                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "failed:", response.StatusCode())
-                m.ReportSegmentFailure("fragment fetch failed", { v: entry.v, itag: entry.itag, sq: sq, segUrl: entry.segUrl, response: response })
+                status = response.StatusCode()
+                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "failed:", status)
                 DeleteFile(tmpPath)
-                return invalid
+                ' status<0 = active error event (reset/-10001), 5xx = server error: both
+                ' transient -> retried. status 0 = timeout (slow/hung) -> not retried.
+                return { ok: false, retryable: status < 0 or status >= 500, reason: LiveSegFailure.FetchFailed, response: response }
             end if
 
             stat = m.fs.Stat(tmpPath)
@@ -499,10 +580,9 @@ namespace Http
                 fileLen = ValidInt(stat.size)
             end if
             if fileLen <= 0
-                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "empty file")
-                m.ReportSegmentFailure("empty fragment file", { v: entry.v, itag: entry.itag, sq: sq, segUrl: entry.segUrl, response: response })
+                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "empty file (status", response.StatusCode(), ")")
                 DeleteFile(tmpPath)
-                return invalid
+                return { ok: false, retryable: true, reason: LiveSegFailure.EmptyFragment, response: response }
             end if
 
             boxes = m.LocateBoxes(tmpPath, fileLen)
@@ -511,23 +591,21 @@ namespace Http
             if wantInit
                 if boxes.moovEnd <= 0 or boxes.moovEnd > fileLen
                     LogErrorNoTelemetry("[LIVE-SEG] no moov in fragment sq", sq, "(moovEnd:", boxes.moovEnd, ")")
-                    m.ReportSegmentFailure("no moov in fragment", { v: entry.v, itag: entry.itag, sq: sq, segUrl: entry.segUrl, response: response })
                     DeleteFile(tmpPath)
-                    return invalid
+                    return { ok: false, retryable: false, reason: LiveSegFailure.NoMoov, response: response }
                 end if
                 out.ReadFile(tmpPath, 0, boxes.moovEnd)
             else
                 if boxes.moofStart <= 0 or boxes.moofStart >= fileLen
                     LogErrorNoTelemetry("[LIVE-SEG] no moof in fragment sq", sq, "(moofStart:", boxes.moofStart, ")")
-                    m.ReportSegmentFailure("no moof in fragment", { v: entry.v, itag: entry.itag, sq: sq, segUrl: entry.segUrl, response: response })
                     DeleteFile(tmpPath)
-                    return invalid
+                    return { ok: false, retryable: false, reason: LiveSegFailure.NoMoof, response: response }
                 end if
                 out.ReadFile(tmpPath, boxes.moofStart, fileLen - boxes.moofStart)
             end if
 
             DeleteFile(tmpPath)
-            return out
+            return { ok: true, bytes: out }
         end function
 
         ' Read the leading boxes of a fragment temp file and return moov/moof offsets.
@@ -584,7 +662,7 @@ namespace Http
         ' capture a transient blip and a later persistent failure separately, without
         ' flooding identical failures every few seconds (Sentry quota). Re-armed per
         ' video in RebuildLiveCache.
-        function ReportSegmentFailure(reason as string, info as object) as void
+        function ReportSegmentFailure(reason as LiveSegFailure, info as object) as void
             statusText = "n/a"
             errorMessage = ""
             response = info.response
