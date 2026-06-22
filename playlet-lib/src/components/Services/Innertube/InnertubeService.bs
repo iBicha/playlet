@@ -9,12 +9,14 @@ import "pkg:/components/Services/Innertube/ResolveUrlEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchEndpoint.bs"
 import "pkg:/components/Services/Innertube/SearchFilters.bs"
 import "pkg:/components/Services/Innertube/SubscriptionEndpoint.bs"
-import "pkg:/components/Services/Innertube/TvClientDowngradeExperiment.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
+
+' DEBUG-only: force the downgrade retry on every non-live VOD.
+#const DEBUG_FORCE_SABR_DOWNGRADE = false
 
 namespace InnertubeService
 
@@ -37,17 +39,14 @@ namespace InnertubeService
         end if
 
         playerResponseJson = invalid
-        client = Innertube.Experiment.InitialPlayerClient()
+        client = Innertube.ClientType.Tv
         totalPlayerRequests = 0
         triedReloadRefresh = false
-        downgradeRetryAttempted = false
-        downgradeRetryArm = invalid
-        downgradeOutcomeReported = false
         while true
             ' We shouldn't be making more than 3 requests:
             ' 1. Make request with TV client.
             ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
-            ' 3. useServerDrivenAbr -> retry with control/treatment client version to recover format URLs.
+            ' 3. useServerDrivenAbr -> retry with downgraded TV client version to recover format URLs.
             if totalPlayerRequests >= 3
                 LogError("Too many player requests, aborting.")
                 return {
@@ -73,10 +72,6 @@ namespace InnertubeService
             end if
 
             if not playerResponse.IsSuccess()
-                if downgradeRetryArm <> invalid and not downgradeOutcomeReported
-                    downgradeOutcomeReported = true
-                    Innertube.Experiment.ReportDowngradeOutcome(downgradeRetryArm, Innertube.Experiment.DowngradeOutcome.RetryFailed, videoId, playerRequest, playerResponse)
-                end if
                 parsedResponse = {
                     error: playerResponse.ErrorMessage()
                 }
@@ -86,22 +81,13 @@ namespace InnertubeService
 
             playerResponseJson = playerResponse.Json()
 
-            if not downgradeRetryAttempted
-                downgradePlan = Innertube.Experiment.PlanTvClientDowngradeRetry(playerResponseJson)
-                if downgradePlan <> invalid
-                    downgradeRetryAttempted = true
-                    downgradeRetryArm = downgradePlan.arm
-                    client = downgradePlan.client
-                    LogInfo("[DOWNGRADE-RETRY] trigger arm=", downgradeRetryArm, " client=", client, " videoId=", videoId)
-                    continue while
-                end if
-            else if downgradeRetryArm <> invalid and not downgradeOutcomeReported
-                downgradeOutcomeReported = true
-                outcome = Innertube.Experiment.DowngradeOutcome.NotRecovered
-                if Innertube.Experiment.ResponseHasUsableAdaptive(playerResponseJson)
-                    outcome = Innertube.Experiment.DowngradeOutcome.Recovered
-                end if
-                Innertube.Experiment.ReportDowngradeOutcome(downgradeRetryArm, outcome, videoId, playerRequest, playerResponse)
+            ' Under server-driven ABR the TV client can withhold every adaptive format URL (stuck
+            ' at 360p); the downgraded TV client is not served SABR. Retry once with it.
+            if client = Innertube.ClientType.Tv and IsSabrLocked(playerResponseJson)
+                client = Innertube.ClientType.TvDowngraded
+                continue while
+            else if client = Innertube.ClientType.TvDowngraded and not HasUsableAdaptiveUrl(playerResponseJson)
+                LogError("Downgraded TV client did not recover SABR-withheld format URLs")
             end if
 
             parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, client, cancellation)
@@ -157,6 +143,39 @@ namespace InnertubeService
         end if
 
         return parsedResponse
+    end function
+
+    ' True when the TV client's response is SABR-locked: server-driven ABR signaled with no usable
+    ' adaptive URL (non-live VOD with streamingData).
+    function IsSabrLocked(playerResponseJson as object) as boolean
+        if not IsAssociativeArray(ObjectUtils.Dig(playerResponseJson, ["streamingData"]))
+            return false
+        end if
+        if ValidBool(ObjectUtils.Dig(playerResponseJson, ["videoDetails", "isLive"]))
+            return false
+        end if
+        serverDrivenAbr = ValidBool(ObjectUtils.Dig(playerResponseJson, ["playerConfig", "mediaCommonConfig", "useServerDrivenAbr"]))
+        locked = serverDrivenAbr and not HasUsableAdaptiveUrl(playerResponseJson)
+        #if DEBUG
+            #if DEBUG_FORCE_SABR_DOWNGRADE
+                locked = true
+            #end if
+        #end if
+        return locked
+    end function
+
+    ' True if any adaptive format carries a playable field (url / signatureCipher / cipher).
+    function HasUsableAdaptiveUrl(playerResponseJson as object) as boolean
+        adaptiveFormats = ObjectUtils.Dig(playerResponseJson, ["streamingData", "adaptiveFormats"])
+        if not IsArray(adaptiveFormats)
+            return false
+        end if
+        for each format in adaptiveFormats
+            if IsAssociativeArray(format) and (not StringUtils.IsNullOrEmpty(format["url"]) or not StringUtils.IsNullOrEmpty(format["signatureCipher"]) or not StringUtils.IsNullOrEmpty(format["cipher"]))
+                return true
+            end if
+        end for
+        return false
     end function
 
     function AwaitAndParseNextResponse(fetchNext as boolean, raw as boolean, parsedResponse as object, nextRequest as object) as object
