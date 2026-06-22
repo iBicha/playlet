@@ -86,6 +86,7 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_STOP_VIDEO] = m.HandleStopVideo
         commandHandlers[COMMAND_TYPE_SEEK_TO] = m.HandleSeekTo
         commandHandlers[COMMAND_TYPE_SET_PLAYBACK_SPEED] = m.HandleSetPlaybackSpeed
+        commandHandlers[COMMAND_TYPE_GET_PLAYBACK_SPEED] = m.HandleGetPlaybackSpeed
 
         for each key in commandHandlers
             m[COMMAND_HANDLER_PREFIX + key] = commandHandlers[key]
@@ -508,6 +509,11 @@ class LoungeApi
             speed = 1.0
         end if
 
+        content = player.content
+        if content <> invalid and content.live = true
+            return
+        end if
+
         currentSpeed = ValidFloat(player.playbackSpeed)
 
         if Abs(currentSpeed - speed) < 0.001
@@ -532,6 +538,27 @@ class LoungeApi
         end if
 
         messagesToSend.Push(LoungeMessages.OnPlaybackSpeedChanged(speed, true))
+    end function
+
+    function HandleGetPlaybackSpeed(commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
+        player = m.videoQueueNode.player
+        if player = invalid
+            return
+        end if
+
+        if not player.hasField("playbackSpeed")
+            LogWarn("Video node does not support 'playbackSpeed' field on this device, ignoring getPlaybackSpeed command")
+            return
+        end if
+
+        speed = ValidFloat(player.playbackSpeed)
+        if speed <= 0
+            speed = 1.0
+        end if
+
+        message = LoungeMessages.OnPlaybackSpeedChanged(speed)
+        message["commandId"] = commandId
+        messagesToSend.Push(message)
     end function
 
     function SendMessages(messages as object, loungeData = invalid as object) as void
