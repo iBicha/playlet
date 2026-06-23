@@ -15,7 +15,7 @@ import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
-' DEBUG-only: force the downgrade retry on every non-live VOD.
+' DEBUG-only: force the SABR downgrade retry on every playable response.
 #const DEBUG_FORCE_SABR_DOWNGRADE = false
 
 namespace InnertubeService
@@ -84,6 +84,7 @@ namespace InnertubeService
             ' Under server-driven ABR the TV client can withhold every adaptive format URL (stuck
             ' at 360p); the downgraded TV client is not served SABR. Retry once with it.
             if client = Innertube.ClientType.Tv and IsSabrLocked(playerResponseJson)
+                LogInfo("SABR-locked response, retrying with downgraded TV client...")
                 client = Innertube.ClientType.TvDowngraded
                 continue while
             else if client = Innertube.ClientType.TvDowngraded and not HasUsableAdaptiveUrl(playerResponseJson)
@@ -146,12 +147,9 @@ namespace InnertubeService
     end function
 
     ' True when the TV client's response is SABR-locked: server-driven ABR signaled with no usable
-    ' adaptive URL (non-live VOD with streamingData).
+    ' adaptive URL.
     function IsSabrLocked(playerResponseJson as object) as boolean
         if not IsAssociativeArray(ObjectUtils.Dig(playerResponseJson, ["streamingData"]))
-            return false
-        end if
-        if ValidBool(ObjectUtils.Dig(playerResponseJson, ["videoDetails", "isLive"]))
             return false
         end if
         serverDrivenAbr = ValidBool(ObjectUtils.Dig(playerResponseJson, ["playerConfig", "mediaCommonConfig", "useServerDrivenAbr"]))
