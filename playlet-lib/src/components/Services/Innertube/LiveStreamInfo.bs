@@ -8,6 +8,10 @@ import "pkg:/source/utils/UrlUtils.bs"
 ' under INT32_MAX (~24.8 days at timescale=1000). YouTube caps live DVR at 12h.
 const LIVE_MAX_DVR_WINDOW_SEC = 43200
 
+' Hold the live edge this many fragments behind the head so a momentary edge-miss refetches
+' instead of erroring. Baked into liveCushionedAvailabilityStartUtc. 0 = ride the head.
+const LIVE_EDGE_CUSHION_SEGMENTS = 2
+
 namespace Innertube
 
     ' Live streams come back with no hlsManifestUrl/dashManifestUrl, just
@@ -109,12 +113,6 @@ namespace Innertube
             windowSec = headTimeSec
         end if
 
-        astDate = CreateObject("roDateTime")
-        astDate.FromSeconds(nowSec - windowSec)
-
-        parsedResponse["liveHeadSeqnum"] = headSeqnum
-        parsedResponse["liveAvailabilityStartUtc"] = astDate.ToISOString()
-        parsedResponse["liveDvrWindowSec"] = windowSec
         ' Effective per-fragment duration, derived from the stream's own counters.
         ' YouTube's reported targetDurationSec is unreliable for long-running streams
         ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
@@ -122,8 +120,33 @@ namespace Innertube
         ' (404). headTime/headSeqnum is the true average and keeps the manifest's
         ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
         ' that availabilityStartTime is built from.
+        fragmentDurationMs = 0
         if headSeqnum > 0
-            parsedResponse["liveFragmentDurationMs"] = Cint((headTimeSec / headSeqnum) * 1000.0)
+            fragmentDurationMs = Cint((headTimeSec / headSeqnum) * 1000.0)
+        end if
+
+        astSec = nowSec - windowSec
+        astDate = CreateObject("roDateTime")
+        astDate.FromSeconds(astSec)
+        cushionSec = Cint(LIVE_EDGE_CUSHION_SEGMENTS * fragmentDurationMs / 1000.0)
+        ' Younger than the cushion: shifting the anchor past now would break the edge math.
+        if cushionSec >= windowSec
+            cushionSec = 0
+        end if
+        ' Shift the anchor later by the cushion so the computed edge lands a cushion behind the head.
+        cushionedAstDate = CreateObject("roDateTime")
+        cushionedAstDate.FromSeconds(astSec + cushionSec)
+        ' Window minus the cushion; the full window would seek below startNumber.
+        seekableWindowSec = windowSec - cushionSec
+
+        parsedResponse["liveHeadSeqnum"] = headSeqnum
+        ' The real (uncushioned) availabilityStartTime, kept for diagnostics.
+        parsedResponse["liveAvailabilityStartUtc"] = astDate.ToISOString()
+        parsedResponse["liveCushionedAvailabilityStartUtc"] = cushionedAstDate.ToISOString()
+        parsedResponse["liveDvrWindowSec"] = windowSec
+        parsedResponse["liveSeekableWindowSec"] = seekableWindowSec
+        if fragmentDurationMs > 0
+            parsedResponse["liveFragmentDurationMs"] = fragmentDurationMs
         end if
     end function
 

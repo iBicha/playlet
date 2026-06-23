@@ -106,31 +106,23 @@ class DashManifest
         }
         nowUtc = ""
         if isLive
-            ' Dynamic (live) manifest: the player derives the current segment from
-            ' wall-clock against availabilityStartTime, and the duration-based
-            ' SegmentTemplate (see GenerateSegmentInformation) auto-extends as the
-            ' stream advances. timeShiftBufferDepth exposes the DVR window.
-            segmentSec = Cint(m.GetLiveFragmentDurationMs(metadata) / 1000.0)
-            if segmentSec < 1
-                segmentSec = 1
-            end if
             dvrWindowSec = ValidInt(metadata.liveDvrWindowSec)
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:isoff-live:2011"
             mpdAttributes["type"] = "dynamic"
-            ' Roku won't track the live edge from wall-clock unless it's handed an
-            ' authoritative "now": without it, it anchors to the Period start
-            ' (availabilityStartTime) and the playhead sits ~stream-age behind. A
-            ' direct UTCTiming + a fresh publishTime (both = current UTC, restamped on
-            ' every refresh) give it that anchor so it computes the real live edge.
+            ' Roku needs an authoritative "now" to track the live edge from wall-clock; UTCTiming +
+            ' publishTime carry the current UTC, restamped each refresh.
             nowUtc = CreateObject("roDateTime").ToISOString()
             mpdAttributes["publishTime"] = nowUtc
-            mpdAttributes["minimumUpdatePeriod"] = `PT${segmentSec}S`
-            mpdAttributes["suggestedPresentationDelay"] = `PT${segmentSec * 3}S`
-            if not StringUtils.IsNullOrEmpty(metadata.liveAvailabilityStartUtc)
-                mpdAttributes["availabilityStartTime"] = metadata.liveAvailabilityStartUtc
+            ' 20s: the duration SegmentTemplate extrapolates the edge between refreshes.
+            mpdAttributes["minimumUpdatePeriod"] = "PT20S"
+            ' Cushion already lives in availabilityStartTime; present at minBufferTime.
+            mpdAttributes["suggestedPresentationDelay"] = mpdAttributes["minBufferTime"]
+            if not StringUtils.IsNullOrEmpty(metadata.liveCushionedAvailabilityStartUtc)
+                mpdAttributes["availabilityStartTime"] = metadata.liveCushionedAvailabilityStartUtc
             end if
             if dvrWindowSec > 0
-                mpdAttributes["timeShiftBufferDepth"] = `PT${dvrWindowSec}S`
+                ' Seekable range = window - cushion; the player's DVR floor uses the same value.
+                mpdAttributes["timeShiftBufferDepth"] = `PT${ValidInt(metadata.liveSeekableWindowSec)}S`
             else
                 LogWarn("Live stream has no DVR window; omitting timeShiftBufferDepth (live seek may fail). videoId:", metadata.videoId)
             end if
@@ -140,9 +132,7 @@ class DashManifest
             mpdAttributes["mediaPresentationDuration"] = `PT${duration}S`
         end if
 
-        ' Dynamic (live) manifests need an explicit Period start so the player can
-        ' anchor the timeline against availabilityStartTime; static keeps the
-        ' attribute-less Period it has always used.
+        ' Live needs an explicit Period start to anchor the timeline against availabilityStartTime.
         periodAttributes = {}
         if isLive
             periodAttributes["start"] = "PT0S"
@@ -665,7 +655,7 @@ class DashManifest
             ' The `v` (video id) lets the proxy cache the per-video format lookup.
             segBase = `${m.liveSegmentBaseUrl}/api/dash/live-seg?v=${metadata.videoId}&itag=${stream.itag}&backend=${m.liveBackend}`
             xml.EmptyNode("SegmentTemplate", {
-                "initialization": `${segBase}&sq=init`
+                "initialization": `${segBase}&init=true`
                 "media": `${segBase}&sq=$Number$`
                 "timescale": "1000"
                 "duration": durationMs

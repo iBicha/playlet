@@ -10,15 +10,10 @@ import "pkg:/source/utils/Types.bs"
 ' playback; when the player asks for them the Await is short/instant. Small on
 ' purpose to bound concurrent roUrlTransfers (x2 representations).
 const LIVE_PREFETCH_SEGMENTS = 2
-' Bounded retry of transient segment failures before surfacing a 502 (one 502 on an
-' init segment kills that bitrate). Retried: 204 (sq past the live edge), reset/error
-' (-7/-10001), 5xx. Not retried: timeout (status 0 = slow/hung; a refetch would abandon
-' a progressing download) and 4xx (signature/availability). Per-attempt timeout left at
-' HttpClient's default; the Roku Video node's ~30s segment timeout bounds the freeze.
+' Immediate refetches (no sleep) for transient network errors (reset/5xx) before surfacing 503.
+' 204/timeout/4xx surface at once: an in-handler sleep would stall the queued audio request ~600ms
+' on the single thread (measured).
 const LIVE_SEG_MAX_ATTEMPTS = 3
-' Pause between attempts only on an empty (204) fragment (not yet produced), so the
-' refetch doesn't busy-loop the edge. Small: the web server is single-threaded.
-const LIVE_SEG_RETRY_BACKOFF_MS = 300
 
 ' Why a live-segment fetch failed. The string values double as the telemetry message
 ' and fingerprint (see ReportSegmentFailure), so they must stay stable - changing one
@@ -71,7 +66,7 @@ namespace Http
             m.cachedInitSeqnum = 0 ' live-edge fragment to source the init from
             m.probeByteCount = m.INITIAL_PROBE_BYTE_COUNT ' current box-walk probe; only grows
             m.reportedFailures = {} ' per-video telemetry dedupe (see ReportSegmentFailure)
-            ' Prefetch cache: "itag|nativeSq" -> in-flight StartSegmentFetch entry,
+            ' Prefetch cache: "itag|sq" -> in-flight StartSegmentFetch entry,
             ' warmed ahead of the player so awaits hit already-downloading fragments.
             m.prefetch = {}
             ' Last itag served per media kind. When the player switches representation
@@ -255,8 +250,8 @@ namespace Http
         '
         ' Endpoint (see DashManifest live SegmentTemplate); segments map 1:1 to native
         ' fragments, so the DASH segment number is the native sq:
-        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=init -> ftyp+moov of the live-edge fragment
-        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=<N>  -> moof+mdat of fragment N
+        '   /api/dash/live-seg?v=<id>&itag=<itag>&init=true -> ftyp+moov of the live-edge fragment
+        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=<N>    -> moof+mdat of fragment N
         '
         ' This is a hot path (called for every audio + video segment, continuously),
         ' so it is written to minimize per-request work: the itag -> url/type lookups
@@ -271,10 +266,14 @@ namespace Http
 
             v = request.query.v
             itag = request.query.itag
-            sq = request.query.sq
+            isInit = ValidString(request.query.init) = "true"
+            sq = -1
+            if not isInit
+                sq = ValidString(request.query.sq).ToInt()
+            end if
 
-            if StringUtils.IsNullOrEmpty(itag) or StringUtils.IsNullOrEmpty(sq) or StringUtils.IsNullOrEmpty(v)
-                response.Default(400, "Missing v, itag or sq")
+            if StringUtils.IsNullOrEmpty(itag) or StringUtils.IsNullOrEmpty(v) or (not isInit and sq <= 0)
+                response.Default(400, "Missing or invalid v, itag, or sq")
                 return true
             end if
 
@@ -290,7 +289,7 @@ namespace Http
                 return true
             end if
 
-            if sq = "init"
+            if isInit
                 ' ftyp+moov, served from the per-itag cache after the first fetch.
                 output = m.cachedInit[itag]
                 if output = invalid
@@ -303,8 +302,8 @@ namespace Http
                     end if
                     output = m.AwaitSegmentWithRetry(baseUrl, initSq, v, itag, true, invalid)
                     if output = invalid
-                        LogErrorNoTelemetry("[LIVE-SEG] INIT fetch failed v:", v, "itag:", itag, "-> 502")
-                        response.Default(502, "Failed to fetch live init segment")
+                        LogErrorNoTelemetry("[LIVE-SEG] INIT fetch failed v:", v, "itag:", itag, "-> 503")
+                        response.Default(503, "Live init segment not ready")
                         return true
                     end if
                     m.cachedInit[itag] = output
@@ -313,9 +312,8 @@ namespace Http
                 ' Media DASH segment = one native YouTube fragment, reduced to moof+mdat
                 ' so Roku reads the init segment only once. The manifest addresses the
                 ' proxy 1:1, so the DASH segment number is the native sq.
-                nativeSq = sq.ToInt()
-                if nativeSq > m.lastSeenSq
-                    m.lastSeenSq = nativeSq
+                if sq > m.lastSeenSq
+                    m.lastSeenSq = sq
                 end if
 
                 ' Representation switch (ABR video / audio track): the previous itag of
@@ -338,14 +336,16 @@ namespace Http
                 ' (Send, no Await) BEFORE blocking here so their downloads overlap this
                 ' fragment's await + playback; then drop entries now outside the window
                 ' (played past, or stranded by a seek) so the cache + temp files stay bounded.
-                entry = m.GetOrStartFetch(baseUrl, nativeSq, v, itag)
-                m.PrefetchAhead(baseUrl, v, itag, nativeSq, LIVE_PREFETCH_SEGMENTS)
-                m.EvictPrefetchOutside(itag, nativeSq + 1, nativeSq + LIVE_PREFETCH_SEGMENTS)
+                entry = m.GetOrStartFetch(baseUrl, sq, v, itag)
+                m.PrefetchAhead(baseUrl, v, itag, sq, LIVE_PREFETCH_SEGMENTS)
+                m.EvictPrefetchOutside(itag, sq + 1, sq + LIVE_PREFETCH_SEGMENTS)
 
-                output = m.AwaitSegmentWithRetry(baseUrl, nativeSq, v, itag, false, entry)
+                output = m.AwaitSegmentWithRetry(baseUrl, sq, v, itag, false, entry)
                 if output = invalid
-                    LogErrorNoTelemetry("[LIVE-SEG] media fragment failed v:", v, "itag:", itag, "sq:", nativeSq, "-> 502")
-                    response.Default(502, "Failed to fetch live media segment")
+                    ' 503 makes Roku re-request the same sq and hold the bitrate (verified); the
+                    ' fragment will exist within ~one re-request.
+                    LogErrorNoTelemetry("[LIVE-SEG] media fragment not ready v:", v, "itag:", itag, "sq:", sq, "-> 503")
+                    response.Default(503, "Live media segment not ready")
                     return true
                 end if
             end if
@@ -513,12 +513,9 @@ namespace Http
             DeleteFile(entry.tmpPath)
         end function
 
-        ' Await `entry` (invalid -> fetch from scratch), transform to the bytes Roku
-        ' needs (wantInit: true -> ftyp+moov, false -> moof+mdat), and retry transient
-        ' failures up to LIVE_SEG_MAX_ATTEMPTS before giving up (invalid). Each retry
-        ' discards the entry and starts a fresh fetch for the same sq - rides an edge
-        ' blip AND un-poisons a prefetched 204 (warmed before the edge produced it).
-        ' Telemetry fires once, on give-up.
+        ' Await `entry` (invalid -> fetch fresh), transform to the bytes Roku needs (wantInit ->
+        ' ftyp+moov, else moof+mdat), retrying transient failures up to LIVE_SEG_MAX_ATTEMPTS. Each
+        ' retry refetches the same sq, which also un-poisons a prefetched 204. Telemetry fires once.
         function AwaitSegmentWithRetry(baseUrl as string, sq as integer, v as string, itag as string, wantInit as boolean, entry as object) as dynamic
             if entry = invalid
                 entry = m.StartSegmentFetch(baseUrl, sq, v, itag)
@@ -531,20 +528,23 @@ namespace Http
                     return result.bytes
                 end if
 
-                if (not result.retryable) or attempt >= LIVE_SEG_MAX_ATTEMPTS
-                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, segUrl: entry.segUrl, response: result.response })
-                    return invalid
-                end if
-
-                ' Empty (204) = sq not produced yet: drop the warmed siblings (also fetched
-                ' too early) so they refetch fresh, and pause so the refetch doesn't
-                ' busy-loop the edge. Network/5xx already spent time in the await -> no pause.
+                ' 204 = sq not produced yet. Return 503 and let Roku re-ask (same sq, then resyncs);
+                ' a sleep+refetch here would stall the queued audio ~600ms on the single thread
+                ' (measured). Evict the warmed siblings - fetched too early, they 204'd too.
                 if result.reason = LiveSegFailure.EmptyFragment
                     if not wantInit
                         m.EvictPrefetchItag(itag)
                     end if
-                    sleep(LIVE_SEG_RETRY_BACKOFF_MS)
+                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, head: m.liveHeadSeqnum, segUrl: entry.segUrl, response: result.response })
+                    return invalid
                 end if
+
+                if (not result.retryable) or attempt >= LIVE_SEG_MAX_ATTEMPTS
+                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, head: m.liveHeadSeqnum, segUrl: entry.segUrl, response: result.response })
+                    return invalid
+                end if
+
+                ' Network/5xx: transient; discard and refetch immediately (no sleep).
                 LogWarnNoTelemetry("[LIVE-SEG] retry sq", sq, "itag", itag, "(", result.reason, ") attempt", attempt + 1, "of", LIVE_SEG_MAX_ATTEMPTS)
 
                 attempt += 1
@@ -557,14 +557,15 @@ namespace Http
         ' One fetch+transform attempt. Reads only the needed byte range from the temp
         ' file and always deletes it. Returns:
         '   { ok: true, bytes }                        - the transformed segment bytes
-        '   { ok: false, retryable, reason, response } - failed; `retryable` separates
-        '     fast transient errors (204/empty, reset/-10001, 5xx) from ones a refetch
-        '     won't fix: a plain timeout (slow/hung), 4xx, or a malformed box.
+        '   { ok: false, retryable, reason, response } - failed; `retryable` marks fast transient
+        '     NETWORK errors (reset/-10001, 5xx) worth an immediate refetch. 204/empty is handled
+        '     specially by the caller (immediate 503); timeout/4xx/malformed are not retried.
         function AttemptSegment(entry as object, wantInit as boolean) as object
             tmpPath = entry.tmpPath
             sq = entry.sq
 
             response = entry.req.Await()
+            m.liveHeadSeqnum = m.ReadHeadSeqnum(response)
             if not response.IsSuccess()
                 status = response.StatusCode()
                 LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "failed:", status)
@@ -582,7 +583,8 @@ namespace Http
             if fileLen <= 0
                 LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "empty file (status", response.StatusCode(), ")")
                 DeleteFile(tmpPath)
-                return { ok: false, retryable: true, reason: LiveSegFailure.EmptyFragment, response: response }
+                ' 204/empty handled specially by the caller (immediate 503, no in-handler retry).
+                return { ok: false, retryable: false, reason: LiveSegFailure.EmptyFragment, response: response }
             end if
 
             boxes = m.LocateBoxes(tmpPath, fileLen)
@@ -606,6 +608,17 @@ namespace Http
 
             DeleteFile(tmpPath)
             return { ok: true, bytes: out }
+        end function
+
+        ' Live head sequence number from a fragment response's X-Head-Seqnum header (-1 if
+        ' absent). Stashed (m.liveHeadSeqnum) so ReportSegmentFailure records how far ahead of
+        ' the real edge a failed sq was (delta = sq - head) - the field signal for edge overshoot.
+        function ReadHeadSeqnum(response as object) as integer
+            headers = response.Headers()
+            if IsAssociativeArray(headers) and headers.DoesExist("X-Head-Seqnum")
+                return ValidString(headers["X-Head-Seqnum"]).ToInt()
+            end if
+            return -1
         end function
 
         ' Read the leading boxes of a fragment temp file and return moov/moof offsets.
@@ -677,11 +690,21 @@ namespace Http
             end if
             m.reportedFailures[dedupeKey] = true
 
+            ' Edge overshoot: how far past the live head (X-Head-Seqnum at the failing fetch, via
+            ' info.head) the failed sq was. delta > 0 = a not-yet-produced fragment (the 503 cause).
+            head = ValidInt(info.head)
+            sqNum = ValidInt(info.sq)
+            deltaText = "n/a"
+            if head > 0 and sqNum > 0
+                deltaText = (sqNum - head).ToStr()
+            end if
             details = [
                 "reason: " + reason
                 "videoId: " + ValidString(info.v)
                 "itag: " + ValidString(info.itag)
                 "sq: " + ToString(info.sq)
+                "head: " + head.ToStr()
+                "delta: " + deltaText
                 "status: " + statusText
                 "error: " + errorMessage
                 "url: " + ValidString(info.segUrl)

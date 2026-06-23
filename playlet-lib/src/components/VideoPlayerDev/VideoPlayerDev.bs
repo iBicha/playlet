@@ -1114,19 +1114,20 @@ function OnVideoContentJobDone(event as object) as void
     ' live floor: how far back the DVR window reaches (0 = unknown -> the brain keeps the [0, edge] clamp).
     ' The generated DASH anchors t=0 to the window start, so floor = edge - window as the session outlives it.
     ' The same window decides rewindability: a buffer-sized window means no live trickplay at all.
-    m.transport.SetLiveDvrWindow(ValidInt(metadata.liveDvrWindowSec) * 1000)
+    ' Use the seekable depth (window - cushion) to match the manifest's timeShiftBufferDepth.
+    m.transport.SetLiveDvrWindow(ValidInt(metadata.liveSeekableWindowSec) * 1000)
     m.trickPlayBar.isLive = isLive
     m.trickPlayBar.canRewind = m.transport.CanRewindLive()
     m.bifDisplay.tileSet = invalid
 
-    ' anchor the live edge clock at the manifest's availabilityStartTime and start the 1s heartbeat: the brain
+    ' anchor the live edge clock at the cushioned availabilityStartTime and start the 1s heartbeat: the brain
     ' gets a continuous edge (OnLiveEdge) that keeps advancing through pauses, so the time-behind offset is
     ' always current — including the moment the chrome reveals.
     m.liveAstSeconds = -1
     m.liveFallbackEdgeMs = -1
     m.liveFallbackAtSeconds = 0
     if isLive
-        ast = ValidString(metadata.liveAvailabilityStartUtc)
+        ast = ValidString(metadata.liveCushionedAvailabilityStartUtc)
         if ast <> ""
             astDate = CreateObject("roDateTime")
             astDate.FromISO8601String(ast)
