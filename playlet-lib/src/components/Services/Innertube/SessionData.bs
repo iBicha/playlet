@@ -11,18 +11,12 @@ namespace Innertube
     const SESSION_DATA_VERSION = 1
     const INNERTUBE_VISITOR_DATA_LIFESPAN_SECONDS = 60 * 60 * 24 * 14 ' 14 days
 
-    function GetSessionData(cancellation = invalid as object) as object
-        sessionData = ReadSessionDataFromRegistry()
-        if sessionData <> invalid
-            return sessionData
+    function IsSessionDataFresh(sessionData as object) as boolean
+        if sessionData = invalid or not IsInt(sessionData.timestamp)
+            return false
         end if
-
-        sessionData = RequestSessionData(cancellation)
-        if sessionData.error <> invalid
-            return sessionData
-        end if
-        SaveSessionDataToRegistry(sessionData)
-        return sessionData
+        nowSeconds = TimeUtils.Now().AsSeconds()
+        return nowSeconds - sessionData.timestamp <= INNERTUBE_VISITOR_DATA_LIFESPAN_SECONDS
     end function
 
     function RequestSessionData(cancellation = invalid as object) as object
@@ -35,12 +29,12 @@ namespace Innertube
         })
         request.Cancellation(cancellation)
         request.TryCount(2)
+        request.NoCache()
 
         response = request.Await()
         if not response.IsSuccess()
-            return {
-                "error": "Failed to fetch session data: " + response.ErrorMessage()
-            }
+            LogError("Failed to fetch session data: " + response.ErrorMessage())
+            return invalid
         end if
 
         text = response.Text()
@@ -48,16 +42,14 @@ namespace Innertube
 
         json = StringUtils.ParseJsonSafe(text)
         if json = invalid
-            return {
-                "error": "Failed to parse session data: " + text
-            }
+            LogError("Failed to parse session data: " + text)
+            return invalid
         end if
 
         visitorData = ObjectUtils.Dig(json, [0, 2, 0, 0, 13])
         if StringUtils.IsNullOrEmpty(visitorData)
-            return {
-                "error": "Failed to find visitorData in session data: " + text
-            }
+            LogError("Failed to find visitorData in session data: " + text)
+            return invalid
         end if
 
         return {
@@ -84,13 +76,7 @@ namespace Innertube
             return invalid
         end if
 
-        timestamp = sessionData.timestamp
-        nowSeconds = TimeUtils.Now().AsSeconds()
-        if nowSeconds - timestamp > INNERTUBE_VISITOR_DATA_LIFESPAN_SECONDS
-            RegistryUtils.Delete(RegistryUtils.INNERTUBE_SESSION_DATA)
-            return invalid
-        end if
-
         return sessionData
     end function
+
 end namespace

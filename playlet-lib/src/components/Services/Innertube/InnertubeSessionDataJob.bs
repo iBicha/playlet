@@ -1,26 +1,28 @@
 import "pkg:/components/Services/Innertube/SessionData.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 @job("InnertubeSessionDataJob")
 function ExecuteJob() as void
-    input = JobGetInput()
+    innertubeNode = JobGetInput().innertube
 
-    innertubeNode = input.innertube
-
-    cancellation = JobGetCancellation()
-    sessionData = Innertube.GetSessionData(cancellation)
-    if sessionData.error <> invalid
-        JobError(sessionData.error)
-        return
+    cached = Innertube.ReadSessionDataFromRegistry()
+    if cached <> invalid and not StringUtils.IsNullOrEmpty(cached.visitorData)
+        if IsInt(cached.timestamp)
+            innertubeNode.timestamp = cached.timestamp
+        end if
+        innertubeNode.visitorData = cached.visitorData
+        if Innertube.IsSessionDataFresh(cached)
+            return
+        end if
     end if
 
-    innertubeNode.queueFields(true)
-    if IsInt(sessionData.timestamp)
-        innertubeNode.timestamp = sessionData.timestamp
+    fetched = Innertube.RequestSessionData(JobGetCancellation())
+    if fetched <> invalid
+        Innertube.SaveSessionDataToRegistry(fetched)
+        innertubeNode.timestamp = fetched.timestamp
+        innertubeNode.visitorData = fetched.visitorData
+    else if StringUtils.IsNullOrEmpty(innertubeNode.visitorData)
+        ' Refresh failed and we never had an id — wake a cold waiter to fail. Never blank a valid id.
+        innertubeNode.visitorData = ""
     end if
-
-    if not StringUtils.IsNullOrEmpty(sessionData.visitorData)
-        innertubeNode.visitorData = sessionData.visitorData
-    end if
-
-    innertubeNode.queueFields(false)
 end function

@@ -4,6 +4,7 @@ import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
+    m.top.observeField("requestVisitorData", FuncName(OnRequestVisitorData))
 end function
 
 function OnNodeReady()
@@ -11,14 +12,14 @@ function OnNodeReady()
 end function
 
 function OnRequestVisitorData() as void
-    if m.innertubeSessionDataJob <> invalid
+    if m.innertubeSessionDataJob <> invalid and not m.innertubeSessionDataJob.done
         return
     end if
 
-    OnForceRequestVisitorData()
+    RequestVisitorData()
 end function
 
-function OnForceRequestVisitorData() as void
+function RequestVisitorData() as void
     if m.innertubeSessionDataJob <> invalid
         m.innertubeSessionDataJob.cancel = true
         m.innertubeSessionDataJob = invalid
@@ -40,4 +41,8 @@ end function
 function OnInnertubeSessionDataJobDone(event as object) as void
     JobSystem.UnobserveCallback(event.getRoSGNode())
     m.innertubeSessionDataJob = invalid
+    if StringUtils.IsNullOrEmpty(m.top.visitorData)
+        ' Trigger observers in case the job threw an error and didn't set the visitorData
+        m.top.visitorData = ""
+    end if
 end function

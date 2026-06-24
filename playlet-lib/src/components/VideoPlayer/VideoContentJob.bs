@@ -1,5 +1,7 @@
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
 
 @job("VideoContentJob")
 function ExecuteJob() as void
@@ -32,19 +34,15 @@ function ExecuteJob() as void
     if not IsAssociativeArray(metadata)
         cancellation = JobGetCancellation()
         if backend = "playlet"
-            visitorData = innertubeNode.visitorData
-            if StringUtils.IsNullOrEmpty(visitorData)
-                messagePort = CreateObject("roMessagePort")
-                MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", messagePort)
-                innertubeNode.requestVisitorData = true
-                message = wait(20000, messagePort)
-                innertubeNode.unobserveFieldScoped("visitorData")
-                if message = invalid
-                    innertubeNode.forceRequestVisitorData = true
-                    JobError("Failed to get visitor data. Please try again later.")
-                    return
-                end if
-                visitorData = message.getData()
+
+            visitorData = GetVisitorData(innertubeNode, cancellation)
+            if visitorData.cancel = true
+                JobCancel()
+                return
+            end if
+            if visitorData.error <> invalid
+                JobError(visitorData.error)
+                return
             end if
 
             accessToken = invalid
@@ -58,7 +56,7 @@ function ExecuteJob() as void
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
                 "cancellation": cancellation
                 "credentialTransferToken": loungeServiceNode.credentialTransferToken
-                "visitorData": visitorData
+                "visitorData": visitorData.visitorData
                 "accessToken": accessToken
                 "onBehalfOfUser": onBehalfOfUser
             })
@@ -152,6 +150,48 @@ function ExecuteJob() as void
     if metadata.liveNow = true
         contentNode.Live = true
     end if
+end function
+
+function GetVisitorData(innertubeNode as object, cancellation as object) as object
+    port = CreateObject("roMessagePort")
+
+    MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", port)
+    CancellationUtils.ObserveCancellationScoped(cancellation, port)
+
+    visitorData = innertubeNode.visitorData
+    if not StringUtils.IsNullOrEmpty(visitorData)
+        innertubeNode.unobserveFieldScoped("visitorData")
+        CancellationUtils.UnobserveCancellationScoped(cancellation)
+
+        return {
+            visitorData: visitorData
+        }
+    end if
+
+    innertubeNode.requestVisitorData = true
+    message = wait(30000, port)
+
+    innertubeNode.unobserveFieldScoped("visitorData")
+    CancellationUtils.UnobserveCancellationScoped(cancellation)
+
+    if message <> invalid
+        if CancellationUtils.IsCancellationEvent(cancellation, message)
+            return {
+                cancel: true
+            }
+        end if
+        visitorData = message.getData()
+    end if
+
+    if StringUtils.IsNullOrEmpty(visitorData)
+        return {
+            error: "Failed to get visitor data. Please try again later."
+        }
+    end if
+
+    return {
+        visitorData: visitorData
+    }
 end function
 
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
