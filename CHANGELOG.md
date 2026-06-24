@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Attempt to fix `MISSING_FORMAT_FIELD` error in live videos
+- Attempt to fix `No valid bitrates` error
 
 ## [0.47.3] - 2026-06-23
 

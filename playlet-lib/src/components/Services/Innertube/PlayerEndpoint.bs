@@ -61,6 +61,7 @@ namespace Innertube
 
         if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             request.Header("x-goog-visitor-id", visitorData)
+            request.poTokenIdentity = visitorData
         end if
 
         request.signatureTimestamp = signatureTimestamp
@@ -102,7 +103,7 @@ namespace Innertube
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
-        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation, client)
+        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation, client, playerRequest.poTokenIdentity)
         if error <> invalid
             parsedResponse["error"] = error.error
             if error.DoesExist("errorCode")
@@ -110,6 +111,9 @@ namespace Innertube
             end if
             return parsedResponse
         end if
+
+        parsedResponse["potAttached"] = HasPotParam(adaptiveFormats) or HasPotParam(formats)
+        LogDebug("poToken attached to deciphered urls:", parsedResponse["potAttached"])
 
         ' if isLive and adaptiveFormats.Count() > 0
         '     LogInfo("[LIVE-INFO] post-decipher, sts:", playerRequest.signatureTimestamp, "format[0].itag:", adaptiveFormats[0]["itag"], "url:", adaptiveFormats[0]["url"])
@@ -499,7 +503,19 @@ namespace Innertube
         return json["sts"]
     end function
 
-    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object, client = invalid as dynamic) as object
+    function HasPotParam(formats as object) as boolean
+        for each fmt in formats
+            url = fmt["url"]
+            if not StringUtils.IsNullOrEmpty(url)
+                if url.Instr("&pot=") <> -1
+                    return true
+                end if
+            end if
+        end for
+        return false
+    end function
+
+    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object, client = invalid as dynamic, poTokenIdentity = invalid as dynamic) as object
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
             return invalid
@@ -523,11 +539,16 @@ namespace Innertube
             })
         end for
 
-        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, {
+        body = {
             "sts": signatureTimestamp
             "formats": reqFormats
             "adaptiveFormats": reqAdaptiveFormats
-        })
+        }
+        if not StringUtils.IsNullOrEmpty(poTokenIdentity)
+            body["identity"] = poTokenIdentity
+        end if
+
+        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, body)
         request.Cancellation(cancellation)
 
         request.LogCurlCommand(false)
