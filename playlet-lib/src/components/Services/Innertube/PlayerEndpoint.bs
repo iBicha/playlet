@@ -14,6 +14,7 @@ namespace Innertube
         cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
+        datasyncIdToken = OptionUtils.Get(options, "datasyncIdToken")
         cpn = InnertubeService.CreateClientPlaybackNonce()
 
         useAccessToken = (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded) and not StringUtils.IsNullOrEmpty(accessToken)
@@ -62,6 +63,8 @@ namespace Innertube
         if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             request.Header("x-goog-visitor-id", visitorData)
             request.poTokenIdentity = visitorData
+        else if useAccessToken and not StringUtils.IsNullOrEmpty(datasyncIdToken)
+            request.poTokenIdentity = datasyncIdToken
         end if
 
         request.signatureTimestamp = signatureTimestamp
@@ -547,6 +550,7 @@ namespace Innertube
         if not StringUtils.IsNullOrEmpty(poTokenIdentity)
             body["identity"] = poTokenIdentity
         end if
+        LogDebug("decipher poToken identity:", poTokenIdentity)
 
         request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, body)
         request.Cancellation(cancellation)

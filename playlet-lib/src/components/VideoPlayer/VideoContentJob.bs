@@ -13,6 +13,7 @@ function ExecuteJob() as void
     preferencesNode = input.preferences
     loungeServiceNode = input.loungeService
     playletServerPort = input.playletServerPort
+    profilesService = input.profilesService
 
     if JobIsCancelled()
         JobCancel()
@@ -47,10 +48,12 @@ function ExecuteJob() as void
 
             accessToken = invalid
             onBehalfOfUser = invalid
+            profileNode = invalid
             authToken = invidiousNode.authToken
             if authToken <> invalid and authToken.profileNode <> invalid and authToken.profileNode.type = "youtube" and not StringUtils.IsNullOrEmpty(authToken.token)
                 accessToken = authToken.token
                 onBehalfOfUser = authToken.activeIdentifyToken
+                profileNode = authToken.profileNode
             end if
 
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
@@ -59,6 +62,8 @@ function ExecuteJob() as void
                 "visitorData": visitorData.visitorData
                 "accessToken": accessToken
                 "onBehalfOfUser": onBehalfOfUser
+                "profileNode": profileNode
+                "profilesService": profilesService
             })
             if IsAssociativeArray(metadata)
                 contentNode.addFields({
