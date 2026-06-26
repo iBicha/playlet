@@ -2,6 +2,7 @@ import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
 import "pkg:/components/Services/Innertube/OTFSegmentInfo.bs"
+import "pkg:/components/Services/Innertube/PoTokens.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -67,6 +68,10 @@ namespace Innertube
             request.poTokenIdentity = datasyncIdToken
         end if
 
+        if not StringUtils.IsNullOrEmpty(request.poTokenIdentity)
+            request.poToken = Innertube.PoTokens.GetValidPoTokenForIdentity(request.poTokenIdentity)
+        end if
+
         request.signatureTimestamp = signatureTimestamp
         request.cpn = cpn
 
@@ -106,7 +111,7 @@ namespace Innertube
         adaptiveFormats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "adaptiveFormats"]))
         formats = ValidArray(ObjectUtils.Dig(payload, ["streamingData", "formats"]))
 
-        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation, client, playerRequest.poTokenIdentity)
+        error = DecipherUrls(formats, adaptiveFormats, playerRequest.signatureTimestamp, cancellation, client, playerRequest.poTokenIdentity, playerRequest.poToken)
         if error <> invalid
             parsedResponse["error"] = error.error
             if error.DoesExist("errorCode")
@@ -116,7 +121,15 @@ namespace Innertube
         end if
 
         parsedResponse["potAttached"] = HasPotParam(adaptiveFormats) or HasPotParam(formats)
-        LogDebug("poToken attached to deciphered urls:", parsedResponse["potAttached"])
+        ' browser = we forwarded a token; server = server minted; none = no pot attached.
+        if not parsedResponse["potAttached"]
+            parsedResponse["potSource"] = "none"
+        else if StringUtils.IsNullOrEmpty(playerRequest.poToken)
+            parsedResponse["potSource"] = "server"
+        else
+            parsedResponse["potSource"] = "browser"
+        end if
+        LogDebug("poToken attached to deciphered urls:", parsedResponse["potAttached"], "source:", parsedResponse["potSource"])
 
         ' if isLive and adaptiveFormats.Count() > 0
         '     LogInfo("[LIVE-INFO] post-decipher, sts:", playerRequest.signatureTimestamp, "format[0].itag:", adaptiveFormats[0]["itag"], "url:", adaptiveFormats[0]["url"])
@@ -518,7 +531,7 @@ namespace Innertube
         return false
     end function
 
-    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object, client = invalid as dynamic, poTokenIdentity = invalid as dynamic) as object
+    function DecipherUrls(formats as object, adaptiveFormats as object, signatureTimestamp as dynamic, cancellation as object, client = invalid as dynamic, poTokenIdentity = invalid as dynamic, poToken = invalid as dynamic) as object
         if signatureTimestamp = invalid
             ' No need to decipher if signatureTimestamp is not available
             return invalid
@@ -551,6 +564,9 @@ namespace Innertube
             body["identity"] = poTokenIdentity
         end if
         LogDebug("decipher poToken identity:", poTokenIdentity)
+        if not StringUtils.IsNullOrEmpty(poToken)
+            body["poToken"] = poToken
+        end if
 
         request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, body)
         request.Cancellation(cancellation)

@@ -1,0 +1,91 @@
+import "pkg:/source/utils/RegistryUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+namespace Innertube.PoTokens
+
+    const POTOKENS_VERSION = 1
+
+    function IsPoTokenEntryValid(entry as object) as boolean
+        if not IsAssociativeArray(entry) or StringUtils.IsNullOrEmpty(entry.token) or not IsInt(entry.expiresAt)
+            return false
+        end if
+        return TimeUtils.Now().AsSeconds() < entry.expiresAt
+    end function
+
+    function PrunePoTokens(poTokens as object) as object
+        pruned = {}
+        for each identity in poTokens
+            if IsPoTokenEntryValid(poTokens[identity])
+                pruned[identity] = poTokens[identity]
+            end if
+        end for
+        return pruned
+    end function
+
+    ' Stored as { identity: { token, expiresAt, mintedAt } }; identity = visitorData or datasyncIdToken.
+    ' Returns the valid token string for an identity (for playback), or "" if there is none.
+    function GetValidPoTokenForIdentity(identity as string) as string
+        if StringUtils.IsNullOrEmpty(identity)
+            return ""
+        end if
+        entry = ReadPoTokensFromRegistry()[identity]
+        if IsPoTokenEntryValid(entry)
+            return entry.token
+        end if
+        return ""
+    end function
+
+    ' Returns the stored entry { token, expiresAt, mintedAt } for an identity, or invalid. The web
+    ' app reads this to decide whether to re-mint.
+    function GetPoTokenEntryForIdentity(identity as string) as object
+        if StringUtils.IsNullOrEmpty(identity)
+            return invalid
+        end if
+        entry = ReadPoTokensFromRegistry()[identity]
+        if not IsAssociativeArray(entry)
+            return invalid
+        end if
+        return entry
+    end function
+
+    function StorePoToken(identity as string, token as string, expiresAt as integer, mintedAt as integer) as void
+        poTokens = PrunePoTokens(ReadPoTokensFromRegistry())
+        poTokens[identity] = {
+            "token": token
+            "expiresAt": expiresAt
+            "mintedAt": mintedAt
+        }
+        SavePoTokensToRegistry(poTokens)
+    end function
+
+    function ClearAllPoTokens() as void
+        SavePoTokensToRegistry({})
+    end function
+
+    function ReadPoTokensFromRegistry() as object
+        stored = RegistryUtils.Read(RegistryUtils.INNERTUBE_POTOKENS)
+        if StringUtils.IsNullOrEmpty(stored)
+            return {}
+        end if
+        parsed = StringUtils.ParseJsonSafe(stored)
+        if not IsAssociativeArray(parsed)
+            return {}
+        end if
+        if parsed.__version <> POTOKENS_VERSION
+            return {}
+        end if
+        if not IsAssociativeArray(parsed.tokens)
+            return {}
+        end if
+        return parsed.tokens
+    end function
+
+    function SavePoTokensToRegistry(poTokens as object) as void
+        RegistryUtils.Write(RegistryUtils.INNERTUBE_POTOKENS, FormatJson({
+            "__version": POTOKENS_VERSION
+            "tokens": poTokens
+        }))
+    end function
+
+end namespace

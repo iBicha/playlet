@@ -7,6 +7,8 @@
   import StringControl from "lib/Screens/Settings/SettingControls/StringControl.svelte";
   import NumberControl from "./SettingControls/NumberControl.svelte";
   import ClearCacheControl from "./SettingControls/ClearCacheControl.svelte";
+  import ClearPoTokensControl from "./SettingControls/ClearPoTokensControl.svelte";
+  import MintPoTokenControl from "./SettingControls/MintPoTokenControl.svelte";
   import EditQualityControl from "./SettingControls/EditQualityControl.svelte";
   import SponsorBlockCategoriesControl from "./SettingControls/SponsorBlockCategoriesControl.svelte";
   import { translate } from "lib/Stores";
@@ -34,6 +36,8 @@
   const customComponents = {
     ClearSearchHistoryControl,
     ClearCacheControl,
+    ClearPoTokensControl,
+    MintPoTokenControl,
     EditHomeScreenControl,
     PlayletLibVersionControl,
     EditQualityControl,

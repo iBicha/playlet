@@ -775,6 +775,20 @@ namespace InnertubeService
         return Innertube.GetDatasyncIdToken(endpoint)
     end function
 
+    ' The identity used to bind GVS poTokens: the signed-in profile's datasyncIdToken,
+    ' falling back to visitorData when logged out (or when no datasyncIdToken is available).
+    function GetCurrentPoTokenIdentity(profilesService as object, innertubeNode as object) as string
+        currentProfile = profilesService.currentProfile
+        if currentProfile <> invalid and currentProfile.type = "youtube"
+            accessToken = currentProfile.accessToken
+            if not StringUtils.IsNullOrEmpty(accessToken)
+                ' Signed in: bind to the datasyncIdToken, matching the decipher request's identity.
+                return GetProfileDatasyncIdToken(currentProfile, accessToken, profilesService, invalid)
+            end if
+        end if
+        return innertubeNode.visitorData
+    end function
+
     function BackfillSelectActiveIdentityEndpoint(profileNode as object, accessToken as string, profilesService as object, cancellation as object) as object
         LogInfo("Backfilling selectActiveIdentityEndpoint for signed-in profile")
         accounts = Innertube.ListAccounts(accessToken, cancellation)

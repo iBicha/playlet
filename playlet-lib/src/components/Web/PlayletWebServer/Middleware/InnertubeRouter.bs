@@ -1,7 +1,9 @@
 import "pkg:/components/Services/Innertube/Constants.bs"
-import "pkg:/components/Services/Innertube/SessionData.bs"
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/components/Services/Innertube/PoTokens.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Types.bs"
 
 namespace Http
 
@@ -14,21 +16,32 @@ namespace Http
             m.profilesService = server.sceneNodes.profilesService
         end function
 
-        @get("/api/innertube/session")
-        function GetSessionData(context as object) as object
+        @get("/api/innertube/potoken")
+        function GetPoToken(context as object) as object
             response = context.response
 
-            sessionData = {
-                "timestamp": m.innertube.timestamp
-                "visitorData": m.innertube.visitorData
-            }
+            identity = InnertubeService.GetCurrentPoTokenIdentity(m.profilesService, m.innertube)
+            if StringUtils.IsNullOrEmpty(identity)
+                response.Default(503, "No current identity")
+                return true
+            end if
 
-            response.Json(sessionData)
+            result = {
+                "identity": identity
+            }
+            entry = Innertube.PoTokens.GetPoTokenEntryForIdentity(identity)
+            if IsAssociativeArray(entry)
+                result["poToken"] = entry.token
+                result["mintedAt"] = entry.mintedAt
+                result["expiresAt"] = entry.expiresAt
+            end if
+
+            response.Json(result)
             return true
         end function
 
-        @post("/api/innertube/session")
-        function SetSessionData(context as object) as object
+        @post("/api/innertube/potoken")
+        function SetPoToken(context as object) as object
             request = context.request
             response = context.response
 
@@ -37,24 +50,37 @@ namespace Http
                 response.Default(400, "Invalid payload")
                 return true
             end if
-
-            if not IsInt(payload.timestamp)
-                response.Default(400, "Invalid timestamp")
+            if StringUtils.IsNullOrEmpty(payload.poToken)
+                response.Default(400, "Invalid poToken")
                 return true
             end if
-            if StringUtils.IsNullOrEmpty(payload.visitorData)
-                response.Default(400, "Invalid visitorData")
+            if StringUtils.IsNullOrEmpty(payload.identity)
+                response.Default(400, "Invalid identity")
                 return true
             end if
 
-            Innertube.SaveSessionDataToRegistry({
-                "timestamp": payload.timestamp
-                "visitorData": payload.visitorData
-            })
+            if not IsInt(payload.mintedAt) or not IsInt(payload.expiresAt)
+                response.Default(400, "Invalid mintedAt/expiresAt")
+                return true
+            end if
 
-            m.innertube.timestamp = payload.timestamp
-            m.innertube.visitorData = payload.visitorData
-            response.Default(204, "Session data updated successfully")
+            ' Reject identities other than the device's current one (guards the shared registry).
+            if payload.identity <> InnertubeService.GetCurrentPoTokenIdentity(m.profilesService, m.innertube)
+                response.Default(409, "identity is not the device's current identity")
+                return true
+            end if
+
+            Innertube.PoTokens.StorePoToken(payload.identity, payload.poToken, payload.expiresAt, payload.mintedAt)
+            response.Default(204, "PoToken updated successfully")
+            return true
+        end function
+
+        @delete("/api/innertube/potoken/all")
+        function ClearPoTokens(context as object) as object
+            response = context.response
+
+            Innertube.PoTokens.ClearAllPoTokens()
+            response.Default(204, "PoTokens cleared")
             return true
         end function
 
@@ -70,8 +96,8 @@ namespace Http
             end if
 
             requestHeaders = requestArgs.Headers
-            ' Ytjs can send requests without specifying a User-Agent.
-            ' In this case, Roku would use its default User-Agent.
+            ' Proxied web-app requests (e.g. BotGuard attestation) may omit a
+            ' User-Agent; fall back to ours instead of Roku's default.
             if StringUtils.IsNullOrEmpty(requestHeaders["User-Agent"])
                 requestHeaders["User-Agent"] = VIDEO_PLAYER_USER_AGENT
             end if

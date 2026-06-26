@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Attempt to fix `No valid bitrates` error by adding PoToken generation in web app
+
+### Removed
+
+- Play with ytjs option from web app, as it wasn't working anyway
+
 ## [0.47.4] - 2026-06-25
 
 ### Fixed

@@ -164,6 +164,27 @@ export class PlayletApi {
         return await fetch(`${PlayletApi.host()}/api/cache`, { method: "DELETE" });
     }
 
+    static async getDevicePoToken() {
+        const response = await fetch(`${PlayletApi.host()}/api/innertube/potoken`);
+        if (!response.ok) {
+            const body = await response.text().catch(() => "");
+            throw new Error(`Failed to read device poToken (HTTP ${response.status}): ${body}`);
+        }
+        return await response.json();
+    }
+
+    static async sendPoToken(identity: string, poToken: string, mintedAt: number, expiresAt: number) {
+        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/innertube/potoken`, { identity, poToken, mintedAt, expiresAt });
+        if (!response.ok) {
+            const body = await response.text().catch(() => "");
+            throw new Error(`Device rejected poToken (HTTP ${response.status}): ${body}`);
+        }
+    }
+
+    static async clearPoTokens() {
+        return await fetch(`${PlayletApi.host()}/api/innertube/potoken/all`, { method: "DELETE" });
+    }
+
     static async getBookmarkFeeds() {
         const response = await fetch(`${PlayletApi.host()}/api/bookmarks/feeds`);
         return await response.json();

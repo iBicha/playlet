@@ -56,10 +56,16 @@ namespace Http
             return true
         end function
 
-        function Default(errcode as integer, reason as string)
-            errname = m.server.utils.HttpTitle(errcode)
+        function Default(errcode as integer, reason as string) as void
             m.http_code = errcode
 
+            if errcode = 204
+                ' 204 No Content carries no body.
+                m.SetBodyDataString("")
+                return
+            end if
+
+            errname = m.server.utils.HttpTitle(errcode)
             buffer = `<html><head><title>${errcode} ${errname}</title></head><body>
 <h1>${errname}</h1>
 ${reason}

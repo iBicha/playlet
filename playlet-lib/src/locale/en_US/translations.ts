@@ -1381,6 +1381,18 @@
         <translation>Cache cleared.</translation>
     </message>
     <message>
+        <source>Clear PoTokens</source>
+        <translation>Clear PoTokens</translation>
+    </message>
+    <message>
+        <source>Clear all stored PoTokens.</source>
+        <translation>Clear all stored PoTokens.</translation>
+    </message>
+    <message>
+        <source>PoTokens cleared.</source>
+        <translation>PoTokens cleared.</translation>
+    </message>
+    <message>
         <source>Enable Diagnostics</source>
         <translation>Enable Diagnostics</translation>
     </message>
