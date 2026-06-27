@@ -20,32 +20,32 @@ function ExecuteJob() as void
     isInnertubeProfile = authToken.profileNode.type = "youtube"
     if isInnertubeProfile
         subscriptionStatus = InnertubeService.GetSubscriptionStatusForChannel(ucid, {
-            cancellation: cancellation
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
-        })
+                cancellation: cancellation
+                accessToken: authToken.token
+                onBehalfOfUser: authToken.activeIdentifyToken
+            })
 
-        if subscriptionStatus.error <> invalid
-            JobError("Failed to fetch subscription status: " + ToString(subscriptionStatus.error))
-            return
-        end if
-        channelView.isSubscribed = subscriptionStatus.isSubscribed
-    else
-        service = new Invidious.InvidiousService(invidiousNode)
-        subscriptionsResponse = service.GetSubscriptions(cancellation)
-        if not subscriptionsResponse.IsSuccess()
-            JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
-            return
-        end if
-        subscriptions = subscriptionsResponse.Json()
-
-        isSubscribed = false
-        for each subscription in subscriptions
-            if subscription.authorId = ucid
-                isSubscribed = true
-                exit for
+            if subscriptionStatus.error <> invalid
+                JobError("Failed to fetch subscription status: " + ToString(subscriptionStatus.error))
+                return
             end if
-        end for
-        channelView.isSubscribed = isSubscribed
-    end if
-end function
+            channelView.isSubscribed = subscriptionStatus.isSubscribed
+        else
+            service = new Invidious.InvidiousService(invidiousNode)
+            subscriptionsResponse = service.GetSubscriptions(cancellation)
+            if not subscriptionsResponse.IsSuccess()
+                JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
+                return
+            end if
+            subscriptions = subscriptionsResponse.Json()
+
+            isSubscribed = false
+            for each subscription in subscriptions
+                if subscription.authorId = ucid
+                    isSubscribed = true
+                    exit for
+                end if
+            end for
+            channelView.isSubscribed = isSubscribed
+        end if
+    end function

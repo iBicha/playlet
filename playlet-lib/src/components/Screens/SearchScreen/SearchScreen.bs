@@ -51,282 +51,282 @@ function OnNodeReady()
     m.rowlist.ObserveFieldScoped("onError", FuncName(OnSearchError))
 
     SetNavigation(invalid, RemoteKeys.Back, m.navBar, function()
-        ScrollUp()
-    end function)
-    SetNavigation(m.suggestions, RemoteKeys.Right, m.keyboard)
-    SetNavigation(m.filtersButton, RemoteKeys.Right, m.keyboard)
-    SetNavigation(m.keyboard, RemoteKeys.Left, m.suggestions)
-    SetNavigation(m.suggestions, RemoteKeys.Left, m.navBar)
-    SetNavigation(m.filtersButton, RemoteKeys.Left, m.navBar)
-    SetNavigation(m.keyboard, RemoteKeys.Left, m.navBar)
-    SetNavigation(m.rowList, RemoteKeys.Left, m.navBar, function()
-        ScrollUp()
-    end function)
-    SetNavigation(m.filtersButton, RemoteKeys.Down, m.suggestions)
-    SetNavigation(m.filtersButton, RemoteKeys.Down, m.keyboard)
+            ScrollUp()
+        end function)
+        SetNavigation(m.suggestions, RemoteKeys.Right, m.keyboard)
+        SetNavigation(m.filtersButton, RemoteKeys.Right, m.keyboard)
+        SetNavigation(m.keyboard, RemoteKeys.Left, m.suggestions)
+        SetNavigation(m.suggestions, RemoteKeys.Left, m.navBar)
+        SetNavigation(m.filtersButton, RemoteKeys.Left, m.navBar)
+        SetNavigation(m.keyboard, RemoteKeys.Left, m.navBar)
+        SetNavigation(m.rowList, RemoteKeys.Left, m.navBar, function()
+                ScrollUp()
+            end function)
+            SetNavigation(m.filtersButton, RemoteKeys.Down, m.suggestions)
+            SetNavigation(m.filtersButton, RemoteKeys.Down, m.keyboard)
 
-    SetNavigation(invalid, RemoteKeys.Down, m.rowList, function()
-        ScrollDown()
-    end function)
-    SetNavigation(m.rowList, RemoteKeys.Up, m.suggestions, function()
-        ScrollUp()
-    end function)
+            SetNavigation(invalid, RemoteKeys.Down, m.rowList, function()
+                    ScrollDown()
+                end function)
+                SetNavigation(m.rowList, RemoteKeys.Up, m.suggestions, function()
+                        ScrollUp()
+                    end function)
 
-    SetNavigation(m.suggestions, RemoteKeys.Up, m.filtersButton)
-    SetNavigation(m.keyboard, RemoteKeys.Up, m.filtersButton)
+                    SetNavigation(m.suggestions, RemoteKeys.Up, m.filtersButton)
+                    SetNavigation(m.keyboard, RemoteKeys.Up, m.filtersButton)
 
-    m.currentNavigtionNode = m.suggestions
-    ' Trigger suggestions
-    OnTextChange()
-end function
+                    m.currentNavigtionNode = m.suggestions
+                    ' Trigger suggestions
+                    OnTextChange()
+                end function
 
-function OnFocusChange() as void
-    if not m.top.focus
-        return
-    end if
+                function OnFocusChange() as void
+                    if not m.top.focus
+                        return
+                    end if
 
-    if m.currentNavigtionNode.isSameNode(m.suggestions) and not m.suggestions.focusable
-        m.currentNavigtionNode = m.keyboard
-    end if
-    NodeSetFocus(m.currentNavigtionNode, true)
-    if m.currentNavigtionNode.isSameNode(m.suggestions)
-        OnSearchButtonFocused()
-    end if
-end function
+                    if m.currentNavigtionNode.isSameNode(m.suggestions) and not m.suggestions.focusable
+                        m.currentNavigtionNode = m.keyboard
+                    end if
+                    NodeSetFocus(m.currentNavigtionNode, true)
+                    if m.currentNavigtionNode.isSameNode(m.suggestions)
+                        OnSearchButtonFocused()
+                    end if
+                end function
 
-function OnTextChange() as void
-    if m.suggestions.isInFocusChain()
-        return
-    end if
+                function OnTextChange() as void
+                    if m.suggestions.isInFocusChain()
+                        return
+                    end if
 
-    if m.searchSuggestionsJob <> invalid
-        m.searchSuggestionsJob.cancel = true
-    end if
+                    if m.searchSuggestionsJob <> invalid
+                        m.searchSuggestionsJob.cancel = true
+                    end if
 
-    input = {
-        "q": m.keyboard.text
-        "invidious": m.invidious
-        "preferences": m.preferences
-        "searchScreen": m.top
-    }
+                    input = {
+                        "q": m.keyboard.text
+                        "invidious": m.invidious
+                        "preferences": m.preferences
+                        "searchScreen": m.top
+                    }
 
-    m.searchSuggestionsJob = JobSystem.CreateCallback()
-    JobSystem.QueueJob(m.jobQueue, Jobs.SearchSuggestionsJob, input, m.searchSuggestionsJob)
-end function
+                    m.searchSuggestionsJob = JobSystem.CreateCallback()
+                    JobSystem.QueueJob(m.jobQueue, Jobs.SearchSuggestionsJob, input, m.searchSuggestionsJob)
+                end function
 
-function OnSearchSuggestions(event as object) as void
-    m.searchSuggestionsJob = invalid
-    result = event.GetData()
+                function OnSearchSuggestions(event as object) as void
+                    m.searchSuggestionsJob = invalid
+                    result = event.GetData()
 
-    if not IsAssociativeArray(result)
-        return
-    end if
+                    if not IsAssociativeArray(result)
+                        return
+                    end if
 
-    ' In case this is an old request, discard suggestions
-    q = result.q
-    if q <> m.keyboard.text
-        return
-    end if
-    suggestions = result.response
-    if suggestions = invalid
-        return
-    end if
+                    ' In case this is an old request, discard suggestions
+                    q = result.q
+                    if q <> m.keyboard.text
+                        return
+                    end if
+                    suggestions = result.response
+                    if suggestions = invalid
+                        return
+                    end if
 
-    if q.len() > 0 and ArrayUtils.IndexOfString(suggestions, q) = -1
-        suggestions.Unshift(q)
-    end if
+                    if q.len() > 0 and ArrayUtils.IndexOfString(suggestions, q) = -1
+                        suggestions.Unshift(q)
+                    end if
 
-    ' Capture current focused button and restore it after resetting the buttons
-    buttonFocused = -1
-    if m.suggestions.isInFocusChain()
-        buttonFocused = m.suggestions.buttonFocused
-    end if
-    if buttonFocused >= m.suggestions.buttons.Count()
-        buttonFocused = m.suggestions.buttons.Count() - 1
-    end if
-    m.suggestions.buttons = suggestions
-    if buttonFocused <> -1
-        m.suggestions.focusButton = buttonFocused
-    end if
-    m.suggestions.focusable = m.suggestions.buttons.Count() > 0
-end function
+                    ' Capture current focused button and restore it after resetting the buttons
+                    buttonFocused = -1
+                    if m.suggestions.isInFocusChain()
+                        buttonFocused = m.suggestions.buttonFocused
+                    end if
+                    if buttonFocused >= m.suggestions.buttons.Count()
+                        buttonFocused = m.suggestions.buttons.Count() - 1
+                    end if
+                    m.suggestions.buttons = suggestions
+                    if buttonFocused <> -1
+                        m.suggestions.focusButton = buttonFocused
+                    end if
+                    m.suggestions.focusable = m.suggestions.buttons.Count() > 0
+                end function
 
-function OnFiltersButtonSelected()
-    searchFilters = CreateObject("roSGNode", "SearchFilters")
-    m.appController@.PushScreen(searchFilters)
-    searchFilters.searchScreen = m.top
-    searchFilters@.BindNode()
-end function
+                function OnFiltersButtonSelected()
+                    searchFilters = CreateObject("roSGNode", "SearchFilters")
+                    m.appController@.PushScreen(searchFilters)
+                    searchFilters.searchScreen = m.top
+                    searchFilters@.BindNode()
+                end function
 
-function OnSearchButtonSelected()
-    selected = m.suggestions.buttonSelected
-    text = m.suggestions.buttons[selected]
-    SearchHistoryUtils.Save(m.preferences, text)
-    Search(text)
-end function
+                function OnSearchButtonSelected()
+                    selected = m.suggestions.buttonSelected
+                    text = m.suggestions.buttons[selected]
+                    SearchHistoryUtils.Save(m.preferences, text)
+                    Search(text)
+                end function
 
-function OnSearchButtonFocused() as void
-    if not m.suggestions.isInFocusChain()
-        return
-    end if
+                function OnSearchButtonFocused() as void
+                    if not m.suggestions.isInFocusChain()
+                        return
+                    end if
 
-    buttonCount = m.suggestions.buttons.Count()
-    selected = m.suggestions.buttonFocused
-    if selected >= buttonCount
-        m.suggestions.focusButton = 0
-    end if
+                    buttonCount = m.suggestions.buttons.Count()
+                    selected = m.suggestions.buttonFocused
+                    if selected >= buttonCount
+                        m.suggestions.focusButton = 0
+                    end if
 
-    selected = m.suggestions.buttonFocused
-    if selected >= m.suggestions.buttons.Count() or selected < 0
-        return
-    end if
-    text = m.suggestions.buttons[selected]
-    m.keyboard.text = text
-end function
+                    selected = m.suggestions.buttonFocused
+                    if selected >= m.suggestions.buttons.Count() or selected < 0
+                        return
+                    end if
+                    text = m.suggestions.buttons[selected]
+                    m.keyboard.text = text
+                end function
 
-function OnFiltersChange()
-    filterCount = 0
-    filters = m.top.filters
-    for each filter in filters
-        value = filters[filter]
-        if IsString(value) and value.len() > 0
-            filterCount++
-        else if IsArray(value) and value.Count() > 0
-            filterCount += value.Count()
-        end if
-    end for
-    if filterCount > 0
-        m.filtersButton.text = `${Tr(Locale.Buttons.Filters)} (${filterCount})`
-    else
-        m.filtersButton.text = Tr(Locale.Buttons.Filters)
-    end if
-end function
+                function OnFiltersChange()
+                    filterCount = 0
+                    filters = m.top.filters
+                    for each filter in filters
+                        value = filters[filter]
+                        if IsString(value) and value.len() > 0
+                            filterCount++
+                        else if IsArray(value) and value.Count() > 0
+                            filterCount += value.Count()
+                        end if
+                    end for
+                    if filterCount > 0
+                        m.filtersButton.text = `${Tr(Locale.Buttons.Filters)} (${filterCount})`
+                    else
+                        m.filtersButton.text = Tr(Locale.Buttons.Filters)
+                    end if
+                end function
 
-function Search(text as string)
-    m.rowlist.UnobserveFieldScoped("someContentReady")
-    m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
-    ShowLoadingScreen()
+                function Search(text as string)
+                    m.rowlist.UnobserveFieldScoped("someContentReady")
+                    m.rowlist.ObserveFieldScoped("someContentReady", FuncName(OnSearchContentReady))
+                    ShowLoadingScreen()
 
-    feedSource = {
-        "id": `inv_search_${CryptoUtils.GetMd5(text)}`
-        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
-        "apiType": "Invidious"
-        "endpoint": "search"
-        "queryParams": {
-            "q": text
-        }
-    }
+                    feedSource = {
+                        "id": `inv_search_${CryptoUtils.GetMd5(text)}`
+                        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
+                        "apiType": "Invidious"
+                        "endpoint": "search"
+                        "queryParams": {
+                            "q": text
+                        }
+                    }
 
-    filters = m.top.filters
-    for each filter in filters
-        value = filters[filter]
-        if IsString(value) and value.len() > 0
-            feedSource.queryParams[filter] = value
-        else if IsArray(value) and value.Count() > 0
-            feedSource.queryParams[filter] = {
-                value: value
-                arrayType: UrlUtils.QueryParamArrayType.CommaSeparated
-            }
-        end if
-    end for
+                    filters = m.top.filters
+                    for each filter in filters
+                        value = filters[filter]
+                        if IsString(value) and value.len() > 0
+                            feedSource.queryParams[filter] = value
+                        else if IsArray(value) and value.Count() > 0
+                            feedSource.queryParams[filter] = {
+                                value: value
+                                arrayType: UrlUtils.QueryParamArrayType.CommaSeparated
+                            }
+                        end if
+                    end for
 
-    m.rowList.feeds = [{
-        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
-        "feedSources": [feedSource]
-    }]
-end function
+                    m.rowList.feeds = [{
+                        "title": `${Tr(Locale.NavBar.Search)} - ${text}`
+                        "feedSources": [feedSource]
+                    }]
+                end function
 
-function OnSearchContentReady() as void
-    m.rowlist.UnobserveFieldScoped("someContentReady")
+                function OnSearchContentReady() as void
+                    m.rowlist.UnobserveFieldScoped("someContentReady")
 
-    if not m.rowlist.someContentReady
-        DialogUtils.ShowDialogEx({
-            message: Tr(Locale.Dialogs.NoResultsFoundMessage)
-            title: Tr(Locale.Dialogs.NoResultsFound)
-        })
-        m.rowlist.feeds = invalid
-        m.rowlist.focusable = false
-        HideLoadingScreen()
-        return
-    end if
+                    if not m.rowlist.someContentReady
+                        DialogUtils.ShowDialogEx({
+                            message: Tr(Locale.Dialogs.NoResultsFoundMessage)
+                            title: Tr(Locale.Dialogs.NoResultsFound)
+                        })
+                        m.rowlist.feeds = invalid
+                        m.rowlist.focusable = false
+                        HideLoadingScreen()
+                        return
+                    end if
 
-    m.rowlist.focusable = true
-    m.currentNavigtionNode = m.rowList
-    NodeSetFocus(m.rowlist, true)
-    ' There's a bug with the floating focus indicator. If the rowList receives focus after the
-    ' content is set, the focus indicator will be "off". This is why we set the content again.
-    m.rowlist.content = m.rowlist.content
-    ScrollDown()
-    HideLoadingScreen()
-end function
+                    m.rowlist.focusable = true
+                    m.currentNavigtionNode = m.rowList
+                    NodeSetFocus(m.rowlist, true)
+                    ' There's a bug with the floating focus indicator. If the rowList receives focus after the
+                    ' content is set, the focus indicator will be "off". This is why we set the content again.
+                    m.rowlist.content = m.rowlist.content
+                    ScrollDown()
+                    HideLoadingScreen()
+                end function
 
-function OnSearchError()
-    ' Note: we don't display an error dialog, VideoRowListRowContentJob will do that.
-    m.rowlist.feeds = invalid
-    m.rowlist.focusable = false
-    HideLoadingScreen()
-end function
+                function OnSearchError()
+                    ' Note: we don't display an error dialog, VideoRowListRowContentJob will do that.
+                    m.rowlist.feeds = invalid
+                    m.rowlist.focusable = false
+                    HideLoadingScreen()
+                end function
 
-function OnVisibilityChange()
-    if m.top.visible = false
-        ClearSearch()
-    else
-        OnTextChange()
-    end if
-end function
+                function OnVisibilityChange()
+                    if m.top.visible = false
+                        ClearSearch()
+                    else
+                        OnTextChange()
+                    end if
+                end function
 
-function ClearSearch()
-    m.keyboard.text = ""
-    m.rowlist.feeds = invalid
-    m.rowlist.focusable = false
-    ScrollUp()
-end function
+                function ClearSearch()
+                    m.keyboard.text = ""
+                    m.rowlist.feeds = invalid
+                    m.rowlist.focusable = false
+                    ScrollUp()
+                end function
 
-function ScrollUp() as void
-    destination = m.scrollAnimationInterpolator.keyValue[0][1]
-    current = m.container.translation[1]
-    if current = destination
-        return
-    end if
+                function ScrollUp() as void
+                    destination = m.scrollAnimationInterpolator.keyValue[0][1]
+                    current = m.container.translation[1]
+                    if current = destination
+                        return
+                    end if
 
-    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = true
-        return
-    end if
+                    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = true
+                        return
+                    end if
 
-    m.scrollAnimationInterpolator.reverse = true
-    m.scrollAnimation.control = "start"
-end function
+                    m.scrollAnimationInterpolator.reverse = true
+                    m.scrollAnimation.control = "start"
+                end function
 
-function ScrollDown() as void
-    destination = m.scrollAnimationInterpolator.keyValue[2][1]
-    current = m.container.translation[1]
-    if current = destination
-        return
-    end if
+                function ScrollDown() as void
+                    destination = m.scrollAnimationInterpolator.keyValue[2][1]
+                    current = m.container.translation[1]
+                    if current = destination
+                        return
+                    end if
 
-    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = false
-        return
-    end if
+                    if m.scrollAnimation.state = "running" and m.scrollAnimationInterpolator.reverse = false
+                        return
+                    end if
 
-    m.scrollAnimationInterpolator.reverse = false
-    m.scrollAnimation.control = "start"
-end function
+                    m.scrollAnimationInterpolator.reverse = false
+                    m.scrollAnimation.control = "start"
+                end function
 
-function OnKeyEvent(key as string, press as boolean) as boolean
-    navigation = NavigationKeyHandler(key, press)
-    if navigation.handled
-        m.currentNavigtionNode = navigation.node
-        if m.currentNavigtionNode.isSameNode(m.navBar)
-            m.currentNavigtionNode = m.suggestions
-        end if
-        if m.currentNavigtionNode.isSameNode(m.suggestions)
-            OnSearchButtonFocused()
-        end if
-        if m.currentNavigtionNode.isSameNode(m.keyboard)
-            ' First section, grid, row and key
-            m.keyboard.keyGrid.jumpToKey = [0, 0, 0, 0]
-        end if
-        return true
-    end if
-    return false
-end function
+                function OnKeyEvent(key as string, press as boolean) as boolean
+                    navigation = NavigationKeyHandler(key, press)
+                    if navigation.handled
+                        m.currentNavigtionNode = navigation.node
+                        if m.currentNavigtionNode.isSameNode(m.navBar)
+                            m.currentNavigtionNode = m.suggestions
+                        end if
+                        if m.currentNavigtionNode.isSameNode(m.suggestions)
+                            OnSearchButtonFocused()
+                        end if
+                        if m.currentNavigtionNode.isSameNode(m.keyboard)
+                            ' First section, grid, row and key
+                            m.keyboard.keyGrid.jumpToKey = [0, 0, 0, 0]
+                        end if
+                        return true
+                    end if
+                    return false
+                end function

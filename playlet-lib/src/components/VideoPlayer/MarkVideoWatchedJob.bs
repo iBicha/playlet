@@ -28,92 +28,92 @@ function ExecuteJob() as void
 
     if playbackTrackingUrls = invalid or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl) or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
         playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
-            cancellation: cancellation
-        })
-    end if
+                accessToken: authToken.token
+                onBehalfOfUser: authToken.activeIdentifyToken
+                cancellation: cancellation
+            })
+        end if
 
-    if playbackTrackingUrls.error <> invalid
-        JobError(`Failed to get playback tracking URLs: ${playbackTrackingUrls.error}`)
-        return
-    end if
-
-    if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl)
-        JobError("videostatsPlaybackUrl is empty")
-        return
-    end if
-
-    if StringUtils.IsNullOrEmpty(cpn)
-        cpn = InnertubeService.CreateClientPlaybackNonce()
-    end if
-
-    markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
-        accessToken: authToken.token
-        onBehalfOfUser: authToken.activeIdentifyToken
-        cpn: cpn
-        cancellation: cancellation
-    })
-    if not markedAsWatched
-        JobError("Failed to mark video as watched")
-        return
-    end if
-
-    if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
-        JobError("videostatsWatchtimeUrl is empty")
-        return
-    end if
-
-    if CancellationUtils.IsCancelled(cancellation)
-        JobCancel()
-        return
-    end if
-
-    port = CreateObject("roMessagePort")
-    callbackNode = JobGetCallbackNode()
-    MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
-    CancellationUtils.ObserveCancellationScoped(cancellation, port)
-    successiveFailures = 0
-    while true
-        message = wait(60000, port)
-        if CancellationUtils.IsCancellationEvent(cancellation, message)
-            JobCancel()
+        if playbackTrackingUrls.error <> invalid
+            JobError(`Failed to get playback tracking URLs: ${playbackTrackingUrls.error}`)
             return
         end if
-        if message = invalid
-            continue while
+
+        if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl)
+            JobError("videostatsPlaybackUrl is empty")
+            return
         end if
 
-        ' Drain the port to get the latest watch time
-        newMessage = port.GetMessage()
-        while newMessage <> invalid
-            if CancellationUtils.IsCancellationEvent(cancellation, newMessage)
+        if StringUtils.IsNullOrEmpty(cpn)
+            cpn = InnertubeService.CreateClientPlaybackNonce()
+        end if
+
+        markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
+                accessToken: authToken.token
+                onBehalfOfUser: authToken.activeIdentifyToken
+                cpn: cpn
+                cancellation: cancellation
+            })
+            if not markedAsWatched
+                JobError("Failed to mark video as watched")
+                return
+            end if
+
+            if StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
+                JobError("videostatsWatchtimeUrl is empty")
+                return
+            end if
+
+            if CancellationUtils.IsCancelled(cancellation)
                 JobCancel()
                 return
             end if
-            message = newMessage
-            newMessage = port.GetMessage()
-        end while
 
-        watchTime = message.getData()
-        success = InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
-            cpn: cpn
-            ' TODO:P1 if we pass cancellation here, http client will remove scoped
-            ' observer, which is stored on the current node.
-            ' This requires an extra observer node to be independent.
-            cancellation: invalid
-        })
-        if success
+            port = CreateObject("roMessagePort")
+            callbackNode = JobGetCallbackNode()
+            MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
+            CancellationUtils.ObserveCancellationScoped(cancellation, port)
             successiveFailures = 0
-        else
-            successiveFailures += 1
-        end if
+            while true
+                message = wait(60000, port)
+                if CancellationUtils.IsCancellationEvent(cancellation, message)
+                    JobCancel()
+                    return
+                end if
+                if message = invalid
+                    continue while
+                end if
 
-        ' If we're consistently failing, stop trying
-        if successiveFailures >= 5
-            return
-        end if
-    end while
-end function
+                ' Drain the port to get the latest watch time
+                newMessage = port.GetMessage()
+                while newMessage <> invalid
+                    if CancellationUtils.IsCancellationEvent(cancellation, newMessage)
+                        JobCancel()
+                        return
+                    end if
+                    message = newMessage
+                    newMessage = port.GetMessage()
+                end while
+
+                watchTime = message.getData()
+                success = InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
+                        accessToken: authToken.token
+                        onBehalfOfUser: authToken.activeIdentifyToken
+                        cpn: cpn
+                        ' TODO:P1 if we pass cancellation here, http client will remove scoped
+                        ' observer, which is stored on the current node.
+                        ' This requires an extra observer node to be independent.
+                        cancellation: invalid
+                    })
+                    if success
+                        successiveFailures = 0
+                    else
+                        successiveFailures += 1
+                    end if
+
+                    ' If we're consistently failing, stop trying
+                    if successiveFailures >= 5
+                        return
+                    end if
+                end while
+            end function
