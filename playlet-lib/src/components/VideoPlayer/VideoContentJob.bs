@@ -57,380 +57,380 @@ function ExecuteJob() as void
             end if
 
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
-                "cancellation": cancellation
-                "credentialTransferToken": loungeServiceNode.credentialTransferToken
-                "visitorData": visitorData.visitorData
-                "accessToken": accessToken
-                "onBehalfOfUser": onBehalfOfUser
-                "profileNode": profileNode
-                "profilesService": profilesService
-            })
-            if IsAssociativeArray(metadata)
-                contentNode.addFields({
-                    potAttached: ValidBool(metadata.potAttached)
-                    potSource: ValidString(metadata.potSource)
-                    loggedIn: not StringUtils.IsNullOrEmpty(accessToken)
+                    "cancellation": cancellation
+                    "credentialTransferToken": loungeServiceNode.credentialTransferToken
+                    "visitorData": visitorData.visitorData
+                    "accessToken": accessToken
+                    "onBehalfOfUser": onBehalfOfUser
+                    "profileNode": profileNode
+                    "profilesService": profilesService
                 })
+                if IsAssociativeArray(metadata)
+                    contentNode.addFields({
+                        potAttached: ValidBool(metadata.potAttached)
+                        potSource: ValidString(metadata.potSource)
+                        loggedIn: not StringUtils.IsNullOrEmpty(accessToken)
+                    })
+                end if
+            else
+                metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
             end if
-        else
-            metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
         end if
-    end if
 
-    if JobIsCancelled()
-        JobCancel()
-        return
-    end if
+        if JobIsCancelled()
+            JobCancel()
+            return
+        end if
 
-    if metadata = invalid
-        JobError("Failed to get video metadata")
-        return
-    end if
+        if metadata = invalid
+            JobError("Failed to get video metadata")
+            return
+        end if
 
-    title = metadata.title
-    if not StringUtils.IsNullOrEmpty(title)
-        contentNode.title = title
-    end if
+        title = metadata.title
+        if not StringUtils.IsNullOrEmpty(title)
+            contentNode.title = title
+        end if
 
-    author = metadata.author
-    if not StringUtils.IsNullOrEmpty(author)
-        contentNode.secondaryTitle = metadata.author
-    end if
-    contentNode.live = metadata.liveNow
+        author = metadata.author
+        if not StringUtils.IsNullOrEmpty(author)
+            contentNode.secondaryTitle = metadata.author
+        end if
+        contentNode.live = metadata.liveNow
 
-    if metadata.error <> invalid
-        ' Adding metadata allows us to play next recommended video after displaying the error
-        contentNode.addFields({ metadata: metadata })
-        JobError(metadata.error)
-        return
-    end if
+        if metadata.error <> invalid
+            ' Adding metadata allows us to play next recommended video after displaying the error
+            contentNode.addFields({ metadata: metadata })
+            JobError(metadata.error)
+            return
+        end if
 
-    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
-    if streamUrls.Count() = 0
-        contentNode.addFields({ metadata: metadata })
-        error = "No playable streams found for this video."
-        lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
-        LogTelemetryEvent({
-            level: "error"
-            message: error
-            fingerprint: error
-            attachments: [{
-                filename: "last_player_response.json"
-                content_type: "application/json"
-                data: lastPlayerResponse
-            }]
-        })
-        JobError(error)
-        return
-    end if
+        streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
+        if streamUrls.Count() = 0
+            contentNode.addFields({ metadata: metadata })
+            error = "No playable streams found for this video."
+            lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+            LogTelemetryEvent({
+                level: "error"
+                message: error
+                fingerprint: error
+                attachments: [{
+                    filename: "last_player_response.json"
+                    content_type: "application/json"
+                    data: lastPlayerResponse
+                }]
+            })
+            JobError(error)
+            return
+        end if
 
-    isDrm = not StringUtils.IsNullOrEmpty(metadata.drmParams)
-    if isDrm
-        licenseServerURL = UrlUtils.BuildUrl(`http://127.0.0.1:${playletServerPort}/api/innertube/get_drm_license`, invalid, {
-            videoId: metadata.videoId
-            drmParams: metadata.drmParams
-            drmSessionId: metadata.drmSessionId
-            cpn: metadata.cpn
-        })
-        contentNode.drmParams = {
-            keySystem: "Widevine"
-            licenseServerURL: licenseServerURL
-        }
-    end if
+        isDrm = not StringUtils.IsNullOrEmpty(metadata.drmParams)
+        if isDrm
+            licenseServerURL = UrlUtils.BuildUrl(`http://127.0.0.1:${playletServerPort}/api/innertube/get_drm_license`, invalid, {
+                    videoId: metadata.videoId
+                    drmParams: metadata.drmParams
+                    drmSessionId: metadata.drmSessionId
+                    cpn: metadata.cpn
+                })
+                contentNode.drmParams = {
+                    keySystem: "Widevine"
+                    licenseServerURL: licenseServerURL
+                }
+            end if
 
-    ' Forwarding query params to HLS playlists is not needed. In fact, it can cause issues
-    ' because the playlist is limited to 4MB, and on large playlists the query params
-    ' significantly increase the size of the playlist, making it cropped.
-    ' https://github.com/iBicha/playlet/issues/500
-    contentNode.ForwardQueryStringParams = false
-    contentNode.addFields({
-        metadata: metadata
-        ' StreamUrls is taken
-        playletStreamUrls: streamUrls
-        playletStreamUrlIndex: 0
-    })
+            ' Forwarding query params to HLS playlists is not needed. In fact, it can cause issues
+            ' because the playlist is limited to 4MB, and on large playlists the query params
+            ' significantly increase the size of the playlist, making it cropped.
+            ' https://github.com/iBicha/playlet/issues/500
+            contentNode.ForwardQueryStringParams = false
+            contentNode.addFields({
+                metadata: metadata
+                ' StreamUrls is taken
+                playletStreamUrls: streamUrls
+                playletStreamUrlIndex: 0
+            })
 
-    firstUrl = streamUrls[0]
-    LogDebug("Setting first url:", firstUrl)
-    if StringUtils.IsNullOrEmpty(firstUrl)
-        LogError("First stream URL is empty!")
-    end if
-    contentNode.url = firstUrl
+            firstUrl = streamUrls[0]
+            LogDebug("Setting first url:", firstUrl)
+            if StringUtils.IsNullOrEmpty(firstUrl)
+                LogError("First stream URL is empty!")
+            end if
+            contentNode.url = firstUrl
 
-    SetCaptions(metadata, service, contentNode)
+            SetCaptions(metadata, service, contentNode)
 
-    if metadata.liveNow = true
-        contentNode.Live = true
-    end if
-end function
+            if metadata.liveNow = true
+                contentNode.Live = true
+            end if
+        end function
 
-function GetVisitorData(innertubeNode as object, cancellation as object) as object
-    port = CreateObject("roMessagePort")
+        function GetVisitorData(innertubeNode as object, cancellation as object) as object
+            port = CreateObject("roMessagePort")
 
-    MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", port)
-    CancellationUtils.ObserveCancellationScoped(cancellation, port)
+            MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", port)
+            CancellationUtils.ObserveCancellationScoped(cancellation, port)
 
-    visitorData = innertubeNode.visitorData
-    if not StringUtils.IsNullOrEmpty(visitorData)
-        innertubeNode.unobserveFieldScoped("visitorData")
-        CancellationUtils.UnobserveCancellationScoped(cancellation)
+            visitorData = innertubeNode.visitorData
+            if not StringUtils.IsNullOrEmpty(visitorData)
+                innertubeNode.unobserveFieldScoped("visitorData")
+                CancellationUtils.UnobserveCancellationScoped(cancellation)
 
-        return {
-            visitorData: visitorData
-        }
-    end if
+                return {
+                    visitorData: visitorData
+                }
+            end if
 
-    innertubeNode.requestVisitorData = true
-    message = wait(30000, port)
+            innertubeNode.requestVisitorData = true
+            message = wait(30000, port)
 
-    innertubeNode.unobserveFieldScoped("visitorData")
-    CancellationUtils.UnobserveCancellationScoped(cancellation)
+            innertubeNode.unobserveFieldScoped("visitorData")
+            CancellationUtils.UnobserveCancellationScoped(cancellation)
 
-    if message <> invalid
-        if CancellationUtils.IsCancellationEvent(cancellation, message)
+            if message <> invalid
+                if CancellationUtils.IsCancellationEvent(cancellation, message)
+                    return {
+                        cancel: true
+                    }
+                end if
+                visitorData = message.getData()
+            end if
+
+            if StringUtils.IsNullOrEmpty(visitorData)
+                return {
+                    error: "Failed to get visitor data. Please try again later."
+                }
+            end if
+
             return {
-                cancel: true
+                visitorData: visitorData
             }
-        end if
-        visitorData = message.getData()
-    end if
+        end function
 
-    if StringUtils.IsNullOrEmpty(visitorData)
-        return {
-            error: "Failed to get visitor data. Please try again later."
-        }
-    end if
+        function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
+            instance = service.GetInstance()
+            proxyVideos = preferences["invidious.proxy_videos"]
+            preferredQuality = preferences["playback.preferred_quality"]
 
-    return {
-        visitorData: visitorData
-    }
-end function
+            streamUrls = []
 
-function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
-    instance = service.GetInstance()
-    proxyVideos = preferences["invidious.proxy_videos"]
-    preferredQuality = preferences["playback.preferred_quality"]
+            if SupportsDrmDashManifestUrl(metadata)
+                dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
+                        url: metadata.dashUrl
+                    })
+                    streamUrls.push(dashUrl)
+                else if SupportsDash(metadata)
+                    AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
+                else if SupportsMuxedFormats(metadata)
+                    for each stream in metadata.formatStreams
+                        if StringUtils.IsNullOrEmpty(stream.url)
+                            continue for
+                        end if
+                        stream.url = AddInstanceToUrlIfNeeded(stream.url, instance)
+                        streamUrls.push(stream.url)
+                    end for
+                else if SupportsHls(metadata)
+                    metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
+                    AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
+                end if
 
-    streamUrls = []
+                return streamUrls
+            end function
 
-    if SupportsDrmDashManifestUrl(metadata)
-        dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
-            url: metadata.dashUrl
-        })
-        streamUrls.push(dashUrl)
-    else if SupportsDash(metadata)
-        AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
-    else if SupportsMuxedFormats(metadata)
-        for each stream in metadata.formatStreams
-            if StringUtils.IsNullOrEmpty(stream.url)
-                continue for
-            end if
-            stream.url = AddInstanceToUrlIfNeeded(stream.url, instance)
-            streamUrls.push(stream.url)
-        end for
-    else if SupportsHls(metadata)
-        metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
-        AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
-    end if
+            function SupportsHls(metadata as object) as boolean
+                return not StringUtils.IsNullOrEmpty(metadata.hlsUrl)
+            end function
 
-    return streamUrls
-end function
+            function SupportsDash(metadata as object) as boolean
+                if not IsArray(metadata.adaptiveFormats) or metadata.adaptiveFormats.Count() = 0
+                    return false
+                end if
 
-function SupportsHls(metadata as object) as boolean
-    return not StringUtils.IsNullOrEmpty(metadata.hlsUrl)
-end function
+                for each fmt in metadata.adaptiveFormats
+                    if not StringUtils.IsNullOrEmpty(fmt.url)
+                        return true
+                    end if
+                end for
 
-function SupportsDash(metadata as object) as boolean
-    if not IsArray(metadata.adaptiveFormats) or metadata.adaptiveFormats.Count() = 0
-        return false
-    end if
+                return false
+            end function
 
-    for each fmt in metadata.adaptiveFormats
-        if not StringUtils.IsNullOrEmpty(fmt.url)
-            return true
-        end if
-    end for
+            function SupportsMuxedFormats(metadata as object) as boolean
+                return IsArray(metadata.formatStreams) and metadata.formatStreams.Count() > 0
+            end function
 
-    return false
-end function
+            function SupportsDrmDashManifestUrl(metadata as object) as boolean
+                if StringUtils.IsNullOrEmpty(metadata.drmParams)
+                    return false
+                end if
 
-function SupportsMuxedFormats(metadata as object) as boolean
-    return IsArray(metadata.formatStreams) and metadata.formatStreams.Count() > 0
-end function
+                if StringUtils.IsNullOrEmpty(metadata.dashUrl)
+                    return false
+                end if
 
-function SupportsDrmDashManifestUrl(metadata as object) as boolean
-    if StringUtils.IsNullOrEmpty(metadata.drmParams)
-        return false
-    end if
+                if StringUtils.IsNullOrEmpty(metadata.drmSessionId)
+                    return false
+                end if
 
-    if StringUtils.IsNullOrEmpty(metadata.dashUrl)
-        return false
-    end if
+                if StringUtils.IsNullOrEmpty(metadata.cpn)
+                    return false
+                end if
 
-    if StringUtils.IsNullOrEmpty(metadata.drmSessionId)
-        return false
-    end if
+                if not IsArray(metadata.licenseInfos) or metadata.licenseInfos.Count() = 0
+                    return false
+                end if
 
-    if StringUtils.IsNullOrEmpty(metadata.cpn)
-        return false
-    end if
+                return true
+            end function
 
-    if not IsArray(metadata.licenseInfos) or metadata.licenseInfos.Count() = 0
-        return false
-    end if
+            function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer)
+                hlsUrl = metadata.hlsUrl
+                hlsUrlLocal = invalid
+                hlsUrlFiltered = invalid
+                hlsUrlFilteredLocal = invalid
 
-    return true
-end function
+                supportsProxying = backend <> "playlet"
+                hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
 
-function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer)
-    hlsUrl = metadata.hlsUrl
-    hlsUrlLocal = invalid
-    hlsUrlFiltered = invalid
-    hlsUrlFilteredLocal = invalid
+                if supportsProxying
+                    hlsUrlLocal = UrlUtils.AppendQueryParams(hlsUrl, { local: "true" })
+                end if
 
-    supportsProxying = backend <> "playlet"
-    hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
+                ' Redirect to Playet's local web server, where we will be
+                ' dynamically adding storyboards to the HLS manifest, and filter quality
+                hlsUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrl, v: metadata.videoId })
+                if supportsProxying
+                    hlsUrlLocal = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrlLocal, v: metadata.videoId })
+                end if
 
-    if supportsProxying
-        hlsUrlLocal = UrlUtils.AppendQueryParams(hlsUrl, { local: "true" })
-    end if
+                if hasQuality
+                    hlsUrlFiltered = UrlUtils.AppendQueryParams(hlsUrl, { quality: preferredQuality })
+                    if supportsProxying
+                        hlsUrlFilteredLocal = UrlUtils.AppendQueryParams(hlsUrlLocal, { quality: preferredQuality })
+                    end if
+                end if
 
-    ' Redirect to Playet's local web server, where we will be
-    ' dynamically adding storyboards to the HLS manifest, and filter quality
-    hlsUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrl, v: metadata.videoId })
-    if supportsProxying
-        hlsUrlLocal = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/hls`, { url: hlsUrlLocal, v: metadata.videoId })
-    end if
+                AddUrls(streamUrls, hlsUrl, hlsUrlLocal, hlsUrlFiltered, hlsUrlFilteredLocal, proxyVideos)
+            end function
 
-    if hasQuality
-        hlsUrlFiltered = UrlUtils.AppendQueryParams(hlsUrl, { quality: preferredQuality })
-        if supportsProxying
-            hlsUrlFilteredLocal = UrlUtils.AppendQueryParams(hlsUrlLocal, { quality: preferredQuality })
-        end if
-    end if
+            function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
+                ' Redirect to Playet's local web server, where will will be
+                ' dynamically generating the DASH manifest, and filter quality
+                dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
+                        v: metadata.videoId
+                        backend: backend
+                    })
 
-    AddUrls(streamUrls, hlsUrl, hlsUrlLocal, hlsUrlFiltered, hlsUrlFilteredLocal, proxyVideos)
-end function
+                    dashUrlLocal = invalid
+                    dashUrlFiltered = invalid
+                    dashUrlFilteredLocal = invalid
 
-function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
-    ' Redirect to Playet's local web server, where will will be
-    ' dynamically generating the DASH manifest, and filter quality
-    dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
-        v: metadata.videoId
-        backend: backend
-    })
+                    supportsProxying = backend <> "playlet"
+                    hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
 
-    dashUrlLocal = invalid
-    dashUrlFiltered = invalid
-    dashUrlFilteredLocal = invalid
+                    if supportsProxying
+                        dashUrlLocal = UrlUtils.AppendQueryParams(dashUrl, { local: "true" })
+                    end if
 
-    supportsProxying = backend <> "playlet"
-    hasQuality = not StringUtils.IsNullOrEmpty(preferredQuality) and preferredQuality <> "auto"
+                    if hasQuality
+                        dashUrlFiltered = UrlUtils.AppendQueryParams(dashUrl, { quality: preferredQuality })
+                        if supportsProxying
+                            dashUrlFilteredLocal = UrlUtils.AppendQueryParams(dashUrlLocal, { quality: preferredQuality })
+                        end if
+                    end if
 
-    if supportsProxying
-        dashUrlLocal = UrlUtils.AppendQueryParams(dashUrl, { local: "true" })
-    end if
+                    AddUrls(streamUrls, dashUrl, dashUrlLocal, dashUrlFiltered, dashUrlFilteredLocal, proxyVideos)
+                end function
 
-    if hasQuality
-        dashUrlFiltered = UrlUtils.AppendQueryParams(dashUrl, { quality: preferredQuality })
-        if supportsProxying
-            dashUrlFilteredLocal = UrlUtils.AppendQueryParams(dashUrlLocal, { quality: preferredQuality })
-        end if
-    end if
+                function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFiltered as dynamic, urlFilteredLocal as dynamic, proxyVideos as string)
+                    if proxyVideos = "if_needed"
+                        if urlFiltered <> invalid
+                            streamUrls.push(urlFiltered)
+                        end if
+                        streamUrls.push(url)
+                        if urlFilteredLocal <> invalid
+                            streamUrls.push(urlFilteredLocal)
+                        end if
+                        if urlLocal <> invalid
+                            streamUrls.push(urlLocal)
+                        end if
+                    else if proxyVideos = "never"
+                        if urlFiltered <> invalid
+                            streamUrls.push(urlFiltered)
+                        end if
+                        streamUrls.push(url)
+                    else if proxyVideos = "always"
+                        if urlFilteredLocal <> invalid
+                            streamUrls.push(urlFilteredLocal)
+                        end if
+                        if urlLocal <> invalid
+                            streamUrls.push(urlLocal)
+                        end if
+                    end if
 
-    AddUrls(streamUrls, dashUrl, dashUrlLocal, dashUrlFiltered, dashUrlFilteredLocal, proxyVideos)
-end function
+                    if streamUrls.Count() = 0
+                        if urlFiltered <> invalid
+                            streamUrls.push(urlFiltered)
+                        end if
+                        streamUrls.push(url)
+                        if urlFilteredLocal <> invalid
+                            streamUrls.push(urlFilteredLocal)
+                        end if
+                        if urlLocal <> invalid
+                            streamUrls.push(urlLocal)
+                        end if
+                    end if
+                end function
 
-function AddUrls(streamUrls as object, url as string, urlLocal as dynamic, urlFiltered as dynamic, urlFilteredLocal as dynamic, proxyVideos as string)
-    if proxyVideos = "if_needed"
-        if urlFiltered <> invalid
-            streamUrls.push(urlFiltered)
-        end if
-        streamUrls.push(url)
-        if urlFilteredLocal <> invalid
-            streamUrls.push(urlFilteredLocal)
-        end if
-        if urlLocal <> invalid
-            streamUrls.push(urlLocal)
-        end if
-    else if proxyVideos = "never"
-        if urlFiltered <> invalid
-            streamUrls.push(urlFiltered)
-        end if
-        streamUrls.push(url)
-    else if proxyVideos = "always"
-        if urlFilteredLocal <> invalid
-            streamUrls.push(urlFilteredLocal)
-        end if
-        if urlLocal <> invalid
-            streamUrls.push(urlLocal)
-        end if
-    end if
+                function AddInstanceToUrlIfNeeded(url as dynamic, instance as string) as dynamic
+                    if IsString(url) and url.StartsWith("/")
+                        return instance + url
+                    end if
+                    return url
+                end function
 
-    if streamUrls.Count() = 0
-        if urlFiltered <> invalid
-            streamUrls.push(urlFiltered)
-        end if
-        streamUrls.push(url)
-        if urlFilteredLocal <> invalid
-            streamUrls.push(urlFilteredLocal)
-        end if
-        if urlLocal <> invalid
-            streamUrls.push(urlLocal)
-        end if
-    end if
-end function
+                function SetCaptions(metadata as object, service as object, contentNode as object) as void
+                    if metadata.captions.Count() = 0
+                        return
+                    end if
 
-function AddInstanceToUrlIfNeeded(url as dynamic, instance as string) as dynamic
-    if IsString(url) and url.StartsWith("/")
-        return instance + url
-    end if
-    return url
-end function
+                    isoLanguageList = StringUtils.ParseJsonSafe(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json5"))
+                    if not IsAssociativeArray(isoLanguageList)
+                        LogError("Failed to load ISO-639 language map; skipping captions")
+                        return
+                    end if
+                    instance = service.GetInstance()
 
-function SetCaptions(metadata as object, service as object, contentNode as object) as void
-    if metadata.captions.Count() = 0
-        return
-    end if
+                    subtitleTracks = []
 
-    isoLanguageList = StringUtils.ParseJsonSafe(ReadAsciiFile("libpkg:/config/ISO-639-1-to-ISO-639-2T.json5"))
-    if not IsAssociativeArray(isoLanguageList)
-        LogError("Failed to load ISO-639 language map; skipping captions")
-        return
-    end if
-    instance = service.GetInstance()
+                    for each caption in metadata.captions
+                        code = caption.language_code
+                        if StringUtils.IsNullOrEmpty(code)
+                            continue for
+                        end if
 
-    subtitleTracks = []
+                        if code.InStr("-") <> -1
+                            code = code.Split("-")[0]
+                        end if
 
-    for each caption in metadata.captions
-        code = caption.language_code
-        if StringUtils.IsNullOrEmpty(code)
-            continue for
-        end if
+                        if code.len() = 2
+                            if not isoLanguageList.DoesExist(code)
+                                continue for
+                            end if
+                            code = isoLanguageList[code]
+                        end if
 
-        if code.InStr("-") <> -1
-            code = code.Split("-")[0]
-        end if
+                        url = caption.url
+                        if not url.StartsWith("http")
+                            url = instance + url
+                        end if
 
-        if code.len() = 2
-            if not isoLanguageList.DoesExist(code)
-                continue for
-            end if
-            code = isoLanguageList[code]
-        end if
+                        subtitleTracks.Push({
+                            Description: caption.label
+                            Language: code
+                            TrackName: url
+                        })
+                    end for
 
-        url = caption.url
-        if not url.StartsWith("http")
-            url = instance + url
-        end if
-
-        subtitleTracks.Push({
-            Description: caption.label
-            Language: code
-            TrackName: url
-        })
-    end for
-
-    contentNode.ClosedCaptions = True
-    contentNode.SubtitleTracks = subtitleTracks
-end function
+                    contentNode.ClosedCaptions = True
+                    contentNode.SubtitleTracks = subtitleTracks
+                end function

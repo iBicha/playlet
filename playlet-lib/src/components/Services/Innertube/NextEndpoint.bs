@@ -49,35 +49,35 @@ namespace Innertube
         endscreen = playerOverlayRenderer["endScreen"]
 
         feeds = Innertube.ParseResponseDataForFeeds(endscreen, {
-            response: httpResponse
-            noContainers: true
-        })
-        if feeds.Count() > 0
-            parsedResponse["recommendedVideos"] = ValidArray(feeds[0].items)
-        end if
+                response: httpResponse
+                noContainers: true
+            })
+            if feeds.Count() > 0
+                parsedResponse["recommendedVideos"] = ValidArray(feeds[0].items)
+            end if
 
-        ' Sometimes the title and author are missing in /player respnonse, so we get them here.
-        ' But if we have an error, we don't need them, recommendedVideos is enough to play the
-        ' next video, after showing the error dialog.
-        if parsedResponse.error <> invalid
+            ' Sometimes the title and author are missing in /player respnonse, so we get them here.
+            ' But if we have an error, we don't need them, recommendedVideos is enough to play the
+            ' next video, after showing the error dialog.
+            if parsedResponse.error <> invalid
+                return parsedResponse
+            end if
+
+            if StringUtils.IsNullOrEmpty(parsedResponse.title)
+                title = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "title"]))
+                if not StringUtils.IsNullOrEmpty(title)
+                    parsedResponse.title = title
+                end if
+            end if
+
+            if StringUtils.IsNullOrEmpty(parsedResponse.author)
+                subtitle = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "subtitle"]))
+                if not StringUtils.IsNullOrEmpty(subtitle)
+                    parsedResponse.author = subtitle
+                end if
+            end if
+
             return parsedResponse
-        end if
+        end function
 
-        if StringUtils.IsNullOrEmpty(parsedResponse.title)
-            title = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "title"]))
-            if not StringUtils.IsNullOrEmpty(title)
-                parsedResponse.title = title
-            end if
-        end if
-
-        if StringUtils.IsNullOrEmpty(parsedResponse.author)
-            subtitle = ParseText(ObjectUtils.Dig(playerOverlayRenderer, ["videoDetails", "playerOverlayVideoDetailsRenderer", "subtitle"]))
-            if not StringUtils.IsNullOrEmpty(subtitle)
-                parsedResponse.author = subtitle
-            end if
-        end if
-
-        return parsedResponse
-    end function
-
-end namespace
+    end namespace

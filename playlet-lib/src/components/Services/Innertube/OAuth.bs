@@ -185,155 +185,155 @@ namespace Innertube
 
     function RevokeToken(token as string, cancellation = invalid as dynamic) as boolean
         request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/revoke", {
-            "token": token
-        })
-        request.Cancellation(cancellation)
-        response = request.Await()
-        success = response.IsSuccess()
-        if not success
-            LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
-        end if
-        return success
-    end function
+                "token": token
+            })
+            request.Cancellation(cancellation)
+            response = request.Await()
+            success = response.IsSuccess()
+            if not success
+                LogError(`Failed to revoke token: ${response.ErrorMessage()}`)
+            end if
+            return success
+        end function
 
-    function ListAccounts(accessToken as string, cancellation = invalid as dynamic) as object
-        deviceInfo = CreateObject("roDeviceInfo")
+        function ListAccounts(accessToken as string, cancellation = invalid as dynamic) as object
+            deviceInfo = CreateObject("roDeviceInfo")
 
-        payload = {
-            "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo)
-            "accountReadMask": {
-                "returnOwner": true
-                "returnBrandAccounts": true
-                "returnPersonaAccounts": true
-                "returnFamilyChildAccounts": true
+            payload = {
+                "context": Innertube.CreateContext(Innertube.ClientType.Tv, deviceInfo)
+                "accountReadMask": {
+                    "returnOwner": true
+                    "returnBrandAccounts": true
+                    "returnPersonaAccounts": true
+                    "returnFamilyChildAccounts": true
+                }
             }
-        }
 
-        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/account/accounts_list", payload)
-        headers = {
-            "Authorization": `Bearer ${accessToken}`
-        }
-        headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Tv))
-        request.Headers(headers)
-        request.Cancellation(cancellation)
-
-        response = request.Await()
-
-        if not response.IsSuccess()
-            return {
-                "error": `Failed to list accounts: ${response.ErrorMessage()}`
+            request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/account/accounts_list", payload)
+            headers = {
+                "Authorization": `Bearer ${accessToken}`
             }
-        end if
+            headers.Append(Innertube.CreateHeaders(Innertube.ClientType.Tv))
+            request.Headers(headers)
+            request.Cancellation(cancellation)
 
-        accounts = ObjectUtils.Dig(response.Json(), ["contents", 0, "accountSectionListRenderer", "contents", 0, "accountItemSectionRenderer", "contents"])
-        if not IsArray(accounts)
-            return {
-                "error": "Could not parse accounts"
-            }
-        end if
+            response = request.Await()
 
-        parsedAccounts = []
-        for each account in accounts
-            accountItem = account["accountItem"]
-            if not IsAssociativeArray(accountItem)
-                continue for
+            if not response.IsSuccess()
+                return {
+                    "error": `Failed to list accounts: ${response.ErrorMessage()}`
+                }
             end if
 
-            parsedAccount = {
-                "accountName": ParseText(accountItem["accountName"])
-                "accountPhoto": ObjectUtils.Dig(accountItem, ["accountPhoto", "thumbnails", 0, "url"])
-                "isSelected": ValidBool(accountItem["isSelected"])
-                "isDisabled": ValidBool(accountItem["isDisabled"])
-                "hasChannel": ValidBool(accountItem["hasChannel"])
-                "accountByline": ParseText(accountItem["accountByline"])
-                "channelHandle": ParseText(accountItem["channelHandle"])
-                "activeIdentifyToken": ParseAccountItemIdentityToken(accountItem)
-                "selectActiveIdentityEndpoint": ValidAssociativeArray(ObjectUtils.Dig(accountItem, ["serviceEndpoint", "selectActiveIdentityEndpoint"]))
-            }
-            parsedAccounts.Push(parsedAccount)
-        end for
-
-        return parsedAccounts
-    end function
-
-    function ParseAccountItemIdentityToken(accountItem as object) as string
-        ' Although selected (default) account would have a token, we usually don't
-        ' need it, since we don't need to pass the "onBehalfOfUser" argument
-        ' when using selected account.
-        if ValidBool(accountItem.isSelected)
-            return ""
-        end if
-
-        supportedTokens = ObjectUtils.Dig(accountItem, ["serviceEndpoint", "selectActiveIdentityEndpoint", "supportedTokens"])
-        if not IsArray(supportedTokens) or supportedTokens.Count() = 0
-            return ""
-        end if
-
-        for each supportedToken in supportedTokens
-            if not IsAssociativeArray(supportedToken)
-                continue for
+            accounts = ObjectUtils.Dig(response.Json(), ["contents", 0, "accountSectionListRenderer", "contents", 0, "accountItemSectionRenderer", "contents"])
+            if not IsArray(accounts)
+                return {
+                    "error": "Could not parse accounts"
+                }
             end if
 
-            ' TODO:P2 should we stick with pageId, and ignore the rest?
-            pageId = ObjectUtils.Dig(supportedToken, ["pageIdToken", "pageId"])
-            if not StringUtils.IsNullOrEmpty(pageId)
-                return pageId
-            end if
-
-            obfuscatedGaiaId = ObjectUtils.Dig(supportedToken, ["accountStateToken", "obfuscatedGaiaId"])
-            if not StringUtils.IsNullOrEmpty(obfuscatedGaiaId)
-                return obfuscatedGaiaId
-            end if
-
-            datasyncIdToken = ObjectUtils.Dig(supportedToken, ["datasyncIdToken", "datasyncIdToken"])
-            if not StringUtils.IsNullOrEmpty(datasyncIdToken)
-                ' "datasyncIdToken": "123456789012345678901||123456789012345678901"
-                match = /(\d+)\|\|(\d+)/.match(datasyncIdToken)
-                if match.Count() = 3
-                    return match[1]
+            parsedAccounts = []
+            for each account in accounts
+                accountItem = account["accountItem"]
+                if not IsAssociativeArray(accountItem)
+                    continue for
                 end if
+
+                parsedAccount = {
+                    "accountName": ParseText(accountItem["accountName"])
+                    "accountPhoto": ObjectUtils.Dig(accountItem, ["accountPhoto", "thumbnails", 0, "url"])
+                    "isSelected": ValidBool(accountItem["isSelected"])
+                    "isDisabled": ValidBool(accountItem["isDisabled"])
+                    "hasChannel": ValidBool(accountItem["hasChannel"])
+                    "accountByline": ParseText(accountItem["accountByline"])
+                    "channelHandle": ParseText(accountItem["channelHandle"])
+                    "activeIdentifyToken": ParseAccountItemIdentityToken(accountItem)
+                    "selectActiveIdentityEndpoint": ValidAssociativeArray(ObjectUtils.Dig(accountItem, ["serviceEndpoint", "selectActiveIdentityEndpoint"]))
+                }
+                parsedAccounts.Push(parsedAccount)
+            end for
+
+            return parsedAccounts
+        end function
+
+        function ParseAccountItemIdentityToken(accountItem as object) as string
+            ' Although selected (default) account would have a token, we usually don't
+            ' need it, since we don't need to pass the "onBehalfOfUser" argument
+            ' when using selected account.
+            if ValidBool(accountItem.isSelected)
+                return ""
             end if
-        end for
 
-        return ""
-    end function
+            supportedTokens = ObjectUtils.Dig(accountItem, ["serviceEndpoint", "selectActiveIdentityEndpoint", "supportedTokens"])
+            if not IsArray(supportedTokens) or supportedTokens.Count() = 0
+                return ""
+            end if
 
-    function GetDatasyncIdToken(selectActiveIdentityEndpoint as object) as string
-        supportedTokens = ObjectUtils.Dig(selectActiveIdentityEndpoint, ["supportedTokens"])
-        if not IsArray(supportedTokens)
+            for each supportedToken in supportedTokens
+                if not IsAssociativeArray(supportedToken)
+                    continue for
+                end if
+
+                ' TODO:P2 should we stick with pageId, and ignore the rest?
+                pageId = ObjectUtils.Dig(supportedToken, ["pageIdToken", "pageId"])
+                if not StringUtils.IsNullOrEmpty(pageId)
+                    return pageId
+                end if
+
+                obfuscatedGaiaId = ObjectUtils.Dig(supportedToken, ["accountStateToken", "obfuscatedGaiaId"])
+                if not StringUtils.IsNullOrEmpty(obfuscatedGaiaId)
+                    return obfuscatedGaiaId
+                end if
+
+                datasyncIdToken = ObjectUtils.Dig(supportedToken, ["datasyncIdToken", "datasyncIdToken"])
+                if not StringUtils.IsNullOrEmpty(datasyncIdToken)
+                    ' "datasyncIdToken": "123456789012345678901||123456789012345678901"
+                    match = /(\d+)\|\|(\d+)/.match(datasyncIdToken)
+                    if match.Count() = 3
+                        return match[1]
+                    end if
+                end if
+            end for
+
             return ""
-        end if
+        end function
 
-        for each supportedToken in supportedTokens
-            if not IsAssociativeArray(supportedToken)
-                continue for
+        function GetDatasyncIdToken(selectActiveIdentityEndpoint as object) as string
+            supportedTokens = ObjectUtils.Dig(selectActiveIdentityEndpoint, ["supportedTokens"])
+            if not IsArray(supportedTokens)
+                return ""
             end if
 
-            datasyncIdToken = ObjectUtils.Dig(supportedToken, ["datasyncIdToken", "datasyncIdToken"])
-            if not StringUtils.IsNullOrEmpty(datasyncIdToken)
-                return datasyncIdToken
+            for each supportedToken in supportedTokens
+                if not IsAssociativeArray(supportedToken)
+                    continue for
+                end if
+
+                datasyncIdToken = ObjectUtils.Dig(supportedToken, ["datasyncIdToken", "datasyncIdToken"])
+                if not StringUtils.IsNullOrEmpty(datasyncIdToken)
+                    return datasyncIdToken
+                end if
+            end for
+
+            return ""
+        end function
+
+        function ToCamelCase(obj as object) as object
+            if not IsAssociativeArray(obj)
+                return obj
             end if
-        end for
 
-        return ""
-    end function
-
-    function ToCamelCase(obj as object) as object
-        if not IsAssociativeArray(obj)
-            return obj
-        end if
-
-        newObj = {}
-        for each key in obj
-            newKey = key
-            underScoreIndex = newKey.InStr("_")
-            while underScoreIndex <> -1 and underScoreIndex < newKey.Len() - 2
-                newKey = newKey.Left(underScoreIndex) + UCase(newKey.Mid(underScoreIndex + 1, 1)) + newKey.Mid(underScoreIndex + 2)
+            newObj = {}
+            for each key in obj
+                newKey = key
                 underScoreIndex = newKey.InStr("_")
-            end while
-            newObj[newKey] = obj[key]
-        end for
-        return newObj
-    end function
+                while underScoreIndex <> -1 and underScoreIndex < newKey.Len() - 2
+                    newKey = newKey.Left(underScoreIndex) + UCase(newKey.Mid(underScoreIndex + 1, 1)) + newKey.Mid(underScoreIndex + 2)
+                    underScoreIndex = newKey.InStr("_")
+                end while
+                newObj[newKey] = obj[key]
+            end for
+            return newObj
+        end function
 
-end namespace
+    end namespace

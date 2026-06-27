@@ -149,279 +149,279 @@ namespace Innertube
         continuation = invalid
         sortOptions = invalid
         feeds = ParseResponseDataForFeeds(responseData, {
-            response: response
-            "currentAuthor": author
-            "currentAuthorId": authorId
-            browseId: browseId
-        })
-        if feeds.Count() > 0
-            items = ValidArray(feeds[0].items)
-            if feeds[0].DoesExist("continuation")
-                continuation = feeds[0].continuation
+                response: response
+                "currentAuthor": author
+                "currentAuthorId": authorId
+                browseId: browseId
+            })
+            if feeds.Count() > 0
+                items = ValidArray(feeds[0].items)
+                if feeds[0].DoesExist("continuation")
+                    continuation = feeds[0].continuation
+                end if
+                if feeds[0].DoesExist("sortOptions")
+                    sortOptions = feeds[0].sortOptions
+                end if
             end if
-            if feeds[0].DoesExist("sortOptions")
-                sortOptions = feeds[0].sortOptions
+
+            channel = {
+                "author": author
+                "authorId": authorId
+                "authorThumbnails": thumbnails
+                "authorBanners": banners
+                "authorSubTitle": authorSubTitle
+                "tabs": tabsNames
+                "tabsParams": tabsParams
+                "tabsTitles": tabsTitles
+                "items": items
+            }
+
+            ' continuation and sort options are specific to certain tabs of the channel
+            if continuation <> invalid
+                channel["continuation"] = continuation
             end if
-        end if
+            if sortOptions <> invalid
+                channel["sortOptions"] = sortOptions
+            end if
 
-        channel = {
-            "author": author
-            "authorId": authorId
-            "authorThumbnails": thumbnails
-            "authorBanners": banners
-            "authorSubTitle": authorSubTitle
-            "tabs": tabsNames
-            "tabsParams": tabsParams
-            "tabsTitles": tabsTitles
-            "items": items
-        }
+            return channel
+        end function
 
-        ' continuation and sort options are specific to certain tabs of the channel
-        if continuation <> invalid
-            channel["continuation"] = continuation
-        end if
-        if sortOptions <> invalid
-            channel["sortOptions"] = sortOptions
-        end if
+        function ParsePlaylistPageResponseData(browseId as string, responseData as object, response as object) as object
+            if responseData = invalid
+                return {
+                    error: "Invalid response data"
+                }
+            end if
 
-        return channel
-    end function
+            error = ParseResponseDataForError(responseData)
+            if error <> ""
+                return {
+                    error: error
+                }
+            end if
 
-    function ParsePlaylistPageResponseData(browseId as string, responseData as object, response as object) as object
-        if responseData = invalid
-            return {
-                error: "Invalid response data"
-            }
-        end if
+            playlistId = invalid
+            title = invalid
+            author = invalid
+            authorId = invalid
+            description = invalid
+            videoCount = -1
+            thumbnail = invalid
+            statsText = invalid
 
-        error = ParseResponseDataForError(responseData)
-        if error <> ""
-            return {
-                error: error
-            }
-        end if
+            playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
+            if playlistSidebarRendererItems <> invalid
+                primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
+                secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
 
-        playlistId = invalid
-        title = invalid
-        author = invalid
-        authorId = invalid
-        description = invalid
-        videoCount = -1
-        thumbnail = invalid
-        statsText = invalid
+                playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
+                title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
+                description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
+                videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).Replace(",", "").ToInt()
+                thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
 
-        playlistSidebarRendererItems = ObjectUtils.Dig(responseData, ["sidebar", "playlistSidebarRenderer", "items"])
-        if playlistSidebarRendererItems <> invalid
-            primaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [0, "playlistSidebarPrimaryInfoRenderer"])
-            secondaryInfo = ObjectUtils.Dig(playlistSidebarRendererItems, [1, "playlistSidebarSecondaryInfoRenderer"])
+                author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
+                authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
+                stats = ObjectUtils.Dig(primaryInfo, ["stats"])
+                if IsArray(stats)
+                    statsTexts = []
+                    for each stat in stats
+                        statText = ParseText(stat)
+                        if statText <> ""
+                            statsTexts.Push(statText)
+                        end if
+                    end for
+                    statsText = statsTexts.Join(" • ")
+                end if
+            end if
 
-            playlistId = ObjectUtils.Dig(primaryInfo, ["navigationEndpoint", "watchEndpoint", "playlistId"])
-            title = ParseText(ObjectUtils.Dig(primaryInfo, ["title"]))
-            description = ParseText(ObjectUtils.Dig(primaryInfo, ["description"]))
-            videoCount = ParseText(ObjectUtils.Dig(primaryInfo, ["stats", 0, "runs", 0, "text"])).Replace(",", "").ToInt()
-            thumbnail = ObjectUtils.Dig(primaryInfo, ["thumbnailRenderer", "playlistVideoThumbnailRenderer", "thumbnail", "thumbnails", 0, "url"])
-
-            author = ParseText(ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "title"]))
-            authorId = ObjectUtils.Dig(secondaryInfo, ["videoOwner", "videoOwnerRenderer", "navigationEndpoint", "browseEndpoint", "browseId"])
-            stats = ObjectUtils.Dig(primaryInfo, ["stats"])
-            if IsArray(stats)
-                statsTexts = []
-                for each stat in stats
-                    statText = ParseText(stat)
-                    if statText <> ""
-                        statsTexts.Push(statText)
+            twoColumnRenderer = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "content", "twoColumnRenderer"])
+            if twoColumnRenderer <> invalid
+                entityMetadataRenderer = ObjectUtils.Dig(twoColumnRenderer, ["leftColumn", "entityMetadataRenderer"])
+                if entityMetadataRenderer <> invalid
+                    if title = invalid
+                        title = ParseText(entityMetadataRenderer["title"])
                     end if
-                end for
-                statsText = statsTexts.Join(" • ")
-            end if
-        end if
-
-        twoColumnRenderer = ObjectUtils.Dig(responseData, ["contents", "tvBrowseRenderer", "content", "tvSurfaceContentRenderer", "content", "twoColumnRenderer"])
-        if twoColumnRenderer <> invalid
-            entityMetadataRenderer = ObjectUtils.Dig(twoColumnRenderer, ["leftColumn", "entityMetadataRenderer"])
-            if entityMetadataRenderer <> invalid
-                if title = invalid
-                    title = ParseText(entityMetadataRenderer["title"])
-                end if
-                if statsText = invalid
-                    statsText = ParseLineRenderer(ObjectUtils.Dig(entityMetadataRenderer, ["bylines", 0, "lineRenderer"]))
-                end if
-                if description = invalid
-                    description = ParseText(entityMetadataRenderer["description"])
-                end if
-                if playlistId = invalid
-                    playlistId = ObjectUtils.Dig(twoColumnRenderer, ["rightColumn", "playlistVideoListRenderer", "playlistId"])
+                    if statsText = invalid
+                        statsText = ParseLineRenderer(ObjectUtils.Dig(entityMetadataRenderer, ["bylines", 0, "lineRenderer"]))
+                    end if
+                    if description = invalid
+                        description = ParseText(entityMetadataRenderer["description"])
+                    end if
+                    if playlistId = invalid
+                        playlistId = ObjectUtils.Dig(twoColumnRenderer, ["rightColumn", "playlistVideoListRenderer", "playlistId"])
+                    end if
                 end if
             end if
-        end if
 
-        if StringUtils.IsNullOrEmpty(playlistId)
-            playlistId = browseId
-        end if
-
-        playlist = {
-            "playlistId": playlistId
-            "videoCount": videoCount
-            "videos": []
-        }
-
-        if title <> invalid
-            playlist["title"] = title
-        end if
-        if author <> invalid
-            playlist["author"] = author
-        end if
-        if authorId <> invalid
-            playlist["authorId"] = authorId
-        end if
-        if description <> invalid
-            playlist["description"] = description
-        end if
-        if thumbnail <> invalid
-            playlist["playlistThumbnail"] = thumbnail
-        end if
-        if statsText <> invalid
-            playlist["statsText"] = statsText
-        end if
-
-        feeds = ParseResponseDataForFeeds(responseData, {
-            response: response
-            browseId: browseId
-        })
-        if feeds.Count() > 0
-            playlist["videos"] = ValidArray(feeds[0].items)
-            if feeds[0].DoesExist("continuation")
-                playlist["continuation"] = feeds[0].continuation
+            if StringUtils.IsNullOrEmpty(playlistId)
+                playlistId = browseId
             end if
-        end if
 
-        if playlist["playlistThumbnail"] = invalid and playlist["videos"].Count() > 0
-            playlist["playlistThumbnail"] = ObjectUtils.Dig(playlist, ["videos", 0, "thumbnails", 0, "url"])
-        end if
-
-        return playlist
-    end function
-
-    function ParseMixPageResponseData(responseData as object, response as object) as object
-        if responseData = invalid
-            return {
-                error: "Invalid response data"
+            playlist = {
+                "playlistId": playlistId
+                "videoCount": videoCount
+                "videos": []
             }
-        end if
 
-        error = Innertube.ParseResponseDataForError(responseData)
-        if error <> ""
-            return {
-                error: error
-            }
-        end if
-
-        playlist = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
-        if playlist = invalid
-            return {
-                error: "Invalid playlist data"
-            }
-        end if
-
-        playlistId = playlist["playlistId"]
-
-        title = ParseText(playlist["title"])
-        if title = ""
-            title = ParseText(playlist["titleText"])
-        end if
-
-        author = ParseText(playlist["ownerName"])
-        if author = ""
-            author = ParseText(playlist["shortBylineText"])
-            if author = ""
-                author = ParseText(playlist["longBylineText"])
+            if title <> invalid
+                playlist["title"] = title
             end if
-        end if
-
-        result = {
-            "playlistId": playlistId
-            "title": title
-            "author": author
-            "videos": []
-            "videoCount": -1
-            "videoCountText": ""
-        }
-
-        feeds = ParseResponseDataForFeeds(playlist, {
-            response: response
-        })
-        if feeds.Count() > 0
-            result["videos"] = ValidArray(feeds[0].items)
-        end if
-
-        return result
-    end function
-
-    function ParseResponseDataForError(responseData as object) as string
-        error = ""
-        if responseData = invalid
-            return error
-        end if
-
-        alerts = responseData["alerts"]
-        if not IsArray(alerts) or alerts.Count() = 0
-            return error
-        end if
-
-        for each alert in alerts
-            if not IsAssociativeArray(alert)
-                continue for
+            if author <> invalid
+                playlist["author"] = author
+            end if
+            if authorId <> invalid
+                playlist["authorId"] = authorId
+            end if
+            if description <> invalid
+                playlist["description"] = description
+            end if
+            if thumbnail <> invalid
+                playlist["playlistThumbnail"] = thumbnail
+            end if
+            if statsText <> invalid
+                playlist["statsText"] = statsText
             end if
 
-            alertRenderer = alert["alertRenderer"]
-            if alertRenderer = invalid
-                alertRenderer = alert["alertWithButtonRenderer"]
-            end if
-            if not IsAssociativeArray(alertRenderer)
-                continue for
-            end if
+            feeds = ParseResponseDataForFeeds(responseData, {
+                    response: response
+                    browseId: browseId
+                })
+                if feeds.Count() > 0
+                    playlist["videos"] = ValidArray(feeds[0].items)
+                    if feeds[0].DoesExist("continuation")
+                        playlist["continuation"] = feeds[0].continuation
+                    end if
+                end if
 
-            alertText = ParseText(alertRenderer.text)
-            if ValidString(alertRenderer.type) = "INFO"
-                LogWarnNoTelemetry("Innertube Alert:", `[${alertRenderer.type}]`, alertText)
-            else
-                LogWarn("Innertube Alert:", `[${alertRenderer.type}]`, alertText)
-            end if
-            if alertRenderer.type = "ERROR"
-                error += alertText
-            end if
-        end for
+                if playlist["playlistThumbnail"] = invalid and playlist["videos"].Count() > 0
+                    playlist["playlistThumbnail"] = ObjectUtils.Dig(playlist, ["videos", 0, "thumbnails", 0, "url"])
+                end if
 
-        return error
-    end function
+                return playlist
+            end function
 
-    function ParseResponseForCacheControl(response as object) as dynamic
-        if not response.IsSuccess()
-            return invalid
-        end if
+            function ParseMixPageResponseData(responseData as object, response as object) as object
+                if responseData = invalid
+                    return {
+                        error: "Invalid response data"
+                    }
+                end if
 
-        headers = ValidAssociativeArray(response.Headers())
-        if headers.DoesExist("cache-control")
-            return headers["cache-control"]
-        end if
+                error = Innertube.ParseResponseDataForError(responseData)
+                if error <> ""
+                    return {
+                        error: error
+                    }
+                end if
 
-        json = response.Json()
-        maxAgeSeconds = ObjectUtils.Dig(json, ["responseContext", "maxAgeSeconds"])
-        if IsInt(maxAgeSeconds)
-            return `max-age=${maxAgeSeconds}`
-        end if
+                playlist = ObjectUtils.Dig(responseData, ["contents", "twoColumnWatchNextResults", "playlist", "playlist"])
+                if playlist = invalid
+                    return {
+                        error: "Invalid playlist data"
+                    }
+                end if
 
-        return invalid
-    end function
+                playlistId = playlist["playlistId"]
 
-    function GetContainers(responseData as object) as object
-        return [
-            responseData["contents"]
-            responseData["response"]
-            responseData["onResponseReceivedActions"]
-            responseData["onResponseReceivedCommands"]
-            responseData["continuationContents"]
-        ]
-    end function
+                title = ParseText(playlist["title"])
+                if title = ""
+                    title = ParseText(playlist["titleText"])
+                end if
 
-end namespace
+                author = ParseText(playlist["ownerName"])
+                if author = ""
+                    author = ParseText(playlist["shortBylineText"])
+                    if author = ""
+                        author = ParseText(playlist["longBylineText"])
+                    end if
+                end if
+
+                result = {
+                    "playlistId": playlistId
+                    "title": title
+                    "author": author
+                    "videos": []
+                    "videoCount": -1
+                    "videoCountText": ""
+                }
+
+                feeds = ParseResponseDataForFeeds(playlist, {
+                        response: response
+                    })
+                    if feeds.Count() > 0
+                        result["videos"] = ValidArray(feeds[0].items)
+                    end if
+
+                    return result
+                end function
+
+                function ParseResponseDataForError(responseData as object) as string
+                    error = ""
+                    if responseData = invalid
+                        return error
+                    end if
+
+                    alerts = responseData["alerts"]
+                    if not IsArray(alerts) or alerts.Count() = 0
+                        return error
+                    end if
+
+                    for each alert in alerts
+                        if not IsAssociativeArray(alert)
+                            continue for
+                        end if
+
+                        alertRenderer = alert["alertRenderer"]
+                        if alertRenderer = invalid
+                            alertRenderer = alert["alertWithButtonRenderer"]
+                        end if
+                        if not IsAssociativeArray(alertRenderer)
+                            continue for
+                        end if
+
+                        alertText = ParseText(alertRenderer.text)
+                        if ValidString(alertRenderer.type) = "INFO"
+                            LogWarnNoTelemetry("Innertube Alert:", `[${alertRenderer.type}]`, alertText)
+                        else
+                            LogWarn("Innertube Alert:", `[${alertRenderer.type}]`, alertText)
+                        end if
+                        if alertRenderer.type = "ERROR"
+                            error += alertText
+                        end if
+                    end for
+
+                    return error
+                end function
+
+                function ParseResponseForCacheControl(response as object) as dynamic
+                    if not response.IsSuccess()
+                        return invalid
+                    end if
+
+                    headers = ValidAssociativeArray(response.Headers())
+                    if headers.DoesExist("cache-control")
+                        return headers["cache-control"]
+                    end if
+
+                    json = response.Json()
+                    maxAgeSeconds = ObjectUtils.Dig(json, ["responseContext", "maxAgeSeconds"])
+                    if IsInt(maxAgeSeconds)
+                        return `max-age=${maxAgeSeconds}`
+                    end if
+
+                    return invalid
+                end function
+
+                function GetContainers(responseData as object) as object
+                    return [
+                        responseData["contents"]
+                        responseData["response"]
+                        responseData["onResponseReceivedActions"]
+                        responseData["onResponseReceivedCommands"]
+                        responseData["continuationContents"]
+                    ]
+                end function
+
+            end namespace
