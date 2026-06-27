@@ -18,7 +18,8 @@ namespace Innertube
         datasyncIdToken = OptionUtils.Get(options, "datasyncIdToken")
         cpn = InnertubeService.CreateClientPlaybackNonce()
 
-        useAccessToken = (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded) and not StringUtils.IsNullOrEmpty(accessToken)
+        isTv = (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded)
+        useAccessToken = isTv and not StringUtils.IsNullOrEmpty(accessToken)
 
         deviceInfo = CreateObject("roDeviceInfo")
 
@@ -56,6 +57,10 @@ namespace Innertube
         signatureTimestamp = GetSignatureTimestamp(cancellation)
         if signatureTimestamp <> invalid
             payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = signatureTimestamp
+        end if
+
+        if isTv
+            payload["playbackContext"]["contentPlaybackContext"]["isLivingRoomDeeplink"] = true
         end if
 
         request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)

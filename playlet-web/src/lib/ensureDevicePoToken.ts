@@ -2,8 +2,8 @@ import { PoTokenMinter } from "lib/Api/PoTokenMinter";
 import { addToast } from "lib/Toast";
 
 // Mints for the current identity if needed, surfacing the outcome as a toast.
-export async function ensureDevicePoTokenWithToast(force = false) {
-    const result = await PoTokenMinter.ensureDevicePoToken(force);
+export async function ensureDevicePoTokenWithToast() {
+    const result = await PoTokenMinter.ensureDevicePoToken();
     switch (result.status) {
         case "minted":
             addToast("PoToken minted on device", "success");

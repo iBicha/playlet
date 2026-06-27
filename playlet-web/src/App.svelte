@@ -24,19 +24,9 @@
   import BookmarksScreen from "lib/Screens/BookmarksScreen.svelte";
   import RemoteControlScreen from "lib/Screens/RemoteControlScreen.svelte";
   import { fetchLocale } from "lib/Api/Locale";
-  import { ensureDevicePoTokenWithToast } from "lib/ensureDevicePoToken";
   import Toast from "lib/Toast.svelte";
 
-  // Mint on load, then refresh hourly while the page is open.
-  const POTOKEN_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
-
   onMount(() => {
-    ensureDevicePoTokenWithToast();
-    const poTokenRefreshInterval = setInterval(
-      ensureDevicePoTokenWithToast,
-      POTOKEN_REFRESH_INTERVAL_MS,
-    );
-
     PlayletApi.getState().then((value) => {
       playletStateStore.set(value);
       fetchLocale(value.device?.current_locale);
@@ -73,8 +63,6 @@
     PlayletApi.getBookmarkFeeds().then((value) => {
       bookmarksStore.set(value);
     });
-
-    return () => clearInterval(poTokenRefreshInterval);
   });
 
   let currentScreen: AppState["screen"];

@@ -180,8 +180,8 @@ export class PoTokenMinter {
         return now - device.mintedAt >= REFRESH_AGE_SECONDS;
     }
 
-    // Mints + uploads a poToken when the device's token needs refreshing, or always when forced.
-    static async ensureDevicePoToken(force = false): Promise<EnsurePoTokenResult> {
+    // Mints + uploads a poToken when the device's token needs refreshing.
+    static async ensureDevicePoToken(): Promise<EnsurePoTokenResult> {
         let device: DevicePoToken;
         try {
             device = await PlayletApi.getDevicePoToken();
@@ -194,7 +194,7 @@ export class PoTokenMinter {
         if (!identity) {
             return { status: "no-session" };
         }
-        if (!force && !PoTokenMinter.shouldRefresh(device)) {
+        if (!PoTokenMinter.shouldRefresh(device)) {
             return { status: "current" };
         }
 

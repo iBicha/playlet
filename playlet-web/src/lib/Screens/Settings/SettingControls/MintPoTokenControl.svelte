@@ -14,7 +14,7 @@
 <div class="m-5">
   <div class={textSizes[level]}>{$translate(displayText)}</div>
   <div class="text-xs text-gray-500">{@html $translate(description)}</div>
-  <button class="btn m-1" on:click={() => ensureDevicePoTokenWithToast(true)}
+  <button class="btn m-1" on:click={() => ensureDevicePoTokenWithToast()}
     >{$translate("Mint PoToken")}</button
   >
 </div>

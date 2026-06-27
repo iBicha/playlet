@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Attempt to fix `No valid bitrates` error by adding PoToken generation in web app
+- Attempt to fix `No valid bitrates` error by adding PoToken generation in server and web app
 
 ### Removed
 
