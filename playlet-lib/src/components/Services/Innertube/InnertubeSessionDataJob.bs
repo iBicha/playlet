@@ -6,23 +6,50 @@ function ExecuteJob() as void
     innertubeNode = JobGetInput().innertube
 
     cached = Innertube.ReadSessionDataFromRegistry()
-    if cached <> invalid and not StringUtils.IsNullOrEmpty(cached.visitorData)
-        if IsInt(cached.timestamp)
-            innertubeNode.timestamp = cached.timestamp
-        end if
-        innertubeNode.visitorData = cached.visitorData
-        if Innertube.IsSessionDataFresh(cached)
-            return
-        end if
+    cachedVisitorData = ""
+    cachedLivingRoomPoTokenId = ""
+    if IsAssociativeArray(cached)
+        cachedVisitorData = ValidString(cached.visitorData)
+        cachedLivingRoomPoTokenId = ValidString(cached.livingRoomPoTokenId)
     end if
 
-    fetched = Innertube.RequestSessionData(JobGetCancellation())
-    if fetched <> invalid
-        Innertube.SaveSessionDataToRegistry(fetched)
-        innertubeNode.timestamp = fetched.timestamp
-        innertubeNode.visitorData = fetched.visitorData
-    else if StringUtils.IsNullOrEmpty(innertubeNode.visitorData)
-        ' Refresh failed and we never had an id — wake a cold waiter to fail. Never blank a valid id.
-        innertubeNode.visitorData = ""
+    ' Publish the cached values immediately so playback isn't blocked while /tv is fetched.
+    innertubeNode.sessionData = {
+        "visitorData": cachedVisitorData
+        "livingRoomPoTokenId": cachedLivingRoomPoTokenId
+    }
+
+    fresh = Innertube.RequestTvClientData(JobGetCancellation())
+    if fresh = invalid
+        return
     end if
+
+    visitorData = cachedVisitorData
+    timestamp = 0
+    if Innertube.IsVisitorDataFresh(cached)
+        visitorData = cached.visitorData
+        timestamp = cached.timestamp
+    else if not StringUtils.IsNullOrEmpty(fresh.visitorData)
+        visitorData = fresh.visitorData
+        timestamp = fresh.timestamp
+    else if not StringUtils.IsNullOrEmpty(cachedVisitorData)
+        visitorData = cachedVisitorData
+        timestamp = cached.timestamp
+    end if
+
+    livingRoomPoTokenId = cachedLivingRoomPoTokenId
+    if not StringUtils.IsNullOrEmpty(fresh.livingRoomPoTokenId)
+        livingRoomPoTokenId = fresh.livingRoomPoTokenId
+    end if
+
+    Innertube.SaveSessionDataToRegistry({
+        "timestamp": timestamp
+        "visitorData": visitorData
+        "livingRoomPoTokenId": livingRoomPoTokenId
+    })
+
+    innertubeNode.sessionData = {
+        "visitorData": visitorData
+        "livingRoomPoTokenId": livingRoomPoTokenId
+    }
 end function

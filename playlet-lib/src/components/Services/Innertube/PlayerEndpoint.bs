@@ -15,7 +15,7 @@ namespace Innertube
         cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
-        datasyncIdToken = OptionUtils.Get(options, "datasyncIdToken")
+        livingRoomPoTokenId = OptionUtils.Get(options, "livingRoomPoTokenId")
         cpn = InnertubeService.CreateClientPlaybackNonce()
 
         isTv = (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded)
@@ -68,12 +68,15 @@ namespace Innertube
 
         if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
             request.Header("x-goog-visitor-id", visitorData)
-            request.poTokenIdentity = visitorData
-        else if useAccessToken and not StringUtils.IsNullOrEmpty(datasyncIdToken)
-            request.poTokenIdentity = datasyncIdToken
+        end if
+
+        if not StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
+            request.poTokenIdentity = livingRoomPoTokenId
         end if
 
         if not StringUtils.IsNullOrEmpty(request.poTokenIdentity)
+            ' NOTE: local potoken (browser-minted) is currently not in use.
+            ' GetValidPoTokenForIdentity should return "", and the backend would mint the potoken.
             request.poToken = Innertube.PoTokens.GetValidPoTokenForIdentity(request.poTokenIdentity)
         end if
 

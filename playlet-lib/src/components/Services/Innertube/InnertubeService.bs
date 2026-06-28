@@ -28,13 +28,6 @@ namespace InnertubeService
         accessToken = OptionUtils.Get(options, "accessToken")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        if not StringUtils.IsNullOrEmpty(accessToken)
-            profileNode = OptionUtils.Get(options, "profileNode")
-            if profileNode <> invalid
-                options["datasyncIdToken"] = GetProfileDatasyncIdToken(profileNode, accessToken, OptionUtils.Get(options, "profilesService"), cancellation)
-            end if
-        end if
-
         nextRequest = invalid
         if fetchNext
             nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
@@ -765,53 +758,6 @@ namespace InnertubeService
 
     function AuthListAccounts(accessToken as string, cancellation = invalid as object) as object
         return Innertube.ListAccounts(accessToken, cancellation)
-    end function
-
-    function GetProfileDatasyncIdToken(profileNode as object, accessToken as string, profilesService as object, cancellation as object) as string
-        endpoint = profileNode.selectActiveIdentityEndpoint
-        if not IsAssociativeArray(endpoint) or endpoint.Count() = 0
-            endpoint = BackfillSelectActiveIdentityEndpoint(profileNode, accessToken, profilesService, cancellation)
-        end if
-        return Innertube.GetDatasyncIdToken(endpoint)
-    end function
-
-    ' The identity used to bind GVS poTokens: the signed-in profile's datasyncIdToken,
-    ' falling back to visitorData when logged out (or when no datasyncIdToken is available).
-    function GetCurrentPoTokenIdentity(profilesService as object, innertubeNode as object) as string
-        currentProfile = profilesService.currentProfile
-        if currentProfile <> invalid and currentProfile.type = "youtube"
-            accessToken = currentProfile.accessToken
-            if not StringUtils.IsNullOrEmpty(accessToken)
-                ' Signed in: bind to the datasyncIdToken, matching the decipher request's identity.
-                return GetProfileDatasyncIdToken(currentProfile, accessToken, profilesService, invalid)
-            end if
-        end if
-        return innertubeNode.visitorData
-    end function
-
-    function BackfillSelectActiveIdentityEndpoint(profileNode as object, accessToken as string, profilesService as object, cancellation as object) as object
-        LogInfo("Backfilling selectActiveIdentityEndpoint for signed-in profile")
-        accounts = Innertube.ListAccounts(accessToken, cancellation)
-        if not IsArray(accounts)
-            return invalid
-        end if
-
-        for each account in accounts
-            if account.activeIdentifyToken <> profileNode.activeIdentifyToken
-                continue for
-            end if
-            endpoint = account.selectActiveIdentityEndpoint
-            if IsAssociativeArray(endpoint) and endpoint.Count() > 0
-                profileNode.selectActiveIdentityEndpoint = endpoint
-                if profilesService <> invalid
-                    profilesService@.SaveUserProfilesToRegistry()
-                end if
-                return endpoint
-            end if
-            exit for
-        end for
-
-        return invalid
     end function
 
     function GetDrmLicense(options as object) as dynamic

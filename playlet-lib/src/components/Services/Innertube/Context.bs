@@ -51,12 +51,13 @@ namespace Innertube
 
     function CreateContext(client as Innertube.ClientType, deviceInfo as object, options = invalid as object) as object
         contextClient = invalid
+        livingRoomPoTokenId = OptionUtils.Get(options, "livingRoomPoTokenId")
         if client = ClientType.Web
             contextClient = CreateContextClientWeb(deviceInfo)
         else if client = ClientType.IOS
             contextClient = CreateContextClientIOS(deviceInfo)
         else if client = ClientType.Tv or client = ClientType.TvDowngraded
-            contextClient = CreateContextClientTv(deviceInfo, client)
+            contextClient = CreateContextClientTv(deviceInfo, client, livingRoomPoTokenId)
         else
             throw "Invalid client type"
         end if
@@ -163,12 +164,12 @@ namespace Innertube
         }
     end function
 
-    function CreateContextClientTv(deviceInfo as object, client as Innertube.ClientType) as object
+    function CreateContextClientTv(deviceInfo as object, client as Innertube.ClientType, livingRoomPoTokenId = "" as dynamic) as object
         tvClientVersion = INNERTUBE_TV_CLIENT_VERSION
         if client = ClientType.TvDowngraded
             tvClientVersion = INNERTUBE_TV_CLIENT_VERSION_DOWNGRADED
         end if
-        return {
+        contextClient = {
             "hl": GetCurrentLocale(deviceInfo)
             "gl": GetContentRegion(deviceInfo)
             "remoteHost": ""
@@ -205,6 +206,10 @@ namespace Innertube
             "playerType": "UNIPLAYER"
             "connectionType": "CONN_CELLULAR_4G"
         }
+        if not StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
+            contextClient.tvAppInfo["livingRoomPoTokenId"] = livingRoomPoTokenId
+        end if
+        return contextClient
     end function
 
     function GetCurrentLocale(deviceInfo as object) as string

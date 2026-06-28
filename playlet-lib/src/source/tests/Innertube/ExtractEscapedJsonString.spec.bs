@@ -1,0 +1,37 @@
+import "pkg:/components/Services/Innertube/SessionData.bs"
+
+namespace Tests
+
+    @suite
+    class InnertubeExtractEscapedJsonStringTests extends Rooibos.BaseTestSuite
+
+        @describe("Innertube.ExtractEscapedJsonString")
+
+        @it("extracts a plain value")
+        function plain()
+            text = `noise "visitorData":"AbCd123" noise`
+            m.assertEqual(Innertube.ExtractEscapedJsonString(text, "visitorData"), "AbCd123")
+        end function
+
+        @it("decodes the escaped = padding")
+        function decodesPadding()
+            bs = Chr(92)
+            text = `"LIVING_ROOM_PO_TOKEN_ID":"THWY0ox3FA4${bs}u003d"`
+            m.assertEqual(Innertube.ExtractEscapedJsonString(text, "LIVING_ROOM_PO_TOKEN_ID"), "THWY0ox3FA4=")
+        end function
+
+        @it("decodes any escape, not just the padding")
+        function decodesAnyEscape()
+            bs = Chr(92)
+            text = `"key":"a${bs}u002fb"`
+            m.assertEqual(Innertube.ExtractEscapedJsonString(text, "key"), "a/b")
+        end function
+
+        @it("returns empty string when the key is absent")
+        function keyAbsent()
+            m.assertEqual(Innertube.ExtractEscapedJsonString(`"other":"x"`, "visitorData"), "")
+        end function
+
+    end class
+
+end namespace

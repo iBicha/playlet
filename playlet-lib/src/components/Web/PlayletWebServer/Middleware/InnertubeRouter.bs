@@ -20,7 +20,12 @@ namespace Http
         function GetPoToken(context as object) as object
             response = context.response
 
-            identity = InnertubeService.GetCurrentPoTokenIdentity(m.profilesService, m.innertube)
+            identity = ""
+            sessionData = m.innertube.sessionData
+            if IsAssociativeArray(sessionData)
+                identity = ValidString(sessionData.livingRoomPoTokenId)
+            end if
+
             if StringUtils.IsNullOrEmpty(identity)
                 response.Default(503, "No current identity")
                 return true
@@ -64,8 +69,20 @@ namespace Http
                 return true
             end if
 
+
+            identity = ""
+            sessionData = m.innertube.sessionData
+            if IsAssociativeArray(sessionData)
+                identity = ValidString(sessionData.livingRoomPoTokenId)
+            end if
+
+            if StringUtils.IsNullOrEmpty(identity)
+                response.Default(503, "No current identity")
+                return true
+            end if
+
             ' Reject identities other than the device's current one (guards the shared registry).
-            if payload.identity <> InnertubeService.GetCurrentPoTokenIdentity(m.profilesService, m.innertube)
+            if payload.identity <> identity
                 response.Default(409, "identity is not the device's current identity")
                 return true
             end if
@@ -146,7 +163,7 @@ namespace Http
             if currentProfile <> invalid and currentProfile.type = "youtube"
                 options["accessToken"] = currentProfile.accessToken
             else
-                options["visitorData"] = m.innertube.visitorData
+                options["visitorData"] = m.innertube.sessionData.visitorData
             end if
 
             drmResponse = InnertubeService.GetDrmLicense(options)

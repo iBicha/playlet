@@ -36,13 +36,13 @@ function ExecuteJob() as void
         cancellation = JobGetCancellation()
         if backend = "playlet"
 
-            visitorData = GetVisitorData(innertubeNode, cancellation)
-            if visitorData.cancel = true
+            sessionData = GetSessionData(innertubeNode, cancellation)
+            if sessionData.cancel = true
                 JobCancel()
                 return
             end if
-            if visitorData.error <> invalid
-                JobError(visitorData.error)
+            if sessionData.error <> invalid
+                JobError(sessionData.error)
                 return
             end if
 
@@ -59,7 +59,8 @@ function ExecuteJob() as void
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
                 "cancellation": cancellation
                 "credentialTransferToken": loungeServiceNode.credentialTransferToken
-                "visitorData": visitorData.visitorData
+                "visitorData": sessionData.visitorData
+                "livingRoomPoTokenId": sessionData.livingRoomPoTokenId
                 "accessToken": accessToken
                 "onBehalfOfUser": onBehalfOfUser
                 "profileNode": profileNode
@@ -164,46 +165,40 @@ function ExecuteJob() as void
     end if
 end function
 
-function GetVisitorData(innertubeNode as object, cancellation as object) as object
-    port = CreateObject("roMessagePort")
+function GetSessionData(innertubeNode as object, cancellation as object) as object
+    sessionData = innertubeNode.sessionData
+    if SessionDataComplete(sessionData)
+        return sessionData
+    end if
 
-    MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "visitorData", port)
+    port = CreateObject("roMessagePort")
+    MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "sessionData", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
 
-    visitorData = innertubeNode.visitorData
-    if not StringUtils.IsNullOrEmpty(visitorData)
-        innertubeNode.unobserveFieldScoped("visitorData")
-        CancellationUtils.UnobserveCancellationScoped(cancellation)
-
-        return {
-            visitorData: visitorData
-        }
-    end if
-
-    innertubeNode.requestVisitorData = true
+    innertubeNode.requestSessionData = true
     message = wait(30000, port)
 
-    innertubeNode.unobserveFieldScoped("visitorData")
+    innertubeNode.unobserveFieldScoped("sessionData")
     CancellationUtils.UnobserveCancellationScoped(cancellation)
 
-    if message <> invalid
-        if CancellationUtils.IsCancellationEvent(cancellation, message)
-            return {
-                cancel: true
-            }
-        end if
-        visitorData = message.getData()
+    if message <> invalid and CancellationUtils.IsCancellationEvent(cancellation, message)
+        return {
+            cancel: true
+        }
     end if
 
-    if StringUtils.IsNullOrEmpty(visitorData)
-        return {
-            error: "Failed to get visitor data. Please try again later."
-        }
+    sessionData = innertubeNode.sessionData
+    if SessionDataComplete(sessionData)
+        return sessionData
     end if
 
     return {
-        visitorData: visitorData
+        error: "Failed to get session data. Please try again later."
     }
+end function
+
+function SessionDataComplete(sessionData as object) as boolean
+    return IsAssociativeArray(sessionData) and not StringUtils.IsNullOrEmpty(sessionData.visitorData) and not StringUtils.IsNullOrEmpty(sessionData.livingRoomPoTokenId)
 end function
 
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
