@@ -24,15 +24,23 @@ namespace Innertube
     function RequestTvClientData(cancellation = invalid as object) as object
         visitorData = ""
         livingRoomPoTokenId = ""
+        visitorDataResponse = ""
+        livingRoomPoTokenIdResponse = ""
 
         for attempt = 1 to TV_CLIENT_DATA_MAX_ATTEMPTS
             text = FetchTvClientPage(cancellation)
-            if text <> invalid
+            if not StringUtils.IsNullOrEmpty(text)
                 if StringUtils.IsNullOrEmpty(visitorData)
                     visitorData = ExtractEscapedJsonString(text, "visitorData")
+                    if StringUtils.IsNullOrEmpty(visitorData)
+                        visitorDataResponse = text
+                    end if
                 end if
                 if StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
                     livingRoomPoTokenId = ExtractEscapedJsonString(text, "LIVING_ROOM_PO_TOKEN_ID")
+                    if StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
+                        livingRoomPoTokenIdResponse = text
+                    end if
                 end if
                 if not StringUtils.IsNullOrEmpty(visitorData) and not StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
                     exit for
@@ -47,10 +55,10 @@ namespace Innertube
         end for
 
         if StringUtils.IsNullOrEmpty(visitorData)
-            LogError("Could not extract visitorData from tv client data")
+            ReportTvClientDataFailure("Could not extract visitorData from tv client data", visitorDataResponse)
         end if
         if StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
-            LogError("Could not extract livingRoomPoTokenId from tv client data")
+            ReportTvClientDataFailure("Could not extract livingRoomPoTokenId from tv client data", livingRoomPoTokenIdResponse)
         end if
         if StringUtils.IsNullOrEmpty(visitorData) and StringUtils.IsNullOrEmpty(livingRoomPoTokenId)
             return invalid
@@ -61,6 +69,22 @@ namespace Innertube
             "visitorData": visitorData
             "livingRoomPoTokenId": livingRoomPoTokenId
         }
+    end function
+
+    function ReportTvClientDataFailure(message as string, responseText as dynamic) as void
+        LogErrorNoTelemetry(message)
+        event = {
+            level: "error"
+            message: message
+        }
+        if not StringUtils.IsNullOrEmpty(responseText)
+            event.attachments = [{
+                filename: "response.html"
+                content_type: "text/html"
+                data: responseText
+            }]
+        end if
+        LogTelemetryEvent(event)
     end function
 
     function FetchTvClientPage(cancellation as object) as dynamic
