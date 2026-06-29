@@ -66,22 +66,6 @@ Can't install from the store? See [How to install Playlet as a sideloaded/dev ap
   - Use the YouTube app to connect using the same Wi-Fi; OR
   - Use the `Link with TV code` to connect
 
-### Picture-in-picture
-
-- When viewing a video in full screen, press ⬇️ (down) button on your remote to shrink the video
-- You can browse or search for videos while you watch
-- To restore currently playing video to full screen, press the ✳️ (options) button
-
-### Customize Invidious instance
-
-1. Open settings in Playlet
-1. Select Invidious -> Instance
-1. Set a custom instance, or choose a public one hosted by volunteers (from [api.invidious.io](https://api.invidious.io/))
-1. Optionally, Select `Test instance` to make sure it works
-1. Hit save
-
-> ℹ️ **Note**: If you are logged in when you change the instance, you will remain logged in to the old instance. In this case, Playlet will use the old instance to retrieve your subscriptions and your playlists, but will use the new instance for everything else. After switching to a new instance, you can log out and log in again to use your profile on the new instance.
-
 ## Development
 
 For everything related to Playlet app development, please see the [documentation](./docs/README.md)
