@@ -1,0 +1,106 @@
+import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+namespace Innertube
+
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object, playerResponse as object) as void
+        if adaptiveFormats.Count() = 0
+            LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
+            return
+        end if
+
+        formatUrl = adaptiveFormats[0]["url"]
+        if StringUtils.IsNullOrEmpty(formatUrl)
+            LogWarn("GetPostLiveDvrInfo: URL is empty")
+            return
+        end if
+
+        ' Query the live edge (no sq): that response is Cache-Control: no-cache, always
+        ' served fresh, so it carries X-Head-*. A finished stream's head is its final
+        ' segment, so X-Head-Seqnum is the total count and X-Head-Time-Millis the duration.
+        primary = FetchPostLiveDvrHead(formatUrl, invalid, cpn, client, cancellation)
+        headers = invalid
+
+        if HasPostLiveDvrHead(primary)
+            headers = primary.headers
+        else
+            ' sq=0 is cacheable, so an edge can return it missing X-Head-* (#359); fall
+            ' back to it only when the live-edge query misses.
+            fallback = FetchPostLiveDvrHead(formatUrl, "0", cpn, client, cancellation)
+            diagnostics = PostLiveDvrDiagnostics(parsedResponse["videoId"], primary, fallback)
+            if HasPostLiveDvrHead(fallback)
+                headers = fallback.headers
+                LogTelemetryEvent({
+                    level: "warning"
+                    message: `GetPostLiveDvrInfo: no-sq missing head, sq=0 fallback recovered\n${diagnostics}`
+                    fingerprint: ["GetPostLiveDvrInfo: sq=0 fallback recovered"]
+                })
+            else
+                ' Stuck: neither header path has the head. Attach the full /player response
+                ' so a fix is findable from telemetry alone - lengthSeconds + targetDurationSec
+                ' approximate count/duration today, and any other usable field is there too.
+                ' The blob folds into Sentry extra, keeping the message lean.
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `GetPostLiveDvrInfo: both no-sq and sq=0 missing head\n${diagnostics}`
+                    fingerprint: ["GetPostLiveDvrInfo: both no-sq and sq=0 missing head"]
+                    attachments: [{
+                        filename: "player_response.json"
+                        content_type: "application/json"
+                        data: FormatJson(playerResponse)
+                    }]
+                })
+                return
+            end if
+        end if
+
+        durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
+        segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
+
+        if durationMs > 0
+            parsedResponse["postLiveDvrDurationMs"] = durationMs
+        end if
+        if segmentCount > 0
+            parsedResponse["postLiveDvrSegmentCount"] = segmentCount
+        end if
+    end function
+
+    function FetchPostLiveDvrHead(formatUrl as string, sq as dynamic, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as object
+        queryComponents = UrlUtils.ParseQueryComponents(formatUrl)
+        queryComponents["rn"] = "0"
+        if sq <> invalid
+            queryComponents["sq"] = sq
+        end if
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
+        end if
+        url = UrlUtils.SetQueryParams(formatUrl, queryComponents)
+
+        request = HttpClient.Head(url)
+        requestHeaders = Innertube.CreateHeaders(client)
+        requestHeaders["origin"] = "https://www.youtube.com"
+        requestHeaders["referer"] = "https://www.youtube.com"
+        requestHeaders["DNT"] = "?1"
+        request.Headers(requestHeaders)
+        request.TryCount(2)
+        request.Cancellation(cancellation)
+        response = request.Await()
+
+        return {
+            url: url
+            statusCode: response.StatusCode()
+            headers: response.Headers()
+        }
+    end function
+
+    function HasPostLiveDvrHead(result as object) as boolean
+        return IsAssociativeArray(result) and IsAssociativeArray(result.headers) and result.headers.DoesExist("X-Head-Time-Millis") and result.headers.DoesExist("X-Head-Seqnum")
+    end function
+
+    function PostLiveDvrDiagnostics(videoId as dynamic, primary as object, fallback as object) as string
+        return `VideoID: ${ValidString(videoId)}` + Chr(10) + `URL (no-sq; sq=0 appends &sq=0): ${primary.url}` + Chr(10) + `no-sq HEAD status: ${primary.statusCode.ToStr()} headers: ${FormatJson(primary.headers)}` + Chr(10) + `sq=0 HEAD status: ${fallback.statusCode.ToStr()} headers: ${FormatJson(fallback.headers)}`
+    end function
+
+end namespace

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Retry condition issue in http client
 - Attempt to fix "page needs to be reloaded" edge case
+- Attempt to reduce errors in post-live DVR videos
 
 ## [0.47.5] - 2026-06-28
 

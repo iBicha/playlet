@@ -4,6 +4,7 @@ import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Innertube/NodesParser.bs"
 import "pkg:/components/Services/Innertube/OTFSegmentInfo.bs"
 import "pkg:/components/Services/Innertube/PoTokens.bs"
+import "pkg:/components/Services/Innertube/PostLiveDvrInfo.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -190,7 +191,7 @@ namespace Innertube
 
         if isPostLiveDvr
             LogDebug("Fetching Post-Live DVR info")
-            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, client, cancellation)
+            GetPostLiveDvrInfo(parsedResponse, adaptiveFormats, playerRequest.cpn, client, cancellation, payload)
         end if
 
         if isOTF
@@ -745,66 +746,6 @@ namespace Innertube
         end for
 
         return false
-    end function
-
-    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
-        if adaptiveFormats.Count() = 0
-            LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
-            return
-        end if
-
-        url = adaptiveFormats[0]["url"]
-        if StringUtils.IsNullOrEmpty(url)
-            LogWarn("GetPostLiveDvrInfo: URL is empty")
-            return
-        end if
-
-        queryComponents = UrlUtils.ParseQueryComponents(url)
-        queryComponents["rn"] = "0"
-        queryComponents["sq"] = "0"
-        if not StringUtils.IsNullOrEmpty(cpn)
-            queryComponents["cpn"] = cpn
-        end if
-
-        url = UrlUtils.SetQueryParams(url, queryComponents)
-
-        request = HttpClient.Head(url)
-        requestHeaders = Innertube.CreateHeaders(client)
-        requestHeaders["origin"] = "https://www.youtube.com"
-        requestHeaders["referer"] = "https://www.youtube.com"
-        requestHeaders["DNT"] = "?1"
-        request.Headers(requestHeaders)
-
-        request.TryCount(2)
-        request.Cancellation(cancellation)
-        response = request.Await()
-
-        if not response.IsSuccess()
-            LogError("Failed to fetch Post-Live DVR info", response.ErrorMessage())
-            return
-        end if
-
-        headers = response.Headers()
-
-        if not headers.DoesExist("X-Head-Time-Millis") or not headers.DoesExist("X-Head-Seqnum")
-            msg = "GetPostLiveDvrInfo: Missing Post-Live DVR info in headers"
-            LogErrorNoTelemetry(msg, url, headers)
-            LogTelemetryEvent({
-                level: "error"
-                message: msg + `\nVideoID: ${parsedResponse["videoId"]}\nUrl: ${url}\nHeaders: ${FormatJson(headers)}`
-                fingerprint: [msg]
-            })
-        end if
-
-        durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
-        segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
-
-        if durationMs > 0
-            parsedResponse["postLiveDvrDurationMs"] = durationMs
-        end if
-        if segmentCount > 0
-            parsedResponse["postLiveDvrSegmentCount"] = segmentCount
-        end if
     end function
 
 end namespace
