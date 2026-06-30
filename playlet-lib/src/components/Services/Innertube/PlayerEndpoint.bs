@@ -13,7 +13,6 @@ namespace Innertube
 
     function CreatePlayerRequest(client as Innertube.ClientType, options = invalid as object) as object
         videoId = OptionUtils.Get(options, "videoId")
-        cancellation = OptionUtils.Get(options, "cancellation")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
         livingRoomPoTokenId = OptionUtils.Get(options, "livingRoomPoTokenId")
@@ -55,7 +54,7 @@ namespace Innertube
             "contentCheckOk": true
         }
 
-        signatureTimestamp = GetSignatureTimestamp(cancellation)
+        signatureTimestamp = OptionUtils.Get(options, "signatureTimestamp")
         if signatureTimestamp <> invalid
             payload["playbackContext"]["contentPlaybackContext"]["signatureTimestamp"] = signatureTimestamp
         end if
@@ -500,16 +499,17 @@ namespace Innertube
         return result
     end function
 
-    function GetSignatureTimestamp(cancellation as object) as dynamic
+    function GetSignatureTimestamp(cancellation as object) as object
         LogDebug(`ReadAsciiFile("tmp:/sts_cache.json")`)
         cache = ReadAsciiFile("tmp:/sts_cache.json")
         if not StringUtils.IsNullOrEmpty(cache)
             json = StringUtils.ParseJsonSafe(cache)
-            return json["sts"]
+            return { sts: json["sts"] }
         end if
 
         request = HttpClient.Get(`${PLAYLET_SUPPORT_SERVER}/v1/sts`)
         request.Cancellation(cancellation)
+        request.TryCount(3)
         request.NoCache()
         response = request.Await()
         if not response.IsSuccess()
@@ -518,13 +518,13 @@ namespace Innertube
             else
                 LogError(response.ErrorMessage())
             end if
-            return invalid
+            return { error: response.ErrorMessage() }
         end if
 
         text = response.Text()
         WriteAsciiFile("tmp:/sts_cache.json", text)
         json = response.Json()
-        return json["sts"]
+        return { sts: json["sts"] }
     end function
 
     function HasPotParam(formats as object) as boolean

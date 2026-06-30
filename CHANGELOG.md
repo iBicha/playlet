@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Retry condition issue in http client
+- Attempt to fix "page needs to be reloaded" edge case
 
 ## [0.47.5] - 2026-06-28
 

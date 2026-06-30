@@ -54,6 +54,16 @@ namespace InnertubeService
                 }
             end if
             totalPlayerRequests += 1
+            stsResult = Innertube.GetSignatureTimestamp(cancellation)
+            if CancellationUtils.IsCancelled(cancellation)
+                return {
+                    error: "Cancelled"
+                }
+            end if
+            if stsResult.error <> invalid
+                return stsResult
+            end if
+            options["signatureTimestamp"] = stsResult.sts
             playerRequest = Innertube.CreatePlayerRequest(client, options)
             if not StringUtils.IsNullOrEmpty(accessToken) and (client = Innertube.ClientType.Tv or client = Innertube.ClientType.TvDowngraded)
                 playerRequest.Header("Authorization", "Bearer " + accessToken)
@@ -359,6 +369,11 @@ namespace InnertubeService
         end if
 
         options["videoId"] = videoId
+        stsResult = Innertube.GetSignatureTimestamp(cancellation)
+        if stsResult.error <> invalid
+            return stsResult
+        end if
+        options["signatureTimestamp"] = stsResult.sts
         playerRequest = Innertube.CreatePlayerRequest(Innertube.ClientType.Tv, options)
         playerRequest.Cancellation(cancellation)
         playerRequest.Header("Authorization", "Bearer " + accessToken)
