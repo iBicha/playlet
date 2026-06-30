@@ -1,0 +1,253 @@
+import "pkg:/components/Services/LoungeService/LoungeBytes.bs"
+import "pkg:/source/utils/ByteArrayUtils.bs"
+
+enum HttpDecoderState
+    Head
+    ChunkSize
+    ChunkData
+    Done
+    Error
+end enum
+
+enum HttpDecoderError
+    None = ""
+    MalformedStatus = "malformed_status"
+    UnsupportedEncoding = "unsupported_encoding"
+    ChunkOverflow = "chunk_overflow"
+    ShortRead = "short_read"
+end enum
+
+const HTTP_DECODER_COMPACT_THRESHOLD = 32768
+const HTTP_DECODER_READ_LENGTH = 65536
+
+class HttpChunkedDecoder
+
+    public statusCode = 0
+    public statusText = ""
+    public errorReason = HttpDecoderError.None
+    public headers
+
+    private buffer
+    private cursor = 0
+    private state = HttpDecoderState.Head
+    private chunkRemaining = 0
+    private headCheckedSize = 0
+
+    function new()
+        m.buffer = CreateObject("roByteArray")
+        m.headers = {}
+    end function
+
+    function Pump(socket as object, output as object) as integer
+        received = m.ReceiveFrom(socket)
+        if received > 0
+            m.Process(output)
+        end if
+        return received
+    end function
+
+    function IsDone() as boolean
+        return m.state = HttpDecoderState.Done
+    end function
+
+    function IsError() as boolean
+        return m.state = HttpDecoderState.Error
+    end function
+
+    private function ReceiveFrom(socket as object) as integer
+        available = socket.GetCountRcvBuf()
+        if available <= 0
+            return 0
+        end if
+
+        lengthToRead = available
+        if lengthToRead > HTTP_DECODER_READ_LENGTH
+            lengthToRead = HTTP_DECODER_READ_LENGTH
+        end if
+
+        writeIndex = m.buffer.Count()
+        m.buffer[writeIndex + lengthToRead - 1] = 0
+        received = socket.Receive(m.buffer, writeIndex, lengthToRead)
+        if received > 0 and received < lengthToRead
+            ' GetCountRcvBuf reported more than Receive delivered, leaving uninitialised slack.
+            m.errorReason = HttpDecoderError.ShortRead
+            m.state = HttpDecoderState.Error
+        end if
+        return received
+    end function
+
+    private function Process(output as object) as void
+        running = true
+        while running
+            if m.state = HttpDecoderState.Head
+                running = m.ParseHead()
+            else if m.state = HttpDecoderState.ChunkSize
+                running = m.ParseChunkSize()
+            else if m.state = HttpDecoderState.ChunkData
+                running = m.ParseChunkData(output)
+            else
+                running = false
+            end if
+        end while
+
+        m.Compact()
+    end function
+
+    ' Status line and headers are ASCII, so they parse as a string; the chunk body that follows is
+    ' not, so it stays in bytes.
+    private function ParseHead() as boolean
+        bufferSize = m.buffer.Count()
+        if bufferSize = m.headCheckedSize
+            return false
+        end if
+
+        head = m.buffer.ToAsciiString()
+        delimiter = head.InStr(`\r\n\r\n`)
+        if delimiter = -1
+            m.headCheckedSize = bufferSize
+            return false
+        end if
+
+        contentStart = delimiter + 4
+        if m.buffer[contentStart - 4] <> 13 or m.buffer[contentStart - 3] <> 10 or m.buffer[contentStart - 2] <> 13 or m.buffer[contentStart - 1] <> 10
+            m.statusText = "Invalid header delimiter - is there unicode text in headers?"
+            m.errorReason = HttpDecoderError.MalformedStatus
+            m.state = HttpDecoderState.Error
+            return false
+        end if
+
+        lines = head.Left(delimiter).Split(`\r\n`)
+        if not m.ParseStatusLine(lines[0])
+            return false
+        end if
+        for i = 1 to lines.Count() - 1
+            m.ParseHeaderLine(lines[i])
+        end for
+
+        m.cursor = contentStart
+        return m.FinishHead()
+    end function
+
+    private function ParseStatusLine(line as string) as boolean
+        if not line.StartsWith("HTTP/1.1 ") and not line.StartsWith("HTTP/1.0 ")
+            m.statusText = "Malformed status line"
+            m.errorReason = HttpDecoderError.MalformedStatus
+            m.state = HttpDecoderState.Error
+            return false
+        end if
+
+        rest = line.Mid(9).Trim()
+        spaceIndex = rest.InStr(" ")
+        if spaceIndex = -1
+            m.statusCode = Int(Val(rest, 10))
+            m.statusText = ""
+        else
+            m.statusCode = Int(Val(rest.Left(spaceIndex), 10))
+            m.statusText = rest.Mid(spaceIndex + 1)
+        end if
+        return true
+    end function
+
+    private function ParseHeaderLine(line as string) as void
+        colon = line.InStr(":")
+        if colon > 0
+            key = LCase(line.Left(colon).Trim())
+            m.headers[key] = line.Mid(colon + 1).Trim()
+        end if
+    end function
+
+    private function FinishHead() as boolean
+        if m.statusCode <> 200
+            m.state = HttpDecoderState.Error
+            return false
+        end if
+
+        transferEncoding = m.headers["transfer-encoding"]
+        if transferEncoding = invalid or LCase(transferEncoding).InStr("chunked") = -1
+            m.statusText = "Unsupported transfer-encoding"
+            m.errorReason = HttpDecoderError.UnsupportedEncoding
+            m.state = HttpDecoderState.Error
+            return false
+        end if
+
+        m.state = HttpDecoderState.ChunkSize
+        return true
+    end function
+
+    private function ParseChunkSize() as boolean
+        ' Skip the CRLF trailing the previous chunk's data (and any stray newlines).
+        while m.cursor < m.buffer.Count() and (m.buffer[m.cursor] = 13 or m.buffer[m.cursor] = 10)
+            m.cursor += 1
+        end while
+
+        crlf = LoungeBytes.IndexOfCrlf(m.buffer, m.cursor)
+        if crlf = -1
+            return false
+        end if
+
+        sizeLine = LoungeBytes.RangeToString(m.buffer, m.cursor, crlf)
+        m.cursor = crlf + 2
+
+        ' A chunk-size line may carry ';ext' extensions; the size is the leading hex token.
+        semicolon = sizeLine.InStr(";")
+        if semicolon > 0
+            sizeLine = sizeLine.Left(semicolon)
+        end if
+        m.chunkRemaining = Int(Val(sizeLine.Trim(), 16))
+
+        if m.chunkRemaining < 0
+            ' A size that doesn't fit a 32-bit int is a corrupt size line or a parse desync.
+            m.errorReason = HttpDecoderError.ChunkOverflow
+            m.state = HttpDecoderState.Error
+            return false
+        end if
+
+        if m.chunkRemaining = 0
+            m.state = HttpDecoderState.Done
+            return false
+        end if
+
+        m.state = HttpDecoderState.ChunkData
+        return true
+    end function
+
+    private function ParseChunkData(output as object) as boolean
+        available = m.buffer.Count() - m.cursor
+        if available <= 0
+            return false
+        end if
+
+        take = available
+        if take > m.chunkRemaining
+            take = m.chunkRemaining
+        end if
+
+        chunk = ByteArrayUtils.Slice(m.buffer, m.cursor, m.cursor + take)
+        output.Append(chunk)
+        m.cursor += take
+        m.chunkRemaining -= take
+
+        if m.chunkRemaining = 0
+            m.state = HttpDecoderState.ChunkSize
+            return true
+        end if
+        return false
+    end function
+
+    ' A fully consumed buffer Clears for free; a partial one waits until the dead prefix is worth a slice.
+    private function Compact() as void
+        if m.cursor = 0
+            return
+        end if
+        if m.cursor >= m.buffer.Count()
+            m.buffer.Clear()
+        else if m.cursor >= HTTP_DECODER_COMPACT_THRESHOLD
+            m.buffer = LoungeBytes.Tail(m.buffer, m.cursor)
+        else
+            return
+        end if
+        m.cursor = 0
+        m.headCheckedSize = 0
+    end function
+
+end class

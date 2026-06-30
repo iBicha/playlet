@@ -1,0 +1,59 @@
+import "pkg:/components/Services/LoungeService/LoungeBytes.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeBytesTests extends Rooibos.BaseTestSuite
+
+        @describe("LoungeBytes byte helpers")
+
+        @it("converts a byte range to a string, byte-exact across a UTF-8 boundary")
+        function rangeToString()
+            ' "Xcafé" where é is 2 bytes; extract "café" = bytes [1, end).
+            cafe = "caf" + m.Utf8(&hC3, &hA9)
+            bytes = m.Bytes("X" + cafe)
+            m.assertEqual(LoungeBytes.RangeToString(bytes, 1, bytes.Count()), cafe)
+        end function
+
+        @it("finds the first CRLF at or after a position")
+        function indexOfCrlf()
+            bytes = m.Bytes(`ab\r\ncd\r\n`)
+            m.assertEqual(LoungeBytes.IndexOfCrlf(bytes, 0), 2)
+            m.assertEqual(LoungeBytes.IndexOfCrlf(bytes, 3), 6)
+        end function
+
+        @it("returns -1 when no CRLF is present")
+        function indexOfCrlfMissing()
+            m.assertEqual(LoungeBytes.IndexOfCrlf(m.Bytes("abc"), 0), -1)
+        end function
+
+        @it("finds the first byte value at or after a position, or -1")
+        function indexOfByte()
+            bytes = m.Bytes("a,b,c")
+            m.assertEqual(LoungeBytes.IndexOfByte(bytes, 0, Asc(",")), 1)
+            m.assertEqual(LoungeBytes.IndexOfByte(bytes, 2, Asc(",")), 3)
+            m.assertEqual(LoungeBytes.IndexOfByte(bytes, 0, Asc("z")), -1)
+        end function
+
+        @it("returns a tail copy from a position to the end")
+        function tail()
+            tail = LoungeBytes.Tail(m.Bytes("hello"), 2)
+            m.assertEqual(tail.ToAsciiString(), "llo")
+        end function
+
+        function Bytes(text as string) as object
+            bytes = CreateObject("roByteArray")
+            bytes.FromAsciiString(text)
+            return bytes
+        end function
+
+        function Utf8(b1 as integer, b2 as integer) as string
+            bytes = CreateObject("roByteArray")
+            bytes.Push(b1)
+            bytes.Push(b2)
+            return bytes.ToAsciiString()
+        end function
+
+    end class
+
+end namespace

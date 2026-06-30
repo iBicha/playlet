@@ -1,0 +1,105 @@
+import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeFramingTests extends Rooibos.BaseTestSuite
+
+        @describe("LoungeFraming.Extract")
+
+        @it("extracts a single complete frame and reports the consumed position")
+        function singleFrame()
+            result = LoungeFraming.Extract(m.Bytes(`5\nhello`), 0)
+            m.assertEqual(result.frames.Count(), 1)
+            m.assertEqual(result.frames[0], "hello")
+            m.assertEqual(result.nextPos, 7)
+        end function
+
+        @it("extracts multiple consecutive frames in one pass")
+        function multipleFrames()
+            result = LoungeFraming.Extract(m.Bytes(`5\nhello3\nfoo`), 0)
+            m.assertEqual(result.frames, ["hello", "foo"])
+        end function
+
+        @it("skips leading CR/LF between frames")
+        function leadingNewlines()
+            result = LoungeFraming.Extract(m.Bytes(`\r\n5\nhello`), 0)
+            m.assertEqual(result.frames, ["hello"])
+        end function
+
+        ' The bug that motivated the rewrite: the length prefix is a BYTE count, but the old
+        ' parser sliced with character-based string ops, so any multi-byte payload shifted every
+        ' subsequent frame. A char-based slice of 5 from "café2..." keeps 5 characters ("café2")
+        ' and desyncs; a byte-accurate slice keeps "café" (5 bytes) and frame 2 still lines up.
+        @it("slices payloads by byte length so multi-byte UTF-8 does not desync the stream")
+        function utf8ByteAccurate()
+            cafe = "caf" + m.Utf8(&hC3, &hA9) ' é is 2 bytes -> "café" is 5 bytes, 4 characters
+            body = m.Bytes(Str(m.ByteLen(cafe)).Trim() + Chr(10) + cafe + Str(m.ByteLen("ok")).Trim() + Chr(10) + "ok")
+
+            result = LoungeFraming.Extract(body, 0)
+            m.assertEqual(result.frames.Count(), 2, "a character-based slice would mis-split frame 2")
+            m.assertEqual(result.frames[0], cafe)
+            m.assertEqual(result.frames[1], "ok")
+        end function
+
+        @it("leaves a whole frame unconsumed when its payload has not fully arrived")
+        function partialPayload()
+            result = LoungeFraming.Extract(m.Bytes(`5\nhel`), 0)
+            m.assertEqual(result.frames.Count(), 0)
+            m.assertEqual(result.nextPos, 0)
+        end function
+
+        @it("consumes complete frames but retains an incomplete trailing frame")
+        function partialAfterComplete()
+            result = LoungeFraming.Extract(m.Bytes(`5\nhello2\nh`), 0)
+            m.assertEqual(result.frames, ["hello"])
+            m.assertEqual(result.nextPos, 7)
+        end function
+
+        @it("waits when the length line is not yet terminated")
+        function partialLengthLine()
+            result = LoungeFraming.Extract(m.Bytes("12"), 0)
+            m.assertEqual(result.frames.Count(), 0)
+            m.assertEqual(result.nextPos, 0)
+        end function
+
+        @it("resumes extraction from a caller-supplied position")
+        function resumeFromPosition()
+            ' Index 7 is the start of the second frame ("3\nfoo").
+            result = LoungeFraming.Extract(m.Bytes(`5\nhello3\nfoo`), 7)
+            m.assertEqual(result.frames, ["foo"])
+        end function
+
+        @it("skips a non-positive length line instead of stalling")
+        function malformedLength()
+            result = LoungeFraming.Extract(m.Bytes(`0\n5\nhello`), 0)
+            m.assertEqual(result.frames, ["hello"])
+        end function
+
+        @it("returns no frames for an empty body")
+        function emptyBody()
+            result = LoungeFraming.Extract(m.Bytes(""), 0)
+            m.assertEqual(result.frames.Count(), 0)
+            m.assertEqual(result.nextPos, 0)
+        end function
+
+        function Bytes(text as string) as object
+            bytes = CreateObject("roByteArray")
+            bytes.FromAsciiString(text)
+            return bytes
+        end function
+
+        function ByteLen(text as string) as integer
+            return m.Bytes(text).Count()
+        end function
+
+        function Utf8(b1 as integer, b2 as integer) as string
+            bytes = CreateObject("roByteArray")
+            bytes.Push(b1)
+            bytes.Push(b2)
+            return bytes.ToAsciiString()
+        end function
+
+    end class
+
+end namespace

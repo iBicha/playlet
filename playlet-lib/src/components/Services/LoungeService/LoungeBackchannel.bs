@@ -1,0 +1,174 @@
+import "pkg:/components/Services/LoungeService/HttpChunkedDecoder.bs"
+import "pkg:/components/Services/LoungeService/LoungeBytes.bs"
+import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+' Server sends periodic noop keepalives, so no data for this long means a dead connection.
+const LOUNGE_BACKCHANNEL_TIMEOUT_MS = 60000
+const LOUNGE_BACKCHANNEL_BODY_COMPACT = 32768
+
+' Raw socket on plain HTTP: roUrlTransfer can't read a streaming body incrementally, and
+' roStreamSocket has no TLS.
+class LoungeBackchannel
+
+    public statusCode = 0
+    public closeReason = ""
+
+    private socket
+    private decoder
+    private body
+    private bodyCursor = 0
+    private timer
+    private url = ""
+
+    function new()
+        m.timer = CreateObject("roTimespan")
+    end function
+
+    function Open(url as string, messagePort as object) as boolean
+        m.url = url
+        m.statusCode = 0
+        m.closeReason = ""
+
+        urlObject = UrlUtils.ParseUrl(url)
+        if urlObject.protocol <> "http"
+            m.closeReason = "invalid_protocol"
+            LogError("Lounge backchannel needs http, got:", urlObject.protocol)
+            return false
+        end if
+
+        portValue = urlObject.port
+        if portValue = invalid or portValue = ""
+            portValue = "80"
+        end if
+
+        address = CreateObject("roSocketAddress")
+        address.SetAddress(urlObject.host + ":" + portValue)
+
+        socket = CreateObject("roStreamSocket")
+        socket.SetSendToAddress(address)
+        if not socket.Connect()
+            m.closeReason = "connect_failed"
+            LogWarnNoTelemetry("Lounge backchannel connect failed:", urlObject.host)
+            return false
+        end if
+
+        CRLF = Chr(13) + Chr(10)
+        request = "GET " + urlObject.path + " HTTP/1.1" + CRLF
+        request += "Host: " + urlObject.host + CRLF
+        request += "Connection: keep-alive" + CRLF
+        request += CRLF
+        socket.SendStr(request)
+
+        socket.NotifyReadable(true)
+        socket.SetMessagePort(messagePort)
+
+        m.socket = socket
+        m.decoder = new HttpChunkedDecoder()
+        m.body = CreateObject("roByteArray")
+        m.bodyCursor = 0
+        m.timer.Mark()
+
+        LogInfo("Lounge backchannel open, socket", socket.GetID())
+        return true
+    end function
+
+    function IsOpen() as boolean
+        return m.socket <> invalid and m.closeReason = ""
+    end function
+
+    function Poll(socketEvents as object) as object
+        frames = []
+        if m.socket = invalid
+            return frames
+        end if
+
+        if not m.socket.IsConnected()
+            m.CloseWith("disconnected")
+            return frames
+        end if
+
+        if m.timer.TotalMilliseconds() > LOUNGE_BACKCHANNEL_TIMEOUT_MS
+            m.CloseWith("timeout")
+            return frames
+        end if
+
+        if not m.HasReadableEvent(socketEvents)
+            return frames
+        end if
+
+        received = m.decoder.Pump(m.socket, m.body)
+        if received = 0
+            m.CloseWith("eof")
+            return frames
+        else if received < 0
+            if not m.socket.eOK()
+                m.CloseWith("receive_error")
+            end if
+            return frames
+        end if
+
+        m.timer.Mark()
+
+        result = LoungeFraming.Extract(m.body, m.bodyCursor)
+        m.bodyCursor = result.nextPos
+        for each frame in result.frames
+            frames.Push(frame)
+        end for
+        m.CompactBody()
+
+        if m.decoder.IsError()
+            m.statusCode = m.decoder.statusCode
+            if m.decoder.errorReason <> HttpDecoderError.None
+                m.CloseWith(m.decoder.errorReason)
+            else
+                m.CloseWith("http_" + StrI(m.statusCode).Trim())
+            end if
+        else if m.decoder.IsDone()
+            m.CloseWith("complete")
+        end if
+
+        return frames
+    end function
+
+    function Close() as void
+        m.CloseWith("closed")
+    end function
+
+    private function HasReadableEvent(socketEvents as object) as boolean
+        id = m.socket.GetID()
+        for each event in socketEvents
+            if event.GetSocketID() = id
+                return true
+            end if
+        end for
+        return false
+    end function
+
+    private function CloseWith(reason as string) as void
+        if m.socket <> invalid
+            m.socket.NotifyReadable(false)
+            m.socket.Close()
+            m.socket = invalid
+        end if
+        if m.closeReason = ""
+            m.closeReason = reason
+        end if
+    end function
+
+    private function CompactBody() as void
+        if m.bodyCursor = 0
+            return
+        end if
+        if m.bodyCursor >= m.body.Count()
+            m.body.Clear()
+        else if m.bodyCursor >= LOUNGE_BACKCHANNEL_BODY_COMPACT
+            m.body = LoungeBytes.Tail(m.body, m.bodyCursor)
+        else
+            return
+        end if
+        m.bodyCursor = 0
+    end function
+
+end class

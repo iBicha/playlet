@@ -73,6 +73,7 @@ function LoungeServiceLoop() as void
 
     m.top.shouldQuit = false
     isOpen = false
+    reconnectAttempts = 0
     outgoingLoungeMessages = []
     portMessages = []
     socketMessages = []
@@ -119,36 +120,48 @@ function LoungeServiceLoop() as void
         outgoingLoungeMessagesResults = api.ProcessPendingOutgoingMessages()
 
         if not isOpen
-            sleep(3000)
+            closeInfo = api.GetCloseInfo()
+            needsRebind = closeInfo.statusCode = 410 or closeInfo.statusCode = 400
+            needsTokenRefresh = closeInfo.statusCode = 401
 
-            unknownSid = false
-            ' TODO:P2 move this check somewhere else
-            if (api.poller.status_code = 410) or (api.poller.status_code = 400 and ValidString(api.poller.status_text) = "Unknown SID")
-                api.poller.status_code = 0
-                unknownSid = true
+            for each result in outgoingLoungeMessagesResults
+                if result.status = 410 or (result.status = 400 and result.error.InStr("Unknown SID") <> -1)
+                    needsRebind = true
+                else if result.status = 401 and result.error.InStr("Expired lounge id token") <> -1
+                    needsTokenRefresh = true
+                end if
+            end for
+
+            LogDebug("Backchannel closed:", closeInfo.reason)
+            if IsActionableCloseFailure(closeInfo.reason, needsRebind, needsTokenRefresh)
+                LogTelemetryEvent({
+                    level: "warning"
+                    message: "Lounge backchannel failure: " + closeInfo.reason
+                    fingerprint: "lounge-backchannel-" + closeInfo.reason
+                })
             end if
 
-            if not unknownSid
-                for each result in outgoingLoungeMessagesResults
-                    if result.status = 410 or (result.status = 400 and result.error.InStr("Unknown SID") <> -1)
-                        unknownSid = true
-                        exit for
-                    end if
-                end for
+            sleep(ComputeReconnectBackoffMs(reconnectAttempts))
+            reconnectAttempts += 1
+
+            if needsTokenRefresh
+                LogWarnNoTelemetry("Lounge token expired, refreshing")
+                api.RefreshToken()
+                needsRebind = true
             end if
 
-            if unknownSid
-                ' We lost the session for some reason, so we need to rejoin the lounge
-                LogWarnNoTelemetry("Lost session, rejoining")
+            if needsRebind
+                LogWarnNoTelemetry("Rejoining lounge session")
                 if not api.GetSessionData()
                     Shutdown("Failed to rejoin session data")
                     return
                 end if
-
                 api.SaveCurrentLoungeData()
             end if
 
             api.FetchCommandsRpc(messagePort)
+        else
+            reconnectAttempts = 0
         end if
     end while
 
@@ -159,4 +172,27 @@ function Shutdown(reason as string)
     LogInfo("Shutting down:", reason)
     m.top.unobserveField("outgoingMessages")
     m.top.isRunning = false
+end function
+
+' Full jitter (random in [0, window)) avoids a fleet-wide thundering-herd reconnect.
+function ComputeReconnectBackoffMs(attempts as integer) as integer
+    capped = attempts
+    if capped > 6
+        capped = 6
+    end if
+    windowMs = 1000 * (2 ^ capped)
+    if windowMs > 30000
+        windowMs = 30000
+    end if
+    return 500 + Int(Rnd(0) * windowMs)
+end function
+
+function IsActionableCloseFailure(reason as string, needsRebind as boolean, needsTokenRefresh as boolean) as boolean
+    if needsRebind or needsTokenRefresh
+        return false
+    end if
+    if reason = "complete" or reason = "eof" or reason = "closed" or reason = "timeout" or reason = "disconnected" or reason = ""
+        return false
+    end if
+    return true
 end function

@@ -1,0 +1,43 @@
+import "pkg:/components/Services/LoungeService/LoungeBytes.bs"
+
+namespace LoungeFraming
+
+    ' Frame = `<byteLength>\n<json>`, the length counted in BYTES. An incomplete trailing frame
+    ' is left unconsumed (nextPos marks its start).
+    function Extract(body as object, startPos as integer) as object
+        frames = []
+        cursor = startPos
+        count = body.Count()
+
+        while true
+            while cursor < count and (body[cursor] = 13 or body[cursor] = 10)
+                cursor += 1
+            end while
+            if cursor >= count
+                exit while
+            end if
+
+            lf = LoungeBytes.IndexOfByte(body, cursor, 10)
+            if lf = -1
+                exit while
+            end if
+
+            frameLength = Int(Val(LoungeBytes.RangeToString(body, cursor, lf).Trim(), 10))
+            if frameLength <= 0
+                cursor = lf + 1
+                continue while
+            end if
+
+            dataStart = lf + 1
+            if count - dataStart < frameLength
+                exit while
+            end if
+
+            frames.Push(LoungeBytes.RangeToString(body, dataStart, dataStart + frameLength))
+            cursor = dataStart + frameLength
+        end while
+
+        return { frames: frames, nextPos: cursor }
+    end function
+
+end namespace

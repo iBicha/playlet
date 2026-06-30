@@ -1,7 +1,8 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
-import "pkg:/components/Services/LoungeService/LongPoller.bs"
+import "pkg:/components/Services/LoungeService/LoungeBackchannel.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
 import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 import "pkg:/components/Services/LoungeService/LoungeVideoQueue.bs"
 import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
@@ -36,7 +37,7 @@ class LoungeApi
 
     private ofs
     private lastProcessedCommandIndex = -1
-    private poller
+    private backchannel
     private outgoingMessagesRequests
 
     function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
@@ -50,7 +51,7 @@ class LoungeApi
         m.deviceName = deviceName
         m.screenName = deviceName
         m.ofs = 0
-        m.poller = invalid
+        m.backchannel = invalid
         m.outgoingMessagesRequests = {}
         m.devices = {}
 
@@ -211,19 +212,30 @@ class LoungeApi
             return false
         end if
 
-        text = response.Text()
-        ' First line should be a number, which is the length of the JSON payload
-        text = text.Mid(text.instr(`\n`) + 1)
+        body = CreateObject("roByteArray")
+        body.FromAsciiString(response.Text())
 
+        ' A new session restarts command indices from 0; clear the high-water mark so its commands
+        ' aren't skipped as duplicates.
+        m.lastProcessedCommandIndex = -1
         messagesToSend = []
-        commands = StringUtils.ParseJsonSafe(text)
-        m.ProcessCommands(commands, messagesToSend)
+        result = LoungeFraming.Extract(body, 0)
+        for each frame in result.frames
+            m.ProcessFrame(frame, messagesToSend)
+        end for
+        if StringUtils.IsNullOrEmpty(m.sessionId) or StringUtils.IsNullOrEmpty(m.gSessionId)
+            LogTelemetryEvent({
+                level: "error"
+                message: "Lounge bind succeeded but yielded no session id"
+                fingerprint: "lounge-bind-no-sid"
+            })
+        end if
         m.SendMessages(messagesToSend)
         return true
     end function
 
     function FetchCommandsRpc(messagePort as object) as void
-        ' Note we're not using https, not supported by LongPoller
+        ' Plain HTTP: LoungeBackchannel streams this response over a raw socket, which has no TLS
         baseUrl = "http://www.youtube.com/api/lounge/bc/bind"
         queryParams = {
             "device": "LOUNGE_SCREEN"
@@ -247,63 +259,48 @@ class LoungeApi
 
         url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
 
-        if m.poller = invalid
-            m.poller = new LongPoller()
+        if m.backchannel = invalid
+            m.backchannel = new LoungeBackchannel()
         end if
 
-        m.poller.SendRequest(url, messagePort)
+        m.backchannel.Open(url, messagePort)
     end function
 
     function Poll(socketMessages as object, messagesToSend as object) as boolean
-        chunks = m.poller.Poll(socketMessages)
-        if IsArray(chunks)
-            for each chunk in chunks
-                m.ProcessChunk(chunk, messagesToSend)
-            end for
-        end if
+        frames = m.backchannel.Poll(socketMessages)
+        for each frame in frames
+            m.ProcessFrame(frame, messagesToSend)
+        end for
 
-        return m.poller.IsOpen()
+        return m.backchannel.IsOpen()
     end function
 
-    function ProcessChunk(chunk as string, messagesToSend as object) as void
-        chunk = m.ConsumeNewLines(chunk)
-        newLineIndex = chunk.InStr(`\n`)
-        while newLineIndex > 0
-            payloadSize = chunk.Left(newLineIndex).trim()
-            payloadSize = payloadSize.ToInt()
-            payload = chunk.Mid(newLineIndex + 1, payloadSize)
-            commands = StringUtils.ParseJsonSafe(payload)
-            m.ProcessCommands(commands, messagesToSend)
-            chunk = chunk.Mid(newLineIndex + payloadSize + 1)
-            newLineIndex = chunk.InStr(`\n`)
-        end while
+    function GetCloseInfo() as object
+        if m.backchannel = invalid
+            return { statusCode: 0, reason: "" }
+        end if
+        return { statusCode: m.backchannel.statusCode, reason: m.backchannel.closeReason }
     end function
 
-    function ConsumeNewLines(chunk as string) as string
-        CR = `\r`
-        LF = `\n`
-        startIndex = 0
-        while true
-            char = chunk.Mid(startIndex, 1)
-            if char = CR or char = LF
-                startIndex += 1
-            else
-                exit while
-            end if
-        end while
+    function RefreshToken() as dynamic
+        m.loungeToken = invalid
+        return m.GetToken()
+    end function
 
-        if startIndex > 0
-            return chunk.Mid(startIndex)
+    function ProcessFrame(frame as string, messagesToSend as object) as void
+        commands = StringUtils.ParseJsonSafe(frame)
+        if not IsArray(commands)
+            LogTelemetryEvent({
+                level: "error"
+                message: "Lounge frame did not parse to a command array: " + frame.Left(256)
+                fingerprint: "lounge-unparseable-frame"
+            })
+            return
         end if
-
-        return chunk
+        m.ProcessCommands(commands, messagesToSend)
     end function
 
     function ProcessCommands(commands as object, messagesToSend as object) as void
-        if not IsArray(commands)
-            return
-        end if
-
         for each command in commands
             if not IsArray(command) or command.Count() <> 2
                 continue for
@@ -646,12 +643,19 @@ class LoungeApi
                 if not response.IsSuccess()
                     isGone = response.StatusCode() = 410
                     unknownSid = response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
-                    ' TODO:P2 handle expired lounge id token
-                    ' expiredLoungeIdToken = response.StatusCode() = 401 and response.ErrorMessage().InStr("Expired lounge id token") <> -1
-                    isKnownError = isGone or unknownSid
+                    expiredToken = response.StatusCode() = 401 and response.ErrorMessage().InStr("Expired lounge id token") <> -1
+                    isKnownError = isGone or unknownSid or expiredToken
 
                     if isKnownError
+                        ' NoTelemetry: the body carries a volatile token; logging it would fragment these.
                         LogErrorNoTelemetry(response.ErrorMessage())
+                        if expiredToken
+                            LogTelemetryEvent({
+                                level: "warning"
+                                message: "Lounge id token expired"
+                                fingerprint: "lounge-expired-token"
+                            })
+                        end if
                     else
                         LogError(response.ErrorMessage())
                     end if

@@ -1,0 +1,153 @@
+import "pkg:/components/Services/LoungeService/HttpChunkedDecoder.bs"
+
+namespace Tests
+
+    @suite
+    class HttpChunkedDecoderTests extends Rooibos.BaseTestSuite
+
+        @describe("HttpChunkedDecoder.Pump")
+
+        @it("decodes a single-chunk 200 response and reaches Done")
+        function singleChunk()
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n`)
+            m.assertEqual(r.body, "hello")
+            m.assertEqual(r.decoder.statusCode, 200)
+            m.assertTrue(r.decoder.IsDone())
+            m.assertFalse(r.decoder.IsError())
+        end function
+
+        @it("concatenates multiple chunks into one body")
+        function multipleChunks()
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n`)
+            m.assertEqual(r.body, "hello world")
+            m.assertTrue(r.decoder.IsDone())
+        end function
+
+        ' A chunk boundary need not align with a socket read: the same response delivered one byte
+        ' per read must reassemble identically.
+        @it("reassembles a response delivered one byte per socket read")
+        function bytewise()
+            r = m.Drive(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n`, 1)
+            m.assertEqual(r.body, "hello world")
+            m.assertTrue(r.decoder.IsDone())
+        end function
+
+        @it("parses a hex chunk size greater than 9")
+        function hexChunkSize()
+            payload = "0123456789abcdef" ' 16 bytes -> chunk size "10" in hex
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n10\r\n` + payload + `\r\n0\r\n\r\n`)
+            m.assertEqual(r.body, payload)
+        end function
+
+        @it("ignores chunk-size extensions after a semicolon")
+        function chunkExtensions()
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5;foo=bar\r\nhello\r\n0\r\n\r\n`)
+            m.assertEqual(r.body, "hello")
+        end function
+
+        @it("extracts a chunk byte-exactly when the body holds multi-byte UTF-8")
+        function utf8Chunk()
+            ' "café" is 4 characters but 5 UTF-8 bytes; the chunk size counts bytes.
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\ncafé\r\n0\r\n\r\n`)
+            m.assertEqual(r.body, "café")
+            m.assertTrue(r.decoder.IsDone())
+        end function
+
+        @it("flags a non-200 status as an error carrying the code")
+        @params("410 Gone", 410)
+        @params("400 Bad Request", 400)
+        @params("401 Unauthorized", 401)
+        function non200(statusLine as string, expectedCode as integer)
+            r = m.DecodeWhole(`HTTP/1.1 ` + statusLine + `\r\n\r\n`)
+            m.assertTrue(r.decoder.IsError())
+            m.assertFalse(r.decoder.IsDone())
+            m.assertEqual(r.decoder.statusCode, expectedCode)
+            m.assertEqual(r.decoder.errorReason, "", "an HTTP status error is fingerprinted by code, not a slug")
+        end function
+
+        @it("flags a 200 response that is not chunked as an error rather than crashing")
+        function nonChunked()
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello`)
+            m.assertTrue(r.decoder.IsError())
+            m.assertEqual(r.decoder.errorReason, "unsupported_encoding")
+        end function
+
+        @it("flags a malformed status line with a stable error reason")
+        function malformedStatus()
+            r = m.DecodeWhole(`HELLO not http\r\n\r\n`)
+            m.assertTrue(r.decoder.IsError())
+            m.assertEqual(r.decoder.errorReason, "malformed_status")
+        end function
+
+        @it("waits for more bytes when the status line is incomplete")
+        function partialStatus()
+            r = m.Drive("HTTP/1.1 20", 0)
+            m.assertFalse(r.decoder.IsError())
+            m.assertFalse(r.decoder.IsDone())
+            m.assertEqual(r.body, "")
+        end function
+
+        @it("errors on a chunk size that overflows a 32-bit int")
+        function chunkOverflow()
+            r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nFFFFFFFF\r\nx`)
+            m.assertTrue(r.decoder.IsError())
+            m.assertEqual(r.decoder.errorReason, "chunk_overflow")
+        end function
+
+        function DecodeWhole(response as string) as object
+            return m.Drive(response, 0)
+        end function
+
+        function Drive(response as string, readSize as integer) as object
+            decoder = new HttpChunkedDecoder()
+            socket = new LoungeMockSocket(m.Bytes(response), readSize)
+            out = CreateObject("roByteArray")
+            while socket.GetCountRcvBuf() > 0 and not decoder.IsDone() and not decoder.IsError()
+                decoder.Pump(socket, out)
+            end while
+            return { decoder: decoder, body: out.ToAsciiString() }
+        end function
+
+        function Bytes(text as string) as object
+            bytes = CreateObject("roByteArray")
+            bytes.FromAsciiString(text)
+            return bytes
+        end function
+
+    end class
+
+    ' Feeds `bytes` to the decoder, at most `readSize` per Receive (0 = all at once), so a test
+    ' can drive fragmented reads.
+    class LoungeMockSocket
+        private data
+        private readPos = 0
+        private readSize = 0
+
+        function new(bytes as object, readSize as integer)
+            m.data = bytes
+            m.readSize = readSize
+        end function
+
+        function GetCountRcvBuf() as integer
+            remaining = m.data.Count() - m.readPos
+            if remaining <= 0
+                return 0
+            end if
+            if m.readSize > 0 and m.readSize < remaining
+                return m.readSize
+            end if
+            return remaining
+        end function
+
+        function Receive(ba as object, index as integer, length as integer) as integer
+            count = 0
+            while count < length and m.readPos < m.data.Count()
+                ba[index + count] = m.data[m.readPos]
+                count += 1
+                m.readPos += 1
+            end while
+            return count
+        end function
+    end class
+
+end namespace
