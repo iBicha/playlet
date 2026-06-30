@@ -737,7 +737,7 @@ function OnVideoState(event as object) as void
         ' reaching "playing" means any in-flight play-through seek has landed. Clear the settling flag before
         ' the freeze so a transport that deferred its pause now freezes this settled-playing video.
         m.transport.MarkSeekSettled()
-        EnforceTransportFreeze()
+        EnforceTransportFreeze("OnVideoState")
         ' a keep-playing seek issued while paused has landed (the device auto-resumed): restore the pause.
         if m.repauseAfterSeek
             m.repauseAfterSeek = false
@@ -774,15 +774,23 @@ end function
 ' visible over the now-paused video. Called from OnVideoState (the change edge) and OnPosition (the net —
 ' OnPosition fires only while playing, so a transport-under-playing always trips it even with no state-change
 ' event). Re-pausing yields state=paused -> OnPosition stops -> no loop.
-function EnforceTransportFreeze() as void
+function EnforceTransportFreeze(source as string) as void
     inTransport = (m.transport.transportMode <> TransportController.Mode.Idle)
     action = PlayerCoordinatorLogic.TransportSafetyAction(m.top.state, inTransport, m.transport.isLive, Int(m.top.position * 1000), m.transport.cursorMs, m.transport.durationMs)
     if action = PlayerCoordinatorLogic.SafetyAction.Freeze
-        LogError("INV-D1 heal: re-pause; playing under transportMode=", m.transport.transportMode)
         m.top.control = VideoControl.Pause
         ' the play-through seek that opened this transport has landed, so clear autoplayAfterSeek; a later
         ' seek-complete must not silently un-freeze the video behind the transport.
         m.top.autoplayAfterSeek = false
+        ' Position detail rides in the message; the fingerprint pins grouping (heal + mode + trigger) so it
+        ' stays a handful of issues instead of fragmenting on the per-event posMs/cursorMs values.
+        healInfo = `INV-D1 heal: re-pause under active transport. src=${source} mode=${m.transport.transportMode} isLive=${m.transport.isLive} state=${m.top.state} posMs=${Int(m.top.position * 1000)} cursorMs=${m.transport.cursorMs} edgeMs=${m.transport.edgeMs}`
+        LogErrorNoTelemetry(healInfo)
+        LogTelemetryEvent({
+            level: "error"
+            message: healInfo
+            fingerprint: ["INV-D1 heal", m.transport.transportMode, source]
+        })
     else if action = PlayerCoordinatorLogic.SafetyAction.FinishEof
         ' content played to the end under a transport sitting at the end: finishing is what "at the end"
         ' means, and the alternative (re-pausing at EOF) loops against the device forever.
@@ -835,7 +843,7 @@ function OnPosition(event as object) as void
     posMs = Int(event.getData() * 1000)
     m.transport.OnPosition(posMs)
     ApplyTransport()
-    EnforceTransportFreeze() ' OnPosition only fires while playing, so it catches a transport auto-resumed with no state-change edge.
+    EnforceTransportFreeze("OnPosition") ' OnPosition only fires while playing, so it catches a transport auto-resumed with no state-change edge.
 
     ' EnforceTransportFreeze can finish playback (FinishEof at the end of content under a transport), which
     ' synchronously closes the player and drops m.sponsorblock. A closed player must run no more of the tick.
