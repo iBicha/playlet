@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Trending back (Gaming and Live) for Playlet backend and Invidious - to avoid a blank home screen when not logged in.
+
 ### Fixed
 
 - Retry condition issue in http client

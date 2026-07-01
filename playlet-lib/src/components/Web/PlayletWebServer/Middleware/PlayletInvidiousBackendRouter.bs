@@ -237,6 +237,48 @@ namespace Http
             return true
         end function
 
+        @get("/playlet-invidious-backend/api/v1/trending")
+        function GetTrending(context as object) as boolean
+            request = context.request
+            response = context.response
+
+            raw = request.query.raw <> invalid
+
+            options = {
+                "disableShorts": m.preferences["content_feed.disable_shorts"]
+                raw: raw
+                type: request.query.type
+            }
+
+            result = InnertubeService.GetTrending(options)
+            if raw
+                response.Json(result)
+                return true
+            end if
+
+            if result.error <> invalid
+                response.Json(result)
+                response.http_code = 500
+                return true
+            end if
+
+            if not IsArray(result.feeds) or result.feeds.Count() = 0
+                response.Json({
+                    "error": "Failed to get trending feed"
+                })
+                response.http_code = 500
+                return true
+            end if
+
+            response.Json(ValidArray(result.feeds[0].items))
+
+            if result.DoesExist("cache-control")
+                response.headers["cache-control"] = result["cache-control"]
+            end if
+
+            return true
+        end function
+
         @get("/playlet-invidious-backend/api/v1/popular")
         function GetPopular(context as object) as boolean
             request = context.request

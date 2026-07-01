@@ -309,6 +309,14 @@
         <translation>Probar Instancia</translation>
     </message>
     <message>
+        <source>Trending - Live</source>
+        <translation>Tendencias - En vivo</translation>
+    </message>
+    <message>
+        <source>Trending - Gaming</source>
+        <translation>Tendencias - Videojuegos</translation>
+    </message>
+    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

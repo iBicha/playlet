@@ -81,6 +81,14 @@
         <translation>Ver el historial</translation>
     </message>
     <message>
+        <source>Trending - Live</source>
+        <translation>Tendencias - En directo</translation>
+    </message>
+    <message>
+        <source>Trending - Gaming</source>
+        <translation>Tendencias - Juegos</translation>
+    </message>
+    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

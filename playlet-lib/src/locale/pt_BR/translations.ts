@@ -141,6 +141,14 @@
         <translation>Histórico de assistidos</translation>
     </message>
     <message>
+        <source>Trending - Live</source>
+        <translation>Em alta - Ao vivo</translation>
+    </message>
+    <message>
+        <source>Trending - Gaming</source>
+        <translation>Em alta - Jogos</translation>
+    </message>
+    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>

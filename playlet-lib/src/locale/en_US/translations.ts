@@ -89,6 +89,14 @@
         <translation>Watch history</translation>
     </message>
     <message>
+        <source>Trending - Live</source>
+        <translation>Trending - Live</translation>
+    </message>
+    <message>
+        <source>Trending - Gaming</source>
+        <translation>Trending - Gaming</translation>
+    </message>
+    <message>
         <source>Popular</source>
         <translation>Popular</translation>
     </message>
