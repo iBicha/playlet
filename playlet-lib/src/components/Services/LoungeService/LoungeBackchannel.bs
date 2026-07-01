@@ -7,6 +7,7 @@ import "pkg:/source/utils/UrlUtils.bs"
 ' Server sends periodic noop keepalives, so no data for this long means a dead connection.
 const LOUNGE_BACKCHANNEL_TIMEOUT_MS = 60000
 const LOUNGE_BACKCHANNEL_BODY_COMPACT = 32768
+const LOUNGE_BACKCHANNEL_MAX_REDIRECTS = 10
 
 ' Raw socket on plain HTTP: roUrlTransfer can't read a streaming body incrementally, and
 ' roStreamSocket has no TLS.
@@ -14,6 +15,7 @@ class LoungeBackchannel
 
     public statusCode = 0
     public closeReason = ""
+    public redirectTarget = ""
 
     private socket
     private decoder
@@ -21,12 +23,28 @@ class LoungeBackchannel
     private bodyCursor = 0
     private timer
     private url = ""
+    private messagePort
+    private redirectCount = 0
 
     function new()
         m.timer = CreateObject("roTimespan")
     end function
 
     function Open(url as string, messagePort as object) as boolean
+        m.messagePort = messagePort
+        m.redirectCount = 0
+        m.redirectTarget = ""
+        return m.Connect(url)
+    end function
+
+    private function Connect(url as string) as boolean
+        ' A redirect or reconnect reuses Connect; close the previous socket so it doesn't leak.
+        if m.socket <> invalid
+            m.socket.NotifyReadable(false)
+            m.socket.Close()
+            m.socket = invalid
+        end if
+
         m.url = url
         m.statusCode = 0
         m.closeReason = ""
@@ -62,7 +80,7 @@ class LoungeBackchannel
         socket.SendStr(request)
 
         socket.NotifyReadable(true)
-        socket.SetMessagePort(messagePort)
+        socket.SetMessagePort(m.messagePort)
 
         m.socket = socket
         m.decoder = new HttpChunkedDecoder()
@@ -110,6 +128,10 @@ class LoungeBackchannel
         end if
 
         m.timer.Mark()
+
+        if m.decoder.IsRedirect()
+            return m.FollowRedirect()
+        end if
 
         result = LoungeFraming.Extract(m.body, m.bodyCursor)
         m.bodyCursor = result.nextPos
@@ -171,4 +193,50 @@ class LoungeBackchannel
         m.bodyCursor = 0
     end function
 
+    private function FollowRedirect() as object
+        frames = []
+
+        location = m.decoder.Location()
+        if not IsString(location) or location = ""
+            m.CloseWith("redirect_no_location")
+            return frames
+        end if
+
+        nextUrl = LoungeRedirect.Resolve(m.url, location)
+        m.redirectTarget = nextUrl
+
+        m.redirectCount += 1
+        if m.redirectCount > LOUNGE_BACKCHANNEL_MAX_REDIRECTS
+            m.CloseWith("redirect_limit")
+            return frames
+        end if
+
+        LogInfo("Lounge backchannel following redirect to", m.redirectTarget)
+        m.Connect(nextUrl)
+        return frames
+    end function
+
 end class
+
+namespace LoungeRedirect
+
+    ' Force the target to plain HTTP - a raw socket has no TLS, so an https redirect is followed over http.
+    function Resolve(currentUrl as string, location as string) as string
+        if location.StartsWith("http://") or location.StartsWith("https://")
+            parts = UrlUtils.ParseUrl(location)
+        else
+            parts = UrlUtils.ParseUrl(currentUrl)
+            if not location.StartsWith("/")
+                location = "/" + location
+            end if
+            parts.path = location
+        end if
+
+        parts.protocol = "http"
+        if parts.port = "80" or parts.port = "443"
+            parts.port = invalid
+        end if
+        return UrlUtils.BuildUrlFromParts(parts)
+    end function
+
+end namespace

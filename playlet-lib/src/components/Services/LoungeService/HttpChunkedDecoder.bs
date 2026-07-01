@@ -6,6 +6,7 @@ enum HttpDecoderState
     ChunkSize
     ChunkData
     Done
+    Redirect
     Error
 end enum
 
@@ -52,6 +53,14 @@ class HttpChunkedDecoder
 
     function IsError() as boolean
         return m.state = HttpDecoderState.Error
+    end function
+
+    function IsRedirect() as boolean
+        return m.state = HttpDecoderState.Redirect
+    end function
+
+    function Location() as dynamic
+        return m.headers["location"]
     end function
 
     private function ReceiveFrom(socket as object) as integer
@@ -157,6 +166,11 @@ class HttpChunkedDecoder
     end function
 
     private function FinishHead() as boolean
+        if m.IsRedirectStatus(m.statusCode)
+            m.state = HttpDecoderState.Redirect
+            return false
+        end if
+
         if m.statusCode <> 200
             m.state = HttpDecoderState.Error
             return false
@@ -172,6 +186,10 @@ class HttpChunkedDecoder
 
         m.state = HttpDecoderState.ChunkSize
         return true
+    end function
+
+    private function IsRedirectStatus(code as integer) as boolean
+        return code = 301 or code = 302 or code = 303 or code = 307 or code = 308
     end function
 
     private function ParseChunkSize() as boolean

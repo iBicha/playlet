@@ -65,6 +65,29 @@ namespace Tests
             m.assertEqual(r.decoder.errorReason, "", "an HTTP status error is fingerprinted by code, not a slug")
         end function
 
+        @it("surfaces a 3xx as a redirect carrying the Location, not an error")
+        @params("301 Moved Permanently", 301)
+        @params("302 Found", 302)
+        @params("303 See Other", 303)
+        @params("307 Temporary Redirect", 307)
+        @params("308 Permanent Redirect", 308)
+        function redirect(statusLine as string, expectedCode as integer)
+            r = m.DecodeWhole(`HTTP/1.1 ` + statusLine + `\r\nLocation: https://rr4.youtube.com/api/lounge/bc/bind?SID=x\r\n\r\n`)
+            m.assertTrue(r.decoder.IsRedirect())
+            m.assertFalse(r.decoder.IsError())
+            m.assertFalse(r.decoder.IsDone())
+            m.assertEqual(r.decoder.statusCode, expectedCode)
+            m.assertEqual(r.decoder.Location(), "https://rr4.youtube.com/api/lounge/bc/bind?SID=x")
+        end function
+
+        @it("treats an HTTP/1.0 307 as a redirect")
+        function redirectHttp10()
+            r = m.DecodeWhole(`HTTP/1.0 307 Temporary Redirect\r\nLocation: http://portal.example/login\r\n\r\n`)
+            m.assertTrue(r.decoder.IsRedirect())
+            m.assertFalse(r.decoder.IsError())
+            m.assertEqual(r.decoder.Location(), "http://portal.example/login")
+        end function
+
         @it("flags a 200 response that is not chunked as an error rather than crashing")
         function nonChunked()
             r = m.DecodeWhole(`HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello`)
@@ -102,7 +125,7 @@ namespace Tests
             decoder = new HttpChunkedDecoder()
             socket = new LoungeMockSocket(m.Bytes(response), readSize)
             out = CreateObject("roByteArray")
-            while socket.GetCountRcvBuf() > 0 and not decoder.IsDone() and not decoder.IsError()
+            while socket.GetCountRcvBuf() > 0 and not decoder.IsDone() and not decoder.IsError() and not decoder.IsRedirect()
                 decoder.Pump(socket, out)
             end while
             return { decoder: decoder, body: out.ToAsciiString() }

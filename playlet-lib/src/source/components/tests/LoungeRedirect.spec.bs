@@ -1,0 +1,44 @@
+import "pkg:/components/Services/LoungeService/LoungeBackchannel.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeRedirectTests extends Rooibos.BaseTestSuite
+
+        @describe("LoungeRedirect.Resolve")
+
+        @it("downgrades an https target to http, keeping host, path and query")
+        function downgradesHttps()
+            resolved = LoungeRedirect.Resolve("http://www.youtube.com/api/lounge/bc/bind?SID=a", "https://rr4.youtube.com/api/lounge/bc/bind?SID=a&gsessionid=b")
+            m.assertEqual(resolved, "http://rr4.youtube.com/api/lounge/bc/bind?SID=a&gsessionid=b")
+        end function
+
+        @it("keeps an http target as-is")
+        function keepsHttp()
+            resolved = LoungeRedirect.Resolve("http://www.youtube.com/x", "http://other.host/y?z=1")
+            m.assertEqual(resolved, "http://other.host/y?z=1")
+        end function
+
+        @it("drops a default 80 or 443 port")
+        @params("https://host:443/p", "http://host/p")
+        @params("http://host:80/p", "http://host/p")
+        @params("http://host:8080/p", "http://host:8080/p")
+        function dropsDefaultPort(location as string, expected as string)
+            m.assertEqual(LoungeRedirect.Resolve("http://www.youtube.com/x", location), expected)
+        end function
+
+        @it("resolves a root-relative Location against the current host")
+        function relativeLocation()
+            resolved = LoungeRedirect.Resolve("http://www.youtube.com/api/lounge/bc/bind?SID=a", "/api/lounge/bc/bind?SID=a&AID=5")
+            m.assertEqual(resolved, "http://www.youtube.com/api/lounge/bc/bind?SID=a&AID=5")
+        end function
+
+        @it("prefixes a slash onto a bare relative Location")
+        function bareRelativeLocation()
+            resolved = LoungeRedirect.Resolve("http://www.youtube.com/api/lounge/bc/bind", "elsewhere?x=1")
+            m.assertEqual(resolved, "http://www.youtube.com/elsewhere?x=1")
+        end function
+
+    end class
+
+end namespace

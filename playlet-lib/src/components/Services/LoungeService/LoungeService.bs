@@ -134,9 +134,13 @@ function LoungeServiceLoop() as void
 
             LogDebug("Backchannel closed:", closeInfo.reason)
             if IsActionableCloseFailure(closeInfo.reason, needsRebind, needsTokenRefresh)
+                message = "Lounge backchannel failure: " + closeInfo.reason
+                if not StringUtils.IsNullOrEmpty(closeInfo.target)
+                    message += " -> " + closeInfo.target
+                end if
                 LogTelemetryEvent({
                     level: "warning"
-                    message: "Lounge backchannel failure: " + closeInfo.reason
+                    message: message
                     fingerprint: "lounge-backchannel-" + closeInfo.reason
                 })
             end if
