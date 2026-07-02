@@ -17,6 +17,11 @@ import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
+' Per-content ceiling on INV-D1 heal / tail-resolve telemetry: a pathological loop otherwise emits one
+' error per second for as long as it runs. Occurrences keep counting past the cap (each message carries
+' its ordinal) and a capped heal loop's true total rides out in one summary event when the content ends.
+const INV_D1_TELEMETRY_CAP = 3
+
 ' Coordinator for the custom video player. extends Video, enableUI=false.
 '
 ' Owns the focused Video node + key router, the Chrome-group fade, PiP resize, and lifecycle plumbing. All
@@ -59,6 +64,8 @@ function Initialize()
     m.errorDialogNode = invalid
     m.ignoreNextFinished = false ' a retry replay -> swallow the next "finished" edge
     m.videoPlayedSuccessfully = false ' true once the stream has actually played (gates error-retry)
+    m.healCount = 0 ' INV-D1 heals this content (telemetry stops at INV_D1_TELEMETRY_CAP; total goes out in the close summary)
+    m.tailResolveCount = 0 ' live tail resolutions this content (telemetry capped the same way)
 
     m.chromeMode = ChromeMode.Hidden
     m.liveBadgeHoldActive = false ' the "● LIVE" reveal hold is running
@@ -312,7 +319,7 @@ end function
 
 ' Apply a seek (ms). The live "jump to edge" sentinel maps to the live-end seek the OS understands.
 function ApplySeek(seekMs as integer) as void
-    if seekMs >= TransportController.LIVE_EDGE_SEEK_MS
+    if TransportController.IsLiveEdgeSentinelMs(seekMs)
         m.top.seek = 999999
         return
     end if
@@ -776,21 +783,41 @@ end function
 ' event). Re-pausing yields state=paused -> OnPosition stops -> no loop.
 function EnforceTransportFreeze(source as string) as void
     inTransport = (m.transport.transportMode <> TransportController.Mode.Idle)
-    action = PlayerCoordinatorLogic.TransportSafetyAction(m.top.state, inTransport, m.transport.isLive, Int(m.top.position * 1000), m.transport.cursorMs, m.transport.durationMs)
+    action = PlayerCoordinatorLogic.TransportSafetyAction(m.top.state, inTransport, m.transport.isLive, Int(m.top.position * 1000), m.transport.cursorMs, m.transport.durationMs, m.transport.SafetyFloorMs())
     if action = PlayerCoordinatorLogic.SafetyAction.Freeze
         m.top.control = VideoControl.Pause
         ' the play-through seek that opened this transport has landed, so clear autoplayAfterSeek; a later
         ' seek-complete must not silently un-freeze the video behind the transport.
         m.top.autoplayAfterSeek = false
+        m.healCount += 1
         ' Position detail rides in the message; the fingerprint pins grouping (heal + mode + trigger) so it
         ' stays a handful of issues instead of fragmenting on the per-event posMs/cursorMs values.
-        healInfo = `INV-D1 heal: re-pause under active transport. src=${source} mode=${m.transport.transportMode} isLive=${m.transport.isLive} state=${m.top.state} posMs=${Int(m.top.position * 1000)} cursorMs=${m.transport.cursorMs} edgeMs=${m.transport.edgeMs}`
+        ' floorMs=-1 marks an unknown-window live stream — the one shape the tail resolution cannot cover.
+        healInfo = `INV-D1 heal: re-pause under active transport. src=${source} mode=${m.transport.transportMode} isLive=${m.transport.isLive} state=${m.top.state} posMs=${Int(m.top.position * 1000)} cursorMs=${m.transport.cursorMs} edgeMs=${m.transport.edgeMs} floorMs=${m.transport.SafetyFloorMs()} heal=${m.healCount}`
         LogErrorNoTelemetry(healInfo)
-        LogTelemetryEvent({
-            level: "error"
-            message: healInfo
-            fingerprint: ["INV-D1 heal", m.transport.transportMode, source]
-        })
+        if m.healCount <= INV_D1_TELEMETRY_CAP
+            LogTelemetryEvent({
+                level: "error"
+                message: healInfo
+                fingerprint: ["INV-D1 heal", m.transport.transportMode, source]
+            })
+        end if
+    else if action = PlayerCoordinatorLogic.SafetyAction.ResumeLiveTail
+        ' the tail overtook the frozen playhead: resolve forward (ResolveLiveTail), don't heal. Telemetered
+        ' at info level so the field shows the resolution working — resolve>1 on one content means the
+        ' resumed playhead was overtaken AGAIN, i.e. LIVE_TAIL_RESUME_MARGIN_MS is too small.
+        m.tailResolveCount += 1
+        resolveInfo = `INV-D1 tail-resolve: resume forward. src=${source} posMs=${Int(m.top.position * 1000)} cursorMs=${m.transport.cursorMs} floorMs=${m.transport.SafetyFloorMs()} edgeMs=${m.transport.edgeMs} resolve=${m.tailResolveCount}`
+        LogInfo(resolveInfo)
+        if m.tailResolveCount <= INV_D1_TELEMETRY_CAP
+            LogTelemetryEvent({
+                level: "info"
+                message: resolveInfo
+                fingerprint: ["INV-D1 tail-resolve", source]
+            })
+        end if
+        m.transport.ResolveLiveTail()
+        ApplyTransport()
     else if action = PlayerCoordinatorLogic.SafetyAction.FinishEof
         ' content played to the end under a transport sitting at the end: finishing is what "at the end"
         ' means, and the alternative (re-pausing at EOF) loops against the device forever.
@@ -798,6 +825,19 @@ function EnforceTransportFreeze(source as string) as void
         m.transport.ResetTransport()
         ApplyTransport()
         OnPlaybackFinished()
+    end if
+end function
+
+' A heal loop that ran past the telemetry cap still reports its true size: one tally event when the
+' content ends (close or content switch). Loop size is the discriminator between a singleton heal and a
+' fight the player lost for minutes — the capped per-event stream can no longer show it.
+function SendHealSummary() as void
+    if m.healCount > INV_D1_TELEMETRY_CAP
+        LogTelemetryEvent({
+            level: "error"
+            message: `INV-D1 heal: ${m.healCount} heals over one content (${m.healCount - INV_D1_TELEMETRY_CAP} past the telemetry cap)`
+            fingerprint: ["INV-D1 heal suppressed"]
+        })
     end if
 end function
 
@@ -880,7 +920,7 @@ function OnDuration(event as object) as void
     m.transport.OnDuration(durMs) ' the brain ignores this on live (the edge comes from the clock)
     ' a live stream WITHOUT the manifest anchor in its metadata: anchor the clock off each duration report
     ' instead (duration freezes during pause, so each report re-anchors; between reports the clock projects).
-    if m.transport.isLive and m.liveAstSeconds <= 0 and durMs > 0 and durMs < TransportController.LIVE_EDGE_SEEK_MS
+    if m.transport.isLive and m.liveAstSeconds <= 0 and durMs > 0 and not TransportController.IsLiveEdgeSentinelMs(durMs)
         m.liveFallbackEdgeMs = durMs
         m.liveFallbackAtSeconds = NowSeconds()
         PushLiveEdge()
@@ -1120,6 +1160,9 @@ function OnVideoContentJobDone(event as object) as void
     ' fill them in for VOD.
     isLive = content <> invalid and content.Live = true
     m.transport.SetContent(isLive, 2000, false)
+    SendHealSummary() ' the previous content's capped heal tally, if any
+    m.healCount = 0
+    m.tailResolveCount = 0
     ' live floor: how far back the DVR window reaches (0 = unknown -> the brain keeps the [0, edge] clamp).
     ' The generated DASH anchors t=0 to the window start, so floor = edge - window as the session outlives it.
     ' The same window decides rewindability: a buffer-sized window means no live trickplay at all.
@@ -1511,6 +1554,7 @@ function OnClose() as void
     end if
     m.onCloseCalled = true
     m.top.previousPlayer = invalid
+    SendHealSummary()
 
     ' A closed player must not react to anything anymore. The onCloseCalled guards already make the handlers
     ' no-ops; unobserving stops the traffic at the source — late device edges from the async stop, a stray

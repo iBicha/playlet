@@ -101,11 +101,13 @@ namespace Tests
         ' =========================================================================================
         @describe("TransportSafetyAction (total device-seam guard)")
 
-        @it("the guard decision is DEFINED and correct over the FULL axis cross-product (state x transport x live x eof)")
+        @it("the guard decision is DEFINED and correct over the FULL axis cross-product (state x transport x live x eof x floor)")
         function _()
             ' the full Roku Video.state enum — including the ones the old guard ignored (none/paused/stopping/
-            ' stopped) — crossed with the live and at-end axes. Only playing-under-a-transport ever acts, and it
-            ' finishes (instead of freezing) exactly when VOD has both the device AND the cursor at the end.
+            ' stopped) — crossed with the live, at-end and tail-floor axes. Only playing-under-a-transport ever
+            ' acts: it finishes (instead of freezing) exactly when VOD has both the device AND the cursor at the
+            ' end, and resolves forward (instead of freezing) exactly when a live playhead sits under the known
+            ' floor + margin. Floors: -1 = unknown, 0 = known but safely below, 100000 = mid pos overtaken.
             states = ["none", "buffering", "playing", "paused", "finished", "error", "stopping", "stopped"]
             durationMs = 210000
             endMs = 209000 ' within FINISH_EPSILON_MS of the duration
@@ -115,26 +117,30 @@ namespace Tests
                     for each isLive in [false, true]
                         for each posAtEnd in [false, true]
                             for each curAtEnd in [false, true]
-                                if posAtEnd
-                                    posMs = endMs
-                                else
-                                    posMs = midMs
-                                end if
-                                if curAtEnd
-                                    curMs = endMs
-                                else
-                                    curMs = midMs
-                                end if
-                                expected = PlayerCoordinatorLogic.SafetyAction.None
-                                if inT and s = "playing"
-                                    if not isLive and posAtEnd and curAtEnd
-                                        expected = PlayerCoordinatorLogic.SafetyAction.FinishEof
+                                for each floorMs in [-1, 0, 100000]
+                                    if posAtEnd
+                                        posMs = endMs
                                     else
-                                        expected = PlayerCoordinatorLogic.SafetyAction.Freeze
+                                        posMs = midMs
                                     end if
-                                end if
-                                got = PlayerCoordinatorLogic.TransportSafetyAction(s, inT, isLive, posMs, curMs, durationMs)
-                                m.assertEqual(got, expected, "state=" + s + " inT=" + inT.ToStr() + " live=" + isLive.ToStr() + " posEnd=" + posAtEnd.ToStr() + " curEnd=" + curAtEnd.ToStr())
+                                    if curAtEnd
+                                        curMs = endMs
+                                    else
+                                        curMs = midMs
+                                    end if
+                                    expected = PlayerCoordinatorLogic.SafetyAction.None
+                                    if inT and s = "playing"
+                                        if isLive and floorMs >= 0 and posMs < floorMs + TransportController.LIVE_TAIL_RESUME_MARGIN_MS
+                                            expected = PlayerCoordinatorLogic.SafetyAction.ResumeLiveTail
+                                        else if not isLive and posAtEnd and curAtEnd
+                                            expected = PlayerCoordinatorLogic.SafetyAction.FinishEof
+                                        else
+                                            expected = PlayerCoordinatorLogic.SafetyAction.Freeze
+                                        end if
+                                    end if
+                                    got = PlayerCoordinatorLogic.TransportSafetyAction(s, inT, isLive, posMs, curMs, durationMs, floorMs)
+                                    m.assertEqual(got, expected, "state=" + s + " inT=" + inT.ToStr() + " live=" + isLive.ToStr() + " posEnd=" + posAtEnd.ToStr() + " curEnd=" + curAtEnd.ToStr() + " floor=" + floorMs.ToStr())
+                                end for
                             end for
                         end for
                     end for
@@ -145,22 +151,37 @@ namespace Tests
         @it("an unmodeled / unexpected device state under a transport is a safe no-op, never an undefined freeze")
         function _()
             ' the wedge's failure mode: a state the guard did not enumerate must NOT trigger a spurious freeze.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("buffering", true, false, 60000, 60000, 210000), PlayerCoordinatorLogic.SafetyAction.None)
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("some_future_state", true, false, 60000, 60000, 210000), PlayerCoordinatorLogic.SafetyAction.None)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("buffering", true, false, 60000, 60000, 210000, -1), PlayerCoordinatorLogic.SafetyAction.None)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("some_future_state", true, false, 60000, 60000, 210000, -1), PlayerCoordinatorLogic.SafetyAction.None)
         end function
 
         @it("VOD playing at the end under a transport whose cursor is ALSO at the end -> FinishEof, not Freeze")
         function _()
             ' both the device and the cursor within the 2s epsilon of duration -> finish.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.FinishEof)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 210000, -1), PlayerCoordinatorLogic.SafetyAction.FinishEof)
             ' cursor rewound away from the end -> the user is heading backwards: keep the freeze.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 100000, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 100000, 210000, -1), PlayerCoordinatorLogic.SafetyAction.Freeze)
             ' device not at the end -> freeze as usual.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 60000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
-            ' LIVE has no EOF: always freeze.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 209000, 209500, 210000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 60000, 209500, 210000, -1), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' LIVE has no EOF: always freeze (above the tail).
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 209000, 209500, 210000, -1), PlayerCoordinatorLogic.SafetyAction.Freeze)
             ' unknown duration -> no EOF concept -> freeze.
-            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 0), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 209000, 209500, 0, -1), PlayerCoordinatorLogic.SafetyAction.Freeze)
+        end function
+
+        @it("live: the sliding tail overtaking the frozen playhead -> ResumeLiveTail, not a doomed freeze")
+        function _()
+            ' frozen 10s above a known floor -> inside the resume margin: resolve forward.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 446000, 441000, 0, 436000), PlayerCoordinatorLogic.SafetyAction.ResumeLiveTail)
+            ' exactly AT floor + margin -> still holdable: keep the freeze.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 436000 + TransportController.LIVE_TAIL_RESUME_MARGIN_MS, 441000, 0, 436000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' floor unknown (-1) -> no floor knowledge, plain freeze even at a tiny position.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, true, 5000, 5000, 0, -1), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' VOD ignores the floor argument entirely.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", true, false, 60000, 60000, 210000, 436000), PlayerCoordinatorLogic.SafetyAction.Freeze)
+            ' not playing / not in a transport -> None regardless of the overtaken floor.
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("paused", true, true, 446000, 441000, 0, 436000), PlayerCoordinatorLogic.SafetyAction.None)
+            m.assertEqual(PlayerCoordinatorLogic.TransportSafetyAction("playing", false, true, 446000, 441000, 0, 436000), PlayerCoordinatorLogic.SafetyAction.None)
         end function
 
         ' =========================================================================================

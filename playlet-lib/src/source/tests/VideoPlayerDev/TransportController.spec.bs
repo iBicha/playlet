@@ -1145,6 +1145,109 @@ namespace Tests
         end function
 
         ' =========================================================================================
+        ' LIVE TAIL RESOLUTION — the sliding floor overtaking the frozen playhead cannot be fought
+        ' (the device force-resumes such a pause every manifest refresh): the transport resolves
+        ' forward with a normal commit from a cursor floored above the tail.
+        ' =========================================================================================
+        @describe("live tail resolution")
+
+        ' the doom setup: playing deep in the window, frozen by a rewind step, then the edge (and with
+        ' it the floor) slides toward the frozen playhead until it sits inside the trigger margin.
+        ' edge 400->405s, window 300s -> floor 100->105s; frozen playhead at 120s.
+        function LiveTailOvertaken() as object
+            t = new TransportController.Controller()
+            t.SetContent(true, 0, false)
+            t.SetLiveDvrWindow(300000)
+            t.OnLiveEdge(400000)
+            t.OnPosition(400000)
+            t.OnPosition(400000) ' confirmed latency floor
+            t.OnReady()
+            t.OnPosition(120000) ' playing deep in the window (after a deep-rewind commit)
+            t.HandleCommand(TransportController.Command.Left) ' freeze; cursor steps to 115000
+            t.TakeVideoIntent() ' drain the freeze pause
+            t.OnLiveEdge(405000) ' floor 105000: the frozen 120000 playhead is inside the trigger margin
+            return t
+        end function
+
+        @it("SafetyFloorMs is -1 on VOD and on an unknown live window; the known floor otherwise")
+        function _()
+            m.assertEqual(m.t.SafetyFloorMs(), -1) ' VOD
+            m.assertEqual(m.Live().SafetyFloorMs(), -1) ' live, window unknown
+            t = m.LiveTailOvertaken()
+            m.assertEqual(t.SafetyFloorMs(), 105000) ' rides the edge (405000 - 300000)
+        end function
+
+        @it("ResolveLiveTail commits forward from the safe floor when the cursor sits at the tail")
+        function _()
+            t = m.LiveTailOvertaken()
+            m.assertEqual(t.cursorMs, 115000)
+            t.ResolveLiveTail()
+            m.assertEqual(t.transportMode, TransportController.Mode.Idle)
+            intent = t.TakeVideoIntent()
+            m.assertEqual(intent.control, TransportController.Control.Resume)
+            m.assertTrue(intent.hasSeek)
+            m.assertEqual(intent.seekMs, 165000) ' floor 105000 + 2x margin (a full margin above the trigger)
+            m.assertEqual(t.cursorMs, 165000)
+            m.assertEqual(t.commitSeq, 1)
+            m.assertEqual(t.liveOffsetMs, 240000) ' the bar keeps showing how far behind the resume is
+            m.assertFalse(t.atLiveEdge)
+        end function
+
+        @it("ResolveLiveTail keeps a cursor the user had already moved above the safe floor")
+        function _()
+            t = m.LiveTailOvertaken()
+            for i = 1 to 11 ' step the cursor up from 115000: +5s per press to 170000
+                t.HandleCommand(TransportController.Command.Right)
+            end for
+            m.assertEqual(t.cursorMs, 170000)
+            t.ResolveLiveTail()
+            m.assertEqual(t.TakeVideoIntent().seekMs, 170000) ' the user's target wins; only the floor is raised
+        end function
+
+        @it("ResolveLiveTail outside LiveDvr is a no-op (idle, and VOD transports)")
+        function _()
+            t = m.LiveWindowed()
+            t.ResolveLiveTail() ' idle
+            m.assertEqual(t.transportMode, TransportController.Mode.Idle)
+            m.assertInvalid(t.TakeVideoIntent())
+            m.assertEqual(t.cursorMs, 300000)
+            ' a VOD scrub is not a live tail
+            m.t.HandleCommand(TransportController.Command.Left)
+            m.t.TakeVideoIntent() ' drain the freeze
+            m.t.ResolveLiveTail()
+            m.assertEqual(m.t.transportMode, TransportController.Mode.Scrub)
+            m.assertInvalid(m.t.TakeVideoIntent())
+        end function
+
+        ' =========================================================================================
+        ' LIVE-EDGE SENTINEL ECHO — the 999999s jump-to-edge seek echoes back through the
+        ' single-precision position field as 999998976ms (24ms UNDER the constant): both ingest
+        ' guards must drop it, or it poisons positionMs and (via the max rule) edgeMs.
+        ' =========================================================================================
+        @describe("live edge sentinel echo")
+
+        @it("OnPosition drops the float32 sentinel echo — position, edge and cursor stay clean")
+        function _()
+            t = m.LiveWindowed()
+            t.OnPosition(999998976) ' Int(float32(999999.0s) * 1000): the echo as the device reports it
+            t.OnPosition(999999000) ' the exact constant
+            m.assertEqual(t.positionMs, 300000)
+            m.assertEqual(t.edgeMs, 300000)
+            m.assertEqual(t.cursorMs, 300000)
+            t.OnPosition(295000) ' a real sample still lands
+            m.assertEqual(t.positionMs, 295000)
+        end function
+
+        @it("OnLiveEdge drops the float32 sentinel echo")
+        function _()
+            t = m.LiveWindowed()
+            t.OnLiveEdge(999998976)
+            m.assertEqual(t.edgeMs, 300000)
+            t.OnLiveEdge(305000) ' the real heartbeat still lands
+            m.assertEqual(t.edgeMs, 305000)
+        end function
+
+        ' =========================================================================================
         ' LIVE REWINDABILITY — a buffer-sized DVR window (the manifest's timeShiftBufferDepth) is not
         ' a rewind feature: the brain takes no live transport input and the bar drops its label.
         ' =========================================================================================

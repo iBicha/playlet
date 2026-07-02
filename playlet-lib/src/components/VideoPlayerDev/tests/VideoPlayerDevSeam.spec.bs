@@ -86,6 +86,58 @@ namespace Tests
             end for
         end function
 
+        ' The one live case where the re-freeze must NOT happen: the sliding DVR tail overtook the frozen
+        ' playhead, and the device force-resumes such a pause on every manifest refresh (verified on device) —
+        ' re-pausing loops 1/s forever. The coordinator resolves forward instead: a commit from a cursor
+        ' floored a margin above the tail.
+        @it("a live playhead the sliding tail overtook resolves forward (commit), not a re-pause loop")
+        function _()
+            ' 12h stream at the edge, 4h window -> floor = 8h. Park the playhead 5s above the floor (a deep
+            ' rewind), then freeze: the frozen position sits inside the tail margin the device cannot hold.
+            m.top.callFunc("TestSetLive", 43200000)
+            m.top.position = 28805.0 ' fires the REAL OnPosition -> brain playhead 28805000ms
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' freeze; the cursor clamps at the floor
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.LiveDvr)
+            m.assertEqual(mid.control, VideoControl.Pause)
+
+            ' the device force-resumes the doomed pause (what the real player does each manifest refresh).
+            m.top.callFunc("TestSetState", VideoState.Playing)
+            snap = m.Snap()
+            m.assertEqual(snap.transportMode, TransportController.Mode.Idle, "the transport resolved instead of fighting")
+            m.assertEqual(snap.control, VideoControl.Resume, "resumed forward, not re-paused")
+            m.assertEqual(Int(m.top.seek * 1000), 28860000, "the resume parks a full margin above the trigger (28800s + 60s)")
+            ' the resolution telemeters at info level (never as a heal) with its per-content ordinal.
+            sent = m.global.telemetry.LogEvent
+            m.assertEqual(sent.level, "info")
+            m.assertTrue(sent.message.InStr("INV-D1 tail-resolve") = 0, "got: " + sent.message)
+            m.assertTrue(sent.message.InStr("resolve=1") > 0)
+        end function
+
+        @it("heal telemetry stops at the cap while the occurrences keep counting")
+        function _()
+            ' a frozen VOD scrub the device keeps flipping to playing: 5 heals, but only 3 events may leave.
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            for i = 1 to 5
+                m.top.callFunc("TestSetState", VideoState.Playing)
+            end for
+            sent = m.global.telemetry.LogEvent
+            m.assertTrue(sent.message.InStr("heal=3") > 0, "telemetry must stop at the 3rd heal; last sent: " + sent.message)
+        end function
+
+        @it("a sentinel-valued duration report cannot anchor the live-edge fallback clock")
+        function _()
+            m.top.callFunc("TestSetLive", 300000)
+            ' the 999999s live seek echoing back through the single-precision duration field.
+            m.top.duration = 999998.976
+            m.assertEqual(m.Snap().brainEdgeMs, 300000, "the sentinel echo must not move the edge")
+            ' a real duration report anchors the fallback and re-feeds the edge.
+            m.top.duration = 400.0
+            m.assertEqual(m.Snap().brainEdgeMs, 400000)
+        end function
+
         ' An external resume (the linked phone via Lounge) under an active transport must TAKE OVER: VPD never
         ' resumes under a transport itself, so a resume here is the phone's. It cancels the scrub and plays.
         @it("an external Lounge resume under a transport takes over: cancels the scrub and lets it play")
@@ -341,7 +393,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "healCount", "tailResolveCount"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden
@@ -422,7 +474,8 @@ namespace Tests
         ' FinishEof -> OnPlaybackFinished -> ClosePlayer -> the queue sets player.close -> OnClose drops
         ' m.sponsorblock — then OnPosition continues to `m.sponsorblock.OnPosition()` and derefs the dropped
         ' controller. (`m.sponsorblock` is a field, so the invalid deref is &hf3, not &hec.) The OLD code crashes
-        ' here; the onCloseCalled re-check after EnforceTransportFreeze bails. Kept LAST: OnClose detaches the node.
+        ' here; the onCloseCalled re-check after EnforceTransportFreeze bails. Kept at the END with the other
+        ' closing test: OnClose detaches the node.
         @it("a finish during a position tick must not deref the dropped sponsorblock (the OnPosition ERR_RO3 crash)")
         function _()
             m.top.callFunc("TestWireQueueClose") ' the stub queue now closes the player on closePlayer, as the real one does
@@ -444,6 +497,21 @@ namespace Tests
             m.top.position = 99
             ' reaching here means OnPosition survived the re-entrant teardown.
             m.assertTrue(m.Snap().onCloseCalled, "the finish closed the player from within the position tick")
+        end function
+
+        ' Also at the end (closes the player): a heal loop that ran past the telemetry cap reports its
+        ' true size in one tally event when the content ends.
+        @it("the close summary carries a capped heal loop's true size")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            for i = 1 to 5
+                m.top.callFunc("TestSetState", VideoState.Playing)
+            end for
+            m.top.close = true
+            summary = m.global.telemetry.LogEvent
+            m.assertTrue(summary.message.InStr("5 heals") > 0, "got: " + summary.message)
+            m.assertTrue(summary.message.InStr("2 past the telemetry cap") > 0, "got: " + summary.message)
         end function
 
     end class

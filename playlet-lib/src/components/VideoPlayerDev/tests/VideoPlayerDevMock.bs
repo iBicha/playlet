@@ -76,6 +76,14 @@ function TestSetup() as void
     m.webServer = m.top.webServer
     m.innertube = m.top.innertube
 
+    ' OnNodeReady re-registers the device-field observers; unobserve-first for the same reason as the
+    ' nudge counter above — stacked observers fire a handler once per prior TestSetup on every write,
+    ' and OnPosition's latency learning reads two identical fires as a CONFIRMED min-gap, poisoning
+    ' LiveEdgeMs for any live test that runs after another test in the suite.
+    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control"]
+        m.top.unobserveField(deviceField)
+    end for
+
     OnNodeReady()
 end function
 
@@ -175,6 +183,7 @@ function TestSnapshot() as object
     return {
         transportMode: m.transport.transportMode
         seekSettling: m.transport.seekSettling
+        brainEdgeMs: m.transport.edgeMs
         onCloseCalled: m.onCloseCalled = true
         control: m.top.control
         autoplay: m.top.autoplayAfterSeek

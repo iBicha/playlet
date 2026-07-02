@@ -145,7 +145,7 @@ namespace Tests
         ' ---------- seeded fuzz with shrink ----------
 
         ' a 16-bit LCG (ZX-Spectrum constants): s*25173 < 2^31 so it never overflows Integer; deterministic +
-        ' reproducible (NOT Rnd, which is clock-seeded). Token = s mod 13 -> one input.
+        ' reproducible (NOT Rnd, which is clock-seeded). Token = s mod 14 -> one input.
         function Lcg(s as integer) as integer
             return (s * 25173 + 13849) and 65535
         end function
@@ -155,7 +155,7 @@ namespace Tests
             s = seed
             for i = 0 to n - 1
                 s = m.Lcg(s)
-                seq.Push(s mod 13)
+                seq.Push(s mod 14)
             end for
             return seq
         end function
@@ -187,6 +187,8 @@ namespace Tests
                 t.Tick(TransportController.Timer.ReplayToast)
             else if tok = 12
                 t.OnLiveEdge(t.edgeMs + 50000) ' a big edge jump (long pause's catch-up)
+            else if tok = 13
+                t.ResolveLiveTail() ' the coordinator's tail-overtake resolution (no-op outside LiveDvr)
             end if
         end function
 

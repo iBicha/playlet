@@ -68,6 +68,15 @@ namespace TransportController
     const SCAN_LEVEL_MAX = 3
     const LIVE_DVR_STEP_MS = 5000
     const LIVE_EDGE_SEEK_MS = 999999000 ' seek target that means "jump to the live edge"
+    ' Video.position is single-precision, so the 999999s sentinel echoes back as 999998.976s and
+    ' Int(position * 1000) lands 24ms UNDER the constant. Sentinel checks take this slack — nothing
+    ' legitimate on the window timeline gets near 11.5 days.
+    const LIVE_EDGE_SENTINEL_SLACK_MS = 100000
+    ' The device will not hold a pause this close to the sliding DVR tail: it force-resumes ~1/s
+    ' (each manifest refresh), starting ~10s ABOVE the advertised floor (measured on device). The
+    ' tail resolution resumes at least this far above the floor so the resumed playhead isn't
+    ' immediately overtaken again.
+    const LIVE_TAIL_RESUME_MARGIN_MS = 30000
     ' Live scan base scales with DVR window length: base = effectiveEdge / DIVISOR, floored at the storyboard
     ' interval so short DVRs are unchanged. 4000 -> ~10.8s base on a 12h DVR -> L3 ~65s/tick.
     const LIVE_SCAN_BASE_DIVISOR = 4000
@@ -88,6 +97,13 @@ namespace TransportController
     ' the clock-driven edge in bursts (segment fetches, brief stalls), and flipping the badge to "0:04" and
     ' back on every burst reads as flicker. User actions (rewind/seek/commit) keep the tight band.
     const LIVE_EDGE_ATEDGE_LEAVE_MS = 6000
+
+    ' Whether a device-reported ms value is the live-edge seek sentinel echoing back through the
+    ' single-precision position/duration fields (see LIVE_EDGE_SENTINEL_SLACK_MS): such values are
+    ' seek plumbing, not positions.
+    function IsLiveEdgeSentinelMs(ms as integer) as boolean
+        return ms >= TransportController.LIVE_EDGE_SEEK_MS - TransportController.LIVE_EDGE_SENTINEL_SLACK_MS
+    end function
 
     ' The transport state machine.
     class Controller
@@ -200,6 +216,16 @@ namespace TransportController
             return floor
         end function
 
+        ' The floor for the coordinator's tail-overtake safety decision: the availability floor when
+        ' the window is known, -1 when it is not (without floor knowledge the safety verdict stays a
+        ' plain freeze).
+        function SafetyFloorMs() as integer
+            if not m.isLive or m.dvrWindowMs <= 0
+                return -1
+            end if
+            return m.LiveFloorMs()
+        end function
+
         ' Storyboards arrive late (the native Video.thumbnailTiles field populates after the manifest loads),
         ' so the coordinator updates the scrub step + bif gate here without the live-edge / replay resets that
         ' SetContent does for new content.
@@ -224,7 +250,7 @@ namespace TransportController
         ' Last real Video position. While idle the cursor tracks it; while a transport is active the machine owns
         ' the cursor. Drops the live-edge seek sentinel echo (see OnDuration).
         function OnPosition(ms as integer) as void
-            if m.isLive and ms >= TransportController.LIVE_EDGE_SEEK_MS
+            if m.isLive and TransportController.IsLiveEdgeSentinelMs(ms)
                 return
             end if
             m.positionMs = ms
@@ -275,7 +301,7 @@ namespace TransportController
         ' at the manifest's availabilityStartTime and pushed ~1/s. Advances through pauses, rebuffers and
         ' startup — the offset/badge math needs no event-pattern heuristics on top.
         function OnLiveEdge(ms as integer) as void
-            if not m.isLive or ms <= 0 or ms >= TransportController.LIVE_EDGE_SEEK_MS
+            if not m.isLive or ms <= 0 or TransportController.IsLiveEdgeSentinelMs(ms)
                 return
             end if
             m.edgeMs = ms
@@ -520,6 +546,24 @@ namespace TransportController
             m.RecomputeLive()
             m.EmitIntent(TransportController.Control.Resume, true, TransportController.LIVE_EDGE_SEEK_MS)
             m.commitSeq = m.commitSeq + 1
+        end function
+
+        ' The sliding DVR tail overtook the frozen playhead (SafetyAction.ResumeLiveTail): the device
+        ' force-resumes such a pause on every manifest refresh, so freezing again just loops. Resolve
+        ' the transport forward instead — a normal commit, with the cursor floored above the tail
+        ' (what the stock player does when paused live content expires). The resume parks a FULL margin
+        ' above the trigger threshold: parked exactly on it, the floor advancing through the resume's
+        ' rebuffer leaves the playhead hovering at the boundary and the very next rewind press would
+        ' trip the trigger again and eat itself.
+        function ResolveLiveTail() as void
+            if m.transportMode <> TransportController.Mode.LiveDvr
+                return ' only a frozen live transport has a tail to resolve
+            end if
+            floorSafe = m.LiveFloorMs() + 2 * TransportController.LIVE_TAIL_RESUME_MARGIN_MS
+            if m.cursorMs < floorSafe
+                m.cursorMs = m.Clamp(floorSafe, 0, m.LiveEdgeMs())
+            end if
+            m.Commit()
         end function
 
         ' The EFFECTIVE live edge: raw edge minus the latency baseline (where the offset reads 0 / "● LIVE").

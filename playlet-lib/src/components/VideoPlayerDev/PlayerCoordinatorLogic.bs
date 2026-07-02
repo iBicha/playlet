@@ -22,6 +22,7 @@ namespace PlayerCoordinatorLogic
         None = 0
         Freeze = 1 ' the video is advancing under a transport -> the coordinator must re-pause it
         FinishEof = 2 ' VOD played to the end under a transport also sitting at the end -> finish, don't re-pause forever
+        ResumeLiveTail = 3 ' live: the sliding DVR tail overtook the frozen playhead -> resolve forward, a re-pause cannot stick
     end enum
 
     ' The buttons in the row above the trackbar, in focus order (the index). The COUNT is owned by ButtonRow
@@ -79,16 +80,26 @@ namespace PlayerCoordinatorLogic
     ' Only a video actively PLAYING under a transport must be re-paused. Every other state is already
     ' not-advancing or owned elsewhere: buffering = a seek/rebuffer the bif covers; paused = the desired frozen
     ' state; none/stopping/stopped = teardown; finished/error = handled in their own OnVideoState branches.
-    ' EXCEPTION: VOD playing at the very end while the transport cursor is ALSO at the end — the device refuses
+    ' EXCEPTION (VOD): playing at the very end while the transport cursor is ALSO at the end — the device refuses
     ' to stay paused at EOF (the freeze would loop forever), and the user is at the end anyway: finish instead.
     ' A cursor rewound away from the end keeps the freeze (the user is heading backwards).
-    function TransportSafetyAction(deviceState as string, inTransport as boolean, isLive as boolean, positionMs as integer, cursorMs as integer, durationMs as integer) as integer
+    ' EXCEPTION (live): the sliding DVR tail overtaking the frozen playhead — the device force-resumes such a
+    ' pause on every manifest refresh (from ~10s above the advertised floor), so a re-pause cannot stick and the
+    ' freeze would loop forever; resolve forward instead. liveFloorMs is the availability floor (edge − window),
+    ' or -1 when the window is unknown (no floor knowledge -> plain freeze).
+    function TransportSafetyAction(deviceState as string, inTransport as boolean, isLive as boolean, positionMs as integer, cursorMs as integer, durationMs as integer, liveFloorMs as integer) as integer
         if not inTransport or deviceState <> VideoState.Playing
             return SafetyAction.None
         end if
+        if isLive
+            if liveFloorMs >= 0 and positionMs < liveFloorMs + TransportController.LIVE_TAIL_RESUME_MARGIN_MS
+                return SafetyAction.ResumeLiveTail
+            end if
+            return SafetyAction.Freeze
+        end if
         atEof = durationMs > 0 and positionMs >= durationMs - TransportController.FINISH_EPSILON_MS
         cursorAtEof = cursorMs >= durationMs - TransportController.FINISH_EPSILON_MS
-        if not isLive and atEof and cursorAtEof
+        if atEof and cursorAtEof
             return SafetyAction.FinishEof
         end if
         return SafetyAction.Freeze
