@@ -505,7 +505,9 @@ namespace Innertube
         cache = ReadAsciiFile("tmp:/sts_cache.json")
         if not StringUtils.IsNullOrEmpty(cache)
             json = StringUtils.ParseJsonSafe(cache)
-            return { sts: json["sts"] }
+            if IsAssociativeArray(json) and json["sts"] <> invalid
+                return { sts: json["sts"] }
+            end if
         end if
 
         request = HttpClient.Get(`${PLAYLET_SUPPORT_SERVER}/v1/sts`)
@@ -523,8 +525,16 @@ namespace Innertube
         end if
 
         text = response.Text()
+        json = StringUtils.ParseJsonSafe(text)
+        if not IsAssociativeArray(json) or json["sts"] = invalid
+            error = "Invalid response from sts service"
+            LogError(error, text)
+            return {
+                error: error
+            }
+        end if
+
         WriteAsciiFile("tmp:/sts_cache.json", text)
-        json = response.Json()
         return { sts: json["sts"] }
     end function
 
