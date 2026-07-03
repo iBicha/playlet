@@ -174,8 +174,18 @@ namespace Http
                 response.ContentType("text/html; charset=utf-8")
                 response.headers["Cache-Control"] = "no-cache"
             else if IsAssociativeArray(drmResponse)
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `DRM license request failed: ${ValidString(drmResponse.error)}\nvideoId: ${request.query.videoId}`
+                    fingerprint: ["DRM license request failed"]
+                })
                 response.Default(500, FormatJson(drmResponse))
             else
+                LogTelemetryEvent({
+                    level: "error"
+                    message: `DRM license request returned an unexpected response type\nvideoId: ${request.query.videoId}`
+                    fingerprint: ["DRM license request failed"]
+                })
                 response.Default(500, "Invalid DRM license response")
             end if
 
