@@ -23,10 +23,22 @@ namespace HomeScreenUtils
             feedItems[item["id"]] = item
         end for
 
+        ' Sections missing from the saved layout (new sections, or layouts
+        ' damaged by old bugs) render as enabled at the end of the feed.
         filteredFeed = []
+        seenIds = {}
         for each item in homeLayout
-            if item.enabled = true
-                filteredFeed.push(feedItems[item.id])
+            if IsAssociativeArray(item) and IsString(item.id)
+                seenIds[item.id] = true
+                if item.enabled = true and feedItems[item.id] <> invalid
+                    filteredFeed.push(feedItems[item.id])
+                end if
+            end if
+        end for
+
+        for each item in feed
+            if not seenIds.DoesExist(item["id"])
+                filteredFeed.push(item)
             end if
         end for
 

@@ -198,6 +198,34 @@ function MigrateExistingPreferences(userPrefs as object) as boolean
         isDirty = true
     end if
 
+    if userPrefs.__version = 8
+        ' A pre-0.45.0 bug persisted an empty home screen layout on fresh installs,
+        ' which the v7 -> v8 migration then turned into a trending-only layout.
+        ' Heal layouts that lost sections: reset tiny ones to defaults, otherwise
+        ' re-add missing sections as enabled so users notice they are back.
+        homeScreenLayout = userPrefs["misc.home_screen_layout"]
+        if IsArray(homeScreenLayout)
+            if homeScreenLayout.Count() < 3
+                userPrefs.Delete("misc.home_screen_layout")
+            else
+                defaultIds = ["subscriptions", "recommended", "popular", "playlists", "watch_history", "trending_livestreams", "trending_gaming"]
+                existingIds = {}
+                for each item in homeScreenLayout
+                    if IsAssociativeArray(item) and IsString(item.id)
+                        existingIds[item.id] = true
+                    end if
+                end for
+                for each id in defaultIds
+                    if not existingIds.DoesExist(id)
+                        homeScreenLayout.Push({ id: id, enabled: true })
+                    end if
+                end for
+            end if
+        end if
+        userPrefs.__version = 9
+        isDirty = true
+    end if
+
     ' TODO:P2 handle case where saved preferences version is higher than current version (e.g. user downgraded)
 
     #if DEBUG

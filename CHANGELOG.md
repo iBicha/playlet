@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Signed-in accounts no longer get stuck sending failing requests after the login session expires
 - Parser for channel video live indicator
+- Home screen reduced to only the Trending sections after updating to 0.48.0
 
 ## [0.48.0] - 2026-07-01
 
