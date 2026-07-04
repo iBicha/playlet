@@ -29,15 +29,13 @@ import { getLiveVideoId } from './live-id';
     await expectField('#trickPlayBar.isLive', true);
     await expectField('#VideoPlayer.state', 'playing');
 
-    group('OK reveals the chrome -> play/pause focused by default');
+    group('OK reveals the chrome -> trackbar focused by default');
     await press(Key.Ok);
     await expectField('#Chrome.opacity', 1);
     await expectField('#VideoPlayer.state', 'playing'); // reveal doesn't pause
-    await expectField('#buttonRow.rowFocused', true);
+    await expectField('#trickPlayBar.focused', true);
 
     group('on the bar, OK toggles the HUD without pausing (live faithful)');
-    await press(Key.Down); // focus the trackbar
-    await expectField('#trickPlayBar.focused', true);
     await press(Key.Ok);
     await expectField('#Chrome.opacity', 0);
     await expectField('#VideoPlayer.state', 'playing');

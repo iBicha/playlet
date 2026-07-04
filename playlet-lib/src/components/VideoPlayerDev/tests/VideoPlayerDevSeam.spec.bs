@@ -191,6 +191,32 @@ namespace Tests
             m.assertTrue(m.Snap().chromeShown, "Up revealed the chrome")
         end function
 
+        ' The point of the bar-default: Left/Right seek and OK pauses with no navigation at all, straight off a
+        ' fresh reveal. Pinned as its own test rather than left as a side effect of the tier round-trip tests.
+        @it("a fresh idle reveal defaults focus to the bar: Left/Right seek and OK pauses with no navigation")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' reveal (VOD, playing, chrome hidden -> shown)
+            snap = m.Snap()
+            m.assertTrue(snap.chromeShown)
+            m.assertEqual(snap.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar, "the bar is focused immediately, no Down needed")
+
+            ' Left seeks right away — the buttons tier is not intercepting it.
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub, "Left scrubs immediately from the default bar focus")
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' commit -> idle (a commit also hides the chrome)
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Idle)
+
+            ' OK pauses directly from the bar tier too — pausing was never gated on the Buttons tier. Re-reveal
+            ' first (the commit above hid the chrome), landing back on the bar by default, then OK pauses.
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' fresh reveal -> bar tier again
+            revealed = m.Snap()
+            m.assertTrue(revealed.chromeShown)
+            m.assertEqual(revealed.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' now pauses
+            m.assertEqual(m.Snap().control, VideoControl.Pause, "OK pauses directly from the bar tier")
+        end function
+
         ' The "● LIVE" reveal hold: an idle live reveal flashes the badge briefly (forceLiveBadge) before the
         ' label swaps to the time-behind-edge — but any live transport must show the TIME immediately (the user
         ' seeks by it), so a transport-key reveal never starts the hold and a scrub mid-hold releases it.
@@ -233,9 +259,8 @@ namespace Tests
         @it("a live scrub started DURING the reveal hold releases the badge immediately")
         function _()
             m.top.callFunc("TestSetLive", 43200000)
-            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' reveal -> hold running
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' reveal -> hold running, bar tier by default
             m.assertTrue(m.Snap().forceLiveBadge)
-            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons tier -> bar tier
             m.top.callFunc("TestKey", RemoteKeys.Left, true) ' scrub back while the hold is still running
             m.top.callFunc("TestKey", RemoteKeys.Left, false)
             snap = m.Snap()
@@ -244,10 +269,12 @@ namespace Tests
         end function
 
         ' The button tier remembers its highlighted button across a buttons->bar->buttons round-trip; only a
-        ' fresh reveal (the row was hidden) resets the highlight to play/pause.
+        ' fresh reveal (the row was hidden) resets the highlight to play/pause. A fresh reveal lands on the bar
+        ' tier by default, so reaching the buttons takes an explicit Up first.
         @it("the button tier keeps its focused button across a bar round-trip; a fresh reveal resets it")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier, play/pause focused
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause focused
             snap = m.Snap()
             m.assertTrue(snap.chromeShown)
             m.assertEqual(snap.focusedButton, 0)
@@ -263,7 +290,8 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Left, false)
             m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' commit -> chrome hides
             m.assertFalse(m.Snap().chromeShown)
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' fresh reveal
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' fresh reveal -> bar tier
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
             m.assertEqual(m.Snap().focusedButton, 0, "a fresh reveal resets the highlight")
         end function
 
@@ -271,10 +299,11 @@ namespace Tests
         ' (nudges) the focused button instead of being swallowed.
         @it("Up at the buttons tier nudges the focused button instead of moving focus")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
             before = m.Snap()
             m.assertEqual(before.focusTarget, PlayerCoordinatorLogic.FocusTarget.Buttons)
-            m.assertEqual(before.nudgeCount, 0, "the reveal itself does not nudge")
+            m.assertEqual(before.nudgeCount, 0, "moving focus does not nudge")
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' nowhere to go up
             after = m.Snap()
             m.assertEqual(after.nudgeCount, 1, "the no-op Up pulsed the focused button")
@@ -285,7 +314,8 @@ namespace Tests
         ' A press that GOES somewhere must not nudge: Left/Right inside the row, Up/Down between the tiers.
         @it("a press that moves focus does not nudge")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier, play/pause
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> minimize
             m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
@@ -296,7 +326,8 @@ namespace Tests
         ' Left/Right clamped at the row's ends pulse the focused button (the original nudge path, at the seam).
         @it("Left/Right clamped at the row ends nudge the focused button")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> play/pause (leftmost)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause (leftmost)
             m.top.callFunc("TestKey", RemoteKeys.Left, true) ' clamped at the left end
             m.assertEqual(m.Snap().nudgeCount, 1)
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> minimize (rightmost)
@@ -306,11 +337,10 @@ namespace Tests
             m.assertEqual(snap.focusedButton, 1, "the clamp held the highlight at the end")
         end function
 
-        ' Down at the bar tier (the bottom) is also a no-op, but the bar is not a button: consumed, no nudge.
+        ' Down at the bar tier (the bottom, and the default on reveal) is a no-op: consumed, no nudge.
         @it("Down at the bar tier is consumed without a nudge")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
-            m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Down, true) ' nowhere to go down
             snap = m.Snap()
             m.assertEqual(snap.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar, "focus stays on the bar")
@@ -357,7 +387,8 @@ namespace Tests
         ' Play always means play/pause: it must NOT activate whatever button happens to be highlighted.
         @it("Play toggles play/pause even while a non-play button is highlighted")
         function _()
-            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
             m.assertEqual(m.Snap().focusedButton, 1)
             m.top.callFunc("TestKey", RemoteKeys.Play, true) ' must pause, not minimize

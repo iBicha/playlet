@@ -72,7 +72,7 @@ function Initialize()
     m.liveBadgeHoldActive = false ' the "● LIVE" reveal hold is running
     m.firstFrameSeen = false
     m.showFullScreenHint = false
-    m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons
+    m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Bar
     m.focusedButton = 0
     m.armedTimerId = TransportController.Timer.None ' which module timer the single transportTimer holds
     m.lastCommitSeq = 0
@@ -495,8 +495,8 @@ function OnBackPress() as boolean
 end function
 
 '===============================================================================
-' FOCUS (two-tier virtual focus) — the real focus stays on the Video node. Two tiers: the BUTTONS (default on
-' reveal) and the BAR (Left/Right scrub; the cursor grows). Up/Down move between them; both exist only while
+' FOCUS (two-tier virtual focus) — the real focus stays on the Video node. Two tiers: the BAR (default on
+' reveal; Left/Right scrub, the cursor grows) and the BUTTONS. Up/Down move between them; both exist only while
 ' the chrome is up and idle.
 '===============================================================================
 function CanFocusInteract() as boolean
@@ -634,9 +634,11 @@ function ShowChrome(instant = false as boolean) as void
     end if
     ' refresh the renderers with the full current projection before the chrome paints — covers the live
     ' offset/badge + glyph, not just position, so a reveal while idle-behind-the-edge is never stale.
-    ' default focus on a fresh idle reveal (not a transport-key instant reveal): the play/pause button.
+    ' default focus on a fresh idle reveal (not a transport-key instant reveal): the trackbar, so Left/Right
+    ' seek and OK-to-pause both work immediately with no extra navigation. focusedButton still resets to
+    ' play/pause — that's the standing highlight for whenever the Buttons tier is later entered via Up.
     if wasHidden and not instant and m.transport.transportMode = TransportController.Mode.Idle
-        m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons
+        m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Bar
         m.focusedButton = PlayerCoordinatorLogic.PlayerButton.PlayPause
     end if
     PushTransportToRenderers()

@@ -50,9 +50,9 @@ const CONTENT_ID = 'aqz-KE-bpKQ'; // Big Buck Bunny — 10min, has storyboards
     await pressChecked(Key.Left, 'scan-to-scrub');
     await pressChecked(Key.Ok, 'final-commit');
 
-    group('two-tier focus: buttons <-> bar, scrub from the bar');
-    await pressChecked(Key.Ok, 'reveal-buttons-focus');
-    await pressChecked(Key.Down, 'focus-bar');
+    group('two-tier focus: bar <-> buttons, scrub from the bar');
+    await pressChecked(Key.Ok, 'reveal-bar-focus'); // bar is focused by default on reveal
+    await pressChecked(Key.Down, 'focus-bar-noop'); // already at the bottom tier
     await pressChecked(Key.Up, 'focus-buttons');
     await pressChecked(Key.Down, 'focus-bar-2');
     await pressChecked(Key.Left, 'scrub-from-bar');
