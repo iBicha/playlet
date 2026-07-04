@@ -1,0 +1,51 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/components/Services/Innertube/OAuth.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace Tests
+
+    @tags("integration")
+    @suite
+    class InnertubeRefreshTokenIntegrationTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.logger = CreateObject("roSGNode", "Logger")
+            m.logger.logLevel = -1
+            ' A failed refresh goes through HttpClient's retry loop, which emits a
+            ' telemetry warning; give the stub a no-op telemetry sink to write to.
+            telemetry = CreateObject("roSGNode", "Node")
+            telemetry.addField("LogWarn", "string", false)
+            telemetry.addField("LogEvent", "assocarray", false)
+            m.global.addFields({ telemetry: telemetry })
+        end function
+
+        @describe("Innertube refresh-token terminal classification (live)")
+
+        @slow(20000)
+        @it("A dead refresh token throws an error classified terminal (so it is cleared + re-auth, not retry-stormed)")
+        function _()
+            ' A real client_id/secret with an invalid refresh token gets a real invalid_grant from Google.
+            identity = Innertube.GetClientIdentity(invalid)
+            m.assertFalse(IsAssociativeArray(identity) and identity.DoesExist("error"), "GetClientIdentity failed: " + FormatJson(identity))
+            m.assertFalse(StringUtils.IsNullOrEmpty(identity.clientId), "no client id scraped")
+
+            accessTokenObject = {
+                clientId: identity.clientId
+                clientSecret: identity.clientSecret
+                refreshToken: "invalid-refresh-token"
+            }
+
+            threw = false
+            try
+                InnertubeService.AuthRefreshAccessToken(accessTokenObject, invalid)
+            catch error
+                threw = true
+            end try
+
+            m.assertTrue(threw, "a dead refresh token must surface as a thrown error")
+            m.assertTrue(ValidBool(accessTokenObject.terminalRefreshError), "a dead refresh token must flag terminalRefreshError on the shared accessToken object")
+        end function
+
+    end class
+
+end namespace

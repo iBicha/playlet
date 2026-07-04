@@ -10,16 +10,23 @@ function ExecuteJob() as void
     try
         cancellation = JobGetCancellation()
         if InnertubeService.AuthRefreshAccessToken(accessTokenObject, cancellation)
-            profileNode.expiresIn = accessTokenObject.expiresIn
-            profileNode.expiresTimestamp = accessTokenObject.expiresTimestamp
-            profileNode.accessToken = accessTokenObject.accessToken
+            profileNode.update({
+                expiresIn: accessTokenObject.expiresIn
+                expiresTimestamp: accessTokenObject.expiresTimestamp
+                accessToken: accessTokenObject.accessToken
+            })
             profilesService@.SaveUserProfilesToRegistry()
         else
-            JobError("Failed to refresh access token")
-            profileNode.accessToken = invalid
+            JobError("Refresh response contained no access token")
         end if
     catch error
+        ' AuthRefreshAccessToken flags a permanently-dead refresh token on the shared object before throwing.
+        if ValidBool(accessTokenObject.terminalRefreshError)
+            profileNode@.MarkNeedsReauth()
+        end if
         JobError("Failed to refresh access token: " + ErrorUtils.Format(error))
-        profileNode.accessToken = invalid
     end try
+
+    ' Signal completion on every outcome so a blocked waiter wakes.
+    profileNode.refreshCompleted = true
 end function

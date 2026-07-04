@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Innertube/PoTokens.bs"
@@ -160,8 +161,12 @@ namespace Http
             }
 
             currentProfile = m.profilesService.currentProfile
+            tokenResult = invalid
             if currentProfile <> invalid and currentProfile.type = "youtube"
-                options["accessToken"] = currentProfile.accessToken
+                tokenResult = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(currentProfile)
+            end if
+            if tokenResult <> invalid and tokenResult.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                options["accessToken"] = tokenResult.token
             else
                 options["visitorData"] = m.innertube.sessionData.visitorData
             end if

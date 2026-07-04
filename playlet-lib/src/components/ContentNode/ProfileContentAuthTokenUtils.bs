@@ -1,0 +1,46 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MessagePortUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+
+namespace ProfileContentAuthTokenUtils
+
+    function DeriveAuthState(profileType as string, accessToken as dynamic, refreshToken as dynamic) as string
+        if profileType = "youtube"
+            if StringUtils.IsNullOrEmpty(refreshToken)
+                return ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            end if
+            return ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated
+        end if
+        if profileType = "invidious"
+            if StringUtils.IsNullOrEmpty(accessToken)
+                return ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            end if
+            ' The Invidious token is signed JSON carrying its own expire timestamp.
+            token = StringUtils.ParseJsonSafe(accessToken)
+            if IsAssociativeArray(token) and IsNumber(token.expire) and token.expire <= TimeUtils.Now().AsSeconds()
+                return ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            end if
+            return ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated
+        end if
+        LogError("Unknown profile type when deriving auth state:", profileType)
+        return ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated
+    end function
+
+    ' The unobserve at the end is field-level: it removes every scoped observer the
+    ' calling component holds on refreshCompleted. Hold long-lived observers on authState.
+    function EnsureFreshAccessToken(profileNode as object) as ProfileContentAuthTokenUtils.AccessTokenResult
+        messagePort = CreateObject("roMessagePort")
+        MessagePortUtils.ObserveFieldScopedExSafe(profileNode, "refreshCompleted", messagePort)
+        result = profileNode@.ResolveAccessToken()
+        if result.state = ProfileContentAuthTokenUtils.AccessTokenState.Refreshing
+            wait(30000, messagePort)
+            result = profileNode@.ResolveAccessToken()
+        end if
+        result.profile = profileNode
+        profileNode.unobserveFieldScoped("refreshCompleted")
+        return result
+    end function
+
+end namespace

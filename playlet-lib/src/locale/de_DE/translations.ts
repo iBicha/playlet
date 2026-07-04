@@ -65,10 +65,6 @@
         <translation>Der Kanal %1 konnte nicht geladen werden</translation>
     </message>
     <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>Es sieht so aus, als hätten Sie sich bei Invidious angemeldet, ohne jedoch die erforderlichen Berechtigungen zu besitzen.\nAus diesem Grund wurden Sie aus Folgenden Profilen ausgeloggt: %1\nBitte loggen Sie sich wieder ein.\nDies kann Folge eines Updates von Playlet sein.\nWir entschuldigen uns für entstandene Unannehmlichkeiten.</translation>
-    </message>
-    <message>
         <source>Premieres in 1 minute</source>
         <translation>Premiere in 1 Minute</translation>
     </message>
@@ -427,10 +423,6 @@
     <message>
         <source>Failed to load feed</source>
         <translation>Feed konnte nicht geladen werden</translation>
-    </message>
-    <message>
-        <source>User logged out</source>
-        <translation>Benutzer ausgellogt</translation>
     </message>
     <message>
         <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>

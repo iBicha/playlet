@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
@@ -9,7 +10,7 @@ function ExecuteJob() as void
     channelView = input.channelView
     ucid = input.ucid
     invidiousNode = input.invidious
-    authToken = input.authToken
+    profile = input.profile
 
     if JobIsCancelled()
         JobCancel()
@@ -17,12 +18,18 @@ function ExecuteJob() as void
     end if
 
     cancellation = JobGetCancellation()
-    isInnertubeProfile = authToken.profileNode.type = "youtube"
-    if isInnertubeProfile
+
+    auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+    if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+        JobError("No usable access token to fetch subscription status: " + auth.state)
+        return
+    end if
+
+    if profile.type = "youtube"
         subscriptionStatus = InnertubeService.GetSubscriptionStatusForChannel(ucid, {
             cancellation: cancellation
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
+            accessToken: auth.token
+            onBehalfOfUser: auth.activeIdentifyToken
         })
 
         if subscriptionStatus.error <> invalid
@@ -32,7 +39,7 @@ function ExecuteJob() as void
         channelView.isSubscribed = subscriptionStatus.isSubscribed
     else
         service = new Invidious.InvidiousService(invidiousNode)
-        subscriptionsResponse = service.GetSubscriptions(cancellation)
+        subscriptionsResponse = service.GetSubscriptions(auth, cancellation)
         if not subscriptionsResponse.IsSuccess()
             JobError("Failed to fetch subscriptions: " + subscriptionsResponse.ErrorMessage())
             return

@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
@@ -5,37 +6,21 @@ import "pkg:/source/utils/StringUtils.bs"
 function ExecuteJob() as void
     input = JobGetInput()
 
-    profilesNode = input.profilesService
     invidiousNode = input.invidious
     profileContentNodes = input.profileNodes
 
     service = new Invidious.InvidiousService(invidiousNode)
-    invalidProfiles = []
 
     for each profileNode in profileContentNodes
-        if not StringUtils.IsNullOrEmpty(profileNode.refreshToken)
+        if profileNode.type <> "invidious"
+            continue for
+        end if
+        if profileNode.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
             continue for
         end if
         if not service.VerifyTokenScope(profileNode.accessToken)
-            invalidProfiles.push(profileNode)
+            ' The stored token can't make authenticated calls anymore (e.g. scopes changed in an update).
+            profileNode@.MarkNeedsReauth()
         end if
     end for
-
-    if invalidProfiles.Count() = 0
-        return
-    end if
-
-    profilesNode@.LogoutWithProfiles(invalidProfiles)
-
-    profileNames = []
-    for each profileNode in invalidProfiles
-        profileNames.push(profileNode.username)
-    end for
-    profileNames = profileNames.join(", ")
-
-    message = Tr(Locale.Dialogs.UserLoggedOutMessage).Replace("\n", `\n`).Replace("%1", profileNames)
-    DialogUtils.ShowDialogEx({
-        message: message
-        title: Tr(Locale.Dialogs.UserLoggedOut)
-    })
 end function

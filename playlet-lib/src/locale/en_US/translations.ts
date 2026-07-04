@@ -225,12 +225,20 @@
         <translation>Failed to load feed</translation>
     </message>
     <message>
-        <source>User logged out</source>
-        <translation>User logged out</translation>
+        <source>Session expired</source>
+        <translation>Session expired</translation>
     </message>
     <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</translation>
+        <source>The session has expired. Please sign in again with this profile, or switch to another profile.</source>
+        <translation>The session has expired. Please sign in again with this profile, or switch to another profile.</translation>
+    </message>
+    <message>
+        <source>The session has expired.</source>
+        <translation>The session has expired.</translation>
+    </message>
+    <message>
+        <source>Please sign in again with this profile, or switch to another profile.</source>
+        <translation>Please sign in again with this profile, or switch to another profile.</translation>
     </message>
     <message>
         <source>Lounge service setup error</source>

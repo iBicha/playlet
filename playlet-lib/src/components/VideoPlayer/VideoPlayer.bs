@@ -1,5 +1,6 @@
 #const DEBUG_LOG_VIDEO_QUALITY = false
 
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
@@ -359,9 +360,11 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic, c
         return
     end if
 
-    invidious = m.top.invidious
-    authToken = invidious.authToken
-    if authToken = invalid
+    profile = m.top.profilesService.currentProfile
+    if profile = invalid
+        return
+    end if
+    if profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
         return
     end if
 
@@ -369,13 +372,10 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic, c
         m.markVideoWatchedJob.cancel = true
     end if
 
-    profileType = authToken.profileNode.type
-
     input = {
         videoId: videoId
-        invidious: invidious
-        authToken: authToken
-        profileType: profileType
+        invidious: m.top.invidious
+        profile: profile
         playbackTrackingUrls: playbackTrackingUrls
         cpn: cpn
     }
@@ -384,7 +384,7 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic, c
     m.markVideoWatchedJob.addField("watchTime", "float", false)
     JobSystem.QueueJob(m.jobQueue, Jobs.MarkVideoWatchedJob, input, m.markVideoWatchedJob)
 
-    if profileType <> "youtube"
+    if profile.type <> "youtube"
         return
     end if
 

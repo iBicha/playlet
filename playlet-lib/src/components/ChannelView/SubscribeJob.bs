@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 
 @job("SubscribeJob")
@@ -8,6 +9,7 @@ function ExecuteJob() as void
     invidiousNode = input.invidious
     ucid = input.ucid
     subscribe = input.subscribe
+    profile = input.profile
 
     if JobIsCancelled()
         JobCancel()
@@ -15,12 +17,19 @@ function ExecuteJob() as void
     end if
 
     cancellation = JobGetCancellation()
+
+    auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+    if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+        JobError("No usable access token to subscribe/unsubscribe: " + auth.state)
+        return
+    end if
+
     service = new Invidious.InvidiousService(invidiousNode)
 
     if subscribe
-        response = service.Subscribe(ucid, cancellation)
+        response = service.Subscribe(auth, ucid, cancellation)
     else
-        response = service.Unsubscribe(ucid, cancellation)
+        response = service.Unsubscribe(auth, ucid, cancellation)
     end if
 
     if not response.IsSuccess()

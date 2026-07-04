@@ -1,6 +1,8 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 
 @job("VideoContentJob")
@@ -49,11 +51,18 @@ function ExecuteJob() as void
             accessToken = invalid
             onBehalfOfUser = invalid
             profileNode = invalid
-            authToken = invidiousNode.authToken
-            if authToken <> invalid and authToken.profileNode <> invalid and authToken.profileNode.type = "youtube" and not StringUtils.IsNullOrEmpty(authToken.token)
-                accessToken = authToken.token
-                onBehalfOfUser = authToken.activeIdentifyToken
-                profileNode = authToken.profileNode
+            profile = profilesService.currentProfile
+            if profile <> invalid and profile.type = "youtube"
+                auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+                if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
+                    JobError(Locale.Dialogs.ProfileNeedsReauthMessage)
+                    return
+                end if
+                if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                    accessToken = auth.token
+                    onBehalfOfUser = auth.activeIdentifyToken
+                    profileNode = profile
+                end if
             end if
 
             metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {

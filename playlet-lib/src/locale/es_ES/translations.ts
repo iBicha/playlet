@@ -209,10 +209,6 @@
         <translation>Fallo al cargar el feed</translation>
     </message>
     <message>
-        <source>User logged out</source>
-        <translation>Usuario desconectado</translation>
-    </message>
-    <message>
         <source>Lounge service setup error</source>
         <translation>Error de configuración del servicio Lounge</translation>
     </message>
@@ -359,10 +355,6 @@
     <message>
         <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>
         <translation>JSON no válido para %1 (no se pudo leer %2)</translation>
-    </message>
-    <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>Parece que has iniciado sesión en Invidious, pero no tienes los permisos necesarios.\nPor este motivo, hemos cerrado tu sesión en los siguientes perfiles: %1\nPor favor, inicia sesión de nuevo.\nEsto puede suceder cuando Playlet se actualiza con nuevas características.\nDisculpa las molestias.</translation>
     </message>
     <message>
         <source>Refresh</source>

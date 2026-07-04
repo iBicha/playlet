@@ -7,6 +7,20 @@ import "pkg:/source/utils/TimeUtils.bs"
 
 namespace Innertube
 
+    enum RefreshErrorCode
+        InvalidGrant = "invalid_grant"
+        InvalidClient = "invalid_client"
+        UnauthorizedClient = "unauthorized_client"
+    end enum
+
+    function IsTerminalRefreshError(json as object) as boolean
+        if not IsAssociativeArray(json)
+            return false
+        end if
+        oauthError = ValidString(json.error)
+        return oauthError = RefreshErrorCode.InvalidGrant or oauthError = RefreshErrorCode.InvalidClient or oauthError = RefreshErrorCode.UnauthorizedClient
+    end function
+
     function GetClientIdentity(cancellation = invalid as dynamic) as object
         request = HttpClient.Get("https://www.youtube.com/tv")
         request.Headers({
@@ -169,9 +183,26 @@ namespace Innertube
 
         request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/token", payload)
         request.Cancellation(cancellation)
+        request.TryCount(3)
+        request.RetryCallback(function(context as object) as boolean
+            return not Innertube.IsTerminalRefreshError(context.response.Json())
+        end function)
         response = request.Await()
 
         if not response.IsSuccess()
+            json = response.Json()
+            oauthError = ""
+            if IsAssociativeArray(json)
+                oauthError = ValidString(json.error)
+            end if
+            if oauthError = RefreshErrorCode.InvalidGrant
+                ' Dead user refresh token: flag the shared object so the job marks the profile.
+                accessToken.terminalRefreshError = true
+            else if oauthError = RefreshErrorCode.InvalidClient or oauthError = RefreshErrorCode.UnauthorizedClient
+                ' Fleet-wide app-side rejection. The credentials are scraped public TV-client
+                ' values, safe to log; don't clear the session — re-login uses the same client.
+                LogError("OAuth client rejected by token endpoint:", response.ErrorMessage(), "client_id:", accessToken.clientId, "client_secret:", accessToken.clientSecret)
+            end if
             throw `Failed to refresh token: ${response.ErrorMessage()}`
         end if
 

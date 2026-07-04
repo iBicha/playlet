@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
@@ -1235,20 +1236,20 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic, c
     if StringUtils.IsNullOrEmpty(videoId)
         return
     end if
-    invidious = m.top.invidious
-    authToken = invidious.authToken
-    if authToken = invalid
+    profile = m.top.profilesService.currentProfile
+    if profile = invalid
+        return
+    end if
+    if profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
         return
     end if
     if m.markVideoWatchedJob <> invalid
         m.markVideoWatchedJob.cancel = true
     end if
-    profileType = authToken.profileNode.type
     input = {
         videoId: videoId
-        invidious: invidious
-        authToken: authToken
-        profileType: profileType
+        invidious: m.top.invidious
+        profile: profile
         playbackTrackingUrls: playbackTrackingUrls
         cpn: cpn
     }
@@ -1258,7 +1259,7 @@ function MarkVideoWatched(videoId as dynamic, playbackTrackingUrls as dynamic, c
 
     ' only YouTube profiles take the periodic watch-time updates.
     m.watchTimeMarker = -1
-    m.reportWatchTime = (profileType = "youtube")
+    m.reportWatchTime = (profile.type = "youtube")
 end function
 
 function SeekToInitialPosition(content as object) as void

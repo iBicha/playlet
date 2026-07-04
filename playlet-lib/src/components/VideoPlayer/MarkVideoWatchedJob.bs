@@ -1,6 +1,8 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
 
 @job("MarkVideoWatchedJob")
 function ExecuteJob() as void
@@ -8,28 +10,37 @@ function ExecuteJob() as void
 
     videoId = input.videoId
     invidiousNode = input.invidious
-    authToken = input.authToken
-    profileType = input.profileType
+    profile = input.profile
     playbackTrackingUrls = input.playbackTrackingUrls
     cpn = input.cpn
 
     cancellation = JobGetCancellation()
 
-    if profileType = "invidious"
-        service = new Invidious.InvidiousService(invidiousNode)
-        service.MarkVideoWatched(videoId, cancellation)
-        return
-    end if
-
-    if profileType <> "youtube"
+    profileType = profile.type
+    if profileType <> "invidious" and profileType <> "youtube"
         JobError(`Unsupported profile type: ${profileType}`)
         return
     end if
 
+    auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+    if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+        return
+    end if
+
+    if profileType = "invidious"
+        service = new Invidious.InvidiousService(invidiousNode)
+        service.MarkVideoWatched(auth, videoId, cancellation)
+        return
+    end if
+    accessToken = auth.token
+    onBehalfOfUser = auth.activeIdentifyToken
+    freshUntilSeconds = auth.freshUntilSeconds
+    refreshRequested = WatchTimeAuthRefreshDue(freshUntilSeconds)
+
     if playbackTrackingUrls = invalid or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsPlaybackUrl) or StringUtils.IsNullOrEmpty(playbackTrackingUrls.videostatsWatchtimeUrl)
         playbackTrackingUrls = InnertubeService.AuthGetPlaybackTrackingUrls(videoId, {
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
+            accessToken: accessToken
+            onBehalfOfUser: onBehalfOfUser
             cancellation: cancellation
         })
     end if
@@ -49,8 +60,8 @@ function ExecuteJob() as void
     end if
 
     markedAsWatched = InnertubeService.AuthMarkVideoWatched(playbackTrackingUrls.videostatsPlaybackUrl, {
-        accessToken: authToken.token
-        onBehalfOfUser: authToken.activeIdentifyToken
+        accessToken: accessToken
+        onBehalfOfUser: onBehalfOfUser
         cpn: cpn
         cancellation: cancellation
     })
@@ -72,33 +83,73 @@ function ExecuteJob() as void
     port = CreateObject("roMessagePort")
     callbackNode = JobGetCallbackNode()
     MessagePortUtils.ObserveFieldScopedExSafe(callbackNode, "watchTime", port)
+    ' authState, not refreshCompleted: EnsureFreshAccessToken below unobserves
+    ' refreshCompleted component-wide, which would remove this observer with it.
+    MessagePortUtils.ObserveFieldScopedExSafe(profile, "authState", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
     successiveFailures = 0
     while true
-        message = wait(60000, port)
+        message = wait(WatchTimeAuthWaitMs(freshUntilSeconds, refreshRequested), port)
         if CancellationUtils.IsCancellationEvent(cancellation, message)
             JobCancel()
             return
         end if
         if message = invalid
+            if refreshRequested or WatchTimeAuthRefreshDue(freshUntilSeconds)
+                auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+                if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                    return
+                end if
+                accessToken = auth.token
+                onBehalfOfUser = auth.activeIdentifyToken
+                freshUntilSeconds = auth.freshUntilSeconds
+                refreshRequested = WatchTimeAuthRefreshDue(freshUntilSeconds)
+            end if
             continue while
         end if
 
-        ' Drain the port to get the latest watch time
+        watchTime = invalid
+        if IsWatchTimeEvent(callbackNode, message)
+            watchTime = message.getData()
+        else if IsAuthStateEvent(profile, message)
+            auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+            if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                return
+            end if
+            accessToken = auth.token
+            onBehalfOfUser = auth.activeIdentifyToken
+            freshUntilSeconds = auth.freshUntilSeconds
+            refreshRequested = WatchTimeAuthRefreshDue(freshUntilSeconds)
+        end if
+
+        ' Drain the port to get the latest watch time and any credential transition.
         newMessage = port.GetMessage()
         while newMessage <> invalid
             if CancellationUtils.IsCancellationEvent(cancellation, newMessage)
                 JobCancel()
                 return
+            else if IsWatchTimeEvent(callbackNode, newMessage)
+                watchTime = newMessage.getData()
+            else if IsAuthStateEvent(profile, newMessage)
+                auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+                if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                    return
+                end if
+                accessToken = auth.token
+                onBehalfOfUser = auth.activeIdentifyToken
+                freshUntilSeconds = auth.freshUntilSeconds
+                refreshRequested = WatchTimeAuthRefreshDue(freshUntilSeconds)
             end if
-            message = newMessage
             newMessage = port.GetMessage()
         end while
 
-        watchTime = message.getData()
+        if watchTime = invalid
+            continue while
+        end if
+
         success = InnertubeService.AuthMarkVideoWatchTime(watchTime, playbackTrackingUrls.videostatsWatchtimeUrl, {
-            accessToken: authToken.token
-            onBehalfOfUser: authToken.activeIdentifyToken
+            accessToken: accessToken
+            onBehalfOfUser: onBehalfOfUser
             cpn: cpn
             ' TODO:P1 if we pass cancellation here, http client will remove scoped
             ' observer, which is stored on the current node.
@@ -116,4 +167,42 @@ function ExecuteJob() as void
             return
         end if
     end while
+end function
+
+function WatchTimeAuthRefreshDue(freshUntilSeconds as dynamic) as boolean
+    if not IsNumber(freshUntilSeconds) or freshUntilSeconds <= 0
+        return false
+    end if
+    return TimeUtils.Now().AsSeconds() >= freshUntilSeconds
+end function
+
+function WatchTimeAuthWaitMs(freshUntilSeconds as dynamic, refreshRequested as boolean) as integer
+    if refreshRequested or not IsNumber(freshUntilSeconds) or freshUntilSeconds <= 0
+        return 60000
+    end if
+
+    secondsUntilRefresh = freshUntilSeconds - TimeUtils.Now().AsSeconds()
+    if secondsUntilRefresh <= 0
+        return 1
+    end if
+    if secondsUntilRefresh > 60
+        return 60000
+    end if
+    return secondsUntilRefresh * 1000
+end function
+
+function IsWatchTimeEvent(callbackNode as object, message as dynamic) as boolean
+    if type(message) <> "roSGNodeEvent"
+        return false
+    end if
+    node = message.getRoSGNode()
+    return node <> invalid and node.isSameNode(callbackNode) and message.getField() = "watchTime"
+end function
+
+function IsAuthStateEvent(profile as object, message as dynamic) as boolean
+    if type(message) <> "roSGNodeEvent"
+        return false
+    end if
+    node = message.getRoSGNode()
+    return node <> invalid and node.isSameNode(profile) and message.getField() = "authState"
 end function

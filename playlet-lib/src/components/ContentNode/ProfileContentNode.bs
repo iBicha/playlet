@@ -1,49 +1,75 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
+import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/TimeUtils.bs"
 
-function HasValidAccessToken(_unused as dynamic) as boolean
-    serverType = m.top.type
-    accessToken = m.top.accessToken
-    if StringUtils.IsNullOrEmpty(accessToken)
-        return false
+' Refresh well before expiry; stop serving a few minutes before expiry so a request
+' never carries a token that dies in flight.
+const REFRESH_THRESHOLD_SECONDS = 60 * 60
+const VALIDITY_THRESHOLD_SECONDS = 60 * 5
+
+' A Refreshing state means a refresh job is in flight; its completion pulses refreshCompleted.
+function ResolveAccessToken(_unused as dynamic) as object
+    result = {
+        state: ProfileContentAuthTokenUtils.AccessTokenState.Refreshing
+        token: ""
+        serverUrl: m.top.serverUrl
+        activeIdentifyToken: m.top.activeIdentifyToken
+        freshUntilSeconds: 0
+    }
+
+    if m.top.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+        result.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
+        return result
     end if
 
-    if serverType = "invidious"
-        return true
+    if m.top.type = "invidious"
+        ' Invidious holds a single long-lived token — nothing to refresh.
+        result.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+        result.token = m.top.accessToken
+        return result
     end if
 
     nowSeconds = TimeUtils.Now().AsSeconds()
     expiresTimestamp = m.top.expiresTimestamp
+    result.freshUntilSeconds = expiresTimestamp - REFRESH_THRESHOLD_SECONDS
 
-    ' We should refresh the token if it's about to expire in 30 minutes
-    ' Although the current token might be valid, we can let current request
-    ' wait for the new token
-    shouldRefreshToken = expiresTimestamp < nowSeconds + 60 * 30
-
-    if shouldRefreshToken
-        RefreshAccessToken()
+    accessToken = m.top.accessToken
+    ' An empty token refreshes regardless of the stored expiry — a Refreshing verdict
+    ' must always have a live job behind it, or a waiter blocks on a pulse that never comes.
+    if expiresTimestamp < nowSeconds + REFRESH_THRESHOLD_SECONDS or StringUtils.IsNullOrEmpty(accessToken)
+        StartRefreshJob()
+        if m.top.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            result.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
+            return result
+        end if
     end if
 
-    return not shouldRefreshToken
+    if not StringUtils.IsNullOrEmpty(accessToken) and expiresTimestamp > nowSeconds + VALIDITY_THRESHOLD_SECONDS
+        result.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+        result.token = accessToken
+    end if
+
+    return result
 end function
 
-function RefreshAccessToken() as void
-    if m.profileRefreshTokenJob <> invalid
+function StartRefreshJob() as void
+    if m.profileRefreshTokenJob <> invalid and not m.profileRefreshTokenJob.done
         return
     end if
 
-    if m.scene = invalid
-        m.scene = m.top.getScene()
+    ' A YouTube profile holds a refresh token by construction; none means the credential is gone.
+    if StringUtils.IsNullOrEmpty(m.top.refreshToken)
+        LogError("Refresh requested for profile without a refresh token")
+        MarkNeedsReauth(invalid)
+        return
     end if
-    if m.profilesService = invalid
-        m.profilesService = m.scene.findNode("ProfilesService")
-    end if
-    if m.jobQueue = invalid
-        m.jobQueue = m.scene.findNode("JobQueue")
-    end if
+
+    EnsureSceneRefs()
 
     LogInfo("Refreshing access token for profile:", m.top.username)
 
@@ -64,4 +90,47 @@ end function
 function OnProfileRefreshTokenJobDone(event as object) as void
     JobSystem.UnobserveCallback(event.getRoSGNode())
     m.profileRefreshTokenJob = invalid
+end function
+
+function MarkNeedsReauth(_unused as dynamic) as void
+    if m.top.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+        return
+    end if
+
+    m.top.update({
+        accessToken: ""
+        refreshToken: ""
+        expiresTimestamp: 0
+        authState: ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+    })
+    ' Wake any waiter blocked on a refresh; it re-resolves and sees NeedsReauth.
+    m.top.refreshCompleted = true
+
+    LogError("Profile credential is dead; sign-in required")
+
+    EnsureSceneRefs()
+    if m.profilesService <> invalid
+        m.profilesService@.SaveUserProfilesToRegistry()
+        currentProfile = m.profilesService.currentProfile
+        if currentProfile <> invalid and currentProfile.isSameNode(m.top)
+            m.profilesService.currentProfileChanged = true
+        end if
+    end if
+
+    DialogUtils.ShowDialogEx({
+        title: Tr(Locale.Dialogs.ProfileNeedsReauthTitle)
+        message: Tr(Locale.Dialogs.ProfileNeedsReauthMessage)
+    })
+end function
+
+function EnsureSceneRefs() as void
+    if m.scene = invalid
+        m.scene = m.top.getScene()
+    end if
+    if m.profilesService = invalid
+        m.profilesService = m.scene.findNode("ProfilesService")
+    end if
+    if m.jobQueue = invalid
+        m.jobQueue = m.scene.findNode("JobQueue")
+    end if
 end function

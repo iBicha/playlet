@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
@@ -5,7 +6,6 @@ import "pkg:/components/VideoFeed/PaginationType.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/Logging.bs"
-import "pkg:/source/utils/MessagePortUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/OptionUtils.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
@@ -66,6 +66,16 @@ namespace Invidious
             }
         end function
 
+        function GetCurrentProfile() as object
+            if m.profilesService = invalid
+                m.profilesService = m.invidiousNode.profilesService
+            end if
+            if m.profilesService = invalid
+                return invalid
+            end if
+            return m.profilesService.currentProfile
+        end function
+
         function GetInstance() as string
             if m.preferences = invalid
                 m.preferences = m.invidiousNode.preferences
@@ -90,21 +100,17 @@ namespace Invidious
             return m.preferences["invidious.instance"]
         end function
 
-        function MarkVideoWatched(videoId as dynamic, cancellation = invalid as object) as void
-            if StringUtils.IsNullOrEmpty(videoId)
+        function MarkVideoWatched(auth as ProfileContentAuthTokenUtils.AccessTokenResult, videoId as dynamic, cancellation = invalid as object) as void
+            if StringUtils.IsNullOrEmpty(videoId) or auth = invalid or auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
                 return
             end if
 
-            authToken = m.invidiousNode.authToken
-            if authToken = invalid
-                return
-            end if
-
-            url = `${authToken.instance}${Invidious.HISTORY_ENDPOINT}/${videoId}`
+            url = `${auth.serverUrl}${Invidious.HISTORY_ENDPOINT}/${videoId}`
             request = HttpClient.Post(url, "")
-            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
-            request.Await()
+            response = request.Await()
+            m.MarkNeedsReauthOn403(response, auth.profile)
         end function
 
         function SearchSuggestions(q as string, cancellation = invalid as object) as object
@@ -180,13 +186,18 @@ namespace Invidious
         end function
 
         function GetPlaylist(playlistId as string, index = 0 as integer, continuation = "" as string, cancellation = invalid as object) as object
-            authToken = m.invidiousNode.authToken
-            if authToken <> invalid
-                url = `${authToken.instance}${Invidious.AUTH_PLAYLISTS}/${playlistId}`
+            profile = m.GetCurrentProfile()
+            auth = invalid
+            if profile <> invalid
+                auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+            end if
+            isAuthenticatedRequest = auth <> invalid and auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+            if isAuthenticatedRequest
+                url = `${auth.serverUrl}${Invidious.AUTH_PLAYLISTS}/${playlistId}`
                 request = HttpClient.Get(url)
-                request.Headers(m.GetAuthenticationHeaders(authToken.token))
-                if not StringUtils.IsNullOrEmpty(authToken.activeIdentifyToken)
-                    request.QueryParam("activeIdentifyToken", authToken.activeIdentifyToken)
+                request.Headers(m.GetAuthenticationHeaders(auth.token))
+                if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
+                    request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
                 end if
             else
                 instance = m.GetInstance()
@@ -201,7 +212,11 @@ namespace Invidious
             end if
             request.Cancellation(cancellation)
 
-            return request.Await()
+            response = request.Await()
+            if isAuthenticatedRequest
+                m.MarkNeedsReauthOn403(response, auth.profile)
+            end if
+            return response
         end function
 
         function GetChannel(authorId as string, cancellation = invalid as object) as object
@@ -284,34 +299,24 @@ namespace Invidious
 
             request = HttpClient.Get(instance + endpoint.url)
 
-            authToken = invalid
+            profile = invalid
 
             if endpoint.authenticated = true
-                authToken = m.invidiousNode.authToken
-                if authToken = invalid
+                profile = m.GetCurrentProfile()
+                auth = invalid
+                if profile <> invalid
+                    auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+                end if
+                if auth = invalid or auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
                     return {
                         success: false
                         error: ERROR_NOT_AUTHENTICATED
                     }
                 end if
-                profileNode = authToken.profileNode
-                ' This is not the right place for a token refresh,
-                ' but it needs a refactor to be done properly.
-                if not profileNode@.HasValidAccessToken()
-                    messagePort = CreateObject("roMessagePort")
-                    MessagePortUtils.ObserveFieldScopedExSafe(profileNode, "accessToken", messagePort)
-                    msg = wait(10000, messagePort)
-                    profileNode.unobserveFieldScoped("accessToken")
-                    if msg <> invalid
-                        authToken.token = profileNode.accessToken
-                        m.invidiousNode.authToken = authToken
-                    end if
-                end if
-
-                request.Url(authToken.instance + endpoint.url)
-                request.Headers(m.GetAuthenticationHeaders(authToken.token))
-                if not StringUtils.IsNullOrEmpty(authToken.activeIdentifyToken)
-                    request.QueryParam("activeIdentifyToken", authToken.activeIdentifyToken)
+                request.Url(auth.serverUrl + endpoint.url)
+                request.Headers(m.GetAuthenticationHeaders(auth.token))
+                if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
+                    request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
                 end if
             end if
 
@@ -372,7 +377,7 @@ namespace Invidious
             result = m[responseHandler]({
                 feedSource: feedSource
                 response: response
-                authToken: authToken
+                profile: profile
             })
 
             if response.IsSuccess() and result <> invalid
@@ -606,9 +611,8 @@ namespace Invidious
 
         function AuthFeedHandler(context as object) as object
             response = context.response
-            authToken = context.authToken
 
-            m.DeleteExpiredToken(response, authToken)
+            m.MarkNeedsReauthOn403(response, context.profile)
 
             if not response.IsSuccess()
                 return invalid
@@ -642,9 +646,8 @@ namespace Invidious
 
         function WatchHistoryHandler(context as object) as object
             response = context.response
-            authToken = context.authToken
 
-            m.DeleteExpiredToken(response, authToken)
+            m.MarkNeedsReauthOn403(response, context.profile)
 
             if not response.IsSuccess()
                 return invalid
@@ -696,19 +699,16 @@ namespace Invidious
             return json
         end function
 
-        function DeleteExpiredToken(response as object, authToken as object) as void
+        ' A 403 on an authenticated call is terminal — only a fresh sign-in recovers.
+        function MarkNeedsReauthOn403(response as object, profile as object) as void
             if response.StatusCode() <> 403
                 return
             end if
 
             LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
-            if not IsAssociativeArray(authToken) or not IsString(authToken.token)
-                LogWarn("No valid token to delete")
-                return
+            if profile <> invalid and profile.type = "invidious"
+                profile@.MarkNeedsReauth()
             end if
-
-            LogInfo("Deleting Invidious token...")
-            m.invidiousNode.profilesService@.LogoutWithAccessToken(authToken.token)
         end function
 
         function VerifyTokenScope(token as string) as boolean
@@ -732,11 +732,11 @@ namespace Invidious
             return validScopes
         end function
 
-        function UnregisterToken(authToken as object) as object
-            url = `${authToken.instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
+        function UnregisterToken(instance as string, token as string) as object
+            url = `${instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
 
-            request = HttpClient.Post(url, authToken.token)
-            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request = HttpClient.Post(url, token)
+            request.Headers(m.GetAuthenticationHeaders(token))
             request.Header("Content-Type", "application/json")
 
             return request.Await()
@@ -763,52 +763,43 @@ namespace Invidious
             return `${invidiousHost}/authorize_token?scopes=${scope}&callback_url=${callbackUrl}&expire=${expire}`
         end function
 
-        function GetSubscriptions(cancellation = invalid as object) as object
-            authToken = m.invidiousNode.authToken
-            if authToken = invalid
-                return invalid
-            end if
-
-            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}`
+        function GetSubscriptions(auth as ProfileContentAuthTokenUtils.AccessTokenResult, cancellation = invalid as object) as object
+            url = `${auth.serverUrl}${Invidious.AUTH_SUBSCRIPTIONS}`
             request = HttpClient.Get(url)
-            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
 
-            return request.Await()
+            response = request.Await()
+            m.MarkNeedsReauthOn403(response, auth.profile)
+            return response
         end function
 
-        function Subscribe(channelId as string, cancellation = invalid as object) as object
-            authToken = m.invidiousNode.authToken
-            if authToken = invalid
-                return invalid
-            end if
-
-            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
+        function Subscribe(auth as ProfileContentAuthTokenUtils.AccessTokenResult, channelId as string, cancellation = invalid as object) as object
+            url = `${auth.serverUrl}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
             request = HttpClient.Post(url, "")
-            if not StringUtils.IsNullOrEmpty(authToken.activeIdentifyToken)
-                request.QueryParam("activeIdentifyToken", authToken.activeIdentifyToken)
+            if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
+                request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
             end if
-            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
 
-            return request.Await()
+            response = request.Await()
+            m.MarkNeedsReauthOn403(response, auth.profile)
+            return response
         end function
 
-        function Unsubscribe(channelId as string, cancellation = invalid as object) as object
-            authToken = m.invidiousNode.authToken
-            if authToken = invalid
-                return invalid
-            end if
-
-            url = `${authToken.instance}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
+        function Unsubscribe(auth as ProfileContentAuthTokenUtils.AccessTokenResult, channelId as string, cancellation = invalid as object) as object
+            url = `${auth.serverUrl}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
             request = HttpClient.Delete(url)
-            if not StringUtils.IsNullOrEmpty(authToken.activeIdentifyToken)
-                request.QueryParam("activeIdentifyToken", authToken.activeIdentifyToken)
+            if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
+                request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
             end if
-            request.Headers(m.GetAuthenticationHeaders(authToken.token))
+            request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
 
-            return request.Await()
+            response = request.Await()
+            m.MarkNeedsReauthOn403(response, auth.profile)
+            return response
         end function
     end class
 

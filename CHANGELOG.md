@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Signed-in accounts no longer get stuck sending failing requests after the login session expires
 
 ## [0.48.0] - 2026-07-01
 

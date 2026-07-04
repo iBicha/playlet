@@ -1,0 +1,135 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
+
+namespace Tests
+
+    @SGNode("Group")
+    @suite
+    class ProfileContentAuthTokenUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("ProfileContentAuthTokenUtils.DeriveAuthState")
+
+        @it("A YouTube profile with a refresh token is Authenticated, even with a stale access token")
+        function _()
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("youtube", "", "rt"), ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated)
+        end function
+
+        @it("A YouTube profile without a refresh token is NeedsReauth, even with an access token")
+        function _()
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("youtube", "stale", ""), ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth)
+        end function
+
+        @it("An Invidious profile derives from its access token")
+        function _()
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("invidious", "token", ""), ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated)
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("invidious", "", ""), ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth)
+        end function
+
+        @it("An Invidious token past its embedded expire is NeedsReauth")
+        function _()
+            nowSeconds = CreateObject("roDateTime").AsSeconds()
+            expired = FormatJson({ session: "v1:abc", expire: nowSeconds - 60, scopes: ["GET:subscriptions"], signature: "sig" })
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("invidious", expired, ""), ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth)
+        end function
+
+        @it("An Invidious token with a future expire is Authenticated")
+        function _()
+            nowSeconds = CreateObject("roDateTime").AsSeconds()
+            live = FormatJson({ session: "v1:abc", expire: nowSeconds + 3600, scopes: ["GET:subscriptions"], signature: "sig" })
+            m.assertEqual(ProfileContentAuthTokenUtils.DeriveAuthState("invidious", live, ""), ProfileContentAuthTokenUtils.ProfileAuthState.Authenticated)
+        end function
+
+        @describe("ProfileContentAuthTokenUtils.EnsureFreshAccessToken")
+
+        @it("Reports NeedsReauth for a NeedsReauth YouTube profile without starting a refresh")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "youtube"
+            node.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.state, ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth)
+            m.assertEqual(result.token, "")
+        end function
+
+        @it("Reports NeedsReauth for a NeedsReauth Invidious profile")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "invidious"
+            node.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.state, ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth)
+            m.assertEqual(result.token, "")
+        end function
+
+        @it("Returns the token of an authenticated Invidious profile")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "invidious"
+            node.accessToken = "inv-token"
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.state, ProfileContentAuthTokenUtils.AccessTokenState.Ok)
+            m.assertEqual(result.token, "inv-token")
+        end function
+
+        @it("Carries the request context so consumers need no further profile reads")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "invidious"
+            node.accessToken = "inv-token"
+            node.serverUrl = "https://instance.example"
+            node.activeIdentifyToken = "delegation-token"
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.serverUrl, "https://instance.example")
+            m.assertEqual(result.activeIdentifyToken, "delegation-token")
+            m.assertTrue(result.profile.isSameNode(node))
+        end function
+
+        @it("Returns a still-valid YouTube token without refreshing")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "youtube"
+            node.accessToken = "fresh-token"
+            node.refreshToken = "rt"
+            expiresTimestamp = CreateObject("roDateTime").AsSeconds() + 7200
+            node.expiresTimestamp = expiresTimestamp
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.state, ProfileContentAuthTokenUtils.AccessTokenState.Ok)
+            m.assertEqual(result.token, "fresh-token")
+            m.assertTrue(result.freshUntilSeconds = expiresTimestamp - 3600)
+        end function
+
+        @it("An empty access token with a live-looking expiry resolves immediately instead of waiting on a refresh that was never started")
+        function _()
+            ' No current code writes this state; the registry is a shared boundary (other
+            ' builds, tooling), and no stored state may park a waiter on a dead 30s wait.
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "youtube"
+            node.accessToken = ""
+            node.refreshToken = ""
+            node.expiresTimestamp = CreateObject("roDateTime").AsSeconds() + 7200
+            result = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(node)
+            m.assertEqual(result.state, ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth)
+            m.assertEqual(node.authState, ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth)
+        end function
+
+        @describe("ProfileContentNode.MarkNeedsReauth")
+
+        @it("Clears the credential and marks the profile in one transition")
+        function _()
+            node = CreateObject("roSGNode", "ProfileContentNode")
+            node.type = "youtube"
+            node.username = "dying"
+            node.accessToken = "tok"
+            node.refreshToken = "rt"
+            node.expiresTimestamp = 12345
+
+            node@.MarkNeedsReauth()
+
+            m.assertEqual(node.accessToken, "")
+            m.assertEqual(node.refreshToken, "")
+            m.assertEqual(node.expiresTimestamp, 0&)
+            m.assertEqual(node.authState, ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth)
+        end function
+
+    end class
+
+end namespace

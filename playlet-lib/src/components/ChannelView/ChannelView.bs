@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/ContextMenu/ContextMenuUtils.bs"
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
@@ -44,7 +45,7 @@ function OnNodeready()
     DisposableObserveFieldScoped(m.subscribeButton, "buttonSelected", FuncName(OnSubscribeButtonSelected))
 
     SetSubscribeButtonVisibility()
-    DisposableObserveFieldScoped(m.invidious, "authToken", FuncName(SetSubscribeButtonVisibility))
+    DisposableObserveFieldScoped(m.profilesService, "currentProfileChanged", FuncName(SetSubscribeButtonVisibility))
     OnSubscriptionChanged()
     DisposableObserveFieldScoped(m.invidious, "subscriptions", FuncName(OnSubscriptionChanged))
 end function
@@ -172,7 +173,19 @@ function OnDispose()
     end if
 end function
 
-function OnSubscribeButtonSelected()
+function OnSubscribeButtonSelected() as void
+    profile = m.profilesService.currentProfile
+    if profile = invalid
+        return
+    end if
+    if profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+        DialogUtils.ShowDialogEx({
+            title: Tr(Locale.Dialogs.ProfileNeedsReauthTitle)
+            message: Tr(Locale.Dialogs.ProfileNeedsReauthMessage)
+        })
+        return
+    end if
+
     if m.subscribeJob <> invalid
         m.subscribeJob.cancel = true
     end if
@@ -185,6 +198,7 @@ function OnSubscribeButtonSelected()
         invidious: m.invidious
         ucid: m.authorId
         subscribe: not m.top.isSubscribed
+        profile: profile
     }
 
     m.subscribeJob = JobSystem.CreateCallback()
@@ -367,7 +381,7 @@ function GetSortingContextMenuOptionsForItem(video as object) as object
 end function
 
 function IsLoggedIn() as boolean
-    return m.invidious.authToken <> invalid
+    return m.profilesService.currentProfile <> invalid
 end function
 
 function OnAuthorIdChange()
@@ -386,7 +400,8 @@ function SetSubscribeButtonVisibility()
 end function
 
 function FetchSubscriptionStatus() as void
-    if not IsLoggedIn()
+    profile = m.profilesService.currentProfile
+    if profile = invalid or profile.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
         return
     end if
 
@@ -402,7 +417,7 @@ function FetchSubscriptionStatus() as void
     input = {
         channelView: m.top
         ucid: authorId
-        authToken: m.invidious.authToken
+        profile: profile
         invidious: m.invidious
     }
 

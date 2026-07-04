@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/ArrayUtils.bs"
@@ -68,6 +69,8 @@ function LoadProfilesFromRegistry()
 
         profileNode.color = profile.color
 
+        profileNode.authState = ProfileContentAuthTokenUtils.DeriveAuthState(ValidString(profile.type), profile.accessToken, profile.refreshToken)
+
         profileNodes.Push(profileNode)
     end for
 
@@ -88,7 +91,6 @@ function LoadProfilesFromRegistry()
 
     if profileNodes.Count() > 0
         input = {
-            profilesService: m.top
             invidious: m.invidious
             profileNodes: profileNodes
         }
@@ -231,6 +233,10 @@ function LoginWithProfile(newProfile as object)
         newProfile.color = ColorUtils.RandomSoftColorHex()
         m.profilesContent.insertChild(newProfile, 0)
     end if
+
+    ' The id-merge above reuses the existing node, which may carry NeedsReauth — re-derive.
+    newProfile.authState = ProfileContentAuthTokenUtils.DeriveAuthState(newProfile.type, newProfile.accessToken, newProfile.refreshToken)
+
     SetCurrentProfile(newProfile)
 end function
 
@@ -301,38 +307,11 @@ function LogoutWithProfiles(profiles as object) as void
     JobSystem.QueueJob(m.jobQueue, Jobs.ProfilesInvidiousUnregisterTokenJob, input)
 end function
 
-function LogoutWithAccessToken(accessToken as dynamic) as void
-    if StringUtils.IsNullOrEmpty(accessToken)
-        return
-    end if
-
-    ' We are not going to invalidate the token on the server
-    ' because we are likely dealing with an invalid token
-    ' in the first place. All we need to do is remove the
-    ' profile from the list of profiles.
-
-    allProfiles = m.profilesContent.getChildren(-1, 0)
-    for each profile in allProfiles
-        if profile.accessToken = accessToken
-            m.profilesContent.removeChild(profile)
-            currentProfile = m.top.currentProfile
-            if currentProfile <> invalid and currentProfile.id = profile.id
-                SetCurrentProfile(invalid)
-            else
-                RefreshActiveProfileState(currentProfile)
-                SaveUserProfilesToRegistry(invalid)
-            end if
-            m.top.onProfileLogout = true
-            exit for
-        end if
-    end for
-end function
-
 function SetCurrentProfile(newActiveProfile as object) as void
     if newActiveProfile = invalid
         RefreshActiveProfileState(invalid)
         m.top.currentProfile = invalid
-        m.invidious.authToken = invalid
+        m.top.currentProfileChanged = true
         LogInfo("Current profile set to <invalid>")
         SaveUserProfilesToRegistry(invalid)
         return
@@ -341,13 +320,7 @@ function SetCurrentProfile(newActiveProfile as object) as void
     RefreshActiveProfileState(newActiveProfile)
 
     m.top.currentProfile = newActiveProfile
-    m.invidious.authToken = {
-        token: newActiveProfile.accessToken
-        instance: newActiveProfile.serverUrl
-        username: newActiveProfile.username
-        activeIdentifyToken: newActiveProfile.activeIdentifyToken
-        profileNode: newActiveProfile
-    }
+    m.top.currentProfileChanged = true
     LogInfo("Current profile set to", newActiveProfile.username, "@", newActiveProfile.serverUrl)
     SaveUserProfilesToRegistry(invalid)
 end function

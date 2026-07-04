@@ -829,10 +829,6 @@
         <translation>Error al cargar la playlist</translation>
     </message>
     <message>
-        <source>User logged out</source>
-        <translation>Usuario cerró sesión</translation>
-    </message>
-    <message>
         <source>Failed to load playlist %1</source>
         <translation>Error al cargar la playlist %1</translation>
     </message>
@@ -923,10 +919,6 @@
     <message>
         <source>Tap &apos;Link with TV code&apos; and enter the code below.</source>
         <translation>Presiona &quot;Vincular con código de TV&quot;, y luego, ingresa el código que se muestra abajo.</translation>
-    </message>
-    <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>Parece que has iniciado sesión en Invidious, pero no tienes los permisos necesarios.\nPor esta razón, hemos cerrado tu sesión en los siguientes perfiles: %1\nPor favor, accede de nuevo.\nEsto puede pasar cuando Playlet es actualizado con nuevas características.\nLo sentimos por la inconveniencia.</translation>
     </message>
     <message>
         <source>Tap the cast icon and select %1</source>

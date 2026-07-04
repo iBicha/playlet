@@ -1,3 +1,4 @@
+import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
@@ -10,6 +11,7 @@ function Init()
     m.activateButton = m.top.findNode("activateButton")
     m.logoutButton = m.top.findNode("logoutButton")
     m.closeButton = m.top.findNode("closeButton")
+    m.reauthLabel = m.top.findNode("ReauthLabel")
 
     DisposableObserveField(m.activateButton, "buttonSelected", FuncName(Activate))
     DisposableObserveField(m.logoutButton, "buttonSelected", FuncName(Logout))
@@ -29,6 +31,7 @@ end function
 function OnContentSet() as void
     content = m.top.content
     if content = invalid
+        m.reauthLabel.visible = false
         return
     end if
 
@@ -69,6 +72,8 @@ function OnContentSet() as void
         m.top.serverUrl = ""
         m.top.backendTypePosterUri = ""
     end if
+
+    UpdateReauthState(content)
 
     UpdateActivateButton()
 end function
@@ -138,6 +143,17 @@ end function
 function OnDispose()
     DisposeObservers()
     m.top.content = invalid
+end function
+
+function UpdateReauthState(content as object) as void
+    needsReauth = content.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+    if needsReauth
+        m.reauthLabel.text = [
+            Tr(Locale.Dialogs.ProfileNeedsReauthMessageLine1)
+            Tr(Locale.Dialogs.ProfileNeedsReauthMessageLine2)
+        ].Join(Chr(10))
+    end if
+    m.reauthLabel.visible = needsReauth
 end function
 
 function OnCunrrentProfileChanged() as void

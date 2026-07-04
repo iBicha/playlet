@@ -217,14 +217,6 @@
         <translation>Erro ao carregar o feed</translation>
     </message>
     <message>
-        <source>User logged out</source>
-        <translation>Usuário desconectado</translation>
-    </message>
-    <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>Parece que você está logado no Invidious, mas não tem as permissões necessárias.\nPor esse motivo, nós o desconectamos dos seguintes perfis: %1\nPor favor, faça login novamente.\nIsso pode acontecer quando o Playlet é atualizado com novos recursos.\nPedimos desculpas pelo inconveniente.</translation>
-    </message>
-    <message>
         <source>Lounge service setup error</source>
         <translation>Erro ao configurar o serviço de lounge</translation>
     </message>

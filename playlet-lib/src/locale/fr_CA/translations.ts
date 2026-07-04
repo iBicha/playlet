@@ -209,14 +209,6 @@
         <translation>Échec du chargement du flux</translation>
     </message>
     <message>
-        <source>User logged out</source>
-        <translation>Utilisateur déconnecté</translation>
-    </message>
-    <message>
-        <source>It looks like you are logged in to Invidious, but do not have the required permissions.\nFor that reason, we have logged you out from the following profiles: %1\nPlease log in again.\nThis can happen when Playlet is updated with new features.\nWe apologize for the inconvenience.</source>
-        <translation>Il semble que vous soyez connecté à Invidious, mais n&apos;avez pas les permissions requises.\nPour cette raison, nous vous avons déconnecté des profils suivants : %1\nVeuillez vous reconnecter.\nCela peut se produire lorsque Playlet est mis à jour avec de nouvelles fonctionnalités.\nNous nous excusons pour la gêne occasionnée.</translation>
-    </message>
-    <message>
         <source>Lounge service setup error</source>
         <translation>Erreur de configuration du service Lounge</translation>
     </message>

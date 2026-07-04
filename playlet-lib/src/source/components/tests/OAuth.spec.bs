@@ -1,0 +1,27 @@
+import "pkg:/components/Services/Innertube/OAuth.bs"
+
+namespace Tests
+
+    @suite
+    class InnertubeOAuthTerminalErrorTests extends Rooibos.BaseTestSuite
+
+        @describe("Innertube.IsTerminalRefreshError")
+
+        @it("Returns true for terminal OAuth error codes (RFC 6749 §5.2)")
+        function _()
+            m.assertTrue(Innertube.IsTerminalRefreshError({ error: "invalid_grant" }))
+            m.assertTrue(Innertube.IsTerminalRefreshError({ error: "invalid_client" }))
+            m.assertTrue(Innertube.IsTerminalRefreshError({ error: "unauthorized_client" }))
+        end function
+
+        @it("Returns false for transient, successful, or non-object bodies")
+        function _()
+            m.assertFalse(Innertube.IsTerminalRefreshError({ error: "authorization_pending" }))
+            m.assertFalse(Innertube.IsTerminalRefreshError({ access_token: "ya29.abc" }))
+            m.assertFalse(Innertube.IsTerminalRefreshError({}))
+            m.assertFalse(Innertube.IsTerminalRefreshError(invalid))
+        end function
+
+    end class
+
+end namespace
