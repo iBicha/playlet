@@ -1106,10 +1106,10 @@ namespace Innertube
 
     ' The badge overlay has two shapes: thumbnailOverlayBadgeViewModel.thumbnailBadges (older, still
     ' used on playlist/podcast/album lockups) and thumbnailBottomOverlayViewModel.badges (video lockups)
-    function GetThumbnailBadgeText(thumbnailViewModel as object) as string
+    function ParseThumbnailBadge(thumbnailViewModel as object) as object
         overlays = ObjectUtils.Dig(thumbnailViewModel, ["overlays"])
         if not IsArray(overlays)
-            return ""
+            return invalid
         end if
 
         for each overlay in overlays
@@ -1117,17 +1117,34 @@ namespace Innertube
             if not IsArray(badges)
                 badges = ObjectUtils.Dig(overlay, ["thumbnailOverlayBadgeViewModel", "thumbnailBadges"])
             end if
-            if IsArray(badges)
-                for each badge in badges
-                    text = ValidString(ObjectUtils.Dig(badge, ["thumbnailBadgeViewModel", "text"]))
-                    if text <> ""
-                        return text
-                    end if
-                end for
+            if not IsArray(badges)
+                continue for
             end if
+            for each badge in badges
+                badgeViewModel = badge["thumbnailBadgeViewModel"]
+                if not IsAssociativeArray(badgeViewModel)
+                    continue for
+                end if
+                text = ValidString(badgeViewModel["text"])
+                if text = ""
+                    continue for
+                end if
+                return {
+                    "text": text
+                    "isLive": ValidString(badgeViewModel["badgeStyle"]) = "THUMBNAIL_OVERLAY_BADGE_STYLE_LIVE"
+                }
+            end for
         end for
 
-        return ""
+        return invalid
+    end function
+
+    function GetThumbnailBadgeText(thumbnailViewModel as object) as string
+        parsedBadge = ParseThumbnailBadge(thumbnailViewModel)
+        if parsedBadge = invalid
+            return ""
+        end if
+        return parsedBadge.text
     end function
 
     function LockupViewModelTypeVideo(nodeData as object, context as object) as object
@@ -1151,7 +1168,17 @@ namespace Innertube
             end if
         end if
 
-        lengthText = GetThumbnailBadgeText(thumbnailViewModel)
+        lengthText = ""
+        liveNow = false
+        parsedBadge = ParseThumbnailBadge(thumbnailViewModel)
+        if parsedBadge <> invalid
+            if parsedBadge.isLive
+                liveNow = true
+            else
+                lengthText = parsedBadge.text
+            end if
+        end if
+
 
         authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
 
@@ -1183,6 +1210,7 @@ namespace Innertube
             "lines": lines
             "videoThumbnails": videoThumbnails
             "lengthText": lengthText
+            "liveNow": liveNow
         }
 
         PushFeedItem(video, context)
