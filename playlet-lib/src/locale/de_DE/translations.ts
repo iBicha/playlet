@@ -1384,5 +1384,13 @@
         <source>Rewind live TV</source>
         <translation>Live-TV zurückspulen</translation>
     </message>
+    <message>
+        <source>Session expired</source>
+        <translation>Sitzung abgelaufen</translation>
+    </message>
+    <message>
+        <source>The session has expired.</source>
+        <translation>Die Sitzung ist abgelaufen.</translation>
+    </message>
 </context>
 </TS>
