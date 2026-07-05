@@ -63,6 +63,14 @@ the exhaustive + seeded-fuzz suite (`TransportControllerCompleteness.spec.bs`). 
 predicate, so it is not in this catalog — it is enforced by `FreezeForTransport` and tested at the seam as
 P-seam, `VideoPlayerDevSeam.spec.bs`.)
 
+Back is a ladder, also a transition property (not an INV-B snapshot predicate, since it rides `ChromeMode` —
+a coordinator field, not a brain one): a transport active cancels it and keeps watching (on live the cancel
+also resumes at the frozen playhead — idle-paused live has no OK-resume and cannot hold near the DVR floor
+anyway; VOD stays paused, the settled cancel/commit asymmetry); else idle with the chrome up dismisses it
+(the same animated fade auto-hide uses); else a chrome still mid fade-out consumes the press and lets the
+fade finish (a visible chrome never exits); else nothing is left to dismiss and Back closes. Tested at the
+seam, `VideoPlayerDevSeam.spec.bs` ("Back ladder").
+
 **INV-D\* (device-seam)** — need the live `Video.state` (no brain field for it), so checked on-device by
 `assertPlayerInvariants()` after every input (`pressChecked`) in the integration harness:
 

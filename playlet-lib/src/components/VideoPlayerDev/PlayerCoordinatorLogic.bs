@@ -7,6 +7,16 @@ import "pkg:/source/utils/Types.bs"
 ' buffering-spinner gate. None of these touch a node, so they are plain functions of their inputs; the player
 ' applies the results to the Video node, the chrome, and the renderers.
 
+' The chrome fade state the coordinator owns (the Chrome group opacity as one unit). Declared here (file
+' scope, not in the namespace) because the Back ladder decides over it; the coordinator keeps using the
+' bare ChromeMode.* names via its import of this file.
+enum ChromeMode
+    Hidden = 0
+    FadingIn = 1
+    Shown = 2
+    FadingOut = 3
+end enum
+
 namespace PlayerCoordinatorLogic
 
     ' What an OK/Select press does while no transport is active. Live toggles the HUD without pausing; VOD
@@ -23,6 +33,15 @@ namespace PlayerCoordinatorLogic
         Freeze = 1 ' the video is advancing under a transport -> the coordinator must re-pause it
         FinishEof = 2 ' VOD played to the end under a transport also sitting at the end -> finish, don't re-pause forever
         ResumeLiveTail = 3 ' live: the sliding DVR tail overtook the frozen playhead -> resolve forward, a re-pause cannot stick
+    end enum
+
+    ' The Back ladder. Priority = enum order: an active transport outranks the chrome, which outranks
+    ' closing — a Back while ANY chrome is on screen never exits.
+    enum BackAction
+        CancelTransport = 0 ' a transport is active -> cancel it, keep watching, never exit
+        DismissChrome = 1 ' idle, chrome shown/fading in -> dismiss it (the same animated fade auto-hide uses)
+        None = 2 ' idle, chrome mid fade-out -> the dismissal is already underway: consume the press, let it finish
+        Close = 3 ' idle, chrome fully hidden -> nothing left to dismiss: close
     end enum
 
     ' The buttons in the row above the trackbar, in focus order (the index). The COUNT is owned by ButtonRow
@@ -70,6 +89,23 @@ namespace PlayerCoordinatorLogic
             return OkAction.Resume
         end if
         return OkAction.Reveal
+    end function
+
+    ' The Back decision. A press while the chrome is still visible in ANY form never exits: shown/fading-in
+    ' dismisses (animated); mid fade-out the dismissal is already underway, so the press is consumed and the
+    ' fade just finishes (the user can still see the UI, so Back must not read as "nothing left to undo").
+    ' Only a fully hidden chrome falls through to Close.
+    function BackActionFor(transportMode as integer, chrome as integer) as integer
+        if transportMode <> TransportController.Mode.Idle
+            return BackAction.CancelTransport
+        end if
+        if chrome = ChromeMode.Shown or chrome = ChromeMode.FadingIn
+            return BackAction.DismissChrome
+        end if
+        if chrome = ChromeMode.FadingOut
+            return BackAction.None
+        end if
+        return BackAction.Close
     end function
 
     ' The mid-stream buffering spinner shows only after the first frame, while idle, and while fullscreen.

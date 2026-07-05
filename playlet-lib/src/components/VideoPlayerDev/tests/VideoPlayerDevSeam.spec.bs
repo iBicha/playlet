@@ -191,6 +191,132 @@ namespace Tests
             m.assertTrue(m.Snap().chromeShown, "Up revealed the chrome")
         end function
 
+        ' =========================================================================================
+        ' Back ladder — a transport active > the chrome visible in any form > nothing left to dismiss.
+        ' =========================================================================================
+
+        ' Rung 1: a transport active -> Back cancels it and KEEPS WATCHING (never exits). VOD stays exactly
+        ' where the freeze put it: PAUSED (no resume intent — the settled cancel/commit asymmetry). Also
+        ' re-arms auto-hide: OnAutoHideFire no-ops without rearming itself (repeat=false) while a transport is
+        ' active, so a scrub that outlasted the 5s timer leaves it dead — TestKillAutoHide models that fired
+        ' state first, otherwise the "start" read here would pass even with the rearm deleted (a fired Timer
+        ' still READS control="start").
+        @it("Back while a VOD transport is active cancels it (rung 1): keeps watching, stays paused, chrome stays up, auto-hide is rearmed")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' transport-key reveal + freeze the scrub
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.Scrub)
+            m.assertTrue(mid.chromeShown)
+            m.assertEqual(mid.control, VideoControl.Pause, "the scrub froze the device")
+            m.top.callFunc("TestKillAutoHide") ' the 5s auto-hide fired mid-scrub: timer dead
+
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Idle, "Back cancelled the transport")
+            m.assertFalse(m.top.videoQueue.closePlayer, "Back must NOT exit while a transport was active -- it only cancels")
+            m.assertEqual(after.control, VideoControl.Pause, "a VOD cancel emits NO intent: the device stays where the freeze put it (paused)")
+            m.assertTrue(after.chromeShown, "the HUD stays up; only the transport is cancelled")
+            m.assertEqual(after.autoHideControl, "start", "auto-hide is rearmed -- else the chrome would be stuck shown (the timer died mid-transport)")
+        end function
+
+        ' Rung 1 on LIVE: cancel also RESUMES at the frozen playhead, without a seek. Idle-paused live is a
+        ' dead end (OK only toggles the HUD on live, and the paused playhead drifts toward the DVR floor
+        ' until the device force-resumes it anyway), so the cancel emits the resume itself.
+        @it("Back while a live transport is active (rung 1): cancels AND resumes at the frozen playhead, no seek")
+        function _()
+            m.top.callFunc("TestSetLive", 43200000) ' 12h stream at the edge, 4h window
+            seekBefore = m.top.seek
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' rewind: LiveDvr + freeze
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.LiveDvr)
+            m.assertEqual(mid.control, VideoControl.Pause, "the live transport froze the device")
+
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Idle, "Back cancelled the transport")
+            m.assertFalse(m.top.videoQueue.closePlayer)
+            m.assertEqual(after.control, VideoControl.Resume, "a LIVE cancel resumes -- idle-paused live has no OK-resume and cannot hold anyway")
+            m.assertEqual(m.top.seek, seekBefore, "the resume carries NO seek: playback continues from the frozen playhead, still behind the edge")
+        end function
+
+        ' Rung 2: idle, chrome shown -> Back dismisses it with the SAME animated fade auto-hide uses
+        ' (HideChrome), not the instant HideChromeNow, and does not exit.
+        @it("Back while idle with the chrome up dismisses it via the animated fade (rung 2): does not exit")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' idle reveal, no transport
+            mid = m.Snap()
+            m.assertEqual(mid.transportMode, TransportController.Mode.Idle)
+            m.assertTrue(mid.chromeShown)
+
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            after = m.Snap()
+            m.assertFalse(m.top.videoQueue.closePlayer, "Back must NOT exit while the chrome was up -- it only dismisses the HUD")
+            m.assertTrue(after.chromeFadingOut, "Back used the animated HideChrome fade (matches auto-hide), not the instant HideChromeNow")
+        end function
+
+        ' Rung 3: idle, chrome mid fade-out (the user can still SEE it) -> Back is CONSUMED but does nothing:
+        ' the dismissal is already underway, so the fade just keeps running. Only once it completes (modeled
+        ' via TestFinishChromeFadeOut — test time can't wait out the 0.3s) does Back close.
+        @it("Back while the chrome is fading out no-ops (rung 3): the fade continues, no exit; Back closes only once fully hidden")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal...
+            m.top.callFunc("TestKey", RemoteKeys.Back, true) ' ...dismiss: now fading out
+            m.assertTrue(m.Snap().chromeFadingOut)
+
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            after = m.Snap()
+            m.assertFalse(m.top.videoQueue.closePlayer, "a Back while the chrome is still visible must NOT exit")
+            m.assertTrue(after.chromeFadingOut, "the fade keeps running -- Back neither restarts, completes, nor cancels it")
+
+            ' the fade completes -> fully hidden -> NOW Back closes.
+            m.top.callFunc("TestFinishChromeFadeOut")
+            m.assertFalse(m.Snap().chromeFadingOut)
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            m.assertTrue(m.top.videoQueue.closePlayer, "once fully hidden, Back closes")
+        end function
+
+        ' Rung 4: idle, chrome fully hidden -> nothing left to dismiss -> close (today's original behavior).
+        @it("Back while idle with the chrome already hidden closes the player (rung 4, unchanged)")
+        function _()
+            m.assertFalse(m.Snap().chromeShown, "starts hidden after setup")
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            m.assertTrue(m.top.videoQueue.closePlayer, "nothing left to dismiss -> Back closes")
+        end function
+
+        ' The full ladder driven in one sequence: cancel transport -> dismiss chrome -> no-op while fading ->
+        ' close once hidden. Proves the rungs compose correctly across successive presses, not just in isolation.
+        @it("the full Back ladder in sequence: cancel transport -> dismiss chrome -> no-op while fading -> close once hidden")
+        function _()
+            ' step 1: transport active -> cancel, keep watching, chrome still up.
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub)
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            step1 = m.Snap()
+            m.assertEqual(step1.transportMode, TransportController.Mode.Idle)
+            m.assertFalse(m.top.videoQueue.closePlayer)
+            m.assertTrue(step1.chromeShown, "rung 1 leaves the chrome up")
+
+            ' step 2: idle, chrome still up from rung 1 -> Back dismisses it (animated).
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            step2 = m.Snap()
+            m.assertFalse(m.top.videoQueue.closePlayer)
+            m.assertTrue(step2.chromeFadingOut, "rung 2 dismisses via the animated fade")
+
+            ' step 3: still fading out (the user can see it) -> Back is consumed, the fade keeps running.
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            step3 = m.Snap()
+            m.assertFalse(m.top.videoQueue.closePlayer, "rung 3 never exits")
+            m.assertTrue(step3.chromeFadingOut, "rung 3 lets the fade finish on its own")
+
+            ' step 4: the fade completes -> chrome fully hidden -> nothing left to dismiss -> close.
+            m.top.callFunc("TestFinishChromeFadeOut")
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            m.assertTrue(m.top.videoQueue.closePlayer, "rung 4: Back closes")
+        end function
+
         ' The point of the bar-default: Left/Right seek and OK pauses with no navigation at all, straight off a
         ' fresh reveal. Pinned as its own test rather than left as a side effect of the tier round-trip tests.
         @it("a fresh idle reveal defaults focus to the bar: Left/Right seek and OK pauses with no navigation")
@@ -424,7 +550,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastExitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "healCount", "tailResolveCount"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "healCount", "tailResolveCount"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden

@@ -132,10 +132,9 @@ namespace TransportController
         private videoIntent as object = invalid
         private intentSeq as integer = 0
 
-        ' commitSeq / exitSeq / finishSeq — pulse counters the coordinator compares to its last-seen value.
-        ' finishSeq pulses when a VOD commit lands at the very end (-> the coordinator finishes playback).
+        ' commitSeq / finishSeq — pulse counters the coordinator compares to its last-seen value. finishSeq
+        ' pulses when a VOD commit lands at the very end (-> the coordinator finishes playback).
         commitSeq as integer = 0
-        exitSeq as integer = 0
         finishSeq as integer = 0
 
         ' timerCmd — the timer schedule the coordinator mirrors onto a real Timer node.
@@ -708,16 +707,22 @@ namespace TransportController
             m.cursorMs = m.positionMs
         end function
 
-        ' Back while a transport is active: reset + pulse exit so the coordinator routes it (close).
-        function Cancel() as void
-            m.ResetToIdle()
-            m.exitSeq = m.exitSeq + 1
-        end function
-
-        ' Minimize (Down): reset to idle WITHOUT a seek/resume/exit pulse. The play/pause state is left exactly as
-        ' it was (no videoIntent emitted).
+        ' Reset an active transport to idle WITHOUT a seek/resume/exit pulse: the play/pause state is left
+        ' exactly as it was (no videoIntent emitted). Used by the involuntary resets — Minimize (Down), video
+        ' error, EOF finish, PiP/Lounge cutovers — which silently return to idle while the player keeps running.
         function ResetTransport() as void
             m.ResetToIdle()
+        end function
+
+        ' Back's rung-1 cancel: reset to idle, and on LIVE also resume at the frozen playhead (no seek — still
+        ' behind the edge). Idle-paused live is a dead end: OK never resumes on live (it only toggles the HUD),
+        ' the paused playhead drifts toward the DVR floor, and the device force-resumes it there anyway. VOD
+        ' stays exactly where the freeze put it — paused (canceling and committing are intentionally asymmetric).
+        function CancelTransport() as void
+            m.ResetToIdle()
+            if m.isLive
+                m.EmitIntent(TransportController.Control.Resume, false, 0)
+            end if
         end function
 
         ' An EXTERNAL authority (SponsorBlock skip) seeks while a transport may be active. Route it THROUGH the

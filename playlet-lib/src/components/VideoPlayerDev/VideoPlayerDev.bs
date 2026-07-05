@@ -31,13 +31,8 @@ const INV_D1_TELEMETRY_CAP = 3
 ' fields. Renderers self-derive visibility from transportMode (commit sets mode=idle and the bif vanishes by
 ' its own rule — no hide call needed).
 
-' The coordinator owns the Chrome group opacity as one unit.
-enum ChromeMode
-    Hidden = 0
-    FadingIn = 1
-    Shown = 2
-    FadingOut = 3
-end enum
+' ChromeMode (the Chrome group fade state, owned here as one unit) lives in PlayerCoordinatorLogic.bs —
+' the Back ladder decides over it.
 
 ' Int values the coordinator pushes onto LoadBufferSpinner.mode. Kept local to avoid importing the component's
 ' .bs (which would collide on Init).
@@ -76,7 +71,6 @@ function Initialize()
     m.focusedButton = 0
     m.armedTimerId = TransportController.Timer.None ' which module timer the single transportTimer holds
     m.lastCommitSeq = 0
-    m.lastExitSeq = 0
     m.lastFinishSeq = 0
     ' a keep-playing seek (SponsorBlock skip / InstantReplay) was issued while the device was PAUSED. The
     ' device auto-resumes on any seek (autoplayAfterSeek only governs resume-after-REBUFFER per the Video
@@ -270,12 +264,6 @@ function ApplyTransport() as void
             m.spinner.mode = SpinMode.Off
         end if
         HideChrome()
-    end if
-
-    ' Back while a transport was active -> the module pulses exitSeq -> close.
-    if m.transport.exitSeq <> m.lastExitSeq
-        m.lastExitSeq = m.transport.exitSeq
-        ClosePlayer()
     end if
 
     ' a VOD commit at the very end pulses finishSeq: watched to the end -> PlayNext/close, no seek.
@@ -483,15 +471,32 @@ function OnPlayPress() as boolean
     return true
 end function
 
-' Back — if a transport is active, cancel it then close; if minimized, the container restores; else close.
+' Back — a ladder: a transport active > the chrome visible in any form > nothing left to dismiss.
+'   1. transport active        -> cancel it (keep watching, never exit; live also resumes)
+'   2. idle, chrome shown      -> dismiss it (the same animated fade auto-hide uses)
+'   3. idle, chrome fading out -> no-op: the dismissal is already underway (a visible chrome never closes)
+'   4. idle, chrome hidden     -> close the player
 function OnBackPress() as boolean
-    if m.transport.transportMode <> TransportController.Mode.Idle
-        m.transport.Cancel()
-        ApplyTransport() ' drains the exit pulse -> ClosePlayer
-        return true
-    end if
-    ClosePlayer()
+    action = PlayerCoordinatorLogic.BackActionFor(m.transport.transportMode, m.chromeMode)
+    ApplyBackAction(action)
     return true
+end function
+
+' Apply the Back decision to the transport / chrome / player.
+function ApplyBackAction(action as integer) as void
+    if action = PlayerCoordinatorLogic.BackAction.CancelTransport
+        m.transport.CancelTransport() ' live also emits a resume at the frozen playhead; VOD stays paused
+        ApplyTransport() ' drains the timer-stop + any resume intent, pushes mode=idle so the bif/glyph self-hide
+        ' OnAutoHideFire no-ops (and does NOT rearm itself, repeat="false") while a transport is active, so a
+        ' scrub/scan/liveDvr that outlasted the 5s auto-hide would leave the timer dead -- rearm it here or the
+        ' chrome could be stuck shown forever.
+        ArmAutoHide()
+    else if action = PlayerCoordinatorLogic.BackAction.DismissChrome
+        HideChrome() ' the same animated 0.3s fade the 5s auto-hide uses -- not the instant HideChromeNow
+    else if action = PlayerCoordinatorLogic.BackAction.Close
+        ClosePlayer()
+    end if
+    ' BackAction.None (mid fade-out) falls through: the press is consumed and the fade finishes on its own.
 end function
 
 '===============================================================================

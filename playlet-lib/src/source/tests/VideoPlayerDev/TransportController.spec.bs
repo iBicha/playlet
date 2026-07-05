@@ -150,15 +150,35 @@ namespace Tests
             m.assertEqual(m.t.cursorMs, 64000)
         end function
 
-        @it("cancel (Back) resets to idle and pulses exit, emitting no seek")
+        @it("ResetTransport (Minimize and the other involuntary resets) resets to idle, emitting no seek/resume/exit")
         function _()
             m.t.HandleCommand(TransportController.Command.Right)
             m.t.TakeVideoIntent() ' drain the freeze
-            seqBefore = m.t.exitSeq
-            m.t.Cancel()
+            m.t.ResetTransport()
             m.assertEqual(m.t.transportMode, TransportController.Mode.Idle)
-            m.assertEqual(m.t.exitSeq, seqBefore + 1)
             m.assertInvalid(m.t.TakeVideoIntent())
+        end function
+
+        @it("CancelTransport (Back) on VOD resets to idle and emits NOTHING: the device stays where the freeze put it")
+        function _()
+            m.t.HandleCommand(TransportController.Command.Right)
+            m.t.TakeVideoIntent() ' drain the freeze
+            m.t.CancelTransport()
+            m.assertEqual(m.t.transportMode, TransportController.Mode.Idle)
+            m.assertInvalid(m.t.TakeVideoIntent())
+        end function
+
+        @it("CancelTransport (Back) on LIVE resets to idle and emits a RESUME with no seek (playback continues from the frozen playhead)")
+        function _()
+            t = m.Live()
+            t.HandleCommand(TransportController.Command.Left)
+            m.assertEqual(t.transportMode, TransportController.Mode.LiveDvr)
+            t.TakeVideoIntent() ' drain the freeze
+            t.CancelTransport()
+            m.assertEqual(t.transportMode, TransportController.Mode.Idle)
+            intent = t.TakeVideoIntent()
+            m.assertEqual(intent.control, TransportController.Control.Resume)
+            m.assertFalse(intent.hasSeek, "no seek: the playhead stays where the freeze left it, still behind the edge")
         end function
 
         ' =========================================================================================

@@ -123,6 +123,21 @@ function TestFireLiveBadgeHold() as void
     OnLiveBadgeHoldFire()
 end function
 
+' TestKillAutoHide — model the one-shot auto-hide timer having FIRED (mid-transport it no-ops without
+' rearming, leaving the timer dead). A fired Timer's control field still reads the last-written "start", so
+' the spec must stop it explicitly — otherwise a rearm assertion could never fail.
+function TestKillAutoHide() as void
+    m.autoHide.control = "stop"
+end function
+
+' TestFinishChromeFadeOut — complete the running 0.3s dismiss fade now (the spec can't wait it out).
+' Stopping the Animation flips its state to "stopped", which drives the REAL OnChromeFadeOutState observer;
+' the direct call after it makes the transition deterministic even if the observer is deferred.
+function TestFinishChromeFadeOut() as void
+    m.chromeFadeOut.control = "stop"
+    OnChromeFadeOutState()
+end function
+
 ' TestPlaybackErrorDialog — seed the error fields, drive OnVideoError down the dialog path, return the dialog's
 ' message + title.
 function TestPlaybackErrorDialog(errorFields as object) as object
@@ -189,6 +204,8 @@ function TestSnapshot() as object
         autoplay: m.top.autoplayAfterSeek
         bifVisible: m.bifDisplay.visible
         chromeShown: (m.chromeMode = ChromeMode.Shown or m.chromeMode = ChromeMode.FadingIn)
+        chromeFadingOut: (m.chromeMode = ChromeMode.FadingOut)
+        autoHideControl: m.autoHide.control
         suppressCaptions: m.top.suppressCaptions
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton

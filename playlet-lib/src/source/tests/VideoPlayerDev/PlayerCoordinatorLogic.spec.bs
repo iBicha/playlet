@@ -71,6 +71,45 @@ namespace Tests
         end function
 
         ' =========================================================================================
+        ' BackActionFor — the Back ladder (P-total over transportMode x chromeMode)
+        ' =========================================================================================
+        @describe("BackActionFor")
+
+        @it("the Back decision is DEFINED and correct over the FULL axis cross-product (transportMode x chromeMode)")
+        function _()
+            modes = [TransportController.Mode.Idle, TransportController.Mode.Scrub, TransportController.Mode.Scan, TransportController.Mode.LiveDvr]
+            chromeModes = [ChromeMode.Hidden, ChromeMode.FadingIn, ChromeMode.Shown, ChromeMode.FadingOut]
+            for each mode in modes
+                for each chrome in chromeModes
+                    expected = PlayerCoordinatorLogic.BackAction.CancelTransport
+                    if mode = TransportController.Mode.Idle
+                        if chrome = ChromeMode.Shown or chrome = ChromeMode.FadingIn
+                            expected = PlayerCoordinatorLogic.BackAction.DismissChrome
+                        else if chrome = ChromeMode.FadingOut
+                            expected = PlayerCoordinatorLogic.BackAction.None
+                        else
+                            expected = PlayerCoordinatorLogic.BackAction.Close
+                        end if
+                    end if
+                    got = PlayerCoordinatorLogic.BackActionFor(mode, chrome)
+                    m.assertEqual(got, expected, "mode=" + mode.ToStr() + " chromeMode=" + chrome.ToStr())
+                end for
+            end for
+        end function
+
+        @it("any active transport outranks the chrome (cancel wins even while the chrome is shown)")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.BackActionFor(TransportController.Mode.Scrub, ChromeMode.Shown), PlayerCoordinatorLogic.BackAction.CancelTransport)
+            m.assertEqual(PlayerCoordinatorLogic.BackActionFor(TransportController.Mode.LiveDvr, ChromeMode.Shown), PlayerCoordinatorLogic.BackAction.CancelTransport)
+        end function
+
+        @it("only a FULLY hidden chrome closes: a chrome mid fade-out consumes the press and lets the fade finish")
+        function _()
+            m.assertEqual(PlayerCoordinatorLogic.BackActionFor(TransportController.Mode.Idle, ChromeMode.FadingOut), PlayerCoordinatorLogic.BackAction.None)
+            m.assertEqual(PlayerCoordinatorLogic.BackActionFor(TransportController.Mode.Idle, ChromeMode.Hidden), PlayerCoordinatorLogic.BackAction.Close)
+        end function
+
+        ' =========================================================================================
         ' ShouldShowBuffering — mid-stream spinner gate (firstFrame AND idle AND fullscreen)
         ' =========================================================================================
         @describe("ShouldShowBuffering")
