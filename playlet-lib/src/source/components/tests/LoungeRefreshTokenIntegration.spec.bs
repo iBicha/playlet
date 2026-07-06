@@ -1,0 +1,61 @@
+import "pkg:/components/Services/LoungeService/LoungeApi.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace Tests
+
+    @tags("integration")
+    @suite
+    class LoungeRefreshTokenIntegrationTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.logger = CreateObject("roSGNode", "Logger")
+            m.logger.logLevel = -1
+            ' LoungeApi's failure paths emit telemetry; give the stub a no-op sink to write to.
+            telemetry = CreateObject("roSGNode", "Node")
+            telemetry.addField("LogWarn", "string", false)
+            telemetry.addField("LogEvent", "assocarray", false)
+            m.global.addFields({ telemetry: telemetry })
+        end function
+
+        @describe("Lounge token-refresh recovery (live)")
+
+        @slow(30000)
+        @it("RefreshToken re-mints a lounge token that successfully rebinds a session")
+        function _()
+            api = m.CreateLiveApi()
+
+            screenId = api.GetScreenId()
+            m.assertFalse(StringUtils.IsNullOrEmpty(screenId), "failed to mint a screen id")
+
+            firstToken = api.GetToken()
+            m.assertFalse(StringUtils.IsNullOrEmpty(firstToken), "failed to mint a lounge token")
+
+            m.assertTrue(api.GetSessionData(), "initial bind failed")
+            m.assertFalse(StringUtils.IsNullOrEmpty(api.sessionId), "no sessionId after initial bind")
+            m.assertFalse(StringUtils.IsNullOrEmpty(api.gSessionId), "no gSessionId after initial bind")
+
+            refreshedToken = api.RefreshToken()
+            m.assertFalse(StringUtils.IsNullOrEmpty(refreshedToken), "RefreshToken returned no token")
+            m.assertEqual(api.loungeToken, refreshedToken, "RefreshToken did not update the api token")
+
+            m.assertTrue(api.GetSessionData(), "rebind after refresh failed")
+            m.assertFalse(StringUtils.IsNullOrEmpty(api.sessionId), "no sessionId after rebind")
+            m.assertFalse(StringUtils.IsNullOrEmpty(api.gSessionId), "no gSessionId after rebind")
+        end function
+
+        private function CreateLiveApi() as object
+            loungeServiceNode = CreateObject("roSGNode", "Node")
+            loungeServiceNode.addFields({
+                deviceId: CreateObject("roDeviceInfo").GetRandomUUID()
+                deviceName: "Playlet integration test"
+            })
+            ' getNowPlaying, received on bind, reads nav state off the queue.
+            queueStub = CreateObject("roSGNode", "Node")
+            queueStub.addFields({ hasPrevious: false, hasNext: false })
+            notifyStub = CreateObject("roSGNode", "Node")
+            return new LoungeApi(loungeServiceNode, queueStub, notifyStub, invalid)
+        end function
+
+    end class
+
+end namespace
