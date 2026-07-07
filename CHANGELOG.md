@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Wrong SponsorBlock in the trackbar due to image caching
+
 ### Changed
 
 - Video Player HUD now focuses initially on the trackbar, instead of the pause button

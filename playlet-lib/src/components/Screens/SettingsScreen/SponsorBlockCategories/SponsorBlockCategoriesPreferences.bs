@@ -1,7 +1,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
-import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockConfig.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
@@ -10,7 +10,7 @@ import "pkg:/source/utils/Types.bs"
 function Init()
     m.categoryList = m.top.findNode("categoryList")
     m.categoryList.ObserveField("itemSelected", FuncName(OnCategorySelected))
-    m.service = new SponsorBlock.SponsorBlockService()
+    m.config = new SponsorBlock.SponsorBlockConfig()
 
     optionTitles = {}
     optionTitles[SponsorBlock.SegmentAction.Disable] = Tr(Locale.SponsorBlock.Disable)
@@ -36,7 +36,7 @@ function Init()
 end function
 
 function SetupCategoriesUi() as void
-    categories = m.service.GetCategories()
+    categories = m.config.GetCategories()
     if categories.Count() = 0
         return
     end if
@@ -47,11 +47,11 @@ function SetupCategoriesUi() as void
     for each category in categories
         categoryNode = CreateObject("roSGNode", "SponsorBlockCategoryContent")
         categoryNode.category = category
-        categoryNode.categoryTitle = Tr(m.service.SegmentTitle(category))
+        categoryNode.categoryTitle = Tr(m.config.SegmentTitle(category))
         categoryNode.selectedOption = SponsorBlock.SegmentAction.Disable
-        categoryNode.options = m.service.GetOptionsForCategory(category)
+        categoryNode.options = m.config.GetOptionsForCategory(category)
         categoryNode.optionTitles = m.optionTitles
-        categoryNode.color = m.service.SegmentColor(category)
+        categoryNode.color = m.config.SegmentColor(category)
         categoryContentNodes.push(categoryNode)
     end for
 

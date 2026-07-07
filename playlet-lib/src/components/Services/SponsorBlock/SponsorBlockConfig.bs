@@ -1,0 +1,75 @@
+import "pkg:/source/utils/ColorUtils.bs"
+
+namespace SponsorBlock
+    class SponsorBlockConfig
+        function new()
+            ' TODO:P2 this is being read and parsed on every skipped segment. It should be cached.
+            m.config = StringUtils.ParseJsonSafe(ReadAsciiFile("libpkg:/config/sponsorblock_config.json5"))
+        end function
+
+        function GetServerAddress() as string
+            if m.config = invalid
+                return ""
+            end if
+
+            return ValidString(m.config.serverAddress)
+        end function
+
+        function GetCategories() as object
+            if m.config = invalid
+                return []
+            end if
+
+            return ValidArray(m.config.categoryList)
+        end function
+
+        function GetOptionsForCategory(category as string) as object
+            if m.config = invalid
+                return []
+            end if
+
+            if not m.config.categories.doesexist(category)
+                return []
+            end if
+
+            return ValidArray(m.config.categories[category].options)
+        end function
+
+        function SegmentColor(category as string) as integer
+            if m.config = invalid
+                return 0
+            end if
+
+            if not m.config.categories.doesexist(category)
+                return 0
+            end if
+
+            color = m.config.categories[category].color
+            return ColorUtils.HexToInt(color)
+        end function
+
+        function SegmentTitle(category as string) as string
+            if m.config = invalid
+                return category
+            end if
+
+            if not m.config.categories.doesexist(category)
+                return category
+            end if
+
+            return m.config.categories[category].title
+        end function
+
+        function SegmentShortTitle(category as string) as string
+            if m.config = invalid
+                return category
+            end if
+
+            if not m.config.categories.doesexist(category)
+                return category
+            end if
+
+            return m.config.categories[category].short_title
+        end function
+    end class
+end namespace

@@ -1,3 +1,4 @@
+import "pkg:/components/Services/SponsorBlock/SponsorBlockConfig.bs"
 import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
 import "pkg:/source/utils/Types.bs"
@@ -11,15 +12,21 @@ function ExecuteJob() as void
     showNotifications = input.showNotifications
     categories = input.categories
 
-    service = new SponsorBlock.SponsorBlockService()
+    config = new SponsorBlock.SponsorBlockConfig()
+    service = new SponsorBlock.SponsorBlockService(config)
     cancellation = JobGetCancellation()
     skipSegments = service.GetSkipSegmentsForVideo(videoId, cancellation)
 
-    skipSegments = ProcessSkipSegments(skipSegments, showNotifications, categories, service)
+    skipSegments = ProcessSkipSegments(skipSegments, showNotifications, categories, config)
 
     barPath = invalid
     if skipSegments <> invalid
-        barPath = `tmp:/sponsorblock_bar.png`
+        barDir = "tmp:/sponsorblock"
+        fs = CreateObject("roFileSystem")
+        fs.Delete(barDir)
+        fs.CreateDirectory(barDir)
+        ' path contains video id to avoid texture cache reuse
+        barPath = `${barDir}/${videoId}.png`
         service.GenerateProgressBarBackground(skipSegments, lengthSeconds, barPath)
     end if
 
@@ -42,7 +49,7 @@ function ExecuteJob() as void
     })
 end function
 
-function ProcessSkipSegments(skipSegments as object, showNotifications as boolean, categories as object, service as SponsorBlock.SponsorBlockService) as object
+function ProcessSkipSegments(skipSegments as object, showNotifications as boolean, categories as object, config as SponsorBlock.SponsorBlockConfig) as object
     if skipSegments = invalid
         return invalid
     end if
@@ -80,8 +87,8 @@ function ProcessSkipSegments(skipSegments as object, showNotifications as boolea
         segment.start = segmentStart
         segment.end = segmentEnd
 
-        segment.title = Tr(ValidString(service.SegmentTitle(segment.category)))
-        segment.shortTitle = Tr(ValidString(service.SegmentShortTitle(segment.category)))
+        segment.title = Tr(ValidString(config.SegmentTitle(segment.category)))
+        segment.shortTitle = Tr(ValidString(config.SegmentShortTitle(segment.category)))
 
         processedSegments.push(segment)
     end for
