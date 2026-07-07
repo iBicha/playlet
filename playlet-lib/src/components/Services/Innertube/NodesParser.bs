@@ -99,9 +99,9 @@ namespace Innertube
             "compactMovieRenderer": ParseCompactMovieRenderer
             "horizontalMovieListRenderer": ParseHorizontalMovieListRenderer
             ' Movies and shows are partially supported, but these renderers are not yet implemented.
-            ' "gridMovieRenderer": ParseNotImplemented
-            ' "gridShowRenderer": ParseNotImplemented
-            ' "playlistShowMetadataRenderer": ParseNotImplemented
+            ' TODO:P1 implement show support in grid
+            "gridShowRenderer": ParseNotImplemented
+            "playlistShowMetadataRenderer": ParseNotImplemented
             ' Ignored nodes:
             ' TODO:P2 handle navigateAction - which are usually a redirect
             ' "navigateAction": ParseNotImplemented
@@ -1093,6 +1093,8 @@ namespace Innertube
             return LockupViewModelTypePodcast(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_ALBUM"
             return LockupViewModelTypeAlbum(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_MOVIE"
+            return LockupViewModelTypeVideo(nodeData, context)
         end if
 
         Warning(`Unknown content type: ${contentType}`, nodeData, context)
@@ -1182,25 +1184,7 @@ namespace Innertube
 
         authorId = ObjectUtils.Dig(metadata, ["image", "decoratedAvatarViewModel", "rendererContext", "commandContext", "onTap", "innertubeCommand", "browseEndpoint", "browseId"])
 
-        lines = invalid
-        contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
-        metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
-        if IsArray(metadataRows) and metadataRows.Count() > 0
-            delimiter = ValidString(contentMetadataViewModel["delimiter"])
-            lines = []
-            for each metadataRow in metadataRows
-                metadataParts = ObjectUtils.Dig(metadataRow, ["metadataParts"])
-                if IsArray(metadataParts) and metadataParts.Count() > 0
-                    parts = []
-                    for each metadataPart in metadataParts
-                        parts.Push(ValidString(ObjectUtils.Dig(metadataPart, ["text", "content"])))
-                    end for
-                    if parts.Count() > 0
-                        lines.Push(parts.Join(delimiter))
-                    end if
-                end if
-            end for
-        end if
+        lines = ParseLockupMetadataLines(metadata)
 
         video = {
             "type": "video"
@@ -1215,6 +1199,42 @@ namespace Innertube
 
         PushFeedItem(video, context)
         return invalid
+    end function
+
+    function ParseLockupMetadataLines(metadata as object) as object
+        contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
+        metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
+        if not IsArray(metadataRows) or metadataRows.Count() = 0
+            return invalid
+        end if
+
+        delimiter = ValidString(contentMetadataViewModel["delimiter"])
+        lines = []
+        for each metadataRow in metadataRows
+            parts = []
+            metadataParts = ObjectUtils.Dig(metadataRow, ["metadataParts"])
+            if IsArray(metadataParts)
+                for each metadataPart in metadataParts
+                    text = ValidString(ObjectUtils.Dig(metadataPart, ["text", "content"]))
+                    if text <> ""
+                        parts.Push(text)
+                    end if
+                end for
+            end if
+            badges = ObjectUtils.Dig(metadataRow, ["badges"])
+            if IsArray(badges)
+                for each badge in badges
+                    text = ValidString(ObjectUtils.Dig(badge, ["badgeViewModel", "badgeText"]))
+                    if text <> ""
+                        parts.Push(text)
+                    end if
+                end for
+            end if
+            if parts.Count() > 0
+                lines.Push(parts.Join(delimiter))
+            end if
+        end for
+        return lines
     end function
 
     function LockupViewModelTypeShort(nodeData as object, context as object) as object
@@ -1244,25 +1264,7 @@ namespace Innertube
             end if
         end if
 
-        lines = invalid
-        contentMetadataViewModel = ObjectUtils.Dig(metadata, ["metadata", "contentMetadataViewModel"])
-        metadataRows = ObjectUtils.Dig(contentMetadataViewModel, ["metadataRows"])
-        if IsArray(metadataRows) and metadataRows.Count() > 0
-            delimiter = ValidString(contentMetadataViewModel["delimiter"])
-            lines = []
-            for each metadataRow in metadataRows
-                metadataParts = ObjectUtils.Dig(metadataRow, ["metadataParts"])
-                if IsArray(metadataParts) and metadataParts.Count() > 0
-                    parts = []
-                    for each metadataPart in metadataParts
-                        parts.Push(ValidString(ObjectUtils.Dig(metadataPart, ["text", "content"])))
-                    end for
-                    if parts.Count() > 0
-                        lines.Push(parts.Join(delimiter))
-                    end if
-                end if
-            end for
-        end if
+        lines = ParseLockupMetadataLines(metadata)
 
         video = {
             "type": "video"
