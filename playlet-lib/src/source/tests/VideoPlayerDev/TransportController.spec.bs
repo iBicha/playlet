@@ -2,7 +2,8 @@
 ' No SceneGraph node, no Video node, no device clock: the suite seeds content, pushes commands, and
 ' fires timers by calling Tick() directly (the controller publishes the schedule; here we are the clock).
 ' Every behavior is asserted, including the input x mode matrix (not just each mode's happy path):
-'   - scrub enter/step/hold/commit/cancel; scan ladder/wrap/flip/cadence/clamp/commit.
+'   - scrub enter/step/hold (with the duration-scaled acceleration ramp)/commit/cancel; scan
+'     ladder/wrap/flip/cadence/clamp/commit.
 '   - LIVE: Left/Right = +/-5s frozen step (scrubRepeat); Rev/Fwd = 3-level scan LADDER (scan timer) climbing
 '     L1->2->3->1, reverse clamps at the DVR floor, forward auto-resumes at the edge; offset counts up frozen.
 '   - LIVE step<->ladder sub-mode transitions clear the other sub-mode's scratch (no stale-tick bleed).
@@ -115,6 +116,57 @@ namespace Tests
             m.assertEqual(cmd.delayMs, TransportController.SCRUB_REPEAT_MS) ' 120ms repeat
             m.t.Tick(TransportController.Timer.ScrubRepeat)
             m.assertEqual(m.t.cursorMs, 66000)
+        end function
+
+        @it("hold acceleration: flat through the ramp delay, then the step grows to the duration-scaled cap")
+        function _()
+            ' 10h VOD: 36000000ms is exactly representable in single precision, so Sqr is exact and the
+            ' cap is deterministic: 61 * Sqr(36000000) = 61 * 6000 = 366000ms per tick.
+            m.t.OnDuration(36000000)
+            m.t.HandleKey(TransportController.Command.Right, true) ' keydown -> 62000
+            ' the first RAMP_DELAY ticks step the flat grid (the fine-adjust window).
+            for i = 1 to TransportController.SCRUB_HOLD_RAMP_DELAY_TICKS
+                m.t.Tick(TransportController.Timer.ScrubRepeat)
+            end for
+            m.assertEqual(m.t.cursorMs, 62000 + TransportController.SCRUB_HOLD_RAMP_DELAY_TICKS * 2000)
+            m.assertEqual(m.t.scrubStepMs, 2000)
+            ' the next tick starts the ramp: the step grows, monotonically, never past the cap.
+            prev = m.t.scrubStepMs
+            for i = 1 to 150
+                m.t.Tick(TransportController.Timer.ScrubRepeat)
+                m.assertTrue(m.t.scrubStepMs >= prev, "the hold step must never shrink mid-hold")
+                m.assertTrue(m.t.scrubStepMs <= 366000, "the hold step must never exceed the cap")
+                prev = m.t.scrubStepMs
+            end for
+            m.assertEqual(m.t.scrubStepMs, 366000) ' saturated at the cap
+        end function
+
+        @it("hold acceleration: releasing and re-pressing restarts the ramp at the flat grid step")
+        function _()
+            m.t.OnDuration(36000000)
+            m.t.HandleKey(TransportController.Command.Right, true)
+            for i = 1 to 30 ' well into the ramp
+                m.t.Tick(TransportController.Timer.ScrubRepeat)
+            end for
+            m.assertTrue(m.t.scrubStepMs > 2000)
+            m.t.HandleKey(TransportController.Command.Right, false) ' release
+            before = m.t.cursorMs
+            m.t.HandleKey(TransportController.Command.Right, true) ' fresh press
+            m.assertEqual(m.t.scrubStepMs, 2000) ' ramp restarted
+            m.assertEqual(m.t.cursorMs, before + 2000) ' the fresh press steps the flat grid
+        end function
+
+        @it("hold acceleration: an unknown duration never accelerates (the cap floors at the grid step)")
+        function _()
+            t = new TransportController.Controller()
+            t.SetContent(false, 2000, true)
+            t.OnPosition(0)
+            t.OnReady() ' duration never learned
+            t.HandleKey(TransportController.Command.Right, true)
+            for i = 1 to 50
+                t.Tick(TransportController.Timer.ScrubRepeat)
+            end for
+            m.assertEqual(t.scrubStepMs, 2000)
         end function
 
         @it("keyUp stops the hold-repeat and clears the glyph")

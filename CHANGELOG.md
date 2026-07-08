@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Video Player HUD now focuses initially on the trackbar, instead of the pause button
 - Pressing back cancels seek, hides UI, then closes the video player
+- Scrubbing accelerates on long videos
 
 ## [0.48.1] - 2026-07-04
 

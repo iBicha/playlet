@@ -58,6 +58,7 @@ the exhaustive + seeded-fuzz suite (`TransportControllerCompleteness.spec.bs`). 
 | B5 | `scanDir ∈ {-1,0,1}`; `scanLevel ∈ [0,3]`; `scanLevel ≥ 1 ⟹ scan/liveDvr` |
 | B6 | scrub and scan scratch never both set |
 | B8 | `scrubHeldDir ∈ {-1,0,1}` |
+| B9 | hold-accel scratch bounded: `scrubHoldTicks ≥ 0`; `scrubStepMs ∈ [storyboardStepMs, cap(duration)]` |
 
 (`seekSettling ⟹ a newly-entered transport defers its freeze-pause` is a *transition* property, not a snapshot
 predicate, so it is not in this catalog — it is enforced by `FreezeForTransport` and tested at the seam as

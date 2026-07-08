@@ -64,6 +64,15 @@ namespace TransportController
 
     const SCRUB_REPEAT_INITIAL_MS = 510
     const SCRUB_REPEAT_MS = 120
+    ' Hold-to-seek acceleration. A held Left/Right steps the flat storyboard grid for the first
+    ' RAMP_DELAY ticks — a fine-adjust window before speed builds — then each tick grows the step by
+    ' 1/RAMP_DIVISOR of its remaining gap to the cap: an exponential approach to a terminal velocity.
+    ' The cap, CAP_SQRT_COEFF * sqrt(durationMs) per tick, scales with the SQUARE ROOT of the duration,
+    ' so the hold time to cross a whole video grows sublinearly: a many-hour VOD stays reachable in a
+    ' few seconds of holding without making short videos twitchy.
+    const SCRUB_HOLD_RAMP_DELAY_TICKS = 8
+    const SCRUB_HOLD_RAMP_DIVISOR = 11
+    const SCRUB_HOLD_CAP_SQRT_COEFF = 61
     const SCAN_LEVEL_MIN = 1
     const SCAN_LEVEL_MAX = 3
     const LIVE_DVR_STEP_MS = 5000
@@ -105,12 +114,22 @@ namespace TransportController
         return ms >= TransportController.LIVE_EDGE_SEEK_MS - TransportController.LIVE_EDGE_SENTINEL_SLACK_MS
     end function
 
+    ' The hold-seek per-tick step cap (see the SCRUB_HOLD_* constants). Floors at the storyboard step
+    ' so a short or unknown duration keeps the flat grid step.
+    function ScrubHoldCapMs(durationMs as integer, storyboardStepMs as integer) as integer
+        cap = Int(TransportController.SCRUB_HOLD_CAP_SQRT_COEFF * Sqr(durationMs))
+        if cap < storyboardStepMs
+            return storyboardStepMs
+        end if
+        return cap
+    end function
+
     ' The transport state machine.
     class Controller
         ' ---- content facts (set once at contentReady) ----
         isLive as boolean = false
         private hasStoryboards as boolean = false
-        private storyboardStepMs as integer = 2000 ' VOD per-tap step + scan base (storyboard L2 interval)
+        storyboardStepMs as integer = 2000 ' VOD per-tap step + scan base (storyboard L2 interval)
         ' Live DVR window length (0 = unknown). The generated DASH anchors t=0 to the window start, so the
         ' rewind floor is edge - window once the session outlives the window (content below it has expired).
         private dvrWindowMs as integer = 0
@@ -146,6 +165,8 @@ namespace TransportController
         ' ---- private scratch ----
         scanDir as integer = 0
         scrubHeldDir as integer = 0
+        scrubHoldTicks as integer = 0 ' consecutive hold-repeat ticks of the current hold (drives the accel ramp)
+        scrubStepMs as integer = 2000 ' current per-step size: storyboardStepMs until the hold ramp grows it
         edgeMs as integer = 0 ' the live edge, fed by OnLiveEdge (the coordinator's wall-clock computation)
         ' Inherent live latency: the smallest CONFIRMED (edge - position) observed this content — the closest
         ' we have ever been IS how close this stream can get. The offset reads relative to it, so steady
@@ -170,6 +191,8 @@ namespace TransportController
             if storyboardStepMs > 0
                 m.storyboardStepMs = storyboardStepMs
             end if
+            m.scrubHoldTicks = 0 ' new content -> a fresh hold ramp
+            m.scrubStepMs = m.storyboardStepMs
             m.dvrWindowMs = 0 ' new content -> unknown window until SetLiveDvrWindow
             m.edgeMs = 0
             m.liveMinGapMs = -1 ' new content -> re-learn the inherent latency
@@ -233,6 +256,10 @@ namespace TransportController
             if storyboardStepMs > 0
                 m.storyboardStepMs = storyboardStepMs
             end if
+            ' a grown grid step raises the hold-step floor (a mid-hold ramp above it just keeps its speed).
+            if m.scrubStepMs < m.storyboardStepMs
+                m.scrubStepMs = m.storyboardStepMs
+            end if
         end function
 
         function OnReady() as void
@@ -294,6 +321,11 @@ namespace TransportController
             end if
             m.durationMs = ms
             m.ClampIdleCursor()
+            ' a duration that regresses mid-hold can leave the ramped step above the new cap — re-clamp.
+            cap = TransportController.ScrubHoldCapMs(m.durationMs, m.storyboardStepMs)
+            if m.scrubStepMs > cap
+                m.scrubStepMs = cap
+            end if
         end function
 
         ' The live edge (ms on the manifest timeline), computed by the coordinator from the wall clock anchored
@@ -414,6 +446,8 @@ namespace TransportController
                 m.StopTimer(TransportController.Timer.Scan)
             end if
             m.scrubHeldDir = dir
+            m.scrubHoldTicks = 0 ' every fresh press restarts the accel ramp: a tap always steps the flat grid
+            m.scrubStepMs = m.storyboardStepMs
             if dir < 0
                 m.glyph = TransportController.Glyph.SkipBack
             else
@@ -424,7 +458,27 @@ namespace TransportController
         end function
 
         function ScrubStep(dir as integer) as void
-            m.cursorMs = m.Clamp(m.cursorMs + dir * m.storyboardStepMs, 0, m.durationMs)
+            m.cursorMs = m.Clamp(m.cursorMs + dir * m.scrubStepMs, 0, m.durationMs)
+        end function
+
+        ' One hold-repeat tick of the acceleration ramp: flat for the first RAMP_DELAY ticks, then the step
+        ' approaches the duration-scaled cap by 1/RAMP_DIVISOR of the remaining gap per tick (the last
+        ' sliver, where integer division floors to 0, snaps to the cap).
+        function AdvanceScrubHold() as void
+            m.scrubHoldTicks = m.scrubHoldTicks + 1
+            if m.scrubHoldTicks <= TransportController.SCRUB_HOLD_RAMP_DELAY_TICKS
+                return
+            end if
+            cap = TransportController.ScrubHoldCapMs(m.durationMs, m.storyboardStepMs)
+            if m.scrubStepMs >= cap
+                m.scrubStepMs = cap
+                return
+            end if
+            grow = (cap - m.scrubStepMs) \ TransportController.SCRUB_HOLD_RAMP_DIVISOR
+            if grow < 1
+                grow = cap - m.scrubStepMs
+            end if
+            m.scrubStepMs = m.scrubStepMs + grow
         end function
 
         ' ------------------------------------------------------------------------------------------------
@@ -702,6 +756,8 @@ namespace TransportController
             m.scanLevel = 0
             m.scanDir = 0
             m.scrubHeldDir = 0
+            m.scrubHoldTicks = 0
+            m.scrubStepMs = m.storyboardStepMs
             m.StopTimer(TransportController.Timer.ScrubRepeat)
             m.StopTimer(TransportController.Timer.Scan)
             m.cursorMs = m.positionMs
@@ -743,6 +799,7 @@ namespace TransportController
         function Tick(timerId as integer) as void
             if timerId = TransportController.Timer.ScrubRepeat
                 if m.transportMode = TransportController.Mode.Scrub and m.scrubHeldDir <> 0
+                    m.AdvanceScrubHold()
                     m.ScrubStep(m.scrubHeldDir)
                     m.ArmTimer(TransportController.Timer.ScrubRepeat, TransportController.SCRUB_REPEAT_MS, false)
                 else if m.transportMode = TransportController.Mode.LiveDvr and m.scrubHeldDir <> 0

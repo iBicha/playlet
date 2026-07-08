@@ -49,6 +49,9 @@ namespace Tests
                 scanLevel: t.scanLevel
                 scanDir: t.scanDir
                 scrubHeldDir: t.scrubHeldDir
+                scrubHoldTicks: t.scrubHoldTicks
+                scrubStepMs: t.scrubStepMs
+                storyboardStepMs: t.storyboardStepMs
                 cursorMs: t.cursorMs
                 positionMs: t.positionMs
                 durationMs: t.durationMs
@@ -238,7 +241,8 @@ namespace Tests
         function _()
             good = {
                 transportMode: TransportController.Mode.Idle, glyph: TransportController.Glyph.None
-                scanLevel: 0, scanDir: 0, scrubHeldDir: 0, cursorMs: 1000, positionMs: 1000
+                scanLevel: 0, scanDir: 0, scrubHeldDir: 0, scrubHoldTicks: 0, scrubStepMs: 2000
+                storyboardStepMs: 2000, cursorMs: 1000, positionMs: 1000
                 durationMs: 600000, edgeMs: 0, liveOffsetMs: 0, atLiveEdge: true, isLive: false, replayPending: false
             }
             m.assertTrue(PlayerInvariants.CheckBrain(good).ok, "good snapshot should pass")
@@ -250,6 +254,9 @@ namespace Tests
             m.assertEqual(m.Break(good, "scanDir", 2).failed, "INV-B5")
             m.assertEqual(m.Break(good, "scanLevel", 1).failed, "INV-B5") ' level>=1 but mode=idle
             m.assertEqual(m.Break(good, "scrubHeldDir", 5).failed, "INV-B8")
+            m.assertEqual(m.Break(good, "scrubHoldTicks", -1).failed, "INV-B9")
+            m.assertEqual(m.Break(good, "scrubStepMs", 1000).failed, "INV-B9") ' below the storyboard step
+            m.assertEqual(m.Break(good, "scrubStepMs", 99999999).failed, "INV-B9") ' above the duration cap
 
             ' INV-B6 needs BOTH held scratch non-zero.
             bleed = {}
@@ -259,7 +266,7 @@ namespace Tests
             m.assertEqual(PlayerInvariants.CheckBrain(bleed).failed, "INV-B6")
 
             ' the catalogued id set is pinned (the VideoPlayerDev README must match BrainIds).
-            m.assertEqual(PlayerInvariants.BrainIds(), ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8"])
+            m.assertEqual(PlayerInvariants.BrainIds(), ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8", "INV-B9"])
         end function
 
         ' ---------- meta: the model accounts for EVERY mutable brain field (no unmodeled axis) ----------
@@ -275,7 +282,7 @@ namespace Tests
             ' FSM AXES — discrete state the exhaustive matrix enumerates + the invariants constrain.
             axes = ["transportMode", "glyph", "scanLevel", "scanDir", "scrubHeldDir", "atLiveEdge", "isLive", "ready", "hasStoryboards", "replayPending", "seekSettling"]
             ' CONTINUOUS — equivalence-classed by the guard predicates (cursor/edge/duration compares), not enumerated.
-            continuous = ["cursorMs", "positionMs", "durationMs", "edgeMs", "liveOffsetMs", "storyboardStepMs", "replayTargetMs", "dvrWindowMs", "liveMinGapMs", "liveMinCandidateMs"]
+            continuous = ["cursorMs", "positionMs", "durationMs", "edgeMs", "liveOffsetMs", "storyboardStepMs", "scrubHoldTicks", "scrubStepMs", "replayTargetMs", "dvrWindowMs", "liveMinGapMs", "liveMinCandidateMs"]
             ' OUTPUT / IO scratch — drained by the coordinator, not state the FSM branches on.
             io = ["videoIntent", "intentSeq", "commitSeq", "finishSeq", "timerCmdAction", "timerCmdId", "timerCmdDelayMs", "timerCmdRepeat"]
 

@@ -15,8 +15,8 @@ import "pkg:/components/VideoPlayerDev/TransportController.bs"
 
 namespace PlayerInvariants
 
-    ' Snapshot keys: transportMode, glyph, scanLevel, scanDir, scrubHeldDir, cursorMs, positionMs, durationMs,
-    ' edgeMs, liveOffsetMs, atLiveEdge, isLive, replayPending.
+    ' Snapshot keys: transportMode, glyph, scanLevel, scanDir, scrubHeldDir, scrubHoldTicks, scrubStepMs,
+    ' storyboardStepMs, cursorMs, positionMs, durationMs, edgeMs, liveOffsetMs, atLiveEdge, isLive, replayPending.
     function CheckBrain(s as object) as object
         hi = s.durationMs
         if s.isLive
@@ -57,6 +57,18 @@ namespace PlayerInvariants
             return Fail("INV-B6")
         end if
 
+        ' INV-B9 — the hold-accel scratch is bounded: the tick count never goes negative and the per-tick
+        ' step stays within [storyboardStepMs, the duration-scaled cap] (same formula the brain ramps to).
+        if s.scrubHoldTicks < 0
+            return Fail("INV-B9")
+        end if
+        if s.scrubStepMs < s.storyboardStepMs
+            return Fail("INV-B9")
+        end if
+        if s.scrubStepMs > TransportController.ScrubHoldCapMs(s.durationMs, s.storyboardStepMs)
+            return Fail("INV-B9")
+        end if
+
         ' INV-B4 — the glyph is legal for the current mode.
         if not GlyphOkForMode(s.transportMode, s.glyph)
             return Fail("INV-B4")
@@ -94,7 +106,7 @@ namespace PlayerInvariants
     ' The brain INV ids this module enforces — the meta-test pins this set against the VideoPlayerDev README so a
     ' catalog row can't be added without an implementation (or vice-versa).
     function BrainIds() as object
-        return ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8"]
+        return ["INV-B1", "INV-B3", "INV-B4", "INV-B5", "INV-B6", "INV-B8", "INV-B9"]
     end function
 
 end namespace
