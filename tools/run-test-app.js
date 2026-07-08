@@ -79,7 +79,7 @@ process.on('uncaughtException', (error, origin) => {
         await rokuDeploy.publish(options);
 
         console.log('Waiting for test to finish');
-        let data = await readFromTelnetUntil(telnet, timeout);
+        let data = withoutQuotedLines(await readFromTelnetUntil(telnet, timeout));
 
         if (reportOnly) {
             data = parseTestReport(data);
@@ -132,6 +132,11 @@ function startTelnetClientAsync(host, port, timeoutSeconds = 2) {
     });
 }
 
+// Lines starting with '| ' are the app quoting the previous run's console (Last Exit Info), not live output.
+function withoutQuotedLines(text) {
+    return text.split('\n').filter((line) => !line.startsWith('| ')).join('\n');
+}
+
 function readFromTelnetUntil(connection, timeoutSeconds = 20, endToken = 'AppExitComplete') {
     return new Promise((resolve, reject) => {
         let data = '';
@@ -148,7 +153,7 @@ function readFromTelnetUntil(connection, timeoutSeconds = 20, endToken = 'AppExi
             clearTimeout(timeoutID);
 
             data += chunk.toString();
-            if (data.includes(endToken)) {
+            if (withoutQuotedLines(data).includes(endToken)) {
                 resolve(data);
                 connection.end();
                 return;

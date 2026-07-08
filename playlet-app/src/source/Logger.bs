@@ -28,12 +28,10 @@ namespace Logger
         msg += `media_player_state: ${lastExitInfo.media_player_state}\n`
         msg += `mem_limit: ${lastExitInfo.mem_limit}\n`
 
-        ' Sometimes lastExitInfo.console_log would contain 'AppExitComplete', which
-        ' is used to detect test runner exits. So we don't log it in test mode.
-        #if TEST_MODE
-        #else
-            msg += `console_log:\n${lastExitInfo.console_log}\n`
-        #end if
+        ' The echo is the PREVIOUS run's console — '| ' marks each line so consumers can skip it
+        ' when scanning live output.
+        consoleLog = `${lastExitInfo.console_log}`
+        msg += `console_log:\n| ` + consoleLog.Replace(chr(10), `\n| `) + `\n`
 
         msg += `********** End Last Exit Info **********\n`
 
