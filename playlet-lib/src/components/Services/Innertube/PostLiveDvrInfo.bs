@@ -5,7 +5,7 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Innertube
 
-    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object, playerResponse as object) as void
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
         if adaptiveFormats.Count() = 0
             LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
             return
@@ -38,19 +38,11 @@ namespace Innertube
                     fingerprint: ["GetPostLiveDvrInfo: sq=0 fallback recovered"]
                 })
             else
-                ' Stuck: neither header path has the head. Attach the full /player response
-                ' so a fix is findable from telemetry alone - lengthSeconds + targetDurationSec
-                ' approximate count/duration today, and any other usable field is there too.
-                ' The blob folds into Sentry extra, keeping the message lean.
+                ' Warning, not error: a known transport-failure tail where playback fails regardless.
                 LogTelemetryEvent({
-                    level: "error"
+                    level: "warning"
                     message: `GetPostLiveDvrInfo: both no-sq and sq=0 missing head\n${diagnostics}`
                     fingerprint: ["GetPostLiveDvrInfo: both no-sq and sq=0 missing head"]
-                    attachments: [{
-                        filename: "player_response.json"
-                        content_type: "application/json"
-                        data: FormatJson(playerResponse)
-                    }]
                 })
                 return
             end if
