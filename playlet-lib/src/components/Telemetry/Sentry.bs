@@ -45,7 +45,7 @@ namespace Sentry
                 }
             }
 
-            message = event.message
+            message = Redact(event.message)
 
             if event.fingerprint = invalid
                 event.fingerprint = GetFingerprint(message)
@@ -69,7 +69,7 @@ namespace Sentry
             if (not SUPPORTS_ATTACHMENTS) and hasAttachments
                 extra = {}
                 for each attachment in event.attachments
-                    extra[attachment.filename] = `content_type:${attachment.content_type}\n${attachment.data}`
+                    extra[attachment.filename] = `content_type:${attachment.content_type}\n${Redact(attachment.data)}`
                 end for
                 eventPayload.extra = extra
             end if
@@ -83,7 +83,7 @@ namespace Sentry
             if SUPPORTS_ATTACHMENTS and hasAttachments
                 tmpBuffer = CreateObject("roByteArray")
                 for each attachment in event.attachments
-                    data = attachment.data
+                    data = Redact(attachment.data)
                     attachment.Delete("data")
                     attachment["type"] = "attachment"
                     tmpBuffer.FromAsciiString(data)
@@ -145,5 +145,23 @@ namespace Sentry
         end for
 
         return message
+    end function
+
+    function Redact(text as dynamic) as dynamic
+        if StringUtils.IsNullOrEmpty(text)
+            return text
+        end if
+
+        authHeader = /Authorization: [^\r\n]*/i
+        for each match in authHeader.MatchAll(text)
+            text = text.Replace(match[0], "Authorization: <REDACTED>")
+        end for
+
+        refreshToken = /("refresh_token"\s*:\s*)"[^"]*"/i
+        for each match in refreshToken.MatchAll(text)
+            text = text.Replace(match[0], `${match[1]}"<REDACTED>"`)
+        end for
+
+        return text
     end function
 end namespace

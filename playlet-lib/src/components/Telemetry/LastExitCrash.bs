@@ -69,7 +69,6 @@ function ReportLastExitCrash() as void
     for each key in lastExitInfo
         message += `\n${key}: ${ToString(lastExitInfo[key])}`
     end for
-    message = RedactAuthHeaders(message)
 
     Sentry.SendEvents([{
         level: "fatal"
@@ -81,13 +80,4 @@ function ReportLastExitCrash() as void
         tags: m.tags
         userId: m.userId
     }])
-end function
-
-function RedactAuthHeaders(text as string) as string
-    authRegex = /Authorization: [^\r\n]*/i
-    matches = authRegex.MatchAll(text)
-    for each match in matches
-        text = text.Replace(match[0], "Authorization: <REDACTED>")
-    end for
-    return text
 end function
