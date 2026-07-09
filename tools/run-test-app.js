@@ -115,6 +115,7 @@ function startTelnetClientAsync(host, port, timeoutSeconds = 2) {
         };
 
         connection.on('close', function () {
+            connection.telnetClosed = true;
             console.log('connection closed');
         });
 
@@ -142,11 +143,29 @@ function readFromTelnetUntil(connection, timeoutSeconds = 20, endToken = 'AppExi
         let data = '';
 
         let timeoutID;
+        let settled = false;
+
+        function settle(fn, arg) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutID);
+            fn(arg);
+        }
 
         function timeoutReached() {
-            reject(`Timeout of ${timeoutSeconds} seconds waiting for ${endToken}`);
+            settle(reject, `Timeout of ${timeoutSeconds} seconds waiting for ${endToken}`);
             connection.end();
         }
+
+        function connectionClosed() {
+            settle(reject, `Connection closed before ${endToken}`);
+        }
+
+        if (connection.telnetClosed) {
+            connectionClosed();
+            return;
+        }
+        connection.on('close', connectionClosed);
 
         connection.on('data', (chunk) => {
             process.stdout.write(chunk.toString());
@@ -154,7 +173,7 @@ function readFromTelnetUntil(connection, timeoutSeconds = 20, endToken = 'AppExi
 
             data += chunk.toString();
             if (withoutQuotedLines(data).includes(endToken)) {
-                resolve(data);
+                settle(resolve, data);
                 connection.end();
                 return;
             }
