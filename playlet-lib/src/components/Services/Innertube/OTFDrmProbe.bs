@@ -1,0 +1,83 @@
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+namespace Innertube
+
+    const DRM_PROBE_TIMEOUT_SECONDS = 15
+    const DRM_PROBE_DIR = "tmp:/drm_probe"
+
+    ' Transport matrix against an OTF+DRM format whose segment-info fetch failed.
+    ' Every variant returns 2xx on healthy googlevideo URLs, so any non-2xx is
+    ' specific to this shape, and any 2xx is an escape to build playback on.
+    function ProbeOTFDrmFormat(format as object, requestHeaders as object, cancellation as object) as string
+        url = ValidString(format.url)
+        if url = ""
+            return "drm probe skipped: format has no url"
+        end if
+
+        rangeUrl = DrmProbeUrlWithParams(url, { range: "0-16383" })
+        sqUrl = DrmProbeUrlWithParams(url, { sq: "0", rn: "0" })
+
+        fs = CreateObject("roFileSystem")
+        fs.Delete(Innertube.DRM_PROBE_DIR)
+        fs.CreateDirectory(Innertube.DRM_PROBE_DIR)
+
+        postBody = CreateObject("roByteArray")
+        postBody.FromHexString("7800")
+        postBody.WriteFile(`${Innertube.DRM_PROBE_DIR}/post_body.bin`)
+
+        ' Bare and sq responses are full media on a healthy URL — stream those to files
+        ' instead of buffering them into strings.
+        variants = [
+            { name: "GET bare", request: HttpClient.Get(url).ToFile(`${Innertube.DRM_PROBE_DIR}/bare.bin`) }
+            { name: "GET Range header", request: HttpClient.Get(url).Header("Range", "bytes=0-16383") }
+            { name: "GET range param", request: HttpClient.Get(rangeUrl) }
+            { name: "GET sq=0", request: HttpClient.Get(sqUrl).ToFile(`${Innertube.DRM_PROBE_DIR}/sq.bin`) }
+            { name: "POST empty range param", request: HttpClient.Post(rangeUrl, "") }
+            { name: "POST {15:0} range param", request: HttpClient.Post(rangeUrl, "").FromFile(`${Innertube.DRM_PROBE_DIR}/post_body.bin`) }
+        ]
+
+        for each variant in variants
+            variant.request.Headers(requestHeaders)
+            variant.request.TimeoutSeconds(Innertube.DRM_PROBE_TIMEOUT_SECONDS)
+            variant.request.Cancellation(cancellation)
+            variant.request.Send()
+        end for
+
+        lines = [`drm probe itag=${format.itag} drmFamilies=${ValidArray(format.drmFamilies).Join(",")}`]
+        for each variant in variants
+            lines.Push(DrmProbeCollect(variant))
+        end for
+
+        fs.Delete(Innertube.DRM_PROBE_DIR)
+
+        return lines.Join(`\n`)
+    end function
+
+    function DrmProbeUrlWithParams(url as string, params as object) as string
+        queryComponents = UrlUtils.ParseQueryComponents(url)
+        queryComponents.Append(params)
+        return UrlUtils.SetQueryParams(url, queryComponents)
+    end function
+
+    function DrmProbeCollect(variant as object) as string
+        name = variant.name
+        response = variant.request.Await()
+
+        if response.IsCancelled()
+            return `${name} -> cancelled`
+        end if
+
+        if response.IsTimedOut()
+            return `${name} -> timed out after ${Innertube.DRM_PROBE_TIMEOUT_SECONDS}s`
+        end if
+
+        line = `${name} -> ${response.StatusCode()}`
+        responseHeaders = response.Headers()
+        if IsAssociativeArray(responseHeaders)
+            line += ` headers=${ToString(responseHeaders)}`
+        end if
+        return line
+    end function
+
+end namespace

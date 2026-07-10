@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/OTFDrmProbe.bs"
 
 namespace Innertube
 
@@ -17,10 +18,11 @@ namespace Innertube
 
     const OTF_MAX_REQUEST_COUNT = 8
 
-    function OTFGetSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object) as void
+    function OTFGetSegmentInfo(adaptiveFormats as object, client as Innertube.ClientType, cancellation as object, playerResponseText as string) as void
         errors = {
             message: ""
             attachments: []
+            drmProbed: false
         }
 
         formatsToProcess = []
@@ -60,12 +62,20 @@ namespace Innertube
 
             pendingFormat = pendingFormats.Shift()
             ' returns false if processing should stop (e.g., cancelled)
-            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.filePath, segmentDurationsRegex, errors)
+            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.filePath, segmentDurationsRegex, errors, requestHeaders, cancellation)
                 exit while
             end if
         end while
 
         fs.Delete("tmp:/otf_segments")
+
+        if errors.drmProbed
+            errors.attachments.Push({
+                filename: "player_response.json"
+                content_type: "application/json"
+                data: playerResponseText
+            })
+        end if
 
         if not StringUtils.IsNullOrEmpty(errors.message) or errors.attachments.Count() > 0
             LogTelemetryEvent({
@@ -98,7 +108,7 @@ namespace Innertube
         return request
     end function
 
-    function OTFProcessPendingFormat(format as object, request as object, filePath as string, segmentDurationsRegex as object, errors as object) as boolean
+    function OTFProcessPendingFormat(format as object, request as object, filePath as string, segmentDurationsRegex as object, errors as object, requestHeaders as object, cancellation as object) as boolean
         response = request.Await()
 
         if response.IsCancelled()
@@ -107,6 +117,10 @@ namespace Innertube
 
         if not response.IsSuccess()
             errors.message += `Failed to get segment info for itag ${format.itag}: ${response.ErrorMessage()}\n`
+            if IsArray(format.drmFamilies) and not errors.drmProbed
+                errors.drmProbed = true
+                errors.message += Innertube.ProbeOTFDrmFormat(format, requestHeaders, cancellation) + `\n`
+            end if
             return true
         end if
 

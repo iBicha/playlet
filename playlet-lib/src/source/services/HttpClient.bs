@@ -241,6 +241,11 @@ namespace HttpClient
             return m._body
         end function
 
+        function FromFile(filePath as string) as HttpRequest
+            m._bodyFilePath = filePath
+            return m
+        end function
+
         function Json(body as object) as HttpRequest
             m.Body(FormatJson(body))
             m.Header("Content-Type", "application/json")
@@ -342,6 +347,10 @@ namespace HttpClient
                 command += ` \\\n  -d '${m._body}'`
             end if
 
+            if not StringUtils.IsNullOrEmpty(m._bodyFilePath)
+                command += ` \\\n  --data-binary @${m._bodyFilePath}`
+            end if
+
             return command
         end function
 
@@ -396,12 +405,20 @@ namespace HttpClient
                 throw "ToFile() can only be used with GET requests."
             end if
 
+            if m._bodyFilePath <> invalid and m._method <> "POST"
+                throw "FromFile() can only be used with POST requests."
+            end if
+
             if m._method = "POST"
-                body = m._body
-                if body = invalid
-                    body = ""
+                if m._bodyFilePath <> invalid
+                    m._sent = m.urlTransfer.AsyncPostFromFile(m._bodyFilePath)
+                else
+                    body = m._body
+                    if body = invalid
+                        body = ""
+                    end if
+                    m._sent = m.urlTransfer.AsyncPostFromString(body)
                 end if
-                m._sent = m.urlTransfer.AsyncPostFromString(body)
             else if m._method = "GET"
                 if m._toFilePath <> invalid
                     m._sent = m.urlTransfer.AsyncGetToFile(m._toFilePath)
