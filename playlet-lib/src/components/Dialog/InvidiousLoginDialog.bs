@@ -1,6 +1,7 @@
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 function Init()
     m.urlLabel = m.top.findNode("urlLabel")
@@ -17,7 +18,12 @@ function OnNodeReady()
     address = m.webserver@.GetServerAddress()
     isValidAddress = not StringUtils.IsNullOrEmpty(address)
     if isValidAddress
-        m.top.url = `${address}/invidious/login`
+        url = `${address}/invidious/login`
+        serverUrl = m.top.serverUrl
+        if not StringUtils.IsNullOrEmpty(serverUrl)
+            url = UrlUtils.AppendQueryParams(url, { server: serverUrl })
+        end if
+        m.top.url = url
     else
         m.urlLabel.text = Tr(Locale.Dialogs.IpAddressNotAvailable)
     end if

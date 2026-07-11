@@ -1,0 +1,46 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace LoginUtils
+
+    function ShowInvidiousLoginDialog(serverUrl = "" as string) as void
+        dialog = CreateObject("roSGNode", "InvidiousLoginDialog")
+        dialog.serverUrl = serverUrl
+        dialog@.BindNode()
+        m.top.getScene().dialog = dialog
+    end function
+
+    function ShowLoginWithYouTubeDisclaimerDialog() as void
+        dialog = DialogUtils.ShowDialogEx({
+            title: Tr(Locale.Dialogs.Disclaimer)
+            message: [
+                Tr(Locale.Dialogs.YouTubeLoginDisclaimer1)
+                Tr(Locale.Dialogs.YouTubeLoginDisclaimer2)
+                Tr(Locale.Dialogs.YouTubeLoginDisclaimer3)
+            ]
+            large: true
+            buttons: [
+                Tr(Locale.Buttons.OK)
+                Tr(Locale.Buttons.Cancel)
+            ]
+        })
+        dialog.ObserveField("buttonSelected", FuncName(LoginUtils.OnLoginWithYouTubeDisclaimerDialogButtonSelected))
+    end function
+
+    function OnLoginWithYouTubeDisclaimerDialogButtonSelected(event as object) as void
+        buttonSelected = event.getData()
+        if buttonSelected <> 0
+            return
+        end if
+
+        LoginUtils.ShowYouTubeLoginDialog()
+    end function
+
+    function ShowYouTubeLoginDialog() as void
+        dialog = CreateObject("roSGNode", "YouTubeLoginDialog")
+        dialog@.BindNode()
+        m.top.getScene().dialog = dialog
+    end function
+
+end namespace

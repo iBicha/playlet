@@ -1,6 +1,7 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Navigation/Navigation.bs"
 import "pkg:/components/Screens/ProfileScreen/BackendTypeSelectionView/BackendTypeSelectionViewUtils.bs"
+import "pkg:/components/Screens/ProfileScreen/LoginUtils.bs"
 import "pkg:/components/Screens/ProfileScreen/ProfileView/ProfileViewUtils.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -54,15 +55,15 @@ function OnBackEndSelected(event as object) as void
 
     selectedBackendType = event.getData()
     if selectedBackendType = "BackendTypeInvidious"
-        LoginWithInvidious()
+        OnLoginWithInvidiousSelected()
     else if selectedBackendType = "BackendTypeYouTube"
-        ShowLoginWithYouTubeDialog()
+        LoginUtils.ShowLoginWithYouTubeDisclaimerDialog()
     else
         LogError("Unknown backend type:", selectedBackendType)
     end if
 end function
 
-function LoginWithInvidious() as void
+function OnLoginWithInvidiousSelected() as void
     invidiousInstance = m.preferences["invidious.instance"]
     if StringUtils.IsNullOrEmpty(invidiousInstance)
         DialogUtils.ShowDialogEx({
@@ -75,41 +76,7 @@ function LoginWithInvidious() as void
         return
     end if
 
-    dialog = CreateObject("roSGNode", "InvidiousLoginDialog")
-    dialog@.BindNode()
-    m.top.getScene().dialog = dialog
-end function
-
-function ShowLoginWithYouTubeDialog() as void
-    dialog = DialogUtils.ShowDialogEx({
-        title: Tr(Locale.Dialogs.Disclaimer)
-        message: [
-            Tr(Locale.Dialogs.YouTubeLoginDisclaimer1)
-            Tr(Locale.Dialogs.YouTubeLoginDisclaimer2)
-            Tr(Locale.Dialogs.YouTubeLoginDisclaimer3)
-        ]
-        large: true
-        buttons: [
-            Tr(Locale.Buttons.OK)
-            Tr(Locale.Buttons.Cancel)
-        ]
-    })
-    dialog.ObserveField("buttonSelected", FuncName(OnLoginWithYouTubeDialogButtonSelected))
-end function
-
-function OnLoginWithYouTubeDialogButtonSelected(event as object) as void
-    buttonSelected = event.getData()
-    if buttonSelected <> 0
-        return
-    end if
-
-    LoginWithYouTube()
-end function
-
-function LoginWithYouTube() as void
-    dialog = CreateObject("roSGNode", "YouTubeLoginDialog")
-    dialog@.BindNode()
-    m.top.getScene().dialog = dialog
+    LoginUtils.ShowInvidiousLoginDialog()
 end function
 
 function OnCurrentProfileChanged() as void

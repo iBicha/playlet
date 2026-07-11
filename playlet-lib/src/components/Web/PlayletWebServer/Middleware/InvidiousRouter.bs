@@ -18,9 +18,16 @@ namespace Http
 
         @get("/invidious/login")
         function Login(context as object) as boolean
+            request = context.request
             response = context.response
 
-            authLink = m.invidiousNode@.GetAuthorizeTokenLink()
+            server = ValidString(request.query["server"])
+
+            authLink = m.invidiousNode@.GetAuthorizeTokenLink(server)
+            if authLink = invalid
+                response.Default(503, "Invidious server not configured")
+                return true
+            end if
             response.Redirect(authLink)
             return true
         end function

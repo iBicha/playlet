@@ -1,28 +1,39 @@
 import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.types.bs"
 import "pkg:/components/Navigation/Navigation.bs"
+import "pkg:/components/Screens/ProfileScreen/LoginUtils.bs"
 import "pkg:/source/utils/DisposableObserve.bs"
 import "pkg:/source/utils/FocusManagement.bs"
 import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
 function Init()
+    m.loginButton = m.top.findNode("loginButton")
     m.activateButton = m.top.findNode("activateButton")
     m.logoutButton = m.top.findNode("logoutButton")
     m.closeButton = m.top.findNode("closeButton")
     m.reauthLabel = m.top.findNode("ReauthLabel")
 
+    m.loginButton.disabled = true
+    m.needsReauth = false
+
+    DisposableObserveField(m.loginButton, "buttonSelected", FuncName(Login))
     DisposableObserveField(m.activateButton, "buttonSelected", FuncName(Activate))
     DisposableObserveField(m.logoutButton, "buttonSelected", FuncName(Logout))
     DisposableObserveField(m.closeButton, "buttonSelected", FuncName(Close))
 end function
 
 function OnNodeReady()
+    SetNavigation(m.loginButton, RemoteKeys.Down, m.activateButton)
+    SetNavigation(m.activateButton, RemoteKeys.Up, m.loginButton)
     SetNavigation(m.activateButton, RemoteKeys.Down, m.logoutButton)
     SetNavigation(m.logoutButton, RemoteKeys.Down, m.closeButton)
     SetNavigation(m.closeButton, RemoteKeys.Up, m.logoutButton)
     SetNavigation(m.logoutButton, RemoteKeys.Up, m.activateButton)
+    SetNavigation(m.loginButton, RemoteKeys.Down, m.logoutButton)
+    SetNavigation(m.logoutButton, RemoteKeys.Up, m.loginButton)
 
     DisposableObserveFieldScoped(m.profilesService, "currentProfile", FuncName(OnCunrrentProfileChanged))
     DisposableObserveFieldScoped(m.profilesService, "onProfileLogout", FuncName(OnProfileLogout))
@@ -31,7 +42,10 @@ end function
 function OnContentSet() as void
     content = m.top.content
     if content = invalid
+        m.needsReauth = false
         m.reauthLabel.visible = false
+        m.loginButton.visible = false
+        m.loginButton.disabled = true
         return
     end if
 
@@ -73,17 +87,21 @@ function OnContentSet() as void
         m.top.backendTypePosterUri = ""
     end if
 
-    UpdateReauthState(content)
+    UpdateReauthState(content.authState)
 
-    UpdateActivateButton()
+    UpdateActivateButton(content.isSelected)
 end function
 
 function OnFocusChange() as void
-    if not m.top.focus
-        return
+    if m.top.focus
+        FocusTopButton()
     end if
+end function
 
-    if m.activateButton.focusable
+function FocusTopButton() as void
+    if m.loginButton.focusable
+        NodeSetFocus(m.loginButton, true)
+    else if m.activateButton.focusable
         NodeSetFocus(m.activateButton, true)
     else
         NodeSetFocus(m.logoutButton, true)
@@ -106,6 +124,22 @@ function OnKeyEvent(key as string, press as boolean) as boolean
     end if
 
     return true
+end function
+
+function Login() as void
+    content = m.top.content
+    if content = invalid
+        return
+    end if
+
+    backendType = content.type
+    if backendType = "invidious"
+        LoginUtils.ShowInvidiousLoginDialog(ValidString(content.serverUrl))
+    else if backendType = "youtube"
+        LoginUtils.ShowYouTubeLoginDialog()
+    else
+        LogError("Unknown backend type:", backendType)
+    end if
 end function
 
 function Activate() as void
@@ -145,15 +179,27 @@ function OnDispose()
     m.top.content = invalid
 end function
 
-function UpdateReauthState(content as object) as void
-    needsReauth = content.authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+function UpdateReauthState(authState as string) as void
+    needsReauth = authState = ProfileContentAuthTokenUtils.ProfileAuthState.NeedsReauth
+    if needsReauth = m.needsReauth
+        return
+    end if
+    m.needsReauth = needsReauth
+
     if needsReauth
         m.reauthLabel.text = [
             Tr(Locale.Dialogs.ProfileNeedsReauthMessageLine1)
             Tr(Locale.Dialogs.ProfileNeedsReauthMessageLine2)
         ].Join(Chr(10))
+        m.loginButton.text = Tr(Locale.Buttons.Login)
     end if
     m.reauthLabel.visible = needsReauth
+    m.loginButton.visible = needsReauth
+    m.loginButton.disabled = not needsReauth
+
+    if m.top.isInFocusChain()
+        FocusTopButton()
+    end if
 end function
 
 function OnCunrrentProfileChanged() as void
@@ -162,7 +208,7 @@ function OnCunrrentProfileChanged() as void
         return
     end if
     m.top.crownVisible = content.isSelected
-    UpdateActivateButton()
+    UpdateActivateButton(content.isSelected)
 end function
 
 function OnProfileLogout() as void
@@ -177,13 +223,7 @@ function OnProfileLogout() as void
     end if
 end function
 
-function UpdateActivateButton() as void
-    content = m.top.content
-    if content = invalid
-        return
-    end if
-
-    isSelected = content.isSelected
+function UpdateActivateButton(isSelected as boolean) as void
     if isSelected
         if m.activateButton.hasFocus()
             NodeSetFocus(m.logoutButton, true)
