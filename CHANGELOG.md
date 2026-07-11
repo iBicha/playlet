@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Wrong SponsorBlock in the trackbar due to image caching
+- Expired profile sessions were not marked in web app
 
 ### Changed
 

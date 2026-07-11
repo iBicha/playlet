@@ -8,6 +8,7 @@
   import VideoCell from "./VideoCell.svelte";
   import PlaylistCell from "./PlaylistCell.svelte";
   import ChannelCell from "./ChannelCell.svelte";
+  import { ProfileAuthState } from "lib/Types";
 
   // TODO:P1 figure out why some uncached feeds (e.g. channels/ucid/videos) get hit twice
   export let feed: any = undefined;
@@ -92,7 +93,12 @@
       userCountryCode = "US";
     }
     invidiousApi.userCountryCode = userCountryCode;
-    invidiousApi.isLoggedIn = !!(value.profiles?.currentProfile ?? false);
+    const currentProfile = (value.profiles?.profiles ?? []).find(
+      (p) => p.id === value.profiles?.currentProfile
+    );
+    invidiousApi.isLoggedIn =
+      !!currentProfile &&
+      currentProfile.authState !== ProfileAuthState.NeedsReauth;
     loadRow();
   });
 

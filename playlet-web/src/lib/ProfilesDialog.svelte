@@ -3,6 +3,7 @@
   import { PlayletApi } from "./Api/PlayletApi";
   import { get } from "svelte/store";
   import ProfileAvatar from "./ProfileAvatar.svelte";
+  import { ProfileAuthState } from "lib/Types";
 
   export function show() {
     modal.showModal();
@@ -118,9 +119,21 @@
                   >
                 {/if}
               </div>
+              {#if profile.authState === ProfileAuthState.NeedsReauth}
+                <div class="badge badge-warning badge-sm mt-1">
+                  {$translate("Session expired")}
+                </div>
+              {/if}
             </div>
           </div>
           <div class="collapse-content">
+            {#if profile.authState === ProfileAuthState.NeedsReauth}
+              <div class="text-sm mb-2">
+                {$translate(
+                  "The session has expired. Please sign in again with this profile, or switch to another profile."
+                )}
+              </div>
+            {/if}
             {#if profile.id !== currentProfile?.id}
               <button
                 on:click={() => activate(profile.id)}

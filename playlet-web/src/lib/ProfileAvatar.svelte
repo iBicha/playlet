@@ -3,7 +3,8 @@
   export let navbar = false;
   export let selected = false;
   import UserIcon from "assets/user.svg.svelte";
-  import { playletStateStore } from "lib/Stores";
+  import { playletStateStore, translate } from "lib/Stores";
+  import { ProfileAuthState } from "lib/Types";
 
   let currentProfile = profile;
 
@@ -15,20 +16,20 @@
       );
     });
   }
+
+  $: needsReauth = currentProfile?.authState === ProfileAuthState.NeedsReauth;
+  $: outlineClass = navbar
+    ? `border-2 ${needsReauth ? "border-warning" : "border-primary"}`
+    : `ring ring-offset-base-100 ring-offset-2 ${
+        needsReauth ? "ring-warning" : selected ? "ring-primary" : ""
+      }`;
 </script>
 
 {#if currentProfile && currentProfile.username}
   <div class={`avatar ${navbar ? "w-8 h-8 m-1" : "w-12 h-12"}`}>
     <div
-      class={`rounded-full flex items-center justify-center w-full h-full
-        ${
-          navbar
-            ? "border-2 border-primary"
-            : selected
-              ? "ring ring-primary ring-offset-base-100 ring-offset-2"
-              : "ring ring-offset-base-100 ring-offset-2"
-        }
-      `}
+      class={`rounded-full flex items-center justify-center w-full h-full ${outlineClass}`}
+      title={needsReauth ? $translate("Session expired") : ""}
       style="background-color: {currentProfile.color};"
     >
       {#if currentProfile.type === "youtube" && currentProfile.thumbnail}
