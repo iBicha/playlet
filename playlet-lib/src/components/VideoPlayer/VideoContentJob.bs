@@ -33,58 +33,55 @@ function ExecuteJob() as void
     service = new Invidious.InvidiousService(invidiousNode)
     backend = preferencesNode["backend.selected"]
 
-    metadata = contentNode.metadata
-    if not IsAssociativeArray(metadata)
-        cancellation = JobGetCancellation()
-        if backend = "playlet"
+    cancellation = JobGetCancellation()
+    if backend = "playlet"
 
-            sessionData = GetSessionData(innertubeNode, cancellation)
-            if sessionData.cancel = true
-                JobCancel()
-                return
-            end if
-            if sessionData.error <> invalid
-                JobError(sessionData.error)
-                return
-            end if
-
-            accessToken = invalid
-            onBehalfOfUser = invalid
-            profileNode = invalid
-            profile = profilesService.currentProfile
-            if profile <> invalid and profile.type = "youtube"
-                auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
-                if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
-                    JobError(Locale.Dialogs.ProfileNeedsReauthMessage)
-                    return
-                end if
-                if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
-                    accessToken = auth.token
-                    onBehalfOfUser = auth.activeIdentifyToken
-                    profileNode = profile
-                end if
-            end if
-
-            metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
-                "cancellation": cancellation
-                "credentialTransferToken": loungeServiceNode.credentialTransferToken
-                "visitorData": sessionData.visitorData
-                "livingRoomPoTokenId": sessionData.livingRoomPoTokenId
-                "accessToken": accessToken
-                "onBehalfOfUser": onBehalfOfUser
-                "profileNode": profileNode
-                "profilesService": profilesService
-            })
-            if IsAssociativeArray(metadata)
-                contentNode.addFields({
-                    potAttached: ValidBool(metadata.potAttached)
-                    potSource: ValidString(metadata.potSource)
-                    loggedIn: not StringUtils.IsNullOrEmpty(accessToken)
-                })
-            end if
-        else
-            metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
+        sessionData = GetSessionData(innertubeNode, cancellation)
+        if sessionData.cancel = true
+            JobCancel()
+            return
         end if
+        if sessionData.error <> invalid
+            JobError(sessionData.error)
+            return
+        end if
+
+        accessToken = invalid
+        onBehalfOfUser = invalid
+        profileNode = invalid
+        profile = profilesService.currentProfile
+        if profile <> invalid and profile.type = "youtube"
+            auth = ProfileContentAuthTokenUtils.EnsureFreshAccessToken(profile)
+            if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.NeedsReauth
+                JobError(Locale.Dialogs.ProfileNeedsReauthMessage)
+                return
+            end if
+            if auth.state = ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                accessToken = auth.token
+                onBehalfOfUser = auth.activeIdentifyToken
+                profileNode = profile
+            end if
+        end if
+
+        metadata = InnertubeService.GetVideoMetadata(contentNode.videoId, {
+            "cancellation": cancellation
+            "credentialTransferToken": loungeServiceNode.credentialTransferToken
+            "visitorData": sessionData.visitorData
+            "livingRoomPoTokenId": sessionData.livingRoomPoTokenId
+            "accessToken": accessToken
+            "onBehalfOfUser": onBehalfOfUser
+            "profileNode": profileNode
+            "profilesService": profilesService
+        })
+        if IsAssociativeArray(metadata)
+            contentNode.addFields({
+                potAttached: ValidBool(metadata.potAttached)
+                potSource: ValidString(metadata.potSource)
+                loggedIn: not StringUtils.IsNullOrEmpty(accessToken)
+            })
+        end if
+    else
+        metadata = service.GetVideoMetadata(contentNode.videoId, { cancellation: m.top.cancellation })
     end if
 
     if JobIsCancelled()
