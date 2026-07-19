@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Display issues for 720p devices
+- Attempt to fix session data fetch errors
 
 ## [0.48.2] - 2026-07-11
 

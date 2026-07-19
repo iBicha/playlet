@@ -1,22 +1,17 @@
 import "pkg:/components/JobSystem/Jobs.bs"
 import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
-import "pkg:/source/utils/StringUtils.bs"
 
 function Init()
-    m.top.observeField("requestSessionData", FuncName(OnRequestSessionData))
 end function
 
 function OnNodeReady()
     QueueSessionDataJob()
 end function
 
-function OnRequestSessionData() as void
-    sessionData = m.top.sessionData
-    if IsAssociativeArray(sessionData) and not StringUtils.IsNullOrEmpty(sessionData.visitorData) and not StringUtils.IsNullOrEmpty(sessionData.livingRoomPoTokenId)
-        return
-    end if
+function EnsureSessionDataJob(_unused as dynamic) as object
     QueueSessionDataJob()
+    return m.innertubeSessionDataJob
 end function
 
 function QueueSessionDataJob() as void
@@ -33,6 +28,9 @@ function QueueSessionDataJob() as void
 end function
 
 function OnInnertubeSessionDataJobDone(event as object) as void
-    JobSystem.UnobserveCallback(event.getRoSGNode())
-    m.innertubeSessionDataJob = invalid
+    node = event.getRoSGNode()
+    JobSystem.UnobserveCallback(node)
+    if m.innertubeSessionDataJob <> invalid and m.innertubeSessionDataJob.isSameNode(node)
+        m.innertubeSessionDataJob = invalid
+    end if
 end function

@@ -177,17 +177,30 @@ function GetSessionData(innertubeNode as object, cancellation as object) as obje
         return sessionData
     end if
 
+    callback = innertubeNode.callFunc("EnsureSessionDataJob", invalid)
+
     port = CreateObject("roMessagePort")
     MessagePortUtils.ObserveFieldScopedExSafe(innertubeNode, "sessionData", port)
+    MessagePortUtils.ObserveFieldScopedExSafe(callback, "done", port)
     CancellationUtils.ObserveCancellationScoped(cancellation, port)
 
-    innertubeNode.requestSessionData = true
-    message = wait(30000, port)
+    cancelled = false
+    while not SessionDataComplete(innertubeNode.sessionData) and callback.done <> true
+        message = wait(30000, port)
+        if message = invalid
+            exit while
+        end if
+        if CancellationUtils.IsCancellationEvent(cancellation, message)
+            cancelled = true
+            exit while
+        end if
+    end while
 
     innertubeNode.unobserveFieldScoped("sessionData")
+    callback.unobserveFieldScoped("done")
     CancellationUtils.UnobserveCancellationScoped(cancellation)
 
-    if message <> invalid and CancellationUtils.IsCancellationEvent(cancellation, message)
+    if cancelled
         return {
             cancel: true
         }
