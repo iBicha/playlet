@@ -58,6 +58,7 @@ class LoungeApi
         commandHandlers = {}
         commandHandlers[COMMAND_TYPE_NOOP] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_GET_VOLUME] = m.HandleIgnoreCommand
+        commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_GET_SUBTITLES_TRACK] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_SET_SUBTITLES] = m.HandleIgnoreCommand
         commandHandlers[COMMAND_TYPE_SET_AUDIO_TRACK] = m.HandleIgnoreCommand
@@ -78,7 +79,6 @@ class LoungeApi
         commandHandlers[COMMAND_TYPE_G_SESSION_ID] = m.HandleGSessionId
         commandHandlers[COMMAND_TYPE_LOUNGE_STATUS] = m.HandleLoungeStatus
         commandHandlers[COMMAND_TYPE_REMOTE_CONNECTED] = m.HandleRemoteConnected
-        commandHandlers[COMMAND_TYPE_SET_VOLUME] = m.HandleSetVolume
         commandHandlers[COMMAND_TYPE_SET_PLAYLIST] = m.HandleSetPlaylist
         commandHandlers[COMMAND_TYPE_UPDATE_PLAYLIST] = m.HandleUpdatePlaylist
         commandHandlers[COMMAND_TYPE_PAUSE] = m.HandlePause
@@ -420,20 +420,6 @@ class LoungeApi
         userAvatarUri = newDevice.userAvatarUri
 
         LoungeDeviceConnected.ShowNotifcation(m.notificationsNode, deviceName, userName, userAvatarUri)
-    end function
-
-    function HandleSetVolume(_commandId as integer, _commandType as string, commandArgs as object, _messagesToSend as object) as void
-        player = m.videoQueueNode.player
-        if player = invalid
-            return
-        end if
-
-        volume = Val(commandArgs["volume"])
-        isMute = volume = 0
-        LogInfo("Setting volume is not supported:", volume, "but can mute:", isMute)
-        ' TODO:P2 volume should be set to the lounge state.
-        ' Also the state needs to be separate from the player, since SponsorBlock can mute sections.
-        player.mute = isMute
     end function
 
     function HandleSetPlaylist(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object)

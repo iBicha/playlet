@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Display issues for 720p devices
 - Attempt to fix session data fetch errors
+- Remove volume handing from cast, to avoid a possible "mute softlock" - feature will be added back later.
 
 ## [0.48.2] - 2026-07-11
 
