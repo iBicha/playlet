@@ -48,6 +48,7 @@ function TelemetryLoop() as void
     m.dist = GetDist(m.tags)
     m.userId = GetUserId()
 
+    ReportSessionStart()
     ReportLastExitCrash()
 
     m.top.observeField("LogInfo", msgPort)
@@ -151,6 +152,18 @@ function TelemetryLoop() as void
             retryAfterTimer.Mark()
         end if
     end while
+end function
+
+function ReportSessionStart() as void
+    Sentry.SendEvents([{
+        level: "info"
+        message: "[SESSION] start"
+        fingerprint: ["session start"]
+        release: m.release
+        dist: m.dist
+        tags: m.tags
+        userId: m.userId
+    }])
 end function
 
 function GetTags() as object

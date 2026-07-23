@@ -805,7 +805,7 @@ function EnforceTransportFreeze(source as string) as void
         LogErrorNoTelemetry(healInfo)
         if m.healCount <= INV_D1_TELEMETRY_CAP
             LogTelemetryEvent({
-                level: "error"
+                level: "warning"
                 message: healInfo
                 fingerprint: ["INV-D1 heal", m.transport.transportMode, source]
             })
@@ -842,7 +842,7 @@ end function
 function SendHealSummary() as void
     if m.healCount > INV_D1_TELEMETRY_CAP
         LogTelemetryEvent({
-            level: "error"
+            level: "warning"
             message: `INV-D1 heal: ${m.healCount} heals over one content (${m.healCount - INV_D1_TELEMETRY_CAP} past the telemetry cap)`
             fingerprint: ["INV-D1 heal suppressed"]
         })
@@ -1152,7 +1152,7 @@ function OnVideoContentJobDone(event as object) as void
     content = m.top.content
 
     if not info.success
-        LogError("VideoContentJob FAILED:", info.error)
+        LogError(`VideoContentJob FAILED: ${info.error}\nbackend: ${ContentBackend(content)}`)
         decision = ErrorDialogController.DecideContentJobFailure(content, info.error)
         ShowErrorDialog(decision)
         Lounge.SendOnStateChange()
@@ -1442,6 +1442,13 @@ function GetPlayerErrorData(videoId as string, errorInfo as object) as object
     return { title: title, body: body, fingerprint: fingerprint }
 end function
 
+function ContentBackend(content as object) as string
+    if content <> invalid and not StringUtils.IsNullOrEmpty(content.backend)
+        return content.backend
+    end if
+    return "unknown"
+end function
+
 ' Send a stream error to telemetry. For malformed-data errors, attach the last generated DASH/HLS manifest and
 ' player response so the failure can be diagnosed from the report.
 function ReportVideoError(errorData as object, url as dynamic, urls as object, urlIndex as dynamic, shownInDialog as boolean) as void
@@ -1464,21 +1471,19 @@ function ReportVideoError(errorData as object, url as dynamic, urls as object, u
             data: ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
         }]
     end if
-    potAttached = "false"
+    potAttached = false
     potSource = "none"
-    loggedIn = "false"
+    loggedIn = false
     content = m.top.content
     if content <> invalid
-        if ValidBool(content.potAttached)
-            potAttached = "true"
-        end if
+        potAttached = ValidBool(content.potAttached)
+        loggedIn = ValidBool(content.loggedIn)
         if not StringUtils.IsNullOrEmpty(content.potSource)
             potSource = content.potSource
         end if
-        if ValidBool(content.loggedIn)
-            loggedIn = "true"
-        end if
     end if
+    backend = ContentBackend(content)
+    isLive = m.transport.isLive
     message = [
         errorData.title
         errorData.body
@@ -1491,11 +1496,15 @@ function ReportVideoError(errorData as object, url as dynamic, urls as object, u
         `pot_attached: ${potAttached}`
         `pot_source: ${potSource}`
         `logged_in: ${loggedIn}`
+        `backend: ${backend}`
+        `is_live: ${isLive}`
     ].Join(Chr(10))
     errorData.fingerprint.Push(shownInDialog)
     errorData.fingerprint.Push(potAttached)
     errorData.fingerprint.Push(potSource)
     errorData.fingerprint.Push(loggedIn)
+    errorData.fingerprint.Push(backend)
+    errorData.fingerprint.Push(isLive)
     if shownInDialog
         level = "error"
     else

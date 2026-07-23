@@ -183,6 +183,38 @@ namespace Tests
             m.assertTrue(snap.title.Instr("dQw4w9WgXcQ") >= 0, "dialog title dropped the videoId")
         end function
 
+        @it("the reported playback error carries the serving backend and the live flag")
+        function _()
+            m.top.callFunc("TestPlaybackErrorDialog", {
+                videoId: "dQw4w9WgXcQ"
+                errorMsg: "no valid bitrates"
+                errorCode: -5
+                errorStr: "buffer:loop:demux:Errors seen on all bitrates:last_err:503"
+                errorInfo: { category: "mediaerror", source: "buffer:loop:demux", ignored: false }
+                backend: "built-in"
+            })
+
+            reported = m.global.telemetry.LogEvent
+            m.assertTrue(reported.message.Instr("backend: built-in") > 0, "got: " + reported.message)
+            m.assertTrue(reported.message.Instr("is_live: false") > 0, "got: " + reported.message)
+            m.assertTrue(reported.message.Instr("pot_attached: false") > 0, "got: " + reported.message)
+            m.assertArrayContains(reported.fingerprint, "built-in")
+        end function
+
+        @it("a playback error on a content node with no backend reports it as unknown")
+        function _()
+            m.top.callFunc("TestPlaybackErrorDialog", {
+                videoId: "dQw4w9WgXcQ"
+                errorMsg: "no valid bitrates"
+                errorCode: -5
+                errorStr: "buffer:loop:demux:Errors seen on all bitrates:last_err:403"
+                errorInfo: { category: "mediaerror", source: "buffer:loop:demux", ignored: false }
+            })
+
+            reported = m.global.telemetry.LogEvent
+            m.assertTrue(reported.message.Instr("backend: unknown") > 0, "got: " + reported.message)
+        end function
+
         ' Up/Down reveal the chrome when it is hidden in idle (they otherwise do nothing).
         @it("Up reveals the chrome when it is hidden in idle")
         function _()

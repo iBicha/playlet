@@ -33,6 +33,10 @@ function ExecuteJob() as void
     service = new Invidious.InvidiousService(invidiousNode)
     backend = preferencesNode["backend.selected"]
 
+    backendId = ResolveBackendId(backend, service)
+    contentNode.addFields({ backend: backendId })
+    contentNode.backend = backendId
+
     cancellation = JobGetCancellation()
     if backend = "playlet"
 
@@ -218,6 +222,16 @@ end function
 
 function SessionDataComplete(sessionData as object) as boolean
     return IsAssociativeArray(sessionData) and not StringUtils.IsNullOrEmpty(sessionData.visitorData) and not StringUtils.IsNullOrEmpty(sessionData.livingRoomPoTokenId)
+end function
+
+function ResolveBackendId(backend as string, service as Invidious.InvidiousService) as string
+    if backend = "playlet"
+        return "playlet"
+    end if
+    if service.GetInstance() = Invidious.PLAYLET_BUILT_IN_INSTANCE
+        return "built-in"
+    end if
+    return "invidious"
 end function
 
 function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
