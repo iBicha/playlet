@@ -1,6 +1,9 @@
 import { getHost } from "lib/Api/Host";
 import { PlayletApi } from "lib/Api/PlayletApi";
-import { BG, buildURL, GOOG_API_KEY, type WebPoSignalOutput, type BgConfig } from "bgutils-js";
+import { BotGuardClient, getChallenge } from "bgutils-js/botguard";
+import { WebPoMinter } from "bgutils-js/webpo";
+import { buildURL, getHeaders } from "bgutils-js/utils";
+import type { WebPoSignalOutput } from "bgutils-js/shared-types";
 
 // Fallback lifetime when GenerateIT reports no TTL.
 const DEFAULT_POTOKEN_TTL_SECONDS = 60 * 60 * 6;
@@ -23,7 +26,7 @@ interface DevicePoToken {
 
 // Mints a GVS poToken in the browser (BotGuard) and hands it to the Roku.
 export class PoTokenMinter {
-    static webPoMinter: BG.WebPoMinter;
+    static webPoMinter: WebPoMinter;
     static webPoMinterPromise: Promise<void>;
     static integrityTokenExpiresAtMs = 0;
 
@@ -93,41 +96,30 @@ export class PoTokenMinter {
             try {
                 const requestKey = 'O43z0dpjhgX20SCx4KAo';
 
-                const bgConfig: BgConfig = {
-                    fetch: (input: string | URL | globalThis.Request, init?: RequestInit) => PoTokenMinter.fetch(input, init),
-                    globalObj: globalThis,
+                const bgChallenge = await getChallenge({
                     requestKey,
-                    identifier: ''
-                };
+                    fetchFunction: PoTokenMinter.fetch
+                });
 
-                const bgChallenge = await BG.Challenge.create(bgConfig);
-                if (!bgChallenge) {
-                    throw new Error('Could not get challenge');
-                }
-
-                const interpreterJavascript = bgChallenge.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue;
+                const interpreterJavascript = bgChallenge.interpreterJavascript?.privateDoNotAccessOrElseSafeScriptWrappedValue;
                 if (interpreterJavascript) {
                     new Function(interpreterJavascript)();
                 } else {
                     throw new Error('Could not load VM');
                 }
 
-                const botguard = await BG.BotGuardClient.create({
+                const botguard = await BotGuardClient.create({
                     globalName: bgChallenge.globalName,
-                    globalObj: globalThis,
+                    globalObject: globalThis,
                     program: bgChallenge.program
                 });
 
                 const webPoSignalOutput: WebPoSignalOutput = [];
                 const botguardResponse = await botguard.snapshot({ webPoSignalOutput });
 
-                const integrityTokenResponse = await bgConfig.fetch(buildURL('GenerateIT', true), {
+                const integrityTokenResponse = await PoTokenMinter.fetch(buildURL('GenerateIT', true), {
                     method: 'POST',
-                    headers: {
-                        'content-type': 'application/json+protobuf',
-                        'x-goog-api-key': GOOG_API_KEY,
-                        'x-user-agent': 'grpc-web-javascript/0.1'
-                    },
+                    headers: getHeaders(),
                     body: JSON.stringify([requestKey, botguardResponse])
                 });
 
@@ -142,7 +134,7 @@ export class PoTokenMinter {
                     : DEFAULT_POTOKEN_TTL_SECONDS;
                 PoTokenMinter.integrityTokenExpiresAtMs = Date.now() + ttlSeconds * 1000;
 
-                PoTokenMinter.webPoMinter = await BG.WebPoMinter.create({ integrityToken: response[0] }, webPoSignalOutput);
+                PoTokenMinter.webPoMinter = await WebPoMinter.create({ integrityToken: response[0] }, webPoSignalOutput);
                 PoTokenMinter.webPoMinterPromise = null;
                 resolve();
             } catch (error) {
