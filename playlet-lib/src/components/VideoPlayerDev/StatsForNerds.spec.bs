@@ -1,0 +1,159 @@
+' StatsForNerds @SGNode suite — verifies the passive renderer independently from the player coordinator.
+
+namespace Tests
+
+    @SGNode("StatsForNerds")
+    @suite
+    class StatsForNerdsTests extends Rooibos.BaseTestSuite
+
+        function BuildVideo() as object
+            container = CreateObject("roSGNode", "Node")
+            container.addField("fullscreen", "boolean", false)
+            container.fullscreen = true
+
+            content = CreateObject("roSGNode", "ContentNode")
+            content.addField("videoId", "string", false)
+            content.addField("metadata", "assocarray", false)
+            content.videoId = "jNQXAC9IVRw"
+            content.url = "https://example.test/videoplayback?container=dash"
+            content.metadata = {
+                adaptiveFormats: [
+                    { height: 2160, bitrate: 26500000 }
+                    ' An audio-looking entry at the same height must never win the video bitrate fallback.
+                    { type: "audio/mp4", height: 2160, bitrate: 99000000 }
+                ]
+            }
+
+            video = CreateObject("roSGNode", "Node")
+            video.addFields({
+                container: container
+                content: content
+                state: "paused"
+                position: 53.0
+                duration: 634.0
+                width: 1280.0
+                height: 720.0
+                streamingSegment: {
+                    width: 3840
+                    height: 2160
+                    fps: 60
+                }
+                videoFormat: "av1"
+                audioFormat: "eac3"
+                bitrate: 26500000
+            })
+            return video
+        end function
+
+        @describe("diagnostics")
+
+        @it("renders the available playback diagnostics")
+        function _()
+            m.top.video = m.BuildVideo()
+
+            m.assertTrue(m.top.findNode("statsBg").visible)
+            m.assertEqual(m.top.findNode("line1Value").text, "jNQXAC9IVRw")
+            m.assertEqual(m.top.findNode("line2Value").text, "paused")
+            m.assertEqual(m.top.findNode("line3Value").text, "0:53 / 10:34")
+            m.assertEqual(m.top.findNode("line4Value").text, "1280 x 720")
+            m.assertEqual(m.top.findNode("line5Value").text, "3840 x 2160 @60fps")
+            m.assertEqual(m.top.findNode("line6Value").text, "av1 / eac3")
+            m.assertEqual(m.top.findNode("line7Value").text, "26.5 Mbps")
+            m.assertEqual(m.top.findNode("line8Value").text, "dash")
+        end function
+
+        @it("hides in picture-in-picture while retaining event-driven diagnostics for restore")
+        function _()
+            video = m.BuildVideo()
+            m.top.video = video
+            m.assertEqual(m.top.findNode("line3Value").text, "0:53 / 10:34")
+
+            video.container.fullscreen = false
+            m.assertFalse(m.top.findNode("statsBg").visible)
+            video.position = 120
+            video.streamingSegment = { width: 1920, height: 1080, fps: 30 }
+            m.assertEqual(m.top.findNode("line3Value").text, "0:53 / 10:34", "hidden overlay does no per-second position work")
+            m.assertEqual(m.top.findNode("line5Value").text, "3840 x 2160 @60fps", "hidden overlay does no label/layout work")
+
+            video.container.fullscreen = true
+            m.assertTrue(m.top.findNode("statsBg").visible)
+            m.assertEqual(m.top.findNode("line3Value").text, "2:00 / 10:34")
+            m.assertEqual(m.top.findNode("line5Value").text, "1920 x 1080 @30fps", "restore paints the cached decoder event")
+        end function
+
+        @it("does not carry stale stream diagnostics into new content")
+        function _()
+            video = m.BuildVideo()
+            m.top.video = video
+            m.assertEqual(m.top.findNode("line5Value").text, "3840 x 2160 @60fps")
+            m.assertEqual(m.top.findNode("line6Value").text, "av1 / eac3")
+            m.assertEqual(m.top.findNode("line7Value").text, "26.5 Mbps")
+            m.assertEqual(m.top.findNode("line8Value").text, "dash")
+
+            content = CreateObject("roSGNode", "ContentNode")
+            content.addField("videoId", "string", false)
+            content.videoId = "newVideoId"
+            ' Roku can leave the previous streamingSegment/videoFormat fields in place briefly after this write.
+            video.content = content
+
+            m.assertEqual(m.top.findNode("line1Value").text, "newVideoId")
+            m.assertEqual(m.top.findNode("line5Value").text, "")
+            m.assertEqual(m.top.findNode("line6Value").text, "")
+            m.assertEqual(m.top.findNode("line7Value").text, "")
+            m.assertEqual(m.top.findNode("line8Value").text, "")
+            m.top.visible = false
+            m.top.visible = true
+            m.assertEqual(m.top.findNode("line5Value").text, "", "showing the overlay cannot revive the previous stream")
+
+            video.streamingSegment = { width: 1920, height: 1080, fps: 30 }
+            m.assertEqual(m.top.findNode("line3Value").text, "", "a decoder event cannot revive old playback time")
+            m.assertEqual(m.top.findNode("line6Value").text, "", "a segment update cannot revive previous codecs")
+            m.assertEqual(m.top.findNode("line7Value").text, "", "a segment update cannot revive the previous bitrate")
+            video.position = 3
+            m.assertEqual(m.top.findNode("line3Value").text, "0:03", "position becomes valid independently")
+            video.duration = 120
+            m.assertEqual(m.top.findNode("line3Value").text, "0:03 / 2:00", "duration completes the playback pair")
+            video.videoFormat = "h264"
+            video.audioFormat = "ac3"
+            video.bitrate = 2500000
+            content.url = "https://example.test/live.m3u8"
+            m.assertEqual(m.top.findNode("line5Value").text, "1920 x 1080 @30fps")
+            m.assertEqual(m.top.findNode("line6Value").text, "h264 / ac3")
+            m.assertEqual(m.top.findNode("line7Value").text, "2.5 Mbps")
+            m.assertEqual(m.top.findNode("line8Value").text, "hls")
+        end function
+
+        @it("clears every rendered value when the observed Video node is removed")
+        function _()
+            m.top.video = m.BuildVideo()
+            m.assertEqual(m.top.findNode("line1Value").text, "jNQXAC9IVRw")
+            m.assertEqual(m.top.findNode("line8Value").text, "dash")
+
+            m.top.video = invalid
+
+            m.assertFalse(m.top.findNode("statsBg").visible)
+            for i = 1 to 8
+                m.assertEqual(m.top.findNode("line" + i.ToStr() + "Value").text, "")
+            end for
+        end function
+
+        @it("tolerates unavailable optional diagnostics")
+        function _()
+            container = CreateObject("roSGNode", "Node")
+            container.addField("fullscreen", "boolean", false)
+            container.fullscreen = true
+            video = CreateObject("roSGNode", "Node")
+            video.addFields({
+                container: container
+            })
+
+            m.top.video = video
+            m.assertTrue(m.top.findNode("statsBg").visible)
+            for i = 1 to 8
+                m.assertEqual(m.top.findNode("line" + i.ToStr() + "Value").text, "")
+            end for
+        end function
+
+    end class
+
+end namespace
