@@ -14,7 +14,7 @@ export { Key, ecp, odc };
 // Mirror the BrightScript enums the renderers project.
 export const Mode = { idle: 0, scrub: 1, scan: 2, liveDvr: 3 } as const;
 export const Glyph = { none: 0, replay: 9 } as const;
-export const Button = { playPause: 0, minimize: 1 } as const;
+export const Button = { playPause: 0, stats: 1, minimize: 2 } as const;
 
 const j = (v: unknown) => JSON.stringify(v);
 const eq = (a: unknown, b: unknown) => j(a) === j(b);
