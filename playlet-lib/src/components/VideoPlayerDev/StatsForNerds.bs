@@ -1,0 +1,586 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+' Heavy decoder fields and low-frequency state changes are retained because Roku can expose them only briefly.
+' Position/duration are observed only while the fullscreen overlay is painted. Hidden/PiP updates cache
+' transient values without writing labels, so an off overlay does no per-second or layout work.
+function Init() as void
+    m.top.focusable = false
+    m.statsBg = m.top.findNode("statsBg")
+    m.lineValues = []
+
+    labels = [
+        Tr(Locale.VideoPlayer.StatsVideoId)
+        Tr(Locale.VideoPlayer.StatsState)
+        Tr(Locale.VideoPlayer.StatsPlayback)
+        Tr(Locale.VideoPlayer.StatsViewport)
+        Tr(Locale.VideoPlayer.StatsResolution)
+        Tr(Locale.VideoPlayer.StatsCodecs)
+        Tr(Locale.VideoPlayer.StatsBitrate)
+        Tr(Locale.VideoPlayer.StatsContainer)
+    ]
+    for i = 0 to labels.Count() - 1
+        lineNumber = (i + 1).ToStr()
+        m.top.findNode("line" + lineNumber + "Label").text = labels[i]
+        m.lineValues.Push(m.top.findNode("line" + lineNumber + "Value"))
+    end for
+
+    m.video = invalid
+    m.container = invalid
+    m.content = invalid
+    m.observingVideo = false
+    m.observingFastFields = false
+    ResetCachedValues()
+
+    m.top.observeFieldScoped("visible", FuncName(OnVisibilityInputChanged))
+    m.top.observeFieldScoped("video", FuncName(OnVideoChanged))
+    OnVideoChanged()
+end function
+
+function OnVideoChanged() as void
+    newVideo = m.top.video
+    if m.video <> invalid and newVideo <> invalid and m.video.isSameNode(newVideo)
+        UpdateVisibility()
+        return
+    end if
+
+    UnobserveFastFields()
+    UnobserveVideo()
+    UnobserveContainer()
+    UnobserveContent()
+    m.video = newVideo
+    ResetCachedValues()
+    ClearValues()
+
+    if m.video <> invalid and m.video.hasField("container")
+        ObserveContainer(m.video.container)
+    end if
+    ObserveContent(GetField(m.video, "content"))
+    ObserveVideo()
+    RefreshInitialStats()
+    UpdateVisibility()
+end function
+
+function ObserveContainer(container as object) as void
+    if container = invalid or not container.hasField("fullscreen")
+        return
+    end if
+    m.container = container
+    m.container.observeFieldScoped("fullscreen", FuncName(OnVisibilityInputChanged))
+end function
+
+function UnobserveContainer() as void
+    if m.container <> invalid
+        m.container.unobserveFieldScoped("fullscreen")
+        m.container = invalid
+    end if
+end function
+
+function ObserveContent(content as object) as void
+    if content = invalid
+        return
+    end if
+    m.content = content
+    if m.content.hasField("url")
+        m.content.observeFieldScoped("url", FuncName(OnContentUrlChanged))
+    end if
+end function
+
+function UnobserveContent() as void
+    if m.content <> invalid
+        if m.content.hasField("url")
+            m.content.unobserveFieldScoped("url")
+        end if
+        m.content = invalid
+    end if
+end function
+
+function OnContentUrlChanged() as void
+    RefreshContainer()
+    if m.statsBg.visible
+        SetValue(8, m.streamContainer)
+    end if
+end function
+
+function OnVisibilityInputChanged() as void
+    UpdateVisibility()
+end function
+
+function UpdateVisibility() as void
+    shouldShow = m.top.visible = true and m.video <> invalid and m.container <> invalid
+    if shouldShow
+        shouldShow = m.container.fullscreen = true
+    end if
+    m.statsBg.visible = shouldShow
+
+    if shouldShow
+        ObserveFastFields()
+        RefreshIdentityStats()
+        PaintStreamStats()
+        RefreshFastStats()
+    else
+        UnobserveFastFields()
+    end if
+end function
+
+function ObserveVideo() as void
+    if m.video = invalid or m.observingVideo
+        return
+    end if
+    for each fieldName in ["content", "state", "width", "height", "streamingSegment", "videoFormat", "audioFormat", "bitrate"]
+        if m.video.hasField(fieldName)
+            m.video.observeFieldScoped(fieldName, FuncName(OnVideoFieldChanged))
+        end if
+    end for
+    m.observingVideo = true
+end function
+
+function UnobserveVideo() as void
+    if m.video = invalid or not m.observingVideo
+        return
+    end if
+    for each fieldName in ["content", "state", "width", "height", "streamingSegment", "videoFormat", "audioFormat", "bitrate"]
+        if m.video.hasField(fieldName)
+            m.video.unobserveFieldScoped(fieldName)
+        end if
+    end for
+    m.observingVideo = false
+end function
+
+function ObserveFastFields() as void
+    if m.video = invalid or m.observingFastFields
+        return
+    end if
+    for each fieldName in ["position", "duration"]
+        if m.video.hasField(fieldName)
+            m.video.observeFieldScoped(fieldName, FuncName(OnFastFieldChanged))
+        end if
+    end for
+    m.observingFastFields = true
+end function
+
+function UnobserveFastFields() as void
+    if m.video = invalid or not m.observingFastFields
+        return
+    end if
+    for each fieldName in ["position", "duration"]
+        if m.video.hasField(fieldName)
+            m.video.unobserveFieldScoped(fieldName)
+        end if
+    end for
+    m.observingFastFields = false
+end function
+
+function OnFastFieldChanged(event as object) as void
+    if event = invalid
+        return
+    end if
+    fieldName = event.getField()
+    if fieldName = "position"
+        m.positionTrusted = true
+        RefreshFastStats()
+    else if fieldName = "duration"
+        m.durationTrusted = true
+        RefreshFastStats()
+    end if
+end function
+
+function OnVideoFieldChanged(event as object) as void
+    fieldName = ""
+    if event <> invalid
+        fieldName = event.getField()
+    end if
+
+    if fieldName = "content"
+        ' A reused Video node can briefly retain the preceding content's decoder fields. Clear them and wait
+        ' for fresh per-field events so the next video never inherits stale resolution/codecs/bitrate/container.
+        UnobserveContent()
+        ResetCachedValues()
+        ObserveContent(GetField(m.video, "content"))
+        RefreshContainer()
+        if m.statsBg.visible
+            ClearValues()
+            RefreshIdentityStats()
+            PaintStreamStats()
+        end if
+    else if fieldName = "state"
+        m.state = ValidString(GetField(m.video, "state"))
+        ' A playing/paused edge confirms that the reused Video node has entered the new playback. Only then
+        ' may a later overlay reveal read position/duration directly; buffering can still expose old values.
+        if m.state = "playing" or m.state = "paused"
+            m.positionTrusted = true
+            m.durationTrusted = true
+        end if
+        if m.statsBg.visible
+            SetValue(2, m.state)
+        end if
+    else if fieldName = "width" or fieldName = "height"
+        if m.statsBg.visible
+            RefreshIdentityStats()
+        end if
+    else if fieldName = "streamingSegment"
+        RefreshSegmentStats()
+        if m.statsBg.visible
+            SetValue(5, m.resolution)
+            SetValue(7, m.bitrate)
+        end if
+    else if fieldName = "videoFormat"
+        RefreshVideoFormat()
+        if m.statsBg.visible
+            SetValue(6, FormatCodecs())
+        end if
+    else if fieldName = "audioFormat"
+        RefreshAudioFormat()
+        if m.statsBg.visible
+            SetValue(6, FormatCodecs())
+        end if
+    else if fieldName = "bitrate"
+        RefreshBitrateField()
+        if m.statsBg.visible
+            SetValue(7, m.bitrate)
+        end if
+    end if
+end function
+
+function RefreshInitialStats() as void
+    if m.video = invalid
+        return
+    end if
+    RefreshSegmentStats()
+    RefreshVideoFormat()
+    RefreshAudioFormat()
+    RefreshBitrateField()
+    RefreshContainer()
+    if GetField(m.video, "content") <> invalid
+        m.positionTrusted = true
+        m.durationTrusted = true
+    end if
+end function
+
+function RefreshFastStats() as void
+    if m.video = invalid
+        return
+    end if
+    m.state = ValidString(GetField(m.video, "state"))
+    if m.positionTrusted
+        m.position = FormatTime(GetField(m.video, "position"))
+    end if
+    if m.durationTrusted
+        m.duration = FormatTime(GetField(m.video, "duration"))
+    end if
+    SetValue(2, m.state)
+    SetValue(3, FormatPlayback())
+end function
+
+function RefreshIdentityStats() as void
+    content = GetField(m.video, "content")
+    videoId = ""
+    if content <> invalid and content.hasField("videoId")
+        videoId = ValidString(content.videoId)
+    end if
+    SetValue(1, videoId)
+    SetValue(4, FormatDimensions(GetField(m.video, "width"), GetField(m.video, "height")))
+end function
+
+function RefreshSegmentStats() as void
+    segment = GetField(m.video, "streamingSegment")
+    resolution = ""
+    bitrateValue = invalid
+    height = invalid
+    if IsAssociativeArray(segment)
+        width = Lookup(segment, "width")
+        height = ParseNumber(Lookup(segment, "height"))
+        resolution = FormatDimensions(width, height)
+        parsedFps = ParseNumber(Lookup(segment, "fps"))
+        if parsedFps = invalid
+            parsedFps = ParseNumber(Lookup(segment, "frameRate"))
+        end if
+        if not StringUtils.IsNullOrEmpty(resolution) and parsedFps <> invalid and parsedFps > 0
+            resolution += " @" + parsedFps.ToStr() + "fps"
+        end if
+        bitrateValue = ExtractSegmentBitrate(segment)
+    end if
+    if not StringUtils.IsNullOrEmpty(resolution)
+        m.resolution = resolution
+    end if
+
+    if bitrateValue = invalid and height <> invalid and height > 0
+        bitrateValue = InferBitrateFromContentMetadata(GetField(m.video, "content"), height)
+    end if
+    bitrateText = FormatBitrate(bitrateValue)
+    if not StringUtils.IsNullOrEmpty(bitrateText)
+        m.bitrate = bitrateText
+    end if
+end function
+
+function RefreshVideoFormat() as void
+    videoFormat = ValidString(GetField(m.video, "videoFormat"))
+    if not StringUtils.IsNullOrEmpty(videoFormat)
+        m.videoFormat = videoFormat
+    end if
+end function
+
+function RefreshAudioFormat() as void
+    audioFormat = ValidString(GetField(m.video, "audioFormat"))
+    if not StringUtils.IsNullOrEmpty(audioFormat)
+        m.audioFormat = audioFormat
+    end if
+end function
+
+function RefreshBitrateField() as void
+    bitrateText = FormatBitrate(GetField(m.video, "bitrate"))
+    if not StringUtils.IsNullOrEmpty(bitrateText)
+        m.bitrate = bitrateText
+    end if
+end function
+
+function RefreshContainer() as void
+    content = GetField(m.video, "content")
+    url = ""
+    if content <> invalid and content.hasField("url")
+        url = ValidString(content.url)
+    end if
+    m.streamContainer = ContainerFromUrl(url)
+end function
+
+function PaintStreamStats() as void
+    SetValue(5, m.resolution)
+    SetValue(6, FormatCodecs())
+    SetValue(7, m.bitrate)
+    SetValue(8, m.streamContainer)
+end function
+
+function FormatPlayback() as string
+    position = m.position
+    duration = m.duration
+    if StringUtils.IsNullOrEmpty(position)
+        return duration
+    else if StringUtils.IsNullOrEmpty(duration)
+        return position
+    end if
+    return position + " / " + duration
+end function
+
+function FormatCodecs() as string
+    if StringUtils.IsNullOrEmpty(m.videoFormat)
+        return m.audioFormat
+    else if StringUtils.IsNullOrEmpty(m.audioFormat)
+        return m.videoFormat
+    end if
+    return m.videoFormat + " / " + m.audioFormat
+end function
+
+function SetValue(index as integer, value as string) as void
+    label = m.lineValues[index - 1]
+    if label.text <> value
+        label.text = value
+    end if
+end function
+
+function GetField(node as object, fieldName as string) as dynamic
+    if node <> invalid and node.hasField(fieldName)
+        return node[fieldName]
+    end if
+    return invalid
+end function
+
+function Lookup(value as object, key as string) as dynamic
+    if value <> invalid and value.DoesExist(key)
+        return value[key]
+    end if
+    return invalid
+end function
+
+function ParseNumber(value as dynamic) as dynamic
+    if IsInt(value)
+        return value
+    else if IsFloat(value) or IsDouble(value)
+        return CInt(value)
+    else if IsString(value) and Val(value) > 0
+        return CInt(Val(value))
+    end if
+    return invalid
+end function
+
+function FormatDimensions(width as dynamic, height as dynamic) as string
+    parsedWidth = ParseNumber(width)
+    parsedHeight = ParseNumber(height)
+    if parsedWidth = invalid or parsedHeight = invalid or parsedWidth <= 0 or parsedHeight <= 0
+        return ""
+    end if
+    return parsedWidth.ToStr() + " x " + parsedHeight.ToStr()
+end function
+
+function ExtractSegmentBitrate(segment as object) as dynamic
+    for each key in ["bitrate", "bandwidth", "avgBitrate", "averageBitrate", "bitsPerSecond", "bps"]
+        value = ParseNumber(Lookup(segment, key))
+        if value <> invalid and value > 0
+            return value
+        end if
+    end for
+    for each key in ["kbps", "kbitrate", "bandwidthKbps"]
+        value = ParseNumber(Lookup(segment, key))
+        if value <> invalid and value > 0
+            return value * 1000
+        end if
+    end for
+    return invalid
+end function
+
+function InferBitrateFromContentMetadata(content as object, targetHeight as integer) as dynamic
+    if content = invalid or targetHeight <= 0 or not content.hasField("metadata")
+        return invalid
+    end if
+    if targetHeight = m.cachedMetaBitrateHeight and m.cachedMetaBitrate <> invalid
+        return m.cachedMetaBitrate
+    else if targetHeight = m.cachedMetaMissHeight
+        return invalid
+    end if
+    metadata = content.metadata
+    if not IsAssociativeArray(metadata)
+        m.cachedMetaMissHeight = targetHeight
+        return invalid
+    end if
+    formats = ValidArray(metadata.adaptiveFormats)
+    if formats.Count() = 0
+        formats = ValidArray(metadata.formatStreams)
+    end if
+
+    bestBitrate = 0
+    for each format in formats
+        if not IsAssociativeArray(format)
+            continue for
+        end if
+        mimeType = ValidString(Lookup(format, "type"))
+        if not StringUtils.IsNullOrEmpty(mimeType) and not mimeType.StartsWith("video/")
+            continue for
+        end if
+        formatHeight = ParseNumber(Lookup(format, "height"))
+        if formatHeight = invalid or formatHeight <> targetHeight
+            continue for
+        end if
+        bitrate = ParseNumber(Lookup(format, "bitrate"))
+        if bitrate <> invalid and bitrate > bestBitrate
+            bestBitrate = bitrate
+        end if
+    end for
+    if bestBitrate > 0
+        m.cachedMetaBitrateHeight = targetHeight
+        m.cachedMetaBitrate = bestBitrate
+        m.cachedMetaMissHeight = -1
+        return bestBitrate
+    end if
+    m.cachedMetaMissHeight = targetHeight
+    return invalid
+end function
+
+function FormatBitrate(value as dynamic) as string
+    bitrate = ParseNumber(value)
+    if bitrate = invalid or bitrate <= 0
+        return ""
+    end if
+    if bitrate >= 1000000
+        scaled = (bitrate + 50000) \ 100000
+        return (scaled \ 10).ToStr() + "." + (scaled mod 10).ToStr() + " Mbps"
+    else if bitrate >= 1000
+        return (bitrate \ 1000).ToStr() + " kbps"
+    end if
+    return bitrate.ToStr() + " bps"
+end function
+
+function ContainerFromUrl(url as string) as string
+    if StringUtils.IsNullOrEmpty(url)
+        return ""
+    end if
+    if url.InStr("?") <> -1
+        query = UrlUtils.ParseQueryComponents(url)
+        if query.DoesExist("container")
+            value = query.container
+            if IsArray(value) and value.Count() > 0
+                value = value[0]
+            end if
+            if IsString(value) and not StringUtils.IsNullOrEmpty(value)
+                return value
+            end if
+        end if
+    end if
+
+    lower = LCase(url)
+    if lower.InStr(".mpd") <> -1 or lower.InStr("/dash") <> -1 or lower.InStr("/mux") <> -1
+        return "dash"
+    else if lower.InStr(".m3u8") <> -1
+        return "hls"
+    else if lower.InStr(".webm") <> -1
+        return "webm"
+    else if lower.InStr(".mkv") <> -1
+        return "mkv"
+    else if lower.InStr(".mp4") <> -1
+        return "mp4"
+    end if
+    return ""
+end function
+
+function FormatTime(value as dynamic) as string
+    seconds = NormalizeSeconds(value)
+    if seconds < 0
+        return ""
+    end if
+    hours = seconds \ 3600
+    minutes = (seconds mod 3600) \ 60
+    seconds = seconds mod 60
+    if hours > 0
+        return hours.ToStr() + ":" + Pad2(minutes) + ":" + Pad2(seconds)
+    end if
+    return minutes.ToStr() + ":" + Pad2(seconds)
+end function
+
+function NormalizeSeconds(value as dynamic) as integer
+    if IsInt(value)
+        return value
+    else if IsFloat(value) or IsDouble(value)
+        return CInt(value)
+    else if IsString(value)
+        return CInt(Val(value))
+    end if
+    return -1
+end function
+
+function Pad2(value as integer) as string
+    if value < 10
+        return "0" + value.ToStr()
+    end if
+    return value.ToStr()
+end function
+
+function ResetCachedValues() as void
+    m.state = ""
+    m.position = ""
+    m.duration = ""
+    m.positionTrusted = false
+    m.durationTrusted = false
+    m.resolution = ""
+    m.videoFormat = ""
+    m.audioFormat = ""
+    m.bitrate = ""
+    m.streamContainer = ""
+    m.cachedMetaBitrateHeight = -1
+    m.cachedMetaBitrate = invalid
+    m.cachedMetaMissHeight = -1
+end function
+
+function ClearValues() as void
+    for i = 1 to m.lineValues.Count()
+        SetValue(i, "")
+    end for
+end function
+
+function OnDispose() as void
+    UnobserveFastFields()
+    UnobserveVideo()
+    UnobserveContainer()
+    UnobserveContent()
+    m.top.unobserveFieldScoped("visible")
+    m.top.unobserveFieldScoped("video")
+end function
