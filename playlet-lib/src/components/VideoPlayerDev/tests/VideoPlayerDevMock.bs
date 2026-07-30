@@ -84,6 +84,14 @@ function TestSetup() as void
         m.top.unobserveField(deviceField)
     end for
 
+    ' The mock node is shared across tests and `duration` is not alwaysNotify, so a leftover duration=100
+    ' swallows the next test's identical write and OnDuration never fires. Reset with the observers off.
+    m.top.state = VideoState.None
+    m.top.control = VideoControl.None
+    m.top.position = 0
+    m.top.duration = 0
+    m.top.seek = 0
+
     OnNodeReady()
 end function
 
@@ -116,6 +124,13 @@ function TestSetLive(edgeMs as integer) as void
     m.trickPlayBar.canRewind = m.transport.CanRewindLive()
     m.transport.OnLiveEdge(edgeMs)
     m.transport.OnPosition(edgeMs)
+end function
+
+' TestSeedSponsorBlock — the segments job's result, minus the job. Writing m.top.position afterwards runs the
+' REAL OnPosition, which is what arms the manual notice.
+function TestSeedSponsorBlock(segments as object) as void
+    m.sponsorblock.enabled = true
+    m.sponsorblock.segments = segments
 end function
 
 ' TestFireLiveBadgeHold — fire the liveBadgeHold timer's handler now (the spec can't wait out the real timer).
@@ -214,6 +229,7 @@ function TestSnapshot() as object
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton
         nudgeCount: m.top.nudgeCount
+        sponsorNoticeShown: SponsorBlock.GetCurrentNotification(m.notifications) <> invalid
         forceLiveBadge: m.trickPlayBar.forceLiveBadge
         liveBadgeShown: m.trickPlayBar.findNode("liveLabel").visible
         barRemainingText: m.trickPlayBar.findNode("remainingLabel").text

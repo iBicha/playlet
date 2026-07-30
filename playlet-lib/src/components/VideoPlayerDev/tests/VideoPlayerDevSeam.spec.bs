@@ -216,11 +216,18 @@ namespace Tests
         end function
 
         ' Up/Down reveal the chrome when it is hidden in idle (they otherwise do nothing).
-        @it("Up reveals the chrome when it is hidden in idle")
+        @it("Up and Down each reveal the chrome when it is hidden in idle")
         function _()
             m.assertFalse(m.Snap().chromeShown) ' starts hidden after setup
             m.top.callFunc("TestKey", RemoteKeys.Up, true)
             m.assertTrue(m.Snap().chromeShown, "Up revealed the chrome")
+
+            ' back to fully hidden: the reveal only fires from Hidden, not mid fade-out.
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            m.top.callFunc("TestFinishChromeFadeOut")
+            m.assertFalse(m.Snap().chromeShown)
+            m.top.callFunc("TestKey", RemoteKeys.Down, true)
+            m.assertTrue(m.Snap().chromeShown, "Down revealed the chrome")
         end function
 
         ' =========================================================================================
@@ -347,6 +354,121 @@ namespace Tests
             m.top.callFunc("TestFinishChromeFadeOut")
             m.top.callFunc("TestKey", RemoteKeys.Back, true)
             m.assertTrue(m.top.videoQueue.closePlayer, "rung 4: Back closes")
+        end function
+
+        ' =========================================================================================
+        ' Key router — the branches that decide WHICH handler runs.
+        ' =========================================================================================
+
+        ' The segment shape SponsorBlockSegmentsJob returns.
+        function ManualSegment(startS as float, endS as float) as object
+            return [{ start: startS, end: endS, option: "manual_skip", title: "Sponsor", shortTitle: "Sponsor", actionText: "Press OK to skip", showNotification: true, UUID: "seg-manual", category: "sponsor" }]
+        end function
+
+        ' Minimize is the discriminator: activating it would have hidden the chrome.
+        @it("an armed SponsorBlock notice outranks the buttons tier: OK skips instead of activating the button")
+        function _()
+            m.top.duration = 100
+            m.top.callFunc("TestSeedSponsorBlock", m.ManualSegment(10.0, 40.0))
+            m.top.position = 12.0 ' the REAL OnPosition arms the manual notice
+            m.assertTrue(m.Snap().sponsorNoticeShown, "the notice is up")
+
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
+            m.assertEqual(m.Snap().focusedButton, 1)
+
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            after = m.Snap()
+            m.assertEqual(Int(m.top.seek * 1000), 40000, "OK skipped to the segment end, not into the focused button")
+            m.assertFalse(after.sponsorNoticeShown, "the skip took the notice down")
+            m.assertTrue(after.chromeShown, "minimize never ran -- it would have hidden the chrome")
+        end function
+
+        @it("an armed SponsorBlock notice outranks the Back ladder: Back dismisses the notice, not the player")
+        function _()
+            m.top.duration = 100
+            m.top.callFunc("TestSeedSponsorBlock", m.ManualSegment(10.0, 40.0))
+            m.top.position = 12.0
+            m.assertTrue(m.Snap().sponsorNoticeShown)
+            m.assertFalse(m.Snap().chromeShown, "chrome hidden: an unrouted Back here would CLOSE the player")
+            seekBefore = m.top.seek
+
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            after = m.Snap()
+            m.assertFalse(after.sponsorNoticeShown, "Back took the notice down")
+            m.assertFalse(m.top.videoQueue.closePlayer, "Back acted on the notice, NOT on the player")
+            m.assertEqual(m.top.seek, seekBefore, "dismissing is not skipping")
+
+            ' one-shot: with the notice gone the next Back is the ordinary ladder again (rung 4 -> close).
+            m.top.callFunc("TestKey", RemoteKeys.Back, true)
+            m.assertTrue(m.top.videoQueue.closePlayer, "the notice consumed one Back, not every Back")
+        end function
+
+        @it("an armed notice on a segment at the video end finishes playback instead of seeking")
+        function _()
+            m.top.duration = 100
+            m.top.callFunc("TestSeedSponsorBlock", m.ManualSegment(90.0, 99.5)) ' ends within 2s of duration
+            m.top.position = 92.0
+            m.assertTrue(m.Snap().sponsorNoticeShown)
+            seekBefore = m.top.seek
+
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            m.assertEqual(m.top.seek, seekBefore, "no seek was issued: the skip resolved to finish")
+            m.assertTrue(m.top.videoQueue.closePlayer, "no next video -> the finish closed the player")
+        end function
+
+        @it("the non-transport keys act on the key-DOWN edge only")
+        function _()
+            ' Back goes first: only from the start state does its DOWN edge close the player.
+            m.assertFalse(m.top.callFunc("TestKey", RemoteKeys.Back, false), "the Back key-up is not consumed")
+            m.assertFalse(m.top.videoQueue.closePlayer, "the Back key-up must not close the player")
+
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' reveal
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true) ' pause
+            m.top.callFunc("TestSetState", VideoState.Paused)
+            m.assertEqual(m.Snap().control, VideoControl.Pause)
+
+            m.assertFalse(m.top.callFunc("TestKey", RemoteKeys.Ok, false), "the OK key-up is not consumed")
+            m.assertFalse(m.top.callFunc("TestKey", RemoteKeys.Play, false), "the Play key-up is not consumed")
+            m.assertFalse(m.top.callFunc("TestKey", RemoteKeys.PlayOnly, false), "the PlayOnly key-up is not consumed")
+            m.assertFalse(m.top.callFunc("TestKey", RemoteKeys.Pause, false), "the Pause key-up is not consumed")
+            m.assertEqual(m.Snap().control, VideoControl.Pause, "no key-up toggled the pause back to playing")
+        end function
+
+        @it("Play commits an active transport, like OK")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub)
+
+            m.top.callFunc("TestKey", RemoteKeys.Play, true)
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Idle, "Play committed the scrub")
+            m.assertTrue(after.seekSettling, "the commit emitted a play-through seek, not a play/pause toggle")
+        end function
+
+        @it("PlayOnly toggles play/pause, like Play")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.PlayOnly, true)
+            m.assertEqual(m.Snap().control, VideoControl.Pause, "PlayOnly paused the playing video")
+            m.top.callFunc("TestSetState", VideoState.Paused)
+            m.top.callFunc("TestKey", RemoteKeys.PlayOnly, true)
+            m.assertEqual(m.Snap().control, VideoControl.Resume, "PlayOnly resumed the paused video")
+        end function
+
+        @it("the transport keys fall through the buttons tier to the transport")
+        function _()
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
+            m.assertEqual(m.Snap().focusTarget, PlayerCoordinatorLogic.FocusTarget.Buttons)
+
+            m.top.callFunc("TestKey", RemoteKeys.Rewind, true)
+            m.top.callFunc("TestKey", RemoteKeys.Rewind, false)
+            after = m.Snap()
+            m.assertEqual(after.transportMode, TransportController.Mode.Scan, "Rev started the scan from the buttons tier")
+            m.assertEqual(after.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar, "a transport key moves focus to the bar")
+            m.assertEqual(after.nudgeCount, 0, "the row did not treat it as one of its own keys")
         end function
 
         ' The point of the bar-default: Left/Right seek and OK pauses with no navigation at all, straight off a
@@ -553,6 +675,61 @@ namespace Tests
             snap = m.Snap()
             m.assertEqual(snap.control, VideoControl.Pause, "Play paused the (playing) video")
             m.assertEqual(snap.focusedButton, 1, "the highlight is untouched")
+        end function
+
+        ' Each arm is asserted: a state that silently failed to arm makes every row that follows vacuous.
+        function ArmRouterState(state as string) as void
+            m.top.callFunc("TestSetup")
+            m.top.callFunc("TestSetState", VideoState.Playing) ' opens the brain's ready-gate, as beforeEach does
+            if state = "idle hidden"
+                m.assertFalse(m.Snap().chromeShown, "armed: " + state)
+            else if state = "chrome/bar"
+                m.top.callFunc("TestKey", RemoteKeys.Up, true)
+                snap = m.Snap()
+                m.assertTrue(snap.chromeShown, "armed: " + state)
+                m.assertEqual(snap.focusTarget, PlayerCoordinatorLogic.FocusTarget.Bar, "armed: " + state)
+            else if state = "chrome/buttons"
+                m.top.callFunc("TestKey", RemoteKeys.Up, true)
+                m.top.callFunc("TestKey", RemoteKeys.Up, true)
+                snap = m.Snap()
+                m.assertTrue(snap.chromeShown, "armed: " + state)
+                m.assertEqual(snap.focusTarget, PlayerCoordinatorLogic.FocusTarget.Buttons, "armed: " + state)
+            else if state = "transport"
+                m.top.callFunc("TestKey", RemoteKeys.Left, true)
+                m.top.callFunc("TestKey", RemoteKeys.Left, false)
+                m.assertEqual(m.Snap().transportMode, TransportController.Mode.Scrub, "armed: " + state)
+            end if
+        end function
+
+        ' BrighterScript enums are compile-time constants with no runtime form, so a new RemoteKeys member
+        ' cannot fail this until someone lists it below — these lists are the decision record, not reflection.
+        @it("every remote key's disposition is pinned in every router state")
+        function _()
+            ownedEverywhere = [RemoteKeys.Left, RemoteKeys.Right, RemoteKeys.Rewind, RemoteKeys.FastForward, RemoteKeys.Replay, RemoteKeys.Ok, RemoteKeys.Back, RemoteKeys.Play, RemoteKeys.PlayOnly]
+            ' AppController's, not the player's.
+            passedEverywhere = [RemoteKeys.Options, RemoteKeys.Pause, RemoteKeys.OkLongPress, RemoteKeys.OptionsLongPress]
+            ' the tier keys are owned only while there is a tier to move through or a chrome to reveal.
+            tierKeys = [RemoteKeys.Up, RemoteKeys.Down]
+
+            for each state in ["idle hidden", "chrome/bar", "chrome/buttons", "transport"]
+                for each key in ownedEverywhere
+                    m.ArmRouterState(state)
+                    m.assertTrue(m.top.callFunc("TestKey", key, true), "'" + key + "' must be consumed in state " + state)
+                end for
+                for each key in passedEverywhere
+                    m.ArmRouterState(state)
+                    m.assertFalse(m.top.callFunc("TestKey", key, true), "'" + key + "' must pass to the parent in state " + state)
+                end for
+                for each key in tierKeys
+                    m.ArmRouterState(state)
+                    consumed = m.top.callFunc("TestKey", key, true)
+                    if state = "transport"
+                        m.assertFalse(consumed, "'" + key + "' has nothing to do under a transport -- it passes to the parent")
+                    else
+                        m.assertTrue(consumed, "'" + key + "' moves focus or reveals the chrome in state " + state)
+                    end if
+                end for
+            end for
         end function
 
         ' The coordinator twin of the brain's unmodeled-axis meta-test: every m.* field on the coordinator must

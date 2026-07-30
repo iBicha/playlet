@@ -1,8 +1,9 @@
 # VideoPlayerDev
 
-The custom video player intended to replace `components/VideoPlayer` — a stock-OS-trickplay replica plus a
-control button row. It is selected at **compile time** by `#const USE_DEV_PLAYER` in `VideoQueue.bs` (default
-`false`). Build with the flag `true` to run it (and the integration suite).
+The custom video player that replaced `components/VideoPlayer` — a stock-OS-trickplay replica plus a control
+button row. It is selected at **compile time** by `#const USE_DEV_PLAYER` in `VideoQueue.bs`, currently `true`:
+this is the player that ships. Build with the flag `false` to fall back to the stock `VideoPlayer` (the
+integration suite asserts the dev player, so it only passes with the flag on).
 
 ## Architecture
 
