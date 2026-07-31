@@ -194,11 +194,21 @@ function OnVideoFieldChanged(event as object) as void
     end if
 
     if fieldName = "content"
+        content = GetField(m.video, "content")
+        if m.content <> invalid and content <> invalid and m.content.isSameNode(content)
+            ' SceneGraph can notify the parent Video.content field when a field on the same ContentNode changes.
+            ' That is not a content transition and must not discard fresh decoder diagnostics.
+            RefreshContainer()
+            if m.statsBg.visible
+                SetValue(8, m.streamContainer)
+            end if
+            return
+        end if
         ' A reused Video node can briefly retain the preceding content's decoder fields. Clear them and wait
         ' for fresh per-field events so the next video never inherits stale resolution/codecs/bitrate/container.
         UnobserveContent()
         ResetCachedValues()
-        ObserveContent(GetField(m.video, "content"))
+        ObserveContent(content)
         RefreshContainer()
         if m.statsBg.visible
             ClearValues()
