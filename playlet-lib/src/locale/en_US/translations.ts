@@ -985,6 +985,38 @@
         <translation>Rewind live TV</translation>
     </message>
     <message>
+        <source>Video ID:</source>
+        <translation>Video ID:</translation>
+    </message>
+    <message>
+        <source>State:</source>
+        <translation>State:</translation>
+    </message>
+    <message>
+        <source>Playback:</source>
+        <translation>Playback:</translation>
+    </message>
+    <message>
+        <source>Viewport:</source>
+        <translation>Viewport:</translation>
+    </message>
+    <message>
+        <source>Resolution:</source>
+        <translation>Resolution:</translation>
+    </message>
+    <message>
+        <source>Codecs:</source>
+        <translation>Codecs:</translation>
+    </message>
+    <message>
+        <source>Bitrate:</source>
+        <translation>Bitrate:</translation>
+    </message>
+    <message>
+        <source>Container:</source>
+        <translation>Container:</translation>
+    </message>
+    <message>
         <source>Video load error</source>
         <translation>Video load error</translation>
     </message>
