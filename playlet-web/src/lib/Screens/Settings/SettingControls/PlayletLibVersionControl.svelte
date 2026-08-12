@@ -12,6 +12,17 @@
   let libUrlType;
   let appId = "693751";
 
+  // Kept in step with PlayletLibUrls.MIN_VERSION in playlet-app, which drops anything older at boot.
+  const MIN_LIB_VERSION = "0.11.0";
+
+  function isSupported(tag) {
+    const version = /^v(\d+\.\d+\.\d+)$/.exec(tag ?? "")?.[1];
+    return (
+      !version ||
+      version.localeCompare(MIN_LIB_VERSION, undefined, { numeric: true }) >= 0
+    );
+  }
+
   onMount(async () => {
     releases = await fetchReleaseTags();
     setCurrentlyUsedRelease();
@@ -62,17 +73,19 @@
         break;
       }
     }
-    return releases.map((release) => {
-      return {
-        name: release.tag_name,
-        enabled:
-          release.assets.filter(
-            (asset) =>
-              asset.name === "playlet-lib.zip" ||
-              asset.name === "playlet-lib.squashfs.pkg"
-          ).length > 0,
-      };
-    });
+    return releases
+      .filter((release) => isSupported(release.tag_name))
+      .map((release) => {
+        return {
+          name: release.tag_name,
+          enabled:
+            release.assets.filter(
+              (asset) =>
+                asset.name === "playlet-lib.zip" ||
+                asset.name === "playlet-lib.squashfs.pkg"
+            ).length > 0,
+        };
+      });
   }
 
   async function apply() {

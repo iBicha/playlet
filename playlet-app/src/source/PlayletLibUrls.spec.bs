@@ -1,0 +1,61 @@
+namespace Tests
+
+    @suite
+    class PlayletLibUrlsTests extends Rooibos.BaseTestSuite
+
+        @describe("PlayletLibUrls.IsUnsupported")
+
+        @it("reports a tagged release below the minimum version")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.7.0/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.9.0/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.10.3/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.10.3/playlet-lib.squashfs.pkg")
+        function _(link as string)
+            m.assertTrue(PlayletLibUrls.IsUnsupported({ type: "custom", link: link }))
+        end function
+
+        @it("reports nothing for a tagged release at or above the minimum version")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.11.0/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.11.1/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/v0.48.3/playlet-lib.squashfs.pkg")
+        @params("https://github.com/iBicha/playlet/releases/download/v1.0.0/playlet-lib.zip")
+        function _(link as string)
+            m.assertFalse(PlayletLibUrls.IsUnsupported({ type: "custom", link: link }))
+        end function
+
+        @it("reports nothing for a url that carries no version")
+        @params("https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.zip")
+        @params("https://github.com/iBicha/playlet/releases/download/0.10.3/playlet-lib.zip")
+        @params("http://192.168.1.10:8888/playlet-lib.zip")
+        @params("pkg:/lib/playlet-lib.zip")
+        @params("")
+        function _(link as string)
+            m.assertFalse(PlayletLibUrls.IsUnsupported({ type: "custom", link: link }))
+        end function
+
+        @describe("PlayletLibUrls.CompareVersions")
+
+        @it("reports the same version as equal")
+        function _()
+            m.assertEqual(PlayletLibUrls.CompareVersions("0.11.0", "0.11.0"), 0)
+        end function
+
+        @it("orders by the first part that differs")
+        @params("0.10.3", "0.11.0")
+        @params("0.11.0", "0.11.1")
+        @params("0.11.0", "1.0.0")
+        function _(older as string, newer as string)
+            m.assertEqual(PlayletLibUrls.CompareVersions(older, newer), -1)
+            m.assertEqual(PlayletLibUrls.CompareVersions(newer, older), 1)
+        end function
+
+        @it("compares parts as numbers, not text")
+        function _()
+            m.assertEqual(PlayletLibUrls.CompareVersions("0.9.0", "0.11.0"), -1)
+            m.assertEqual(PlayletLibUrls.CompareVersions("0.11.0", "0.9.0"), 1)
+        end function
+
+    end class
+
+end namespace

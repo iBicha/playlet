@@ -1,3 +1,5 @@
+import "pkg:/source/PlayletLibUrls.bs"
+
 namespace Registry
 
     function ReadKey(key as string, section as string) as dynamic
@@ -39,6 +41,23 @@ namespace Registry
         end if
         DeleteKey("playlet_lib_urls", "Playlet")
         Logger.Log("Cleared key playlet_lib_urls from registry")
+    end function
+
+    ' BootstrapScene's load-failure fallback never reaches a pinned lib that loads and then
+    ' crashes, so the device stays on it across every channel update.
+    function ClearUnsupportedPlayletLibUrls() as void
+        urls = GetPlayletLibUrlsFromRegistry()
+        if urls = invalid
+            return
+        end if
+
+        for each entry in urls
+            if PlayletLibUrls.IsUnsupported(entry)
+                DeleteKey("playlet_lib_urls", "Playlet")
+                Logger.Log(`Cleared key playlet_lib_urls from registry: ${entry.link} is no longer supported`)
+                return
+            end if
+        end for
     end function
 
     function ClearRegistryIfNeeded(launchArgs as object) as void

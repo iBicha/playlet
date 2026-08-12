@@ -1,0 +1,37 @@
+namespace PlayletLibUrls
+
+    const RELEASE_URL_PATTERN = "^https://github\.com/iBicha/playlet/releases/download/v(\d+\.\d+\.\d+)/"
+
+    ' v0.11.0 is the first release without HomeGridScreen, which still crashes on the devices
+    ' pinned to v0.7.0 - v0.10.3.
+    const MIN_VERSION = "0.11.0"
+
+    function IsUnsupported(entry as object) as boolean
+        matches = CreateObject("roRegex", RELEASE_URL_PATTERN, "").Match(entry.link)
+        if matches.Count() <> 2
+            return false
+        end if
+
+        return CompareVersions(matches[1], MIN_VERSION) < 0
+    end function
+
+    function CompareVersions(left as string, right as string) as integer
+        leftParts = left.Tokenize(".")
+        rightParts = right.Tokenize(".")
+
+        for i = 0 to leftParts.Count() - 1
+            leftPart = leftParts[i].ToInt()
+            rightPart = rightParts[i].ToInt()
+
+            if leftPart < rightPart
+                return -1
+            end if
+            if leftPart > rightPart
+                return 1
+            end if
+        end for
+
+        return 0
+    end function
+
+end namespace
