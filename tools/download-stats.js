@@ -34,22 +34,26 @@ This page was automatically generated on ${formattedDate}.
     fs.writeFileSync(markdownFile, markdownContent);
 }
 
-async function deleteExistingAttachments() {
-    try {
-        const files = fs.readdirSync(attachmentDestination);
+function deleteExistingAttachments() {
+    const files = fs.readdirSync(attachmentDestination);
 
-        for (const file of files) {
-            if (path.extname(file) === '.png') {
-                fs.unlinkSync(path.join(attachmentDestination, file));
-                console.log(`Deleted ${file}`);
-            }
+    for (const file of files) {
+        if (path.extname(file) === '.png') {
+            fs.unlinkSync(path.join(attachmentDestination, file));
+            console.log(`Deleted ${file}`);
         }
-    } catch (error) {
-        console.error(error);
     }
 }
 
 const config = getEnvVars(['EMAIL', 'EMAIL_APP_PASSWORD']);
+
+// Gmail can take 15s or more to answer LOGIN, well past node-imap's 5s default,
+// and throttles an account that reconnects right after a failed attempt.
+const AUTH_TIMEOUT_MS = 60 * 1000;
+const CONNECT_TIMEOUT_MS = 30 * 1000;
+const CONNECT_ATTEMPTS = 3;
+const RETRY_DELAY_MS = 30 * 1000;
+const RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
 const imap = new Imap({
     user: config.EMAIL,
@@ -59,7 +63,9 @@ const imap = new Imap({
     tls: true,
     tlsOptions: {
         rejectUnauthorized: false
-    }
+    },
+    connTimeout: CONNECT_TIMEOUT_MS,
+    authTimeout: AUTH_TIMEOUT_MS
 });
 
 const searchAsync = promisify(imap.search).bind(imap);
@@ -129,59 +135,91 @@ async function moveToTrash(from, subject, since) {
     console.log('Moved %d message(s) to Trash for subject "%s"', uids.length, subject);
 }
 
-const timeout = setTimeout(() => {
-    console.log('Timeout');
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function fail(error) {
+    console.error('Error:', error);
     process.exit(1);
-}, 10 * 60 * 1000);
+}
 
-imap.once('ready', async () => {
-    try {
-        await openBoxAsync('INBOX');
+function connectAsync() {
+    return new Promise((resolve, reject) => {
+        const onReady = () => {
+            imap.removeListener('error', onError);
+            imap.on('error', fail);
+            resolve();
+        };
+        const onError = error => {
+            imap.removeListener('ready', onReady);
+            reject(error);
+        };
+        imap.once('ready', onReady);
+        imap.once('error', onError);
+        imap.connect();
+    });
+}
 
-        const now = new Date();
-        const yesterday = new Date(now - 24 * 60 * 60 * 1000);
-        const yesterdayString = yesterday.toISOString().slice(0, 19).replace('T', ' ');
-
-        deleteExistingAttachments();
-
-        const images = []
-        images.push({
-            title: 'App Health',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Health', yesterdayString)
-        })
-        images.push({
-            title: 'App Engagement',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString)
-        })
-        images.push({
-            title: 'Viewership Summary',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString)
-        })
-        images.push({
-            title: 'App Stability',
-            filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Stability', yesterdayString)
-        })
-
-        writeMarkDownFile(images);
-
-        await moveToTrash('bdp_noreply@data.roku.com', 'App Health', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
-        await moveToTrash('bdp_noreply@data.roku.com', 'App Stability', yesterdayString);
-
-        imap.end();
-    } catch (error) {
-        console.error('Error:', error);
+async function connectWithRetryAsync() {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            await connectAsync();
+            return;
+        } catch (error) {
+            if (attempt === CONNECT_ATTEMPTS) {
+                throw error;
+            }
+            console.error('Connection attempt %d/%d failed: %s', attempt, CONNECT_ATTEMPTS, error.message);
+            await sleep(RETRY_DELAY_MS);
+        }
     }
-    clearTimeout(timeout);
-});
+}
 
-imap.once('error', err => {
-    console.error(err);
-});
+async function downloadStats() {
+    await connectWithRetryAsync();
+    await openBoxAsync('INBOX');
 
-imap.once('end', () => {
+    const now = new Date();
+    const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+    const yesterdayString = yesterday.toISOString().slice(0, 19).replace('T', ' ');
+
+    deleteExistingAttachments();
+
+    const images = []
+    images.push({
+        title: 'App Health',
+        filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Health', yesterdayString)
+    })
+    images.push({
+        title: 'App Engagement',
+        filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString)
+    })
+    images.push({
+        title: 'Viewership Summary',
+        filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString)
+    })
+    images.push({
+        title: 'App Stability',
+        filename: await getAttachementAsync('bdp_noreply@data.roku.com', 'App Stability', yesterdayString)
+    })
+
+    writeMarkDownFile(images);
+
+    await moveToTrash('bdp_noreply@data.roku.com', 'App Health', yesterdayString);
+    await moveToTrash('bdp_noreply@data.roku.com', 'App Engagement', yesterdayString);
+    await moveToTrash('bdp_noreply@data.roku.com', 'Viewership Summary', yesterdayString);
+    await moveToTrash('bdp_noreply@data.roku.com', 'App Stability', yesterdayString);
+
+    imap.end();
+}
+
+imap.on('end', () => {
     console.log('Connection ended');
 });
 
-imap.connect();
+setTimeout(() => fail(new Error(`Gave up after ${RUN_TIMEOUT_MS / 1000}s`)), RUN_TIMEOUT_MS);
+
+downloadStats().then(() => {
+    process.exit(0);
+}).catch(fail);
