@@ -35,11 +35,16 @@ const CONTENT_ID = 'jNQXAC9IVRw'; // "Me at the zoo"
     await expectField('#PlayPauseButton.focused', true);
     await expectField('#trickPlayBar.focused', false);
     await press(Key.Right);
-    await expectField('#buttonRow.focusedIndex', Button.minimize);
-    await expectField('#MinimizeButton.focused', true);
+    await expectField('#buttonRow.focusedIndex', Button.stats);
+    await expectField('#StatsButton.focused', true);
     await expectField('#PlayPauseButton.focused', false);
     await press(Key.Right);
+    await expectField('#buttonRow.focusedIndex', Button.minimize);
+    await expectField('#MinimizeButton.focused', true);
+    await press(Key.Right);
     await expectField('#buttonRow.focusedIndex', Button.minimize); // clamp, no wrap
+    await press(Key.Left);
+    await expectField('#buttonRow.focusedIndex', Button.stats);
     await press(Key.Left);
     await expectField('#buttonRow.focusedIndex', Button.playPause);
 
@@ -77,6 +82,7 @@ const CONTENT_ID = 'jNQXAC9IVRw'; // "Me at the zoo"
     await waitFor('#trickPlayBar.focused', (v) => v === true, 'trackbar focused on reveal');
     await press(Key.Up); // -> buttons tier, play/pause (doubled defensively, as above)
     await press(Key.Up);
+    await press(Key.Right);
     await press(Key.Right);
     await expectField('#buttonRow.focusedIndex', Button.minimize);
     await press(Key.Ok); // activate -> PiP shrink (width 1280 -> 426, ~0.3s)
