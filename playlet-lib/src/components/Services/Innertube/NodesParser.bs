@@ -1496,6 +1496,12 @@ namespace Innertube
                 return invalid
             end if
 
+            ' "Explore more" tileRenderer, opens a search with a predefined query, like TILE_CONTENT_TYPE_EDU below
+            if TileRendererHasSearchEndpoint(nodeData["onSelectCommand"])
+                LogWarnNoTelemetry("Skipping tileRenderer without contentType for search endpoint")
+                return invalid
+            end if
+
             Warning("TileRenderer without contentType", nodeData, context)
             return invalid
         end if
@@ -1524,6 +1530,29 @@ namespace Innertube
         #end if
         ' bs:disable-next-line LINT2001
         return invalid
+    end function
+
+    function TileRendererHasSearchEndpoint(onSelectCommand as object) as boolean
+        if not IsAssociativeArray(onSelectCommand)
+            return false
+        end if
+
+        if IsAssociativeArray(onSelectCommand["searchEndpoint"])
+            return true
+        end if
+
+        commands = ObjectUtils.Dig(onSelectCommand, ["commandExecutorCommand", "commands"])
+        if not IsArray(commands)
+            return false
+        end if
+
+        for each command in commands
+            if IsAssociativeArray(command) and IsAssociativeArray(command["searchEndpoint"])
+                return true
+            end if
+        end for
+
+        return false
     end function
 
     function TileRendererTypeVideo(nodeData as object, context as object) as object
