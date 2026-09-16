@@ -12,6 +12,7 @@ namespace Tests
             m.top.rowFocused = false
             m.top.focusedIndex = 0
             m.top.playing = true
+            m.top.statsEnabled = false
         end function
 
         @describe("visibility + layout")
@@ -30,11 +31,11 @@ namespace Tests
 
         @it("exposes its button count and auto-positions the clusters (centered + right-aligned)")
         function _()
-            m.assertEqual(m.top.buttonCount, 2)
-            ' one 42px button per cluster: centered on 640 -> x=619; right-aligned to 1212 -> x=1170. Pins the
+            m.assertEqual(m.top.buttonCount, 3)
+            ' One centered button -> x=619; two right-cluster buttons span 104px -> x=1108. Pins the
             ' ClusterWidth math so a drift in BUTTON_WIDTH/itemSpacings can't silently de-center.
             m.assertEqual(m.top.findNode("CenterCluster").translation[0], 619.0)
-            m.assertEqual(m.top.findNode("RightCluster").translation[0], 1170.0)
+            m.assertEqual(m.top.findNode("RightCluster").translation[0], 1108.0)
         end function
 
         @describe("virtual-focus highlight")
@@ -43,6 +44,7 @@ namespace Tests
         function _()
             m.top.rowFocused = false
             m.assertFalse(m.top.findNode("PlayPauseButton").focused)
+            m.assertFalse(m.top.findNode("StatsButton").focused)
             m.assertFalse(m.top.findNode("MinimizeButton").focused)
         end function
 
@@ -51,9 +53,14 @@ namespace Tests
             m.top.rowFocused = true
             m.top.focusedIndex = 0
             m.assertTrue(m.top.findNode("PlayPauseButton").focused)
+            m.assertFalse(m.top.findNode("StatsButton").focused)
             m.assertFalse(m.top.findNode("MinimizeButton").focused)
             m.top.focusedIndex = 1
             m.assertFalse(m.top.findNode("PlayPauseButton").focused)
+            m.assertTrue(m.top.findNode("StatsButton").focused)
+            m.assertFalse(m.top.findNode("MinimizeButton").focused)
+            m.top.focusedIndex = 2
+            m.assertFalse(m.top.findNode("StatsButton").focused)
             m.assertTrue(m.top.findNode("MinimizeButton").focused)
         end function
 
@@ -62,7 +69,7 @@ namespace Tests
         @it("nudge pulses the focused button's animation")
         function _()
             m.top.rowFocused = true
-            m.top.focusedIndex = 1
+            m.top.focusedIndex = 2
             anim = m.top.findNode("MinimizeButton").findNode("nudgeAnim")
             anim.control = "stop"
             m.top.nudge = true
@@ -74,11 +81,14 @@ namespace Tests
             m.top.rowFocused = true
             m.top.focusedIndex = 5
             playAnim = m.top.findNode("PlayPauseButton").findNode("nudgeAnim")
+            statsAnim = m.top.findNode("StatsButton").findNode("nudgeAnim")
             minimizeAnim = m.top.findNode("MinimizeButton").findNode("nudgeAnim")
             playAnim.control = "stop"
+            statsAnim.control = "stop"
             minimizeAnim.control = "stop"
             m.top.nudge = true
             m.assertEqual(playAnim.control, "stop")
+            m.assertEqual(statsAnim.control, "stop")
             m.assertEqual(minimizeAnim.control, "stop")
         end function
 
@@ -91,6 +101,17 @@ namespace Tests
             m.assertFalse(m.top.findNode("PlayPauseButton").toggleState)
             m.top.playing = false
             m.assertTrue(m.top.findNode("PlayPauseButton").toggleState)
+        end function
+
+        @describe("stats icon tracks the current-video toggle")
+
+        @it("shows the off icon initially and the on icon while stats are enabled")
+        function _()
+            ' toggleState=true shows iconUri (off); false shows iconUri2 (on).
+            m.top.statsEnabled = false
+            m.assertTrue(m.top.findNode("StatsButton").toggleState)
+            m.top.statsEnabled = true
+            m.assertFalse(m.top.findNode("StatsButton").toggleState)
         end function
 
     end class
