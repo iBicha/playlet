@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Default audio track is now the regular audio instead of "Voice Boost" or "Stable Volume", which are now separate tracks
 
 ## [0.48.3] - 2026-07-28
 

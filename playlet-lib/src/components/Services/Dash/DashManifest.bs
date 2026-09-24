@@ -255,6 +255,7 @@ class DashManifest
                 xtagsInfo = m.GetXtagsInfo(format)
                 format.xtagsInfo = xtagsInfo
                 format.isDrc = xtagsInfo.isDrc
+                format.isVoiceBoost = xtagsInfo.isVoiceBoost
                 format.isDubbed = xtagsInfo.isDubbed
                 format.isAutoDubbed = xtagsInfo.isAutoDubbed
                 format.isDescriptive = xtagsInfo.isDescriptive
@@ -277,12 +278,7 @@ class DashManifest
                 audioTrackId = format.audioTrack.id
             end if
 
-            drc = ""
-            if format.isDrc = true
-                drc = "drc"
-            end if
-
-            groupId = `${mimeType}-${justCodec}-${colorInfo}-${audioTrackId}-${drc}`
+            groupId = `${mimeType}-${justCodec}-${colorInfo}-${audioTrackId}${m.GetAudioVariantSuffix(format)}`
 
             if groupInfo[groupId] = invalid
                 groupInfo[groupId] = []
@@ -441,7 +437,7 @@ class DashManifest
                     end for
                 end if
 
-                if IsAssociativeArray(firstFormat.audioTrack) or firstFormat.isDrc = true
+                if IsAssociativeArray(firstFormat.audioTrack) or firstFormat.isDrc = true or firstFormat.isVoiceBoost = true
                     ' Roles
                     roles = m.GetTrackRoles(firstFormat)
                     for each role in roles
@@ -474,9 +470,7 @@ class DashManifest
                     if IsAssociativeArray(stream.audioTrack) and IsString(stream.audioTrack.id)
                         representationId = `${representationId}-${stream.audioTrack.id}`
                     end if
-                    if stream.isDrc = true
-                        representationId = `${representationId}-drc`
-                    end if
+                    representationId = `${representationId}${m.GetAudioVariantSuffix(stream)}`
 
                     representationAttributes = {
                         "id": representationId
@@ -739,7 +733,10 @@ class DashManifest
 
     function GetTrackRoles(format as object) as object
         roles = []
-        if format.isOriginal = true
+        ' Within the preferred language, the device defaults to a "main" track (a set
+        ' without a Role counts as main) regardless of bitrate or manifest order.
+        ' Stable Volume and Voice Boost are opt-in re-mixes of the original.
+        if format.isOriginal = true and format.isDrc <> true and format.isVoiceBoost <> true
             roles.Push("main")
         else
             roles.Push("alternate")
@@ -753,11 +750,26 @@ class DashManifest
             roles.Push("description")
         end if
 
-        if format.isDrc = true
+        ' The device's audio menu ignores Label: it lists tracks by language, and this
+        ' role is what shows a same-language variant separately, as "Enhanced audio".
+        if format.isVoiceBoost = true
             roles.Push("enhanced-audio-intelligibility")
         end if
 
         return roles
+    end function
+
+    ' Stable Volume and Voice Boost are re-mixes of the same itag: without the suffix
+    ' they share an AdaptationSet (and Representation ids) with the regular mix.
+    function GetAudioVariantSuffix(format as object) as string
+        suffix = ""
+        if format.isDrc = true
+            suffix = `${suffix}-drc`
+        end if
+        if format.isVoiceBoost = true
+            suffix = `${suffix}-vb`
+        end if
+        return suffix
     end function
 
     function GenerateImageAdaptationSets(xml as object, storyboards as object, id as integer) as integer
@@ -885,6 +897,7 @@ class DashManifest
             lang: ""
             acont: ""
             isDrc: false
+            isVoiceBoost: false
             isDubbed: false
             isAutoDubbed: false
             isDescriptive: false
@@ -921,6 +934,8 @@ class DashManifest
                 result.acont = tags[key]
             else if key = "drc" and tags[key] = "1"
                 result.isDrc = true
+            else if key = "vb" and tags[key] = "1"
+                result.isVoiceBoost = true
             end if
         end for
 
