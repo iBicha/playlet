@@ -9,65 +9,57 @@ import "pkg:/source/utils/StringUtils.bs"
 const MAX_JOB_TASK_COUNT = 30
 ' Minimum number of JobTasks that will be kept alive
 const MIN_JOB_TASK_COUNT = 2
-' Time in milliseconds to wait before scaling down JobTasks
+' Time in milliseconds without a message before scaling down JobTasks
 const SCALE_DOWN_THRESHOLD_MS = 10000
+' wait() sometimes isn't woken by a new message (seen on device); the next wait() returns it
+const POLL_MS = 1000
+' Missed requests cluster right after start (measured): check the port more often then
+const STARTUP_WINDOW_MS = 2000
+const STARTUP_POLL_MS = 100
 
 function Init()
     m.top.functionName = "JobQueueTaskLoop"
+    m.port = CreateObject("roMessagePort")
+    m.top.observeField("shutdown", m.port)
+    m.top.observeField("request", m.port)
 end function
 
 function JobQueueTaskLoop() as void
-    messagePort = CreateObject("roMessagePort")
-
-    m.top.observeField("shutdown", messagePort)
-    m.top.observeField("request", messagePort)
-
-    m.top.ready = true
+    port = m.port
 
     m.busyJobTasks = {}
     m.idleJobTasks = []
 
     requests = []
+    startup = CreateObject("roTimespan")
+    scaleDownTimer = CreateObject("roTimespan")
 
     while true
-        while requests.count() > 0
-            if m.idleJobTasks.Count() > 0
-                ScheduleRequest(requests.Shift(), m.idleJobTasks.Pop())
-                continue while
-            end if
-
-            if m.idleJobTasks.Count() + m.busyJobTasks.Count() < MAX_JOB_TASK_COUNT
-                LogDebug("Creating a new JobTask. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
-                jobTask = CreateObject("roSGNode", "JobTask")
-                jobTaskId = "JobTask-" + StringUtils.RandomId()
-                jobTask.id = jobTaskId
-                jobTaskObject = {
-                    id: jobTaskId
-                    node: jobTask
-                }
-                m.busyJobTasks[jobTaskId] = jobTaskObject
-                MessagePortUtils.ObserveFieldScopedExSafe(jobTask, "ready", messagePort)
-                jobTask.control = "run"
-            else
-                #if DEBUG
-                    LogWarnNoTelemetry("Cannot create new JobTask. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
-                #end if
-            end if
-
-            exit while
+        while requests.Count() > 0 and m.idleJobTasks.Count() > 0
+            ScheduleRequest(requests.Shift(), m.idleJobTasks.Pop())
         end while
 
-        scaleDownThresholdMs = m.idleJobTasks.Count() > MIN_JOB_TASK_COUNT ? SCALE_DOWN_THRESHOLD_MS : 0
-        message = wait(scaleDownThresholdMs, messagePort)
+        if requests.Count() > 0 and m.idleJobTasks.Count() + m.busyJobTasks.Count() < MAX_JOB_TASK_COUNT
+            StartJobTask(requests.Shift(), port)
+        end if
+
+        waitMs = POLL_MS
+        if startup.TotalMilliseconds() < STARTUP_WINDOW_MS
+            waitMs = STARTUP_POLL_MS
+        end if
+
+        message = wait(waitMs, port)
         if message = invalid
-            if m.idleJobTasks.Count() > 0
+            if m.idleJobTasks.Count() > MIN_JOB_TASK_COUNT and scaleDownTimer.TotalMilliseconds() >= SCALE_DOWN_THRESHOLD_MS
                 jobTaskObject = m.idleJobTasks.Pop()
                 jobTaskObject.node.UnobserveFieldScoped("ready")
                 jobTaskObject.node.shutdown = true
                 LogDebug("Scaled down JobTasks. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
+                scaleDownTimer.Mark()
             end if
             continue while
         end if
+        scaleDownTimer.Mark()
 
         messageType = Type(message)
         if messageType = "roSGNodeEvent"
@@ -89,16 +81,32 @@ function JobQueueTaskLoop() as void
     end while
 end function
 
+function StartJobTask(request as object, port as object) as void
+    LogDebug("Creating a new JobTask. Idle:", m.idleJobTasks.Count(), ", Busy:", m.busyJobTasks.Count())
+
+    jobTask = CreateObject("roSGNode", "JobTask")
+    jobTaskId = "JobTask-" + StringUtils.RandomId()
+    jobTask.id = jobTaskId
+    jobTaskObject = {
+        id: jobTaskId
+        node: jobTask
+    }
+    MessagePortUtils.ObserveFieldScopedExSafe(jobTask, "ready", port)
+    ' Set the request before starting the task: its first wait() then returns it right away,
+    ' with no wakeup to miss.
+    ScheduleRequest(request, jobTaskObject)
+    jobTask.control = "run"
+end function
+
 function ScheduleRequest(request as dynamic, jobTaskObject as dynamic)
     m.busyJobTasks[jobTaskObject.id] = jobTaskObject
     jobTaskObject.node.request = request
 end function
 
 function Shutdown()
-    m.top.UnobserveFieldScoped("request")
-    m.top.UnobserveFieldScoped("shutdown")
+    m.top.UnobserveField("request")
+    m.top.UnobserveField("shutdown")
     m.top.request = invalid
-    m.top.ready = false
 
     for each jobTaskId in m.busyJobTasks
         jobTask = m.busyJobTasks[jobTaskId]
