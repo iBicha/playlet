@@ -358,8 +358,9 @@ namespace Tests
 
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
-            m.assertEqual(m.Snap().focusedButton, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> stats
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' stats -> minimize
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Minimize)
 
             m.top.callFunc("TestKey", RemoteKeys.Ok, true)
             after = m.Snap()
@@ -666,7 +667,6 @@ namespace Tests
         function _()
             initial = m.Snap()
             m.assertFalse(initial.statsEnabled)
-            m.assertTrue(initial.statsOverlayPresent, "hidden diagnostics are ready before transient stream events")
             m.assertFalse(initial.statsOverlayVisible)
             m.assertTrue(initial.statsButtonToggleState, "the row initially shows the stats-off icon")
 
@@ -676,7 +676,6 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Ok, true)
             enabled = m.Snap()
             m.assertTrue(enabled.statsEnabled)
-            m.assertTrue(enabled.statsOverlayPresent)
             m.assertTrue(enabled.statsOverlayVisible)
             m.assertFalse(enabled.statsButtonToggleState, "the row shows the stats-on icon")
             m.assertEqual(enabled.focusedButton, PlayerCoordinatorLogic.PlayerButton.Stats)
@@ -684,11 +683,16 @@ namespace Tests
             m.top.container.fullscreen = false
             minimized = m.Snap()
             m.assertTrue(minimized.statsEnabled, "PiP does not discard the current-video choice")
-            m.assertTrue(minimized.statsOverlayPresent)
             m.assertFalse(minimized.statsOverlayVisible, "the diagnostics do not cover the PiP player")
 
+            ' The mock has no interpolated VideoPlayer node, so drive translation the way the minimize anim would.
+            m.top.translation = [834, 460]
             m.top.container.fullscreen = true
-            m.assertTrue(m.Snap().statsOverlayVisible, "restoring fullscreen restores the enabled overlay")
+            m.assertFalse(m.Snap().statsOverlayVisible, "restore holds the overlay while the player is still shrunk")
+            m.top.translation = [417, 230]
+            m.assertFalse(m.Snap().statsOverlayVisible, "and while the grow animation is mid-flight")
+            m.top.translation = [0, 0]
+            m.assertTrue(m.Snap().statsOverlayVisible, "the settled fullscreen player restores the enabled overlay")
 
             ' PiP hides chrome, so the fresh reveal resets the row highlight to Play/Pause. Return to Stats.
             m.top.callFunc("TestKey", RemoteKeys.Up, true)
@@ -699,7 +703,6 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Ok, true)
             disabled = m.Snap()
             m.assertFalse(disabled.statsEnabled)
-            m.assertTrue(disabled.statsOverlayPresent)
             m.assertFalse(disabled.statsOverlayVisible)
             m.assertTrue(disabled.statsButtonToggleState)
         end function

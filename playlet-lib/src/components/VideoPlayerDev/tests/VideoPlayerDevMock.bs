@@ -70,7 +70,7 @@ function TestSetup() as void
     ' nudge counter above — stacked observers fire a handler once per prior TestSetup on every write,
     ' and OnPosition's latency learning reads two identical fires as a CONFIRMED min-gap, poisoning
     ' LiveEdgeMs for any live test that runs after another test in the suite.
-    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control", "bufferingStatus", "playStartInfo"]
+    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control", "bufferingStatus", "playStartInfo", "translation"]
         m.top.unobserveField(deviceField)
     end for
 
@@ -216,10 +216,6 @@ end function
 
 ' TestSnapshot — read the seam state the spec asserts on (brain + the device control the coordinator wrote).
 function TestSnapshot() as object
-    statsOverlayVisible = false
-    if m.statsForNerds <> invalid
-        statsOverlayVisible = m.statsForNerds.findNode("statsBg").visible
-    end if
     return {
         transportMode: m.transport.transportMode
         seekSettling: m.transport.seekSettling
@@ -235,8 +231,7 @@ function TestSnapshot() as object
         focusTarget: m.focusTarget
         focusedButton: m.focusedButton
         statsEnabled: m.statsEnabled
-        statsOverlayPresent: m.statsForNerds <> invalid
-        statsOverlayVisible: statsOverlayVisible
+        statsOverlayVisible: m.statsForNerds.visible
         statsButtonToggleState: m.buttonRow.findNode("StatsButton").toggleState
         nudgeCount: m.top.nudgeCount
         sponsorNoticeShown: SponsorBlock.GetCurrentNotification(m.notifications) <> invalid

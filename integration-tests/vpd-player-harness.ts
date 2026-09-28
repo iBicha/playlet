@@ -137,6 +137,28 @@ export async function assertPlayerInvariants(label: string): Promise<void> {
     check(`INV-D5 @ ${label}`, opacity !== 0 || !rowFocused, `opacity=${opacity} rowFocused=${rowFocused}`);
 }
 
+// Put virtual focus on the Stats button from anywhere in the fullscreen player (chrome hidden, bar tier, or any
+// button). The row remembers its last-focused button, so clamp to the left edge first for deterministic visits.
+export async function focusStatsButton(): Promise<void> {
+    if (await field<boolean>('#buttonRow.rowFocused') !== true) {
+        if (await field<boolean>('#trickPlayBar.focused') !== true) {
+            await press(Key.Ok); // reveal -> trackbar
+            await frames(150);
+        }
+        await expectField('#trickPlayBar.focused', true);
+        await press(Key.Up);
+        await frames(150);
+        if (await field<boolean>('#buttonRow.rowFocused') !== true) await press(Key.Up);
+    }
+    await expectField('#buttonRow.rowFocused', true);
+    await press(Key.Left);
+    await press(Key.Left);
+    await press(Key.Right);
+    await expectField('#buttonRow.focusedIndex', Button.stats);
+    await expectField('#StatsButton.focused', true);
+}
+
+
 // press + assert the whole invariant set (rapid adversarial sequences have no single per-key oracle). The paced
 // wait lets the deferred freeze land after a commit-seek settles before the strict check.
 export async function pressChecked(key: Key, label: string): Promise<void> {
