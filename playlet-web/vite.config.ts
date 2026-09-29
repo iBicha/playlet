@@ -35,7 +35,7 @@ const config: UserConfig = {
 // But the tools are not (because brighterscript is expecting CommonJs)
 // so we can't import the function from the tools/get-env-vars.js.
 function getEnvVars(requiredVars = undefined) {
-  const envFile = joinPath(__dirname, '../.env');
+  const envFile = joinPath(import.meta.dirname, '../.env');
 
   let envVars = process.env;
   if (existsSync(envFile)) {
