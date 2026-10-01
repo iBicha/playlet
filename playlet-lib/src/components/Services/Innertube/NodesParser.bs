@@ -1084,18 +1084,25 @@ namespace Innertube
 
     function ParseLockupViewModel(nodeData as object, context as object) as object
         contentType = ValidString(nodeData["contentType"])
-        if contentType = "LOCKUP_CONTENT_TYPE_VIDEO"
+        if contentType = "LOCKUP_CONTENT_TYPE_VIDEO" or contentType = "LOCKUP_CONTENT_TYPE_MOVIE"
             return LockupViewModelTypeVideo(nodeData, context)
         else if contentType = "LOCKUP_CONTENT_TYPE_SHORT"
             return LockupViewModelTypeShort(nodeData, context)
-        else if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST"
+        else if contentType = "LOCKUP_CONTENT_TYPE_PLAYLIST" or contentType = "LOCKUP_CONTENT_TYPE_PODCAST" or contentType = "LOCKUP_CONTENT_TYPE_ALBUM"
             return LockupViewModelTypePlaylist(nodeData, context)
-        else if contentType = "LOCKUP_CONTENT_TYPE_PODCAST"
-            return LockupViewModelTypePodcast(nodeData, context)
-        else if contentType = "LOCKUP_CONTENT_TYPE_ALBUM"
-            return LockupViewModelTypeAlbum(nodeData, context)
-        else if contentType = "LOCKUP_CONTENT_TYPE_MOVIE"
-            return LockupViewModelTypeVideo(nodeData, context)
+        else if contentType = "LOCKUP_CONTENT_TYPE_SHOW" or contentType = "LOCKUP_CONTENT_TYPE_SEASON" or contentType = "LOCKUP_CONTENT_TYPE_COURSE" or contentType = "LOCKUP_CONTENT_TYPE_STATION"
+            ' For these content types the tap target, not the type, says what the item is: a show or season
+            ' is a creator playlist or a paid Movies & TV title, a station is a live stream or a YouTube Music playlist.
+            contentId = ValidString(nodeData["contentId"])
+            command = ObjectUtils.Dig(nodeData, ["rendererContext", "commandContext", "onTap", "innertubeCommand"])
+            if contentId <> ""
+                if ValidString(ObjectUtils.Dig(command, ["watchEndpoint", "videoId"])) = contentId
+                    return LockupViewModelTypeVideo(nodeData, context)
+                end if
+                if ValidString(ObjectUtils.Dig(command, ["watchEndpoint", "playlistId"])) = contentId or ValidString(ObjectUtils.Dig(command, ["watchPlaylistEndpoint", "playlistId"])) = contentId or ValidString(ObjectUtils.Dig(command, ["browseEndpoint", "browseId"])) = "VL" + contentId
+                    return LockupViewModelTypePlaylist(nodeData, context)
+                end if
+            end if
         end if
 
         Warning(`Unknown content type: ${contentType}`, nodeData, context)
@@ -1109,7 +1116,7 @@ namespace Innertube
     end function
 
     ' The badge overlay has two shapes: thumbnailOverlayBadgeViewModel.thumbnailBadges (older, still
-    ' used on playlist/podcast/album lockups) and thumbnailBottomOverlayViewModel.badges (video lockups)
+    ' used on playlist lockups) and thumbnailBottomOverlayViewModel.badges (video lockups)
     function ParseThumbnailBadge(thumbnailViewModel as object) as object
         overlays = ObjectUtils.Dig(thumbnailViewModel, ["overlays"])
         if not IsArray(overlays)
@@ -1161,7 +1168,12 @@ namespace Innertube
         metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
 
         title = ObjectUtils.Dig(metadata, ["title", "content"])
-        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "thumbnailViewModel"])
+        contentImage = nodeData["contentImage"]
+        thumbnailViewModel = ObjectUtils.Dig(contentImage, ["thumbnailViewModel"])
+        if thumbnailViewModel = invalid
+            ' Station lockups frame their live stream as a collection
+            thumbnailViewModel = ObjectUtils.Dig(contentImage, ["collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
+        end if
 
         if context.generateVideoThumbnails = true
             videoThumbnails = GenerateVideoThumbnails(videoId)
@@ -1325,76 +1337,6 @@ namespace Innertube
                 playlist["videoId"] = videoId
             end if
         end if
-
-        PushFeedItem(playlist, context)
-        return invalid
-    end function
-
-    function LockupViewModelTypePodcast(nodeData as object, context as object) as object
-        playlistId = nodeData["contentId"]
-        if not IsString(playlistId)
-            Warning("Invalid playlist ID in lockupViewModelTypePodcast", nodeData, context)
-            return invalid
-        end if
-
-        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
-
-        title = ObjectUtils.Dig(metadata, ["title", "content"])
-        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
-        thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
-        videoCountText = GetThumbnailBadgeText(thumbnailViewModel)
-
-        author = invalid
-        authorId = invalid
-        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
-            author = context.currentAuthor
-            authorId = context.currentAuthorId
-        end if
-
-        playlist = {
-            "type": "playlist"
-            "playlistId": playlistId
-            "title": title
-            "author": author
-            "authorId": authorId
-            "playlistThumbnail": thumbnail
-            "videoCountText": videoCountText
-        }
-
-        PushFeedItem(playlist, context)
-        return invalid
-    end function
-
-    function LockupViewModelTypeAlbum(nodeData as object, context as object) as object
-        playlistId = nodeData["contentId"]
-        if not IsString(playlistId)
-            Warning("Invalid playlist ID in lockupViewModelTypeAlbum", nodeData, context)
-            return invalid
-        end if
-
-        metadata = ObjectUtils.Dig(nodeData, ["metadata", "lockupMetadataViewModel"])
-
-        title = ObjectUtils.Dig(metadata, ["title", "content"])
-        thumbnailViewModel = ObjectUtils.Dig(nodeData, ["contentImage", "collectionThumbnailViewModel", "primaryThumbnail", "thumbnailViewModel"])
-        thumbnail = ObjectUtils.Dig(thumbnailViewModel, ["image", "sources", 0, "url"])
-        videoCountText = GetThumbnailBadgeText(thumbnailViewModel)
-
-        author = invalid
-        authorId = invalid
-        if IsString(context.currentAuthor) and IsString(context.currentAuthorId)
-            author = context.currentAuthor
-            authorId = context.currentAuthorId
-        end if
-
-        playlist = {
-            "type": "playlist"
-            "playlistId": playlistId
-            "title": title
-            "author": author
-            "authorId": authorId
-            "playlistThumbnail": thumbnail
-            "videoCountText": videoCountText
-        }
 
         PushFeedItem(playlist, context)
         return invalid
