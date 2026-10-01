@@ -40,6 +40,33 @@ namespace Invidious
 
     const ERROR_NOT_AUTHENTICATED = "Not authenticated"
 
+    ' Apply this only to a separate authentication-check response, not the
+    ' original route's 403: that route may have failed after authenticating.
+    function ShouldMarkNeedsReauth(token as string, statusCode as integer, body as string) as boolean
+        if statusCode <> 403 and statusCode <> 401
+            return false
+        end if
+
+        payload = StringUtils.ParseJsonSafe(body)
+        if not IsAssociativeArray(payload)
+            return false
+        end if
+
+        error = ValidString(payload.error)
+        if StringUtils.IsNullOrEmpty(error) or error = "Invalid scope"
+            return false
+        end if
+        parsedToken = StringUtils.ParseJsonSafe(token)
+        if not IsAssociativeArray(parsedToken)
+            return true
+        end if
+        if StringUtils.IsNullOrEmpty(parsedToken.session) or StringUtils.IsNullOrEmpty(parsedToken.signature) or not IsArray(parsedToken.scopes)
+            return true
+        end if
+        ' Unknown 403s may still be database/proxy failures, not invalid tokens.
+        return statusCode = 401 or error = "Request must be authenticated" or error = "Invalid signature" or error = "Erroneous token" or error.StartsWith("Token is expired")
+    end function
+
     class InvidiousService
         public invidiousNode as object
 
@@ -699,15 +726,32 @@ namespace Invidious
             return json
         end function
 
-        ' A 403 on an authenticated call is terminal — only a fresh sign-in recovers.
         function MarkNeedsReauthOn403(response as object, profile as object) as void
             if response.StatusCode() <> 403
                 return
             end if
 
-            LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
-            if profile <> invalid and profile.type = "invidious"
+            if profile = invalid or profile.type <> "invidious"
+                return
+            end if
+            auth = profile@.ResolveAccessToken()
+            if auth.state <> ProfileContentAuthTokenUtils.AccessTokenState.Ok
+                return
+            end if
+            ' Read local database state using an endpoint included in Playlet's
+            ' scopes. Avoid GetSubscriptions to prevent recursive 403 checks.
+            request = HttpClient.Get(`${auth.serverUrl}${Invidious.AUTH_SUBSCRIPTIONS}`)
+            request.Headers(m.GetAuthenticationHeaders(auth.token))
+            request.TimeoutSeconds(5).LogCurlCommand(false)
+            confirmation = request.Await()
+            ' A sign-in may have replaced the token while this request waited.
+            if profile.accessToken <> auth.token
+                return
+            end if
+            if Invidious.ShouldMarkNeedsReauth(auth.token, confirmation.StatusCode(), confirmation.Text())
                 profile@.MarkNeedsReauth()
+            else
+                LogInfo("Keeping Invidious profile after unconfirmed authentication failure")
             end if
         end function
 
