@@ -162,6 +162,7 @@ namespace Innertube
         parsedResponse["adaptiveFormats"] = adaptiveFormats
         parsedResponse["formatStreams"] = formats
         parsedResponse["captions"] = ParseCaptions(payload)
+        AttestCaptionTracks(parsedResponse.captions, parsedResponse.videoId, playerRequest.signatureTimestamp, cancellation)
 
         if not StringUtils.IsNullOrEmpty(videoDetails["title"])
             parsedResponse["title"] = videoDetails["title"]
@@ -390,6 +391,7 @@ namespace Innertube
                 "label": label
                 "language_code": languageCode
                 "url": baseUrl
+                "auto_generated": track["kind"] = "asr"
             }
 
             if track["kind"] = "asr"
@@ -403,6 +405,46 @@ namespace Innertube
         ' Put automatically generated captions at the end so human-generated ones take priority
         captions.Append(autoCaptions)
         return captions
+    end function
+
+    ' Captions need a video-bound token, not the identity-bound playback token.
+    ' Reuse the existing automatic support service; no browser setup is needed.
+    function AttestCaptionTracks(captions as object, videoId as string, sts as dynamic, cancellation as object) as void
+        if captions.Count() = 0 or sts = invalid
+            return
+        end if
+        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, {
+            "sts": sts
+            "identity": videoId
+            "formats": [{ "url": captions[0].url }]
+            "adaptiveFormats": []
+        })
+        request.Cancellation(cancellation).TimeoutSeconds(10).LogCurlCommand(false)
+        response = request.Await()
+        if not response.IsSuccess()
+            LogInfo("Caption attestation unavailable; retaining original caption URLs")
+            return
+        end if
+        result = response.Json()
+        if not IsAssociativeArray(result) or not IsArray(result.formats) or result.formats.Count() = 0
+            return
+        end if
+        url = result.formats[0].url
+        if not IsString(url)
+            return
+        end if
+        token = UrlUtils.ParseQueryComponents(url)["pot"]
+        if StringUtils.IsNullOrEmpty(token)
+            return
+        end if
+        for each caption in captions
+            params = UrlUtils.ParseQueryComponents(caption.url)
+            params.fmt = "vtt"
+            params.potc = "1"
+            params.pot = token
+            caption.url = UrlUtils.SetQueryParams(caption.url, params)
+        end for
+        LogInfo("Attested direct caption tracks:", captions.Count())
     end function
 
     function TransformFormats(formats as object) as object
