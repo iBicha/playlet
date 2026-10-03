@@ -1,6 +1,9 @@
 import "pkg:/source/services/HttpClient.bs"
 
-const SENTRY_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/envelope"
+const SUPPORT_SERVER_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/envelope"
+' A fallback is needed to investigate https://github.com/iBicha/playlet/issues/906
+const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4512194184544256/envelope/"
+const SENTRY_FALLBACK_KEY = "a16c510299b23ccc63bdc84f751c9950"
 
 const SUPPORTS_ATTACHMENTS = false
 
@@ -95,24 +98,34 @@ namespace Sentry
             end if
         end for
 
-        request = HttpClient.Post(SENTRY_ENVELOPE_URL, payload)
+        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL, payload)
         request.Header("Content-Type", "application/x-sentry-envelope")
         response = request.Await()
-        if not response.IsSuccess()
-            #if DEBUG
-                LogErrorNoTelemetry("Failed to send event to Sentry:", response.ErrorMessage(), `\nHeaders:`, response.Headers())
-            #end if
-
-            retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
-            LogErrorNoTelemetry("Rate limited by Sentry. Retry after", retryAfter, "seconds")
-            if retryAfter = 0
-                retryAfter = 60
-            end if
-            return retryAfter
+        ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
+        if response.StatusCode() <= 0
+            LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", response.ErrorMessage())
+            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL, payload)
+            request.Header("Content-Type", "application/x-sentry-envelope")
+            request.QueryParam("sentry_key", SENTRY_FALLBACK_KEY)
+            response = request.Await()
         end if
 
-        LogDebug("Sent events to Sentry. Response:", response.Text())
-        return 0
+        if response.IsSuccess()
+            LogDebug("Sent events to", request.BuildUrl(), "Response:", response.Text())
+            return 0
+        end if
+
+        retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
+        if retryAfter = 0
+            retryAfter = 60
+        end if
+
+        if response.StatusCode() = 429
+            LogErrorNoTelemetry("Rate limited by", request.BuildUrl(), "Retry after", retryAfter, "seconds")
+        else
+            LogErrorNoTelemetry("Failed to send events to", request.BuildUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
+        end if
+        return retryAfter
     end function
 
     function GetFingerprint(message as dynamic) as dynamic
