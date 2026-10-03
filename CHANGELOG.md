@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing shows, seasons, courses and stations (except paid ones)
-- Verify authentication after an Invidious HTTP 403 before marking a session expired; keep valid sessions signed in on server errors or insufficient scope
+- Keep Invidious profiles signed in when a 403 does not report a known authentication error
 
 ## [0.48.5] - 2026-09-29
 
