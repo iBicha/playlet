@@ -2,7 +2,6 @@ import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
-import "pkg:/source/utils/CaptionUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 
@@ -169,7 +168,7 @@ function ExecuteJob() as void
     end if
     contentNode.url = firstUrl
 
-    SetCaptions(metadata, service, contentNode, backend, playletServerPort)
+    SetCaptions(metadata, service, contentNode)
 
     if metadata.liveNow = true
         contentNode.Live = true
@@ -417,7 +416,7 @@ function AddInstanceToUrlIfNeeded(url as dynamic, instance as string) as dynamic
     return url
 end function
 
-function SetCaptions(metadata as object, service as object, contentNode as object, backend as string, playletServerPort as integer) as void
+function SetCaptions(metadata as object, service as object, contentNode as object) as void
     if metadata.captions.Count() = 0
         return
     end if
@@ -448,7 +447,10 @@ function SetCaptions(metadata as object, service as object, contentNode as objec
             code = isoLanguageList[code]
         end if
 
-        url = CaptionUtils.TrackUrl(caption, instance, backend, playletServerPort)
+        url = caption.url
+        if not url.StartsWith("http")
+            url = instance + url
+        end if
 
         subtitleTracks.Push({
             Description: caption.label
