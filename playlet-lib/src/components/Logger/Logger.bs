@@ -8,6 +8,13 @@ const FILENAME = "app_logs.txt"
 const FILENAME_PREVIOUS = "app_logs_previous.txt"
 const FILENAME_STARTUP = "cachefs:/playlet_startup_logs.txt"
 
+enum SysLogUrlType
+    Captions = "captions"
+    VideoPlayback = "videoplayback"
+    Manifest = "manifest"
+    Other = "other"
+end enum
+
 function Init()
     m.top.functionName = "LoggerLoop"
 
@@ -125,9 +132,10 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
     buffer.FromAsciiString(line + `\n`)
     buffer.AppendFile(logsFile)
 
-    fingerprint = `SysLog${info.Status}${info.LogType}${httpCode}${info.Method}`
+    urlType = GetSysLogUrlType(info.OrigUrl)
+    fingerprint = `SysLog-${urlType}-${info.Status}-${info.LogType}-${httpCode}-${info.Method}`
 
-    if ThrottleEvent("SysLogError", fingerprint, 60)
+    if ThrottleEvent("SysLogError" + urlType, fingerprint, 60)
         return
     end if
 
@@ -136,6 +144,23 @@ function OnLineSysLog(event as object, dateTime as object, logsFile as string, b
         message: line + `\nCurrentTime: ${m.eventThrottleTimer.TotalSeconds()}`
         fingerprint: [fingerprint]
     })
+end function
+
+function GetSysLogUrlType(url as dynamic) as string
+    if not IsString(url)
+        return SysLogUrlType.Other
+    end if
+
+    if url.InStr("/api/timedtext") <> -1 or url.InStr("/api/v1/captions/") <> -1
+        return SysLogUrlType.Captions
+    end if
+    if url.InStr("/videoplayback") <> -1 or url.InStr("/api/dash/live-seg") <> -1
+        return SysLogUrlType.VideoPlayback
+    end if
+    if url.InStr("/api/manifest/") <> -1 or url.InStr("/api/dash") <> -1 or url.InStr("/api/hls") <> -1
+        return SysLogUrlType.Manifest
+    end if
+    return SysLogUrlType.Other
 end function
 
 function OnLineLogMonitorMemoryWarning(event as object, dateTime as object, logsFile as string, buffer as object) as void
