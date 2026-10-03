@@ -58,6 +58,8 @@ function Initialize()
     m.seekToPercent = invalid
 
     m.errorDialogNode = invalid
+    m.statsForNerds = invalid
+    m.statsEnabled = false
     m.ignoreNextFinished = false ' a retry replay -> swallow the next "finished" edge
     m.videoPlayedSuccessfully = false ' true once the stream has actually played (gates error-retry)
     m.healCount = 0 ' INV-D1 heals this content (telemetry stops at INV_D1_TELEMETRY_CAP; total goes out in the close summary)
@@ -129,6 +131,9 @@ end function
 
 ' Called by AutoBind once the bound interface fields (container, jobQueue, services, ...) resolve.
 function OnNodeReady()
+    ' Create diagnostics before playback begins so transient streamingSegment/format events can be retained.
+    ' It remains hidden and event-driven until the current video's Stats button is activated.
+    EnsureStatsForNerds()
 
     ' Created here, not Init, because it needs AutoBind-resolved deps (jobQueue / preferences / notifications).
     m.sponsorblock = new SponsorBlockController.Controller({
@@ -543,6 +548,8 @@ end function
 function ActivateButton(index as integer) as void
     if index = PlayerCoordinatorLogic.PlayerButton.PlayPause
         TogglePlayPause()
+    else if index = PlayerCoordinatorLogic.PlayerButton.Stats
+        ToggleStatsForNerds()
     else if index = PlayerCoordinatorLogic.PlayerButton.Minimize
         MinimizeReset()
         VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
@@ -559,7 +566,47 @@ function SyncFocus() as void
     m.buttonRow.rowFocused = chromeShown and (m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons)
     m.buttonRow.focusedIndex = m.focusedButton
     m.buttonRow.playing = (m.top.state = VideoState.Playing)
+    m.buttonRow.statsEnabled = m.statsEnabled
     m.trickPlayBar.focused = chromeShown and (m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Bar)
+end function
+
+' Stats are intentionally per-video: the button is always available, the overlay starts off for each
+' player/content, and it never writes an app preference. Keeping the overlay outside Chrome lets it remain
+' visible after the controls auto-hide; the component itself hides while the player is minimized.
+function ToggleStatsForNerds() as void
+    SetStatsForNerdsEnabled(not m.statsEnabled)
+    ArmAutoHide()
+end function
+
+function SetStatsForNerdsEnabled(enabled as boolean) as void
+    m.statsEnabled = enabled
+    EnsureStatsForNerds()
+    if m.statsForNerds <> invalid
+        m.statsForNerds.visible = enabled
+    end if
+    if m.buttonRow <> invalid
+        m.buttonRow.statsEnabled = m.statsEnabled
+    end if
+end function
+
+function EnsureStatsForNerds() as void
+    if m.statsForNerds <> invalid
+        m.statsForNerds.visible = m.statsEnabled
+        return
+    end if
+    m.statsForNerds = CreateObject("roSGNode", "StatsForNerds")
+    m.statsForNerds.visible = m.statsEnabled
+    m.statsForNerds.video = m.top
+    m.top.appendChild(m.statsForNerds)
+end function
+
+function RemoveStatsForNerds() as void
+    if m.statsForNerds = invalid
+        return
+    end if
+    m.statsForNerds.dispose = true
+    m.top.removeChild(m.statsForNerds)
+    m.statsForNerds = invalid
 end function
 
 '===============================================================================
@@ -1075,6 +1122,7 @@ end function
 '===============================================================================
 function PlayWithContent(contentNode as object)
     LogInfo("PlayWithContent videoId=", contentNode.videoId, " title=", contentNode.title)
+    SetStatsForNerdsEnabled(false)
     videoContentNode = CreateObject("roSGNode", "ContentNode")
 
     if not StringUtils.IsNullOrEmpty(contentNode.videoId)
@@ -1624,6 +1672,7 @@ function OnClose() as void
         m.sponsorblock.Dispose()
         m.sponsorblock = invalid
     end if
+    RemoveStatsForNerds()
     DismissErrorDialog()
 
     parent = m.top.getParent()

@@ -558,7 +558,7 @@ namespace Tests
             snap = m.Snap()
             m.assertTrue(snap.chromeShown)
             m.assertEqual(snap.focusedButton, 0)
-            ' highlight minimize, drop to the bar, come back up: still minimize.
+            ' Highlight stats, drop to the bar, come back up: still stats.
             m.top.callFunc("TestKey", RemoteKeys.Right, true)
             m.assertEqual(m.Snap().focusedButton, 1)
             m.top.callFunc("TestKey", RemoteKeys.Down, true)
@@ -596,10 +596,10 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> minimize
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> stats
             m.top.callFunc("TestKey", RemoteKeys.Down, true) ' buttons -> bar
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
-            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' minimize -> play/pause
+            m.top.callFunc("TestKey", RemoteKeys.Left, true) ' stats -> play/pause
             m.assertEqual(m.Snap().nudgeCount, 0, "every press moved focus; none may pulse")
         end function
 
@@ -610,11 +610,12 @@ namespace Tests
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier, play/pause (leftmost)
             m.top.callFunc("TestKey", RemoteKeys.Left, true) ' clamped at the left end
             m.assertEqual(m.Snap().nudgeCount, 1)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> stats
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' -> minimize (rightmost)
             m.top.callFunc("TestKey", RemoteKeys.Right, true) ' clamped at the right end
             snap = m.Snap()
             m.assertEqual(snap.nudgeCount, 2)
-            m.assertEqual(snap.focusedButton, 1, "the clamp held the highlight at the end")
+            m.assertEqual(snap.focusedButton, 2, "the clamp held the highlight at the end")
         end function
 
         ' Down at the bar tier (the bottom, and the default on reveal) is a no-op: consumed, no nudge.
@@ -669,12 +670,55 @@ namespace Tests
         function _()
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar tier (default)
             m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons tier
-            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight minimize
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' highlight stats
             m.assertEqual(m.Snap().focusedButton, 1)
             m.top.callFunc("TestKey", RemoteKeys.Play, true) ' must pause, not minimize
             snap = m.Snap()
             m.assertEqual(snap.control, VideoControl.Pause, "Play paused the (playing) video")
             m.assertEqual(snap.focusedButton, 1, "the highlight is untouched")
+            m.assertFalse(snap.statsEnabled, "Play did not activate the highlighted stats button")
+        end function
+
+        @it("Stats toggles an off-by-default, current-player overlay that follows fullscreen")
+        function _()
+            initial = m.Snap()
+            m.assertFalse(initial.statsEnabled)
+            m.assertTrue(initial.statsOverlayPresent, "hidden diagnostics are ready before transient stream events")
+            m.assertFalse(initial.statsOverlayVisible)
+            m.assertTrue(initial.statsButtonToggleState, "the row initially shows the stats-off icon")
+
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' reveal -> bar
+            m.top.callFunc("TestKey", RemoteKeys.Up, true) ' bar -> buttons
+            m.top.callFunc("TestKey", RemoteKeys.Right, true) ' play/pause -> stats
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            enabled = m.Snap()
+            m.assertTrue(enabled.statsEnabled)
+            m.assertTrue(enabled.statsOverlayPresent)
+            m.assertTrue(enabled.statsOverlayVisible)
+            m.assertFalse(enabled.statsButtonToggleState, "the row shows the stats-on icon")
+            m.assertEqual(enabled.focusedButton, PlayerCoordinatorLogic.PlayerButton.Stats)
+
+            m.top.container.fullscreen = false
+            minimized = m.Snap()
+            m.assertTrue(minimized.statsEnabled, "PiP does not discard the current-video choice")
+            m.assertTrue(minimized.statsOverlayPresent)
+            m.assertFalse(minimized.statsOverlayVisible, "the diagnostics do not cover the PiP player")
+
+            m.top.container.fullscreen = true
+            m.assertTrue(m.Snap().statsOverlayVisible, "restoring fullscreen restores the enabled overlay")
+
+            ' PiP hides chrome, so the fresh reveal resets the row highlight to Play/Pause. Return to Stats.
+            m.top.callFunc("TestKey", RemoteKeys.Up, true)
+            m.top.callFunc("TestKey", RemoteKeys.Up, true)
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.PlayPause)
+            m.top.callFunc("TestKey", RemoteKeys.Right, true)
+            m.assertEqual(m.Snap().focusedButton, PlayerCoordinatorLogic.PlayerButton.Stats)
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            disabled = m.Snap()
+            m.assertFalse(disabled.statsEnabled)
+            m.assertTrue(disabled.statsOverlayPresent)
+            m.assertFalse(disabled.statsOverlayVisible)
+            m.assertTrue(disabled.statsButtonToggleState)
         end function
 
         ' Each arm is asserted: a state that silently failed to arm makes every row that follows vacuous.
@@ -747,7 +791,7 @@ namespace Tests
                 classified[name] = "controller"
             end for
             ' cached child nodes / timers / animations / reusable helpers (structure, not state).
-            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime"]
+            for each name in ["chrome", "titleLabel", "secondaryTitleLabel", "clock", "bifDisplay", "trickPlayBar", "spinner", "largePause", "buttonRow", "fullScreenHint", "autoHide", "transportTimer", "liveBadgeHold", "liveEdgeClock", "fullScreenHintTimer", "chromeFadeIn", "chromeFadeOut", "minimize", "nowDateTime", "statsForNerds"]
                 classified[name] = "node"
             end for
             ' in-flight job handles.
@@ -759,7 +803,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "healCount", "tailResolveCount"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive", "healCount", "tailResolveCount", "statsEnabled"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden
