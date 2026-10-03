@@ -110,7 +110,7 @@ namespace Invidious
             request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
             response = request.Await()
-            m.MarkNeedsReauthOn403(response, auth.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, auth.profile)
         end function
 
         function SearchSuggestions(q as string, cancellation = invalid as object) as object
@@ -214,7 +214,7 @@ namespace Invidious
 
             response = request.Await()
             if isAuthenticatedRequest
-                m.MarkNeedsReauthOn403(response, auth.profile)
+                m.MarkNeedsReauthIfCredentialsRejected(response, auth.profile)
             end if
             return response
         end function
@@ -612,7 +612,7 @@ namespace Invidious
         function AuthFeedHandler(context as object) as object
             response = context.response
 
-            m.MarkNeedsReauthOn403(response, context.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, context.profile)
 
             if not response.IsSuccess()
                 return invalid
@@ -647,7 +647,7 @@ namespace Invidious
         function WatchHistoryHandler(context as object) as object
             response = context.response
 
-            m.MarkNeedsReauthOn403(response, context.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, context.profile)
 
             if not response.IsSuccess()
                 return invalid
@@ -699,14 +699,20 @@ namespace Invidious
             return json
         end function
 
-        ' A 403 on an authenticated call is terminal — only a fresh sign-in recovers.
-        function MarkNeedsReauthOn403(response as object, profile as object) as void
+        function MarkNeedsReauthIfCredentialsRejected(response as object, profile as object) as void
             if response.StatusCode() <> 403
                 return
             end if
 
-            LogWarn(`Invidious instance responded with 403: ${response.Text()}`)
-            if profile <> invalid and profile.type = "invidious"
+            body = ValidString(response.Text())
+            LogWarn(`Invidious instance responded with 403: ${body}`)
+            if profile = invalid or profile.type <> "invidious"
+                return
+            end if
+
+            ' Invidious answers 403 to any exception on /api/v1/auth/*, including a route failing after
+            ' authentication succeeded. Only these errors, raised while validating the session, mean it's dead.
+            if body.InStr("Request must be authenticated") <> -1 or body.InStr("Invalid signature") <> -1 or body.InStr("Erroneous token") <> -1 or body.InStr("Token is expired") <> -1
                 profile@.MarkNeedsReauth()
             end if
         end function
@@ -773,7 +779,7 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
-            m.MarkNeedsReauthOn403(response, auth.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, auth.profile)
             return response
         end function
 
@@ -787,7 +793,7 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
-            m.MarkNeedsReauthOn403(response, auth.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, auth.profile)
             return response
         end function
 
@@ -801,7 +807,7 @@ namespace Invidious
             request.Cancellation(cancellation)
 
             response = request.Await()
-            m.MarkNeedsReauthOn403(response, auth.profile)
+            m.MarkNeedsReauthIfCredentialsRejected(response, auth.profile)
             return response
         end function
     end class
