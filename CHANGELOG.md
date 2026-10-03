@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Missing shows, seasons, courses and stations (except paid ones)
 - Keep Invidious profiles signed in when a 403 does not report a known authentication error
+- Fix missing subtitles on some videos during local Playlet playback
+- Fall back to direct captions when Invidious returns an empty subtitle track
+- Stop auto-generated subtitles from repeating previously displayed text
 
 ## [0.48.5] - 2026-09-29
 
