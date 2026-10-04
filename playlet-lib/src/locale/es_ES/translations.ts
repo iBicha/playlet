@@ -1182,7 +1182,7 @@
     </message>
     <message>
         <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
-        <translation>Utilizar instancia de Invidious, Ejemplo: https://example.com. Encuentra más instancias en  %INVIDIOUS_PUBLIC_INSTANCES%</translation>
+        <translation>Utilizar instancia de Invidious, Ejemplo: https://example.com. Encuentra más instancias en %INVIDIOUS_PUBLIC_INSTANCES%</translation>
     </message>
     <message>
         <source>Tap &apos;Link with TV code&apos; and enter the code below.</source>
@@ -1251,6 +1251,174 @@
     <message>
         <source>Rewind live TV</source>
         <translation>Retroceder TV en directo</translation>
+    </message>
+    <message>
+        <source>Do not show again</source>
+        <translation>No volver a mostrar de nuevo</translation>
+    </message>
+    <message>
+        <source>Recommended</source>
+        <translation>Recomendados</translation>
+    </message>
+    <message>
+        <source>Courses</source>
+        <translation>Cursos</translation>
+    </message>
+    <message>
+        <source>Session expired</source>
+        <translation>Sesion expirada</translation>
+    </message>
+    <message>
+        <source>The session has expired. Please sign in again with this profile, or switch to another profile.</source>
+        <translation>Esta sesión ha expirado. Por favor inicia sesion de nuevo con este perfil, o cambia a otro perfil.</translation>
+    </message>
+    <message>
+        <source>The session has expired.</source>
+        <translation>La sesión ha expirado.</translation>
+    </message>
+    <message>
+        <source>Please sign in again with this profile, or switch to another profile.</source>
+        <translation>Porfavor inicia sesion otra vez con este perfil, o cambia a otro perfil.</translation>
+    </message>
+    <message>
+        <source>Select a service to login</source>
+        <translation>Seleccione un servicio para iniciar sesion</translation>
+    </message>
+    <message>
+        <source>Login to YouTube</source>
+        <translation>Iniciar sesion en YouTube</translation>
+    </message>
+    <message>
+        <source>Open the link %1 and enter the following code:</source>
+        <translation>Abre el link %1 y escribe el siguiente código:</translation>
+    </message>
+    <message>
+        <source>Disclaimer</source>
+        <translation>Descargo de responsabilidad</translation>
+    </message>
+    <message>
+        <source>Playlet is a third-party app and is not affiliated with, endorsed by, or sponsored by YouTube or Google. All trademarks and registered trademarks mentioned are the property of their respective owners and are used only for identification purposes.</source>
+        <translation>Playlet es una aplicación de terceros y no está afiliada, respaldada ni patrocinada por YouTube ni Google. Todas las marcas comerciales y marcas registradas mencionadas son propiedad de sus respectivos dueños y se utilizan únicamente con fines de identificación.</translation>
+    </message>
+    <message>
+        <source>By using Playlet and signing in with your YouTube account, you acknowledge that you do so at your own risk. The developers of Playlet are not liable for any harm, including but not limited to data loss, account suspension or ban, hacking, or loss of content.</source>
+        <translation>Al usar Playlet e iniciar sesión con tu cuenta de YouTube, aceptas hacerlo bajo tu propia responsabilidad. Los desarrolladores de Playlet no se hacen responsables de ningún daño, incluyendo, entre otros, la pérdida de datos, la suspensión o el bloqueo de la cuenta, el pirateo informático o la pérdida de contenido.</translation>
+    </message>
+    <message>
+        <source>Use responsibly, especially if your YouTube account is tied to business or monetization.</source>
+        <translation>Usalo con responsabilidad, especialmente si tu cuenta de YouTube esta ligada a negocios o monetizacion.</translation>
+    </message>
+    <message>
+        <source>Who&apos;s watching?</source>
+        <translation>¿Quien esta viendo?</translation>
+    </message>
+    <message>
+        <source>No valid accounts found for YouTube login.</source>
+        <translation>No se encontraron cuentas válidas para iniciar sesión en YouTube.</translation>
+    </message>
+    <message>
+        <source>Error</source>
+        <translation>Error</translation>
+    </message>
+    <message>
+        <source>Backend</source>
+        <translation>Servidor</translation>
+    </message>
+    <message>
+        <source>Backend preferences</source>
+        <translation>Preferencias de el servidor</translation>
+    </message>
+    <message>
+        <source>Selected backend</source>
+        <translation>Servidor seleccionado</translation>
+    </message>
+    <message>
+        <source>The backend used for browsing and playing videos.</source>
+        <translation>El servidor es usado para navegar y reproducir videos.</translation>
+    </message>
+    <message>
+        <source>Content Feed</source>
+        <translation>Feed</translation>
+    </message>
+    <message>
+        <source>Feed preferences</source>
+        <translation>Preferencias de el feed</translation>
+    </message>
+    <message>
+        <source>Disable auto-dubbed audio</source>
+        <translation>Desactivar el doblaje automatico</translation>
+    </message>
+    <message>
+        <source>Remove AI-generated dubbed audio tracks.</source>
+        <translation>Elimina el doblaje generado por AI.</translation>
+    </message>
+    <message>
+        <source>Disable Shorts</source>
+        <translation>Desactivar Shorts</translation>
+    </message>
+    <message>
+        <source>Disable short videos.</source>
+        <translation>Desactivar videos shorts.</translation>
+    </message>
+    <message>
+        <source>Playlet built-in backend</source>
+        <translation>Servidor integrado de Playlet</translation>
+    </message>
+    <message>
+        <source>Categories</source>
+        <translation>Categorias</translation>
+    </message>
+    <message>
+        <source>Configure which segments to skip</source>
+        <translation>Configurar que segmentos para saltar</translation>
+    </message>
+    <message>
+        <source>Select option for %1</source>
+        <translation>Seleccione la opción para %1</translation>
+    </message>
+    <message>
+        <source>Press OK to skip</source>
+        <translation>Presiona OK para saltar</translation>
+    </message>
+    <message>
+        <source>Disable</source>
+        <translation>Desactivar</translation>
+    </message>
+    <message>
+        <source>Auto Skip</source>
+        <translation>Auto omitir</translation>
+    </message>
+    <message>
+        <source>Manual Skip</source>
+        <translation>Omisión manual</translation>
+    </message>
+    <message>
+        <source>Show in Seekbar</source>
+        <translation>Mostrar en la Seekbar</translation>
+    </message>
+    <message>
+        <source>Open in YouTube</source>
+        <translation>Abrir en YouTube</translation>
+    </message>
+    <message>
+        <source>Clear PoTokens</source>
+        <translation>Limpiar PoTokens</translation>
+    </message>
+    <message>
+        <source>Clear all stored PoTokens.</source>
+        <translation>Borra todos los PoTokens almacenados.</translation>
+    </message>
+    <message>
+        <source>PoTokens cleared.</source>
+        <translation>PoTokens eliminados.</translation>
+    </message>
+    <message>
+        <source>Enable Diagnostics</source>
+        <translation>Habilitar diagnósticos</translation>
+    </message>
+    <message>
+        <source>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</source>
+        <translation>Ayuda a mejorar Playlet activando las herramientas de diagnóstico. Esto enviará datos de diagnóstico anónimos al desarrollador.</translation>
     </message>
 </context>
 </TS>
