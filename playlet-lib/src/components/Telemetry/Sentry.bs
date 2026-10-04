@@ -5,11 +5,57 @@ const SUPPORT_SERVER_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/en
 const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4512194184544256/envelope/"
 const SENTRY_FALLBACK_KEY = "a16c510299b23ccc63bdc84f751c9950"
 
-const SUPPORTS_ATTACHMENTS = false
-
 namespace Sentry
 
     function SendEvents(events as object) as integer
+        payload = BuildEnvelope(events, false)
+        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL, payload)
+        request.Header("Content-Type", "application/x-sentry-envelope")
+        response = request.Await()
+        ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
+        if response.StatusCode() <= 0
+            LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", response.ErrorMessage())
+            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL, BuildEnvelope([CreateSupportServerUnreachableEvent(events[0], payload, response.ErrorMessage())], true))
+            request.Header("Content-Type", "application/x-sentry-envelope")
+            request.QueryParam("sentry_key", SENTRY_FALLBACK_KEY)
+            response = request.Await()
+        end if
+
+        if response.IsSuccess()
+            LogDebug("Sent events to", request.BuildUrl(), "Response:", response.Text())
+            return 0
+        end if
+
+        retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
+        if retryAfter = 0
+            retryAfter = 60
+        end if
+
+        if response.StatusCode() = 429
+            LogErrorNoTelemetry("Rate limited by", request.BuildUrl(), "Retry after", retryAfter, "seconds")
+        else
+            LogErrorNoTelemetry("Failed to send events to", request.BuildUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
+        end if
+        return retryAfter
+    end function
+
+    function CreateSupportServerUnreachableEvent(originalEvent as object, payload as string, errorMessage as string) as object
+        return {
+            level: "warning"
+            message: `Support server unreachable: ${errorMessage}`
+            fingerprint: ["support server unreachable"]
+            release: originalEvent.release
+            tags: originalEvent.tags
+            userId: originalEvent.userId
+            attachments: [{
+                filename: "envelope.txt"
+                content_type: "text/plain"
+                data: payload
+            }]
+        }
+    end function
+
+    function BuildEnvelope(events as object, supportsAttachments as boolean) as string
         timestamp = CreateObject("roDateTime").ToISOString()
 
         payload = FormatJson({
@@ -69,7 +115,7 @@ namespace Sentry
 
             hasAttachments = IsArray(event.attachments) and event.attachments.Count() > 0
 
-            if (not SUPPORTS_ATTACHMENTS) and hasAttachments
+            if (not supportsAttachments) and hasAttachments
                 extra = {}
                 for each attachment in event.attachments
                     extra[attachment.filename] = `content_type:${attachment.content_type}\n${Redact(attachment.data)}`
@@ -83,7 +129,7 @@ namespace Sentry
 
             payload += FormatJson(eventPayload) + `\n`
 
-            if SUPPORTS_ATTACHMENTS and hasAttachments
+            if supportsAttachments and hasAttachments
                 tmpBuffer = CreateObject("roByteArray")
                 for each attachment in event.attachments
                     data = Redact(attachment.data)
@@ -98,34 +144,7 @@ namespace Sentry
             end if
         end for
 
-        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL, payload)
-        request.Header("Content-Type", "application/x-sentry-envelope")
-        response = request.Await()
-        ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
-        if response.StatusCode() <= 0
-            LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", response.ErrorMessage())
-            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL, payload)
-            request.Header("Content-Type", "application/x-sentry-envelope")
-            request.QueryParam("sentry_key", SENTRY_FALLBACK_KEY)
-            response = request.Await()
-        end if
-
-        if response.IsSuccess()
-            LogDebug("Sent events to", request.BuildUrl(), "Response:", response.Text())
-            return 0
-        end if
-
-        retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
-        if retryAfter = 0
-            retryAfter = 60
-        end if
-
-        if response.StatusCode() = 429
-            LogErrorNoTelemetry("Rate limited by", request.BuildUrl(), "Retry after", retryAfter, "seconds")
-        else
-            LogErrorNoTelemetry("Failed to send events to", request.BuildUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
-        end if
-        return retryAfter
+        return payload
     end function
 
     function GetFingerprint(message as dynamic) as dynamic
@@ -165,7 +184,7 @@ namespace Sentry
             return text
         end if
 
-        authHeader = /Authorization: [^\r\n]*/i
+        authHeader = /Authorization: (?!<REDACTED>)[^\r\n]*/i
         for each match in authHeader.MatchAll(text)
             text = text.Replace(match[0], "Authorization: <REDACTED>")
         end for

@@ -1,4 +1,4 @@
-#const SUPPORTS_BATCHING = false
+#const SUPPORTS_BATCHING = true
 
 import "pkg:/components/Telemetry/LastExitCrash.bs"
 import "pkg:/components/Telemetry/Sentry.bs"
@@ -72,7 +72,8 @@ function TelemetryLoop() as void
         "LogError": "error"
     }
 
-    messages = []
+    receivedAt = CreateObject("roDateTime")
+    inbox = []
     events = []
 
     while true
@@ -86,7 +87,8 @@ function TelemetryLoop() as void
             end if
         end if
 
-        messages.Push(msg)
+        receivedAt.Mark()
+        inbox.Push({ msg: msg, timestamp: receivedAt.ToISOString() })
 
         #if SUPPORTS_BATCHING
             debounceTimer.Mark()
@@ -97,8 +99,9 @@ function TelemetryLoop() as void
                     LogDebug("No more messages")
                     exit while
                 end if
-                messages.Push(msg)
-                if messages.Count() >= debounceCountLimit
+                receivedAt.Mark()
+                inbox.Push({ msg: msg, timestamp: receivedAt.ToISOString() })
+                if inbox.Count() >= debounceCountLimit
                     LogDebug("Reached debounce count limit")
                     exit while
                 end if
@@ -110,7 +113,8 @@ function TelemetryLoop() as void
         #end if
 
         events.Clear()
-        for each msg in messages
+        for each item in inbox
+            msg = item.msg
             msgType = type(msg)
             if msgType <> "roSGNodeEvent"
                 continue for
@@ -122,6 +126,7 @@ function TelemetryLoop() as void
                 events.Push({
                     level: levelMap[field]
                     message: msg.getData()
+                    timestamp: item.timestamp
                     release: m.release
                     dist: m.dist
                     tags: m.tags
@@ -132,6 +137,7 @@ function TelemetryLoop() as void
                 events.Push({
                     level: data.level
                     message: data.message
+                    timestamp: item.timestamp
                     release: m.release
                     dist: m.dist
                     tags: m.tags
@@ -141,7 +147,7 @@ function TelemetryLoop() as void
                 })
             end if
         end for
-        messages.Clear()
+        inbox.Clear()
 
         if events.Count() = 0
             continue while
