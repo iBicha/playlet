@@ -1,0 +1,355 @@
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/ErrorUtils.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace PlaybackTelemetry
+
+    const PLAY_START_SAMPLE_CAP = 10
+    const UNDERRUN_SAMPLE_CAP = 10
+    const INV_D1_SAMPLE_CAP = 3
+
+    enum Outcome
+        Closed = "closed"
+        Finished = "finished"
+        Error = "error"
+    end enum
+
+    enum Span
+        None = 0
+        Playing = 1
+        BufferingWithoutStatus = 2
+        Underrun = 3
+        NotUnderrun = 4
+    end enum
+
+    function ContentBackend(content as object) as string
+        if content <> invalid and not StringUtils.IsNullOrEmpty(content.backend)
+            return content.backend
+        end if
+        return "unknown"
+    end function
+
+    ' The summary's wire rule: false, 0, "", [] and invalid are omitted, at every depth; a reader takes an absent
+    ' field as that default.
+    function OmitDefaults(value as dynamic) as dynamic
+        if IsAssociativeArray(value)
+            result = {}
+            for each key in value
+                item = PlaybackTelemetry.OmitDefaults(value[key])
+                if not PlaybackTelemetry.IsDefault(item)
+                    result[key] = item
+                end if
+            end for
+            return result
+        end if
+        if IsArray(value)
+            result = []
+            for each item in value
+                result.Push(PlaybackTelemetry.OmitDefaults(item))
+            end for
+            return result
+        end if
+        return value
+    end function
+
+    function IsDefault(value as dynamic) as boolean
+        if value = invalid
+            return true
+        end if
+        if IsBool(value)
+            return not value
+        end if
+        if IsNumber(value)
+            return value = 0
+        end if
+        if IsString(value)
+            return value = ""
+        end if
+        if IsArray(value)
+            return value.Count() = 0
+        end if
+        return false
+    end function
+
+    class Recorder
+        private playerTimer as object = invalid ' started with the player: every *Ms is ms on it
+        private transport as object = invalid
+        private top as object = invalid
+
+        private outcome as string = PlaybackTelemetry.Outcome.Closed
+        private metadataDoneAtMs as integer = -1
+        private firstPlayingAtMs as integer = -1
+        private playStartInfos as object = invalid
+        private playStartCount as integer = 0
+        private span as integer = PlaybackTelemetry.Span.None
+        private spanStartMs as integer = 0
+        private lastIsUnderrun as boolean = false
+        private playingMs as integer = 0
+        private underrunCount as integer = 0
+        private underrunMs as integer = 0
+        private underrunSamples as object = invalid
+        private bufferingsWithoutStatusCount as integer = 0
+        private isUnderrunChangeCount as integer = 0
+        private errorCount as integer = 0
+        private healCount as integer = 0
+        private healSamples as object = invalid
+        private tailResolveCount as integer = 0
+        private tailResolveSamples as object = invalid
+
+        function new(deps as object)
+            m.playerTimer = deps.playerTimer
+            m.transport = deps.transport
+            m.top = deps.top
+            m.playStartInfos = []
+            m.underrunSamples = []
+            m.healSamples = []
+            m.tailResolveSamples = []
+        end function
+
+        function OnMetadataDone() as void
+            m.metadataDoneAtMs = m.playerTimer.TotalMilliseconds()
+        end function
+
+        function OnState(state as string) as void
+            nowMs = m.playerTimer.TotalMilliseconds()
+            m.CloseSpan(nowMs, state)
+            m.spanStartMs = nowMs
+            if state = VideoState.Playing
+                m.span = PlaybackTelemetry.Span.Playing
+                if m.firstPlayingAtMs < 0
+                    m.firstPlayingAtMs = nowMs
+                end if
+                ' playing under an error dialog: the playback recovered, so the error did not end it.
+                if m.outcome = PlaybackTelemetry.Outcome.Error
+                    m.outcome = PlaybackTelemetry.Outcome.Closed
+                end if
+            else if state = VideoState.Buffering
+                m.span = PlaybackTelemetry.Span.BufferingWithoutStatus
+            else
+                m.span = PlaybackTelemetry.Span.None
+            end if
+        end function
+
+        ' Measured: a seek, resume, startup or retry buffering reports isUnderrun false; only a playback that ran
+        ' dry reports true.
+        function OnBufferingStatus(status as object) as void
+            if status = invalid or not IsBool(status.isUnderrun)
+                return
+            end if
+            isUnderrun = status.isUnderrun
+            if m.span = PlaybackTelemetry.Span.BufferingWithoutStatus
+                if isUnderrun
+                    m.span = PlaybackTelemetry.Span.Underrun
+                else
+                    m.span = PlaybackTelemetry.Span.NotUnderrun
+                end if
+                m.lastIsUnderrun = isUnderrun
+            else if (m.span = PlaybackTelemetry.Span.Underrun or m.span = PlaybackTelemetry.Span.NotUnderrun) and isUnderrun <> m.lastIsUnderrun
+                m.isUnderrunChangeCount += 1
+                m.lastIsUnderrun = isUnderrun
+            end if
+        end function
+
+        function OnPlayStartInfo(info as object) as void
+            if info = invalid
+                return
+            end if
+            m.playStartCount += 1
+            if m.playStartInfos.Count() < PlaybackTelemetry.PLAY_START_SAMPLE_CAP
+                m.playStartInfos.Push(info)
+            end if
+        end function
+
+        function OnErrorDialog() as void
+            m.outcome = PlaybackTelemetry.Outcome.Error
+        end function
+
+        function OnFinished() as void
+            m.outcome = PlaybackTelemetry.Outcome.Finished
+        end function
+
+        function RecordHeal(source as string) as void
+            m.healCount += 1
+            positionMs = Int(m.top.position * 1000)
+            floorMs = m.transport.SafetyFloorMs()
+            LogDebug(`INV-D1 heal: re-pause under active transport. src=${source} mode=${m.transport.transportMode} isLive=${m.transport.isLive} state=${m.top.state} posMs=${positionMs} cursorMs=${m.transport.cursorMs} edgeMs=${m.transport.edgeMs} floorMs=${floorMs} heal=${m.healCount}`)
+            if m.healSamples.Count() < PlaybackTelemetry.INV_D1_SAMPLE_CAP
+                m.healSamples.Push({
+                    "at_ms": m.playerTimer.TotalMilliseconds()
+                    "source": source
+                    "mode": m.transport.transportMode
+                    "position_ms": positionMs
+                    "cursor_ms": m.transport.cursorMs
+                    "edge_ms": m.transport.edgeMs
+                    "floor_ms": floorMs ' -1 = no floor: VOD, or a live stream with an unknown window
+                })
+            end if
+        end function
+
+        function RecordTailResolve(source as string) as void
+            m.tailResolveCount += 1
+            positionMs = Int(m.top.position * 1000)
+            floorMs = m.transport.SafetyFloorMs()
+            LogDebug(`INV-D1 tail-resolve: resume forward. src=${source} posMs=${positionMs} cursorMs=${m.transport.cursorMs} floorMs=${floorMs} edgeMs=${m.transport.edgeMs} resolve=${m.tailResolveCount}`)
+            if m.tailResolveSamples.Count() < PlaybackTelemetry.INV_D1_SAMPLE_CAP
+                m.tailResolveSamples.Push({
+                    "at_ms": m.playerTimer.TotalMilliseconds()
+                    "source": source
+                    "position_ms": positionMs
+                    "cursor_ms": m.transport.cursorMs
+                    "floor_ms": floorMs
+                    "edge_ms": m.transport.edgeMs
+                })
+            end if
+        end function
+
+        function ReportVideoError(errorData as object, errorInfo as object, url as dynamic, urlIndex as dynamic, shownInDialog as boolean) as void
+            m.errorCount += 1
+            ' malformed data: the last generated DASH/HLS manifest and player response diagnose it from the report.
+            attachments = invalid
+            if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
+                attachments = [{
+                    filename: "last_generated_dash.xml"
+                    content_type: "plain/text"
+                    data: ValidString(ReadAsciiFile("cachefs:/last_generated_dash.xml"))
+                }, {
+                    filename: "last_generated_hls.m3u8"
+                    content_type: "plain/text"
+                    data: ValidString(ReadAsciiFile("cachefs:/last_generated_hls.m3u8"))
+                }, {
+                    filename: "last_player_response.json"
+                    content_type: "application/json"
+                    data: ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+                }]
+            end if
+            potAttached = false
+            potSource = "none"
+            loggedIn = false
+            urls = invalid
+            content = m.top.content
+            if content <> invalid
+                urls = content.playletStreamUrls
+                potAttached = ValidBool(content.potAttached)
+                loggedIn = ValidBool(content.loggedIn)
+                if not StringUtils.IsNullOrEmpty(content.potSource)
+                    potSource = content.potSource
+                end if
+            end if
+            backend = PlaybackTelemetry.ContentBackend(content)
+            isLive = m.transport.isLive
+            message = [
+                errorData.title
+                errorData.body
+                `Dialog shown: ${shownInDialog}`
+                `Position: ${m.top.position}`
+                `Duration: ${m.top.duration}`
+                `Url: ${url}`
+                "Urls: " + FormatJson(urls)
+                `Url index: ${urlIndex}`
+                `pot_attached: ${potAttached}`
+                `pot_source: ${potSource}`
+                `logged_in: ${loggedIn}`
+                `backend: ${backend}`
+                `is_live: ${isLive}`
+            ].Join(Chr(10))
+            fingerprint = [
+                Locale.VideoPlayer.ErrorPlayingVideo
+                m.top.errorMsg
+                m.top.errorCode
+            ]
+            if errorInfo <> invalid
+                fingerprint.Append([
+                    errorInfo.source
+                    errorInfo.ignored
+                    errorInfo.category
+                    errorInfo.errcode
+                    errorInfo.drmerrcode
+                ])
+            end if
+            fingerprint.Append([shownInDialog, potAttached, potSource, loggedIn, backend, isLive])
+            if shownInDialog
+                level = "error"
+            else
+                level = "warning"
+            end if
+            LogTelemetryEvent({
+                level: level
+                message: message
+                fingerprint: fingerprint
+                attachments: attachments
+            })
+        end function
+
+        function ReportContentJobFailure(error as dynamic) as void
+            LogError(`VideoContentJob FAILED: ${error}\nbackend: ${PlaybackTelemetry.ContentBackend(m.top.content)}`)
+        end function
+
+        function ReportStopFailure(error as object) as void
+            LogError("error stopping video:", ErrorUtils.Format(error))
+        end function
+
+        function SendSummary() as void
+            lifetimeMs = m.playerTimer.TotalMilliseconds()
+            endedInUnderrun = m.span = PlaybackTelemetry.Span.Underrun
+            m.CloseSpan(lifetimeMs, "")
+            m.span = PlaybackTelemetry.Span.None
+            content = m.top.content
+            summary = {
+                "live": m.transport.isLive
+                "backend": PlaybackTelemetry.ContentBackend(content)
+                "outcome": m.outcome
+                "metadata_done_at_ms": m.metadataDoneAtMs
+                "first_playing_at_ms": m.firstPlayingAtMs
+                "play_start_infos": m.playStartInfos
+                "play_start_count": m.playStartCount
+                "lifetime_ms": lifetimeMs
+                "playing_ms": m.playingMs
+                "underrun_count": m.underrunCount
+                "underrun_ms": m.underrunMs
+                "underrun_samples": m.underrunSamples
+                "ended_in_underrun": endedInUnderrun
+                "bufferings_without_status_count": m.bufferingsWithoutStatusCount
+                "is_underrun_change_count": m.isUnderrunChangeCount
+                "error_count": m.errorCount
+                "heal_count": m.healCount
+                "heal_samples": m.healSamples
+                "tail_resolve_count": m.tailResolveCount
+                "tail_resolve_samples": m.tailResolveSamples
+            }
+            if content <> invalid
+                summary["stream_source"] = content.playletStreamSource
+                summary["drm"] = not StringUtils.IsNullOrEmpty(ValidAssociativeArray(content.drmParams).keySystem)
+                summary["stream_url_index"] = content.playletStreamUrlIndex
+                if m.firstPlayingAtMs < 0 or m.underrunCount > 0 or m.bufferingsWithoutStatusCount > 0 or m.isUnderrunChangeCount > 0 or m.errorCount > 0 or m.healCount > 0 or m.outcome = PlaybackTelemetry.Outcome.Error
+                    summary["video_id"] = content.videoId
+                end if
+            end if
+            LogTelemetryEvent({
+                level: "info"
+                message: FormatJson(PlaybackTelemetry.OmitDefaults(summary))
+                fingerprint: ["playback summary"]
+            })
+        end function
+
+        ' A buffering that got no status counts only when it reached playing: a close, pause or error can land before
+        ' the first status, which follows the buffering edge by up to ~65 ms (measured).
+        function CloseSpan(nowMs as integer, nextState as string) as void
+            durationMs = nowMs - m.spanStartMs
+            if m.span = PlaybackTelemetry.Span.Playing
+                m.playingMs += durationMs
+            else if m.span = PlaybackTelemetry.Span.Underrun
+                m.underrunCount += 1
+                m.underrunMs += durationMs
+                if m.underrunCount <= PlaybackTelemetry.UNDERRUN_SAMPLE_CAP
+                    m.underrunSamples.Push({ "at_ms": m.spanStartMs, "ms": durationMs })
+                end if
+            else if m.span = PlaybackTelemetry.Span.BufferingWithoutStatus and nextState = VideoState.Playing
+                m.bufferingsWithoutStatusCount += 1
+            end if
+        end function
+    end class
+
+end namespace

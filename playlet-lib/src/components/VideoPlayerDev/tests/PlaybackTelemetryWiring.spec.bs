@@ -1,0 +1,196 @@
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/RemoteKeys.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace Tests
+
+    @SGNode("VideoPlayerDevMock")
+    @suite
+    class PlaybackTelemetryWiringTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.top.callFunc("TestSetup")
+        end function
+
+        function State(state as string) as void
+            m.top.callFunc("TestSetState", state)
+        end function
+
+        function SetContent(urls as object) as void
+            content = CreateObject("roSGNode", "ContentNode")
+            content.addField("videoId", "string", false)
+            content.addField("backend", "string", false)
+            content.addField("playletStreamUrls", "array", false)
+            content.addField("playletStreamUrlIndex", "integer", false)
+            content.addField("playletStreamSource", "string", false)
+            content.setFields({
+                videoId: "vid1"
+                backend: "playlet"
+                url: urls[0]
+                playletStreamUrls: urls
+                playletStreamUrlIndex: 0
+                playletStreamSource: "adaptiveFormats"
+            })
+            m.top.content = content
+        end function
+
+        function BufferingStatus(isUnderrun as boolean) as void
+            m.top.bufferingStatus = { actualStart: 0, isUnderrun: isUnderrun, percentage: 0, prebufferDone: false }
+        end function
+
+        function SentSummary() as object
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.fingerprint, ["playback summary"])
+            return StringUtils.ParseJsonSafe(event.message)
+        end function
+
+        function Close() as object
+            m.top.close = true
+            ' an error dialog still up was closed by OnClose; drop it from the scene for the next test.
+            m.top.getScene().dialog = invalid
+            return m.SentSummary()
+        end function
+
+        function HttpError() as void
+            m.top.errorMsg = "There was an error in the HTTP response."
+            m.top.errorCode = -1
+            m.top.errorStr = "reader pick stream error:HTTP error"
+            m.top.errorInfo = { category: "http", source: "buffer:reader", ignored: false }
+        end function
+
+        @describe("playback telemetry wiring")
+
+        @it("state edges and bufferingStatus reach the summary: an underrun counts")
+        function _()
+            m.SetContent(["http://stream"])
+            m.State(VideoState.Playing)
+            m.State(VideoState.Buffering)
+            m.BufferingStatus(true)
+            m.State(VideoState.Playing)
+            summary = m.Close()
+            m.assertEqual(summary.underrun_count, 1)
+            m.assertTrue(ValidInt(summary.first_playing_at_ms) >= 0, "the first playing was recorded")
+            m.assertEqual(summary.backend, "playlet")
+            m.assertEqual(summary.stream_source, "adaptiveFormats")
+            m.assertFalse(summary.DoesExist("drm"), "an unset drmParams on a ContentNode reads as no DRM")
+            m.assertFalse(summary.DoesExist("stream_url_index"))
+            m.assertEqual(summary.outcome, "closed")
+        end function
+
+        @it("a buffering whose bufferingStatus is no underrun is not counted")
+        function _()
+            m.SetContent(["http://stream"])
+            m.State(VideoState.Playing)
+            m.State(VideoState.Buffering)
+            m.BufferingStatus(false)
+            m.State(VideoState.Playing)
+            m.assertFalse(m.Close().DoesExist("underrun_count"))
+        end function
+
+        @it("every playStartInfo reaches the summary")
+        function _()
+            m.SetContent(["http://stream"])
+            m.State(VideoState.Playing)
+            m.top.playStartInfo = { start_type: "init", total_dur: 0.5 }
+            m.top.playStartInfo = { start_type: "cseek", total_dur: 0.25 }
+            summary = m.Close()
+            m.assertEqual(summary.play_start_count, 2)
+            m.assertEqual(summary.play_start_infos[0].start_type, "init")
+            m.assertEqual(summary.play_start_infos[1].start_type, "cseek")
+        end function
+
+        @it("a retry: the report names the url that failed; the summary, the one that played")
+        function _()
+            m.SetContent(["http://a", "http://b"])
+            m.HttpError()
+            m.State(VideoState.Error)
+            report = m.global.telemetry.LogEvent
+            m.assertEqual(report.level, "warning", "retried: not shown to the viewer")
+            m.assertTrue(report.message.InStr("Url: http://a") > 0 and report.message.InStr("Url index: 0") > 0, "got: " + report.message)
+            m.State(VideoState.Playing)
+            summary = m.Close()
+            m.assertEqual(summary.error_count, 1)
+            m.assertEqual(summary.stream_url_index, 1)
+            m.assertEqual(summary.outcome, "closed")
+        end function
+
+        @it("an error with no retry left ends in error")
+        function _()
+            m.SetContent(["http://stream"])
+            m.State(VideoState.Playing)
+            m.HttpError()
+            m.State(VideoState.Error)
+            summary = m.Close()
+            m.assertEqual(summary.outcome, "error")
+            m.assertEqual(summary.error_count, 1)
+        end function
+
+        @it("content that never loaded ends in error, with no player error")
+        function _()
+            m.SetContent(["http://stream"])
+            m.top.callFunc("TestContentJobFailed", "content job failed")
+            summary = m.Close()
+            m.assertEqual(summary.outcome, "error")
+            m.assertFalse(summary.DoesExist("error_count"))
+            m.assertTrue(ValidInt(summary.metadata_done_at_ms) >= 0, "the content job's result is recorded")
+        end function
+
+        @it("after the close, a late playStartInfo or bufferingStatus reaches nothing")
+        function _()
+            m.SetContent(["http://stream"])
+            m.State(VideoState.Playing)
+            m.top.playStartInfo = { start_type: "init", total_dur: 0.5 }
+            m.State(VideoState.Buffering)
+            m.assertEqual(m.Close().play_start_count, 1)
+            m.top.playStartInfo = { start_type: "cseek", total_dur: 0.25 }
+            m.top.bufferingStatus = { isUnderrun: true, percentage: 0, prebufferDone: false, actualStart: 0 }
+            m.top.callFunc("TestResendSummary")
+            resent = m.SentSummary()
+            m.assertEqual(resent.play_start_count, 1)
+            m.assertFalse(resent.DoesExist("underrun_count"))
+        end function
+
+        @it("finishing ends in finished, sent from within the finish")
+        function _()
+            m.SetContent(["http://stream"])
+            m.top.callFunc("TestWireQueueClose") ' the stub queue closes the player on closePlayer, as the real one does
+            m.State(VideoState.Playing)
+            m.State(VideoState.Finished)
+            m.assertEqual(m.SentSummary().outcome, "finished")
+        end function
+
+        @it("a heal loop: every heal counted, the first 3 sampled, none sent on its own")
+        function _()
+            m.State(VideoState.Playing) ' the first playing opens the transport's ready gate
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.global.telemetry.LogEvent = {}
+            for i = 1 to 5
+                m.State(VideoState.Playing) ' playing under a scrub: healed
+            end for
+            m.assertInvalid(m.global.telemetry.LogEvent.message, "a heal sends nothing until the summary")
+            summary = m.Close()
+            m.assertEqual(summary.heal_count, 5)
+            m.assertEqual(summary.heal_samples.Count(), 3)
+            m.assertEqual(summary.heal_samples[0].source, "OnVideoState")
+            m.assertFalse(summary.DoesExist("tail_resolve_count"))
+        end function
+
+        @it("a live tail the sliding floor overtook is a tail resolve, not a heal")
+        function _()
+            m.State(VideoState.Playing) ' the first playing opens the transport's ready gate
+            m.top.callFunc("TestSetLive", 43200000)
+            m.top.position = 28805.0
+            m.top.callFunc("TestKey", RemoteKeys.Left, true)
+            m.top.callFunc("TestKey", RemoteKeys.Left, false)
+            m.State(VideoState.Playing) ' the device force-resumes the pause the tail overtook
+            summary = m.Close()
+            m.assertEqual(summary.tail_resolve_count, 1)
+            m.assertEqual(summary.tail_resolve_samples[0].source, "OnVideoState")
+            m.assertFalse(summary.DoesExist("heal_count"))
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,452 @@
+import "pkg:/components/VideoPlayerDev/PlaybackTelemetry.bs"
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+
+namespace Tests
+
+    @suite
+    class PlaybackTelemetryTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' the logger plugin reads m.global.logger; LogTelemetryEvent writes m.global.telemetry.LogEvent.
+            if m.global.logger = invalid
+                m.global.addField("logger", "node", false)
+                m.global.logger = CreateObject("roSGNode", "Logger")
+            end if
+            if m.global.telemetry = invalid
+                m.global.addField("telemetry", "node", false)
+                telemetry = CreateObject("roSGNode", "Node")
+                telemetry.addField("LogEvent", "assocarray", false)
+                m.global.telemetry = telemetry
+            end if
+            m.playerClock = {
+                ms: 0
+                TotalMilliseconds: function() as integer
+                    return m.ms
+                end function
+            }
+            m.fakeTransport = {
+                transportMode: TransportController.Mode.Idle
+                isLive: false
+                cursorMs: 0
+                edgeMs: 0
+                SafetyFloorMs: function() as integer
+                    return -1
+                end function
+            }
+            m.fakeTop = {
+                content: { videoId: "vid1", backend: "playlet", playletStreamSource: "adaptiveFormats", playletStreamUrlIndex: 0 }
+                state: VideoState.Playing
+                position: 0.0
+                duration: 0.0
+                errorMsg: "There was an error in the HTTP response."
+                errorCode: -1
+            }
+            m.recorder = new PlaybackTelemetry.Recorder({ playerTimer: m.playerClock, transport: m.fakeTransport, top: m.fakeTop })
+        end function
+
+        function At(ms as integer) as void
+            m.playerClock.ms = ms
+        end function
+
+        function State(state as string) as void
+            m.recorder.OnState(state)
+        end function
+
+        function Status(isUnderrun as boolean) as void
+            m.recorder.OnBufferingStatus({ actualStart: 0, isUnderrun: isUnderrun, percentage: 0, prebufferDone: false })
+        end function
+
+        function StartInfo(startType as string) as void
+            m.recorder.OnPlayStartInfo({ start_type: startType, total_dur: 0.5, prebuf_dur: 0.25, drm_load_dur: 0 })
+        end function
+
+        function ReportError() as void
+            m.recorder.ReportVideoError({ title: "Error playing video vid1", body: "errorMsg: http" }, invalid, "http://stream", 0, false)
+        end function
+
+        function SendAt(ms as integer) as object
+            m.At(ms)
+            m.recorder.SendSummary()
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.fingerprint, ["playback summary"])
+            return StringUtils.ParseJsonSafe(event.message)
+        end function
+
+        function SortedKeys(aa as object) as object
+            keys = aa.Keys()
+            keys.Sort()
+            return keys
+        end function
+
+        @describe("playback summary")
+
+        @it("a clean play sends only what is not a default")
+        function _()
+            m.At(1000)
+            m.recorder.OnMetadataDone()
+            m.At(1500)
+            m.State(VideoState.Buffering)
+            m.Status(false)
+            m.At(2000)
+            m.State(VideoState.Playing)
+            m.StartInfo("init")
+            summary = m.SendAt(62000)
+            m.assertEqual(m.SortedKeys(summary), ["backend", "first_playing_at_ms", "lifetime_ms", "metadata_done_at_ms", "outcome", "play_start_count", "play_start_infos", "playing_ms", "stream_source"])
+            m.assertEqual(summary.backend, "playlet")
+            m.assertEqual(summary.stream_source, "adaptiveFormats")
+            m.assertEqual(summary.outcome, "closed")
+            m.assertEqual(summary.metadata_done_at_ms, 1000)
+            m.assertEqual(summary.first_playing_at_ms, 2000)
+            m.assertEqual(summary.play_start_count, 1)
+            m.assertEqual(m.SortedKeys(summary.play_start_infos[0]), ["prebuf_dur", "start_type", "total_dur"])
+            m.assertEqual(summary.play_start_infos[0].start_type, "init")
+            m.assertEqual(summary.lifetime_ms, 62000)
+            m.assertEqual(summary.playing_ms, 60000)
+        end function
+
+        @it("count and total cover every underrun; samples stop at 10")
+        function _()
+            m.fakeTransport.isLive = true
+            m.At(1000)
+            m.State(VideoState.Playing)
+            t = 1000
+            for i = 1 to 12
+                t += 10000
+                m.At(t)
+                m.State(VideoState.Buffering)
+                m.Status(true)
+                t += i * 100
+                m.At(t)
+                m.State(VideoState.Playing)
+            end for
+            summary = m.SendAt(t + 1000)
+            m.assertEqual(summary.underrun_count, 12)
+            m.assertEqual(summary.underrun_ms, 7800)
+            m.assertEqual(summary.underrun_samples.Count(), 10)
+            m.assertEqual(summary.underrun_samples[0], { at_ms: 11000, ms: 100 })
+            m.assertEqual(summary.underrun_samples[9].ms, 1000)
+            m.assertTrue(summary.live)
+            m.assertFalse(summary.DoesExist("ended_in_underrun"))
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("a buffering whose first bufferingStatus is no underrun is not counted")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(5000)
+            m.State(VideoState.Buffering)
+            m.Status(false)
+            m.Status(false)
+            m.At(5500)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(6000)
+            m.assertFalse(summary.DoesExist("underrun_count"))
+            m.assertFalse(summary.DoesExist("bufferings_without_status_count"))
+            m.assertEqual(summary.playing_ms, 4500)
+        end function
+
+        @it("an underrun before the first playing counts")
+        function _()
+            m.At(100)
+            m.State(VideoState.Buffering)
+            m.Status(true)
+            m.At(2100)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(3000)
+            m.assertEqual(summary.underrun_count, 1)
+            m.assertEqual(summary.underrun_samples[0], { at_ms: 100, ms: 2000 })
+        end function
+
+        @it("a buffering with no valid bufferingStatus is counted as one, with the video id")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(5000)
+            m.State(VideoState.Buffering)
+            m.recorder.OnBufferingStatus(invalid)
+            m.At(5150)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(6000)
+            m.assertEqual(summary.bufferings_without_status_count, 1)
+            m.assertFalse(summary.DoesExist("underrun_count"))
+            m.assertEqual(summary.playing_ms, 4850)
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("a buffering cut short before any status is not counted: a pause, an error, the close")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.State(VideoState.Buffering)
+            m.State(VideoState.Paused)
+            m.State(VideoState.Buffering)
+            m.State(VideoState.Error)
+            m.State(VideoState.Buffering)
+            summary = m.SendAt(2000)
+            m.assertFalse(summary.DoesExist("bufferings_without_status_count"))
+        end function
+
+        @it("an update with no boolean isUnderrun is no status")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.State(VideoState.Buffering)
+            m.recorder.OnBufferingStatus({ percentage: 33, prebufferDone: true })
+            m.recorder.OnBufferingStatus({ isUnderrun: "true", percentage: 99 })
+            m.At(2000)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(3000)
+            m.assertEqual(summary.bufferings_without_status_count, 1)
+            m.assertFalse(summary.DoesExist("underrun_count"))
+        end function
+
+        @it("the first bufferingStatus classifies; each later isUnderrun change is counted")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(5000)
+            m.State(VideoState.Buffering)
+            m.Status(false)
+            m.Status(true)
+            m.Status(true)
+            m.Status(false)
+            m.At(6000)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(7000)
+            m.assertEqual(summary.is_underrun_change_count, 2)
+            m.assertFalse(summary.DoesExist("underrun_count"))
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("a bufferingStatus outside a buffering is ignored")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.Status(true)
+            m.At(2000)
+            m.State(VideoState.Paused)
+            m.Status(true)
+            summary = m.SendAt(3000)
+            m.assertFalse(summary.DoesExist("underrun_count"))
+            m.assertFalse(summary.DoesExist("is_underrun_change_count"))
+        end function
+
+        @it("an underrun ends at a pause")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(5000)
+            m.State(VideoState.Buffering)
+            m.Status(true)
+            m.At(6000)
+            m.State(VideoState.Paused)
+            m.At(9000)
+            m.State(VideoState.Buffering)
+            m.Status(false)
+            m.At(9100)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(10000)
+            m.assertEqual(summary.underrun_count, 1)
+            m.assertEqual(summary.underrun_samples[0], { at_ms: 5000, ms: 1000 })
+        end function
+
+        @it("an underrun still running at the send counts up to it, and ended the playback")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(5000)
+            m.State(VideoState.Buffering)
+            m.Status(true)
+            summary = m.SendAt(8000)
+            m.assertEqual(summary.underrun_count, 1)
+            m.assertEqual(summary.underrun_samples[0], { at_ms: 5000, ms: 3000 })
+            m.assertTrue(summary.ended_in_underrun)
+            m.assertEqual(summary.playing_ms, 4000)
+        end function
+
+        @it("every playStartInfo is counted; the first 10 are kept as written")
+        function _()
+            m.recorder.OnPlayStartInfo(invalid)
+            m.StartInfo("init")
+            for i = 1 to 11
+                m.StartInfo("cseek")
+            end for
+            summary = m.SendAt(1000)
+            m.assertEqual(summary.play_start_count, 12)
+            m.assertEqual(summary.play_start_infos.Count(), 10)
+            m.assertEqual(summary.play_start_infos[0].start_type, "init")
+            m.assertEqual(summary.play_start_infos[1].start_type, "cseek")
+        end function
+
+        @it("a video that never played: -1 for what never happened, with its video id")
+        function _()
+            m.At(100)
+            m.State(VideoState.Buffering)
+            summary = m.SendAt(9000)
+            m.assertEqual(summary.metadata_done_at_ms, -1)
+            m.assertEqual(summary.first_playing_at_ms, -1)
+            m.assertFalse(summary.DoesExist("bufferings_without_status_count"), "a buffering open at the close never reached playing")
+            m.assertFalse(summary.DoesExist("play_start_infos"))
+            m.assertFalse(summary.DoesExist("playing_ms"))
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("DRM content from the DASH manifest url, after a retry")
+        function _()
+            m.fakeTop.content = { videoId: "vid1", backend: "playlet", playletStreamSource: "dashUrl", playletStreamUrlIndex: 1, drmParams: { keySystem: "Widevine" } }
+            summary = m.SendAt(1000)
+            m.assertTrue(summary.drm)
+            m.assertEqual(summary.stream_source, "dashUrl")
+            m.assertEqual(summary.stream_url_index, 1)
+        end function
+
+        @it("content that never loaded sends no stream fields")
+        function _()
+            m.fakeTop.content = { videoId: "vid1", backend: "playlet" }
+            summary = m.SendAt(1000)
+            m.assertFalse(summary.DoesExist("stream_source"))
+            m.assertFalse(summary.DoesExist("drm"))
+            m.assertFalse(summary.DoesExist("stream_url_index"))
+        end function
+
+        @it("an error dialog ends the playback in error")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(2000)
+            m.ReportError()
+            m.State(VideoState.Error)
+            m.recorder.OnErrorDialog()
+            summary = m.SendAt(3000)
+            m.assertEqual(summary.outcome, "error")
+            m.assertEqual(summary.error_count, 1)
+            m.assertEqual(summary.playing_ms, 1000)
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("playing under the error dialog: recovered, so the error did not end it")
+        function _()
+            m.ReportError()
+            m.State(VideoState.Error)
+            m.recorder.OnErrorDialog()
+            m.At(2000)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(4000)
+            m.assertEqual(summary.outcome, "closed")
+            m.assertEqual(summary.error_count, 1)
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("a finished video ends in finished")
+        function _()
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.At(9000)
+            m.State(VideoState.Finished)
+            m.recorder.OnFinished()
+            summary = m.SendAt(9000)
+            m.assertEqual(summary.outcome, "finished")
+            m.assertEqual(summary.playing_ms, 8000)
+            m.assertFalse(summary.DoesExist("video_id"), "a clean finish carries no video id")
+        end function
+
+        @it("heals: all counted, the first 3 sampled, no event of their own")
+        function _()
+            m.fakeTransport.transportMode = TransportController.Mode.Scrub
+            m.fakeTransport.cursorMs = 48000
+            m.fakeTop.position = 51.2
+            m.State(VideoState.Playing)
+            m.global.telemetry.LogEvent = {}
+            for i = 1 to 5
+                m.At(i * 1000)
+                m.recorder.RecordHeal("OnPosition")
+            end for
+            m.assertInvalid(m.global.telemetry.LogEvent.message, "a heal sends nothing until the summary")
+            summary = m.SendAt(9000)
+            m.assertEqual(summary.heal_count, 5)
+            m.assertEqual(summary.heal_samples.Count(), 3)
+            m.assertEqual(summary.heal_samples[0], { at_ms: 1000, source: "OnPosition", mode: TransportController.Mode.Scrub, position_ms: 51200, cursor_ms: 48000, floor_ms: -1 })
+            m.assertEqual(summary.video_id, "vid1")
+        end function
+
+        @it("tail resolves: all counted, the first 3 sampled, no event of their own, no video id")
+        function _()
+            m.fakeTransport.isLive = true
+            m.fakeTransport.cursorMs = 6134000
+            m.fakeTransport.edgeMs = 6640000
+            m.fakeTransport.SafetyFloorMs = function() as integer
+                return 6134000
+            end function
+            m.fakeTop.position = 6137.0
+            m.State(VideoState.Playing)
+            m.global.telemetry.LogEvent = {}
+            for i = 1 to 4
+                m.At(i * 1000)
+                m.recorder.RecordTailResolve("OnVideoState")
+            end for
+            m.assertInvalid(m.global.telemetry.LogEvent.message, "a tail resolve sends nothing until the summary")
+            summary = m.SendAt(9000)
+            m.assertEqual(summary.tail_resolve_count, 4)
+            m.assertEqual(summary.tail_resolve_samples.Count(), 3)
+            m.assertEqual(summary.tail_resolve_samples[0], { at_ms: 1000, source: "OnVideoState", position_ms: 6137000, cursor_ms: 6134000, floor_ms: 6134000, edge_ms: 6640000 })
+            m.assertFalse(summary.DoesExist("video_id"))
+        end function
+
+        @it("no content: an unknown backend, no content fields")
+        function _()
+            m.fakeTop.content = invalid
+            summary = m.SendAt(1000)
+            m.assertEqual(summary.backend, "unknown")
+            m.assertFalse(summary.DoesExist("video_id"))
+            m.assertFalse(summary.DoesExist("stream_source"))
+        end function
+
+        @it("a video error report: its level, fingerprint and the summary's error count")
+        function _()
+            m.fakeTop.content = { videoId: "vid1", backend: "playlet", playletStreamUrls: ["http://a", "http://b"] }
+            errorInfo = { source: "buffer:reader", ignored: false, category: "http" }
+            m.recorder.ReportVideoError({ title: "Error playing video vid1", body: "errorMsg: http" }, errorInfo, "http://a", 0, false)
+            m.assertEqual(m.global.telemetry.LogEvent.level, "warning", "retried: not shown to the viewer")
+            m.recorder.ReportVideoError({ title: "Error playing video vid1", body: "errorMsg: http" }, errorInfo, "http://b", 1, true)
+            sent = m.global.telemetry.LogEvent
+            m.assertEqual(sent.level, "error")
+            m.assertTrue(sent.message.InStr("Url: http://b") > 0 and sent.message.InStr("Url index: 1") > 0, "got: " + sent.message)
+            m.assertTrue(sent.message.InStr(`Urls: ["http://a","http://b"]`) > 0, "got: " + sent.message)
+            m.assertEqual(sent.fingerprint, [Locale.VideoPlayer.ErrorPlayingVideo, "There was an error in the HTTP response.", -1, "buffer:reader", false, "http", invalid, invalid, true, false, "none", false, "playlet", false])
+            m.assertTrue(sent.message.InStr("backend: playlet") > 0, "got: " + sent.message)
+            m.assertEqual(m.SendAt(1000).error_count, 2)
+        end function
+
+        @describe("OmitDefaults")
+
+        @it("drops false, 0, 0.0, empty strings and arrays and invalid at every depth; keeps -1 and the rest")
+        function _()
+            value = {
+                f: false
+                zero: 0
+                zeroFloat: 0.0
+                empty: ""
+                none: []
+                missing: invalid
+                never: -1
+                yes: true
+                text: "x"
+                list: [{ zero: 0, one: 1 }]
+                nested: { zero: 0, inner: { f: false, two: 2.5 } }
+            }
+            m.assertEqual(PlaybackTelemetry.OmitDefaults(value), {
+                never: -1
+                yes: true
+                text: "x"
+                list: [{ one: 1 }]
+                nested: { inner: { two: 2.5 } }
+            })
+        end function
+
+    end class
+
+end namespace

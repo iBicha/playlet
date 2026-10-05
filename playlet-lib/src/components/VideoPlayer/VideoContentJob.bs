@@ -5,6 +5,14 @@ import "pkg:/source/utils/CancellationUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/MessagePortUtils.bs"
 
+enum StreamSource
+    None = ""
+    DashUrl = "dashUrl"
+    AdaptiveFormats = "adaptiveFormats"
+    FormatStreams = "formatStreams"
+    HlsUrl = "hlsUrl"
+end enum
+
 @job("VideoContentJob")
 function ExecuteJob() as void
     input = JobGetInput()
@@ -116,7 +124,8 @@ function ExecuteJob() as void
         return
     end if
 
-    streamUrls = CreateStreamUrls(metadata, service, preferencesNode, backend, playletServerPort)
+    streamSource = SelectStreamSource(metadata)
+    streamUrls = CreateStreamUrls(streamSource, metadata, service, preferencesNode, backend, playletServerPort)
     if streamUrls.Count() = 0
         contentNode.addFields({ metadata: metadata })
         error = "No playable streams found for this video."
@@ -159,6 +168,7 @@ function ExecuteJob() as void
         ' StreamUrls is taken
         playletStreamUrls: streamUrls
         playletStreamUrlIndex: 0
+        playletStreamSource: streamSource
     })
 
     firstUrl = streamUrls[0]
@@ -234,21 +244,34 @@ function ResolveBackendId(backend as string, service as Invidious.InvidiousServi
     return "invidious"
 end function
 
-function CreateStreamUrls(metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
+function SelectStreamSource(metadata as object) as string
+    if SupportsDrmDashManifestUrl(metadata)
+        return StreamSource.DashUrl
+    else if SupportsDash(metadata)
+        return StreamSource.AdaptiveFormats
+    else if SupportsMuxedFormats(metadata)
+        return StreamSource.FormatStreams
+    else if SupportsHls(metadata)
+        return StreamSource.HlsUrl
+    end if
+    return StreamSource.None
+end function
+
+function CreateStreamUrls(source as string, metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
     instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
     preferredQuality = preferences["playback.preferred_quality"]
 
     streamUrls = []
 
-    if SupportsDrmDashManifestUrl(metadata)
+    if source = StreamSource.DashUrl
         dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
             url: metadata.dashUrl
         })
         streamUrls.push(dashUrl)
-    else if SupportsDash(metadata)
+    else if source = StreamSource.AdaptiveFormats
         AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
-    else if SupportsMuxedFormats(metadata)
+    else if source = StreamSource.FormatStreams
         for each stream in metadata.formatStreams
             if StringUtils.IsNullOrEmpty(stream.url)
                 continue for
@@ -256,7 +279,7 @@ function CreateStreamUrls(metadata as object, service as Invidious.InvidiousServ
             stream.url = AddInstanceToUrlIfNeeded(stream.url, instance)
             streamUrls.push(stream.url)
         end for
-    else if SupportsHls(metadata)
+    else if source = StreamSource.HlsUrl
         metadata.hlsUrl = AddInstanceToUrlIfNeeded(metadata.hlsUrl, instance)
         AddHlsUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
     end if

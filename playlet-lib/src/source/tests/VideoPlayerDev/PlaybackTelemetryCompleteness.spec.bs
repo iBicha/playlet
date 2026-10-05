@@ -1,0 +1,412 @@
+' Completeness suite for the playback summary: every short input sequence (exhaustive) and long random ones
+' (seeded fuzz, shrunk to a minimal repro) go through the Recorder, and the summary it sends must equal the one
+' an independent model rebuilds from the same event log, interval by interval.
+
+import "pkg:/components/VideoPlayerDev/PlaybackTelemetry.bs"
+import "pkg:/components/VideoPlayerDev/TransportController.bs"
+import "pkg:/components/VideoPlayerDev/VideoNode.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace Tests
+
+    @suite
+    class PlaybackTelemetryCompletenessTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            if m.global.logger = invalid
+                m.global.addField("logger", "node", false)
+                m.global.logger = CreateObject("roSGNode", "Logger")
+            end if
+            if m.global.telemetry = invalid
+                m.global.addField("telemetry", "node", false)
+                telemetry = CreateObject("roSGNode", "Node")
+                telemetry.addField("LogEvent", "assocarray", false)
+                m.global.telemetry = telemetry
+            end if
+        end function
+
+        ' ---------- inputs ----------
+
+        ' One token = one input to the Recorder. The span tokens (0-8) drive the state machine; the rest are every
+        ' other input the coordinator forwards.
+        function Tokens() as object
+            return [
+                { kind: "wait", ms: 1000 } ' 0
+                { kind: "state", state: VideoState.Playing } ' 1
+                { kind: "state", state: VideoState.Buffering } ' 2
+                { kind: "state", state: VideoState.Paused } ' 3
+                { kind: "state", state: VideoState.Error } ' 4
+                { kind: "status", status: { isUnderrun: true, percentage: 33 } } ' 5
+                { kind: "status", status: { isUnderrun: false, percentage: 33 } } ' 6
+                { kind: "status", status: invalid } ' 7
+                { kind: "status", status: { percentage: 33 } } ' 8: no isUnderrun
+                { kind: "wait", ms: 37 } ' 9
+                { kind: "state", state: VideoState.Finished } ' 10
+                { kind: "state", state: VideoState.Stopped } ' 11
+                { kind: "start", info: { start_type: "init", total_dur: 1, prebuf_dur: 0 } } ' 12
+                { kind: "start", info: { start_type: "cseek", total_dur: 2 } } ' 13
+                { kind: "start", info: invalid } ' 14
+                { kind: "heal" } ' 15
+                { kind: "tail" } ' 16
+                { kind: "videoError" } ' 17
+                { kind: "dialog" } ' 18
+                { kind: "finished" } ' 19
+                { kind: "metadata" } ' 20
+                { kind: "status", status: { isUnderrun: "true" } } ' 21: a non-boolean isUnderrun
+            ]
+        end function
+
+        function NewTrial() as object
+            trial = {
+                clock: {
+                    ms: 0
+                    TotalMilliseconds: function() as integer
+                        return m.ms
+                    end function
+                }
+                transport: {
+                    transportMode: TransportController.Mode.Scrub
+                    isLive: false
+                    cursorMs: 4000
+                    edgeMs: 0
+                    SafetyFloorMs: function() as integer
+                        return -1
+                    end function
+                }
+                top: {
+                    content: { videoId: "vid1", backend: "playlet", playletStreamSource: "adaptiveFormats", playletStreamUrlIndex: 0 }
+                    state: VideoState.Playing
+                    position: 3.0
+                    duration: 0.0
+                    errorMsg: "boom"
+                    errorCode: -1
+                }
+                log: []
+            }
+            trial.recorder = new PlaybackTelemetry.Recorder({ playerTimer: trial.clock, transport: trial.transport, top: trial.top })
+            return trial
+        end function
+
+        function Apply(trial as object, token as object) as void
+            trial.log.Push({ at: trial.clock.ms, token: token })
+            r = trial.recorder
+            kind = token.kind
+            if kind = "wait"
+                trial.clock.ms += token.ms
+            else if kind = "state"
+                r.OnState(token.state)
+            else if kind = "status"
+                r.OnBufferingStatus(token.status)
+            else if kind = "start"
+                r.OnPlayStartInfo(token.info)
+            else if kind = "heal"
+                r.RecordHeal("OnPosition")
+            else if kind = "tail"
+                r.RecordTailResolve("OnVideoState")
+            else if kind = "videoError"
+                r.ReportVideoError({ title: "t", body: "b" }, invalid, "http://a", 0, false)
+            else if kind = "dialog"
+                r.OnErrorDialog()
+            else if kind = "finished"
+                r.OnFinished()
+            else if kind = "metadata"
+                r.OnMetadataDone()
+            end if
+        end function
+
+        function Sent(trial as object) as object
+            trial.recorder.SendSummary()
+            return StringUtils.ParseJsonSafe(m.global.telemetry.LogEvent.message)
+        end function
+
+        ' ---------- the model: the summary rebuilt from the event log, one state interval at a time ----------
+
+        function Expected(trial as object) as object
+            log = trial.log
+            lifetimeMs = trial.clock.ms
+            ' intervals between state edges; the last one runs to the send (next state "").
+            edges = []
+            for i = 0 to log.Count() - 1
+                if log[i].token.kind = "state"
+                    edges.Push(i)
+                end if
+            end for
+            playingMs = 0
+            underrunCount = 0
+            underrunMs = 0
+            samples = []
+            withoutStatus = 0
+            changes = 0
+            endedInUnderrun = false
+            for e = 0 to edges.Count() - 1
+                startIndex = edges[e]
+                state = log[startIndex].token.state
+                startMs = log[startIndex].at
+                if e + 1 < edges.Count()
+                    endIndex = edges[e + 1]
+                    endMs = log[endIndex].at
+                    nextState = log[endIndex].token.state
+                else
+                    endIndex = log.Count()
+                    endMs = lifetimeMs
+                    nextState = ""
+                end if
+                if state = VideoState.Playing
+                    playingMs += endMs - startMs
+                else if state = VideoState.Buffering
+                    values = []
+                    for i = startIndex + 1 to endIndex - 1
+                        token = log[i].token
+                        if token.kind = "status" and token.status <> invalid and IsBool(token.status.isUnderrun)
+                            values.Push(token.status.isUnderrun)
+                        end if
+                    end for
+                    if values.Count() = 0
+                        if nextState = VideoState.Playing
+                            withoutStatus += 1
+                        end if
+                    else
+                        for i = 1 to values.Count() - 1
+                            if values[i] <> values[i - 1]
+                                changes += 1
+                            end if
+                        end for
+                        if values[0]
+                            underrunCount += 1
+                            underrunMs += endMs - startMs
+                            if samples.Count() < 10
+                                samples.Push({ "at_ms": startMs, "ms": endMs - startMs })
+                            end if
+                            endedInUnderrun = nextState = ""
+                        end if
+                    end if
+                end if
+            end for
+
+            outcome = "closed"
+            metadataDoneAtMs = -1
+            firstPlayingAtMs = -1
+            starts = []
+            startCount = 0
+            errorCount = 0
+            healCount = 0
+            heals = []
+            tailCount = 0
+            tails = []
+            for each entry in log
+                token = entry.token
+                kind = token.kind
+                if kind = "state" and token.state = VideoState.Playing
+                    if firstPlayingAtMs < 0
+                        firstPlayingAtMs = entry.at
+                    end if
+                    if outcome = "error"
+                        outcome = "closed"
+                    end if
+                else if kind = "dialog"
+                    outcome = "error"
+                else if kind = "finished"
+                    outcome = "finished"
+                else if kind = "metadata"
+                    metadataDoneAtMs = entry.at
+                else if kind = "start" and token.info <> invalid
+                    startCount += 1
+                    if starts.Count() < 10
+                        starts.Push(token.info)
+                    end if
+                else if kind = "videoError"
+                    errorCount += 1
+                else if kind = "heal"
+                    healCount += 1
+                    if heals.Count() < 3
+                        heals.Push({ "at_ms": entry.at, "source": "OnPosition", "mode": trial.transport.transportMode, "position_ms": 3000, "cursor_ms": 4000, "edge_ms": 0, "floor_ms": -1 })
+                    end if
+                else if kind = "tail"
+                    tailCount += 1
+                    if tails.Count() < 3
+                        tails.Push({ "at_ms": entry.at, "source": "OnVideoState", "position_ms": 3000, "cursor_ms": 4000, "floor_ms": -1, "edge_ms": 0 })
+                    end if
+                end if
+            end for
+
+            expected = {
+                "live": false
+                "backend": "playlet"
+                "stream_source": "adaptiveFormats"
+                "drm": false
+                "stream_url_index": 0
+                "outcome": outcome
+                "metadata_done_at_ms": metadataDoneAtMs
+                "first_playing_at_ms": firstPlayingAtMs
+                "play_start_infos": starts
+                "play_start_count": startCount
+                "lifetime_ms": lifetimeMs
+                "playing_ms": playingMs
+                "underrun_count": underrunCount
+                "underrun_ms": underrunMs
+                "underrun_samples": samples
+                "ended_in_underrun": endedInUnderrun
+                "bufferings_without_status_count": withoutStatus
+                "is_underrun_change_count": changes
+                "error_count": errorCount
+                "heal_count": healCount
+                "heal_samples": heals
+                "tail_resolve_count": tailCount
+                "tail_resolve_samples": tails
+            }
+            if firstPlayingAtMs < 0 or underrunCount > 0 or withoutStatus > 0 or changes > 0 or errorCount > 0 or healCount > 0 or outcome = "error"
+                expected["video_id"] = "vid1"
+            end if
+            return m.WithoutDefaults(expected)
+        end function
+
+        ' the wire rule, written independently of PlaybackTelemetry.OmitDefaults.
+        function WithoutDefaults(value as dynamic) as dynamic
+            if IsArray(value)
+                out = []
+                for each item in value
+                    out.Push(m.WithoutDefaults(item))
+                end for
+                return out
+            end if
+            if not IsAssociativeArray(value)
+                return value
+            end if
+            out = {}
+            for each key in value
+                item = value[key]
+                keep = true
+                if item = invalid
+                    keep = false
+                else if IsBool(item)
+                    keep = item
+                else if IsInt(item) or IsFloat(item)
+                    keep = item <> 0
+                else if IsString(item)
+                    keep = item <> ""
+                else if IsArray(item)
+                    keep = item.Count() > 0
+                end if
+                if keep
+                    out[key] = m.WithoutDefaults(item)
+                end if
+            end for
+            return out
+        end function
+
+        ' replay a token sequence and compare; "" when the summary matches the model, else both summaries.
+        function Mismatch(sequence as object) as string
+            trial = m.NewTrial()
+            tokens = m.Tokens()
+            for each index in sequence
+                m.Apply(trial, tokens[index])
+            end for
+            actual = FormatJson(m.Sent(trial))
+            expected = FormatJson(m.Expected(trial))
+            if actual = expected
+                return ""
+            end if
+            return "sent " + actual + " | model " + expected
+        end function
+
+        @describe("playback summary completeness")
+
+        ' "" when every sequence of `length` span tokens matches the model, else the first that does not.
+        function ExhaustiveFailure(length as integer) as string
+            spanTokens = 9
+            total = 1
+            for i = 1 to length
+                total *= spanTokens
+            end for
+            for n = 0 to total - 1
+                sequence = []
+                rest = n
+                for i = 1 to length
+                    sequence.Push(rest mod spanTokens)
+                    rest = rest \ spanTokens
+                end for
+                failure = m.Mismatch(sequence)
+                if failure <> ""
+                    return "tokens " + FormatJson(sequence) + ": " + failure
+                end if
+            end for
+            return ""
+        end function
+
+        @it("every sequence of 4 span inputs sends the summary the model rebuilds")
+        function _()
+            m.assertEqual(m.ExhaustiveFailure(4), "")
+        end function
+
+        ' ---------- seeded fuzz with shrink ----------
+
+        ' a 16-bit LCG: deterministic and reproducible (Rnd is clock-seeded).
+        function Lcg(s as integer) as integer
+            return (s * 25173 + 13849) and 65535
+        end function
+
+        function GenSequence(seed as integer, n as integer, count as integer) as object
+            sequence = []
+            s = seed
+            for i = 0 to n - 1
+                s = m.Lcg(s)
+                sequence.Push(s mod count)
+            end for
+            return sequence
+        end function
+
+        function Shrink(sequence as object) as object
+            for k = 0 to sequence.Count() - 1
+                prefix = []
+                for j = 0 to k
+                    prefix.Push(sequence[j])
+                end for
+                if m.Mismatch(prefix) <> ""
+                    return prefix
+                end if
+            end for
+            return sequence
+        end function
+
+        function FuzzFailure(seeds as object, length as integer, tokenCount as integer) as string
+            for each seed in seeds
+                sequence = m.GenSequence(seed, length, tokenCount)
+                if m.Mismatch(sequence) <> ""
+                    minimal = m.Shrink(sequence)
+                    return "seed=" + seed.ToStr() + "; minimal repro (" + minimal.Count().ToStr() + " tokens) " + FormatJson(minimal) + ": " + m.Mismatch(minimal)
+                end if
+            end for
+            return ""
+        end function
+
+        @it("seeded random sequences of every input send the summary the model rebuilds (shrinkable)")
+        function _()
+            m.assertEqual(m.FuzzFailure([1, 2, 7, 42, 1337, 4242, 9001, 31337], 120, m.Tokens().Count()), "")
+        end function
+
+        @it("seeded random sequences of span inputs send the summary the model rebuilds (shrinkable)")
+        function _()
+            seeds = []
+            for seed = 100 to 160
+                seeds.Push(seed)
+            end for
+            m.assertEqual(m.FuzzFailure(seeds, 60, 9), "")
+        end function
+
+        @it("every summary the fuzz sends carries no default value at any depth")
+        function _()
+            for each seed in [3, 5, 11]
+                trial = m.NewTrial()
+                tokens = m.Tokens()
+                for each index in m.GenSequence(seed, 120, tokens.Count())
+                    m.Apply(trial, tokens[index])
+                end for
+                sent = m.Sent(trial)
+                m.assertEqual(FormatJson(sent), FormatJson(m.WithoutDefaults(sent)), "seed=" + seed.ToStr())
+            end for
+        end function
+
+    end class
+
+end namespace

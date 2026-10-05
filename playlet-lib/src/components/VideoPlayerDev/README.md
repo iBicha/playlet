@@ -23,6 +23,9 @@ A thin coordinator over a pure-logic brain and projection-only renderers:
   nav, storyboard normalize).
 - **`SponsorBlockController.bs`** (class) / **`ErrorDialogController.bs`** (namespace functions) — SponsorBlock
   and error logic; the coordinator owns the node-scoped pieces (job callbacks, the dialog node).
+- **`PlaybackTelemetry.bs`** (class, `m.playbackTelemetry`) — every telemetry event the player sends: video error
+  reports, and the playback summary sent on close (startup, play starts, playing and underrun time, errors, INV-D1
+  heals and tail resolves, how it ended). The coordinator reports what happens; it holds no telemetry code.
 - **Renderers** (`TrickPlayBar/`, `BifDisplay/`, `LargePause/`, `LoadBufferSpinner/`, `ButtonRow/`,
   `VideoPlayerButton/`) — SceneGraph components that are pure projections of scalar input fields.
   Each self-derives its own visibility from `transportMode` (a commit sets `transportMode=idle` and the bif
@@ -35,7 +38,7 @@ A thin coordinator over a pure-logic brain and projection-only renderers:
 |-------|-------|----------|
 | Unit — logic | `source/tests/VideoPlayerDev/*.spec.bs` | `npm run test:lib` |
 | Unit — renderers | `components/VideoPlayerDev/**/*.spec.bs` | `npm run test:lib` |
-| Seam (real coordinator, faked device) | `components/VideoPlayerDev/tests/VideoPlayerDevSeam.spec.bs` | `npm run test:lib` |
+| Seam (real coordinator, faked device) | `components/VideoPlayerDev/tests/*.spec.bs` | `npm run test:lib` |
 | Integration (on device) | `integration-tests/vpd-player-*.ts` | `npm run test:integration:player [-- filter]` |
 
 The integration suite asserts `#VideoPlayer` is a `VideoPlayerDev`, so it only passes when the lib is built

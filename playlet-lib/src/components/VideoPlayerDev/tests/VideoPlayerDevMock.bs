@@ -26,7 +26,7 @@ function TestSetup() as void
         m.global.logger = CreateObject("roSGNode", "Logger")
     end if
 
-    ' ReportVideoError -> LogTelemetryEvent writes m.global.telemetry.LogEvent; stub it so the error path runs.
+    ' LogTelemetryEvent (error reports, the playback summary on close) writes m.global.telemetry.LogEvent; stub it.
     if m.global.telemetry = invalid
         m.global.addField("telemetry", "node", false)
         telemetry = CreateObject("roSGNode", "Node")
@@ -80,7 +80,7 @@ function TestSetup() as void
     ' nudge counter above — stacked observers fire a handler once per prior TestSetup on every write,
     ' and OnPosition's latency learning reads two identical fires as a CONFIRMED min-gap, poisoning
     ' LiveEdgeMs for any live test that runs after another test in the suite.
-    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control"]
+    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control", "bufferingStatus", "playStartInfo"]
         m.top.unobserveField(deviceField)
     end for
 
@@ -196,6 +196,19 @@ function TestPlaybackErrorDialog(errorFields as object) as object
     return result
 end function
 
+' TestContentJobFailed — the VideoContentJob's failure result, minus the job: runs the REAL OnVideoContentJobDone.
+function TestContentJobFailed(errorMessage as string) as void
+    OnVideoContentJobDone({
+        info: { success: false, cancel: false, error: errorMessage }
+        getRoSGNode: function() as dynamic
+            return invalid
+        end function
+        getInfo: function() as object
+            return m.info
+        end function
+    })
+end function
+
 ' TestCoordinatorFields — every non-function key on the coordinator's m, for the unmodeled-axis meta-test
 ' (the coordinator twin of the brain's reflection test). Call AFTER TestSetup so Initialize/OnNodeReady have
 ' populated m. The ONLY filtering here is the two DYNAMICALLY-named runtime families ("__delay_<uuid>" and
@@ -241,6 +254,12 @@ end function
 ' re-entrancy spec needs the full synchronous teardown chain wired up.
 function TestWireQueueClose() as void
     m.videoQueue.observeFieldScoped("closePlayer", FuncName(OnTestQueueClose))
+end function
+
+' TestResendSummary — send the playback summary again after the close, so a spec can see whether anything reached
+' the Recorder since.
+function TestResendSummary() as void
+    m.playbackTelemetry.SendSummary()
 end function
 
 function OnTestQueueClose() as void

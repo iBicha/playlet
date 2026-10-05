@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet.
+### Fixed
+
+- Playback telemetry: capture baseline buffering states, to be able to optimize in future versions
 
 ## [0.48.6] - 2026-10-03
 
