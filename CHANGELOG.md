@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Spanish translations
+
 ### Fixed
 
 - Playback telemetry: capture baseline buffering states, to be able to optimize in future versions
