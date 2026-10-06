@@ -1,4 +1,5 @@
 import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
@@ -28,6 +29,10 @@ function ExecuteJob() as void
     if JobIsCancelled()
         JobCancel()
         return
+    end if
+
+    if preferencesNode["backend.selected"] = "invidious" and StringUtils.IsNullOrEmpty(preferencesNode["invidious.instance"])
+        SwitchBackendToPlaylet(preferencesNode)
     end if
 
     DeleteFile("cachefs:/last_generated_dash.xml")
@@ -232,6 +237,23 @@ end function
 
 function SessionDataComplete(sessionData as object) as boolean
     return IsAssociativeArray(sessionData) and not StringUtils.IsNullOrEmpty(sessionData.visitorData) and not StringUtils.IsNullOrEmpty(sessionData.livingRoomPoTokenId)
+end function
+
+function SwitchBackendToPlaylet(preferencesNode as object) as void
+    preferencesNode["backend.selected"] = "playlet"
+
+    dialog = DialogUtils.ShowDialogEx({
+        title: Tr(Locale.Dialogs.BackendSwitchedToPlayletTitle)
+        message: Tr(Locale.Dialogs.BackendSwitchedToPlayletMessage)
+    })
+    if dialog = invalid
+        return
+    end if
+
+    port = CreateObject("roMessagePort")
+    MessagePortUtils.ObserveFieldScopedExSafe(dialog, "wasClosed", port)
+    wait(0, port)
+    dialog.unobserveFieldScoped("wasClosed")
 end function
 
 function ResolveBackendId(backend as string, service as Invidious.InvidiousService) as string

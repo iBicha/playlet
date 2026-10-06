@@ -241,6 +241,14 @@
         <translation>Please sign in again with this profile, or switch to another profile.</translation>
     </message>
     <message>
+        <source>Backend changed</source>
+        <translation>Backend changed</translation>
+    </message>
+    <message>
+        <source>Backend changed to Playlet, because no Invidious instance is set.</source>
+        <translation>Backend changed to Playlet, because no Invidious instance is set.</translation>
+    </message>
+    <message>
         <source>Lounge service setup error</source>
         <translation>Lounge service setup error</translation>
     </message>
