@@ -150,17 +150,6 @@ namespace Tests
             m.assertFalse(m.top.findNode("liveLabel").visible)
         end function
 
-        @it("a NON-rewindable live stream (buffer-sized DVR window) drops the rewind label")
-        function _()
-            m.top.isLive = true
-            m.top.transportMode = TransportController.Mode.Idle
-            m.top.canRewind = false
-            m.assertEqual(m.top.findNode("currentLabel").text, "")
-            ' rewindable again (e.g. next content) -> the label returns
-            m.top.canRewind = true
-            m.assertEqual(m.top.findNode("currentLabel").text, Tr(Locale.VideoPlayer.RewindLiveTv))
-        end function
-
         @it("AT the edge: frac=1 -> playhead at 1130.87 (the exact at-edge stock pin) + ● LIVE")
         function _()
             m.top.isLive = true
@@ -187,6 +176,21 @@ namespace Tests
             ' moved back ~1/12 of the 1136.87-wide travel from the edge
             moved = atEdgeX - playheadX
             m.assertTrue(moved > 85 and moved < 105) ' ~1136.87/12 ≈ 95px
+        end function
+
+        @it("starts the bar at the floor once the session outlives the window")
+        function _()
+            m.top.isLive = true
+            m.top.transportMode = TransportController.Mode.LiveDvr
+            m.top.atLiveEdge = false
+            m.top.liveFloorMs = 3600000 ' 1h into the session: the first hour has expired
+            m.top.cursorMs = 25200000 ' 7h
+            m.top.liveOffsetMs = 21600000 ' 6h behind -> edge 13h, halfway through [1h, 13h]
+            fill = m.top.findNode("trackFill")
+            m.assertTrue(Abs(fill.clippingRect.x - 0.5 * 1136.8679) < 0.5)
+            m.top.cursorMs = 3600000 ' at the floor
+            m.top.liveOffsetMs = 43200000
+            m.assertEqual(fill.clippingRect.x, 0.0)
         end function
 
         @it("shows the ● LIVE badge only at the edge")

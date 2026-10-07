@@ -170,16 +170,18 @@ namespace Invidious
             end if
 
             metadata = response.Json()
-            ' Live videos need the same X-Head-* enrichment the innertube path does
-            ' (liveHeadSeqnum / liveAvailabilityStartUtc / liveDvrWindowSec / ...),
-            ' or the generated dynamic DASH manifest has no availabilityStartTime and
-            ' Roku fails with "availabilityStartTime not available for live stream".
-            ' The Invidious adaptiveFormats urls are already signed googlevideo urls,
-            ' so the shared helper works with no client/cpn. parser is set so the
-            ' manifest's diagnostic comment reflects the real source.
-            if IsAssociativeArray(metadata) and ValidBool(metadata.liveNow) and IsArray(metadata.adaptiveFormats)
+            if not IsAssociativeArray(metadata)
+                return metadata
+            end if
+            ' Playlet's built-in instance answers with innertube metadata, parser and live
+            ' timeline included; an Invidious server sends neither.
+            if StringUtils.IsNullOrEmpty(metadata["parser"])
                 metadata["parser"] = "invidious"
-                Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, invalid, invalid, cancellation)
+            end if
+            ' The Invidious adaptiveFormats urls are already signed googlevideo urls;
+            ' Invidious sends no chunk readahead or cpn.
+            if Invidious.NeedsLiveStreamInfo(metadata)
+                Innertube.GetLiveStreamInfo(metadata, metadata.adaptiveFormats, 0, invalid, cancellation)
             end if
 
             return metadata
@@ -811,5 +813,11 @@ namespace Invidious
             return response
         end function
     end class
+
+    ' Whether a /videos response is a live video still missing the live timeline the
+    ' innertube path gets: the built-in instance's responses carry it already.
+    function NeedsLiveStreamInfo(metadata as object) as boolean
+        return ValidBool(metadata.liveNow) and IsArray(metadata.adaptiveFormats) and StringUtils.IsNullOrEmpty(metadata.liveHeadUrl)
+    end function
 
 end namespace

@@ -1,6 +1,6 @@
 // VideoPlayerDev live e2e: on the trackbar, OK toggles the HUD without pausing (stock live faithfulness);
-// Rewind enters the live-DVR ladder. Live streams are unstable, so this skips cleanly when none is available
-// and the DVR-ladder checks are soft (a stream may expose no DVR window).
+// Rewind enters the live-DVR ladder: every live stream rewinds (the generated DASH lists everything since the
+// stream's start, up to 12h). Live streams are unstable, so this skips cleanly when none is available.
 //
 //   cd references/playlet-legacy && npx tsx ./integration-tests/vpd-player-live.ts
 //   PLAYER_LIVE_ID=<id> npx tsx ./integration-tests/vpd-player-live.ts   # override the stream
@@ -40,9 +40,9 @@ import { getLiveVideoId } from './live-id';
     await expectField('#Chrome.opacity', 0);
     await expectField('#VideoPlayer.state', 'playing');
 
-    group('Rewind enters the live-DVR ladder (soft — needs a DVR window)');
+    group('Rewind enters the live-DVR ladder');
     await press(Key.Rewind);
-    await expectSoft('#trickPlayBar.transportMode', (v) => v === Mode.liveDvr, 'rewind -> liveDvr');
+    await expectField('#trickPlayBar.transportMode', Mode.liveDvr);
     await expectSoft('#trickPlayBar.glyph', (v) => v !== Glyph.none, 'rewind glyph present');
     await expectSoft('#bifDisplay.visible', (v) => v === true, 'bif shows in liveDvr');
 
@@ -53,8 +53,8 @@ import { getLiveVideoId } from './live-id';
     // Pause a live stream, let the edge run on, resume -> you're behind the edge, so the badge swaps "● LIVE" for
     // the time-behind offset. The brain drops off the edge the moment the device reports the user pause
     // (pausing live IS falling behind); the offset reads out once the post-resume duration catch-up lands.
-    // Soft: needs a real DVR/pause window and a few seconds of wall clock.
-    group('pause -> resume drops off the live edge and shows the offset (soft — needs DVR window)');
+    // Soft: the pause keypress can race the device.
+    group('pause -> resume drops off the live edge and shows the offset');
     await waitFor('#VideoPlayer.state', (v) => v === 'playing', 'settle the commit-to-live seek before pausing');
     const durBefore = Number(await field('#VideoPlayer.duration'));
     // verified toggle: a single ECP Play can land out of phase (eaten/raced), inverting every check after it.

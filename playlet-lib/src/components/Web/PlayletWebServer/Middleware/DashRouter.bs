@@ -1,42 +1,23 @@
 import "pkg:/components/Services/Dash/DashManifest.bs"
+import "pkg:/components/Services/Dash/LiveTimeline.types.bs"
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 
-' How many DASH segments ahead to warm per representation. On a request for segment
-' N we Send (without Await) the next few so their downloads overlap N's await +
-' playback; when the player asks for them the Await is short/instant. Small on
-' purpose to bound concurrent roUrlTransfers (x2 representations).
-const LIVE_PREFETCH_SEGMENTS = 2
-' Immediate refetches (no sleep) for transient network errors (reset/5xx) before surfacing 503.
-' 204/timeout/4xx surface at once: an in-handler sleep would stall the queued audio request ~600ms
-' on the single thread (measured).
-const LIVE_SEG_MAX_ATTEMPTS = 3
-
-' Why a live-segment fetch failed. The string values double as the telemetry message
-' and fingerprint (see ReportSegmentFailure), so they must stay stable - changing one
-' forks its Bugsink issue and orphans the history.
-enum LiveSegFailure
-    NoFormatUrl = "no live format url"
-    FormatsNotArray = "adaptiveFormats not an array"
-    FetchFailed = "fragment fetch failed"
-    EmptyFragment = "empty fragment file"
-    NoMoov = "no moov in fragment"
-    NoMoof = "no moof in fragment"
-end enum
+' Manifest requests closer together than this (Roku re-fetching after an error) share one live head check.
+const LIVE_HEAD_MIN_INTERVAL_MS = 500
+' The manifest response waits on the head check; past this it lists the last known head.
+const LIVE_HEAD_TIMEOUT_SECONDS = 2
+' Head time leaping this far past the listed timeline within one head check is a stall.
+const LIVE_STALL_JUMP_MS = 10000
 
 namespace Http
 
     class DashRouter extends HttpRouter
-        ' Starting probe size for the live-segment box walk (see LocateBoxes):
-        ' ftyp+moov+emsg sit well within this (observed ~920 bytes), so we never read
-        ' the (large) mdat just to find where moof starts.
-        private INITIAL_PROBE_BYTE_COUNT = 2048
-        ' Hard ceiling on the probe so a fragment that genuinely has no moof (corrupt)
-        ' can't make us slurp a whole multi-hundred-KB mdat into memory while growing.
-        private MAX_PROBE_BYTE_COUNT = 65536
 
         function new(server as object)
             super()
@@ -44,66 +25,53 @@ namespace Http
             m.videoQueueNode = server.sceneNodes.videoQueue
             m.invidiousNode = server.sceneNodes.invidious
             m.preferencesNode = server.sceneNodes.preferences
-            m.serverPort = server.settings.Port
             m.invidiousService = new Invidious.InvidiousService(m.invidiousNode)
             ' No need to pass the invidious instance here, we will refresh it for
             ' each request to make sure we are using the latest one
             m.dashManifest = new DashManifest("")
-            m.fs = CreateObject("roFileSystem")
 
-            ' Live manifests are re-fetched every `minimumUpdatePeriod` (~20s), and
-            ' reading metadata off the videoQueue node is a cross-thread rendezvous
-            ' that deep-copies the whole (~39 KB) metadata AA. The metadata is
-            ' immutable for a given videoId, so cache it and only dig the node when
-            ' the video changes. The same dig also feeds the live-segment lookups
-            ' below, so /api/dash and /api/dash/live-seg share one dig + one copy.
-            m.cachedVideoId = invalid
-            m.cachedBackend = invalid
+            ' Live manifests are re-fetched every `minimumUpdatePeriod`, and reading
+            ' metadata off the player's content is a cross-thread rendezvous that
+            ' deep-copies the whole (~39 KB) metadata AA. The metadata is immutable for a
+            ' video load, so it is cached per load, not per video: replaying a video (or
+            ' switching backends) pushes fresh metadata with re-signed urls for the same
+            ' video id.
+            m.cachedVideoLoadId = invalid
             m.cachedMetadata = invalid
-            ' Live-segment caches, (re)built from the same metadata dig:
-            m.cachedUrls = {} ' itag -> signed base url
-            m.cachedTypes = {} ' itag -> "audio/mp4" | "video/mp4"
-            m.cachedInitSeqnum = 0 ' live-edge fragment to source the init from
-            m.probeByteCount = m.INITIAL_PROBE_BYTE_COUNT ' current box-walk probe; only grows
-            m.reportedFailures = {} ' per-video telemetry dedupe (see ReportSegmentFailure)
-            ' Prefetch cache: "itag|sq" -> in-flight StartSegmentFetch entry,
-            ' warmed ahead of the player so awaits hit already-downloading fragments.
-            m.prefetch = {}
-            ' Last itag served per media kind. When the player switches representation
-            ' (ABR video / audio track), the previous itag's warmed entries are evicted
-            ' so they don't leak until the next video change.
-            m.lastVideoItag = invalid
-            m.lastAudioItag = invalid
-            ' itag -> transformed init bytes (ftyp+moov). moov is constant per
-            ' representation, so fetch once and serve later init requests from memory.
-            ' Cleared per video in RebuildLiveCache.
-            m.cachedInit = {}
-            ' Highest native sq requested; sources the init from a current fragment (the
-            ' load-time live edge ages out of the DVR window over a long session).
-            m.lastSeenSq = 0
+            m.liveHeadUrl = ""
+            m.liveHeadTimer = invalid ' since the last head check; invalid = never checked
+            m.liveHeadSeqnum = 0
+            m.liveLoadHeadSeqnum = 0
+            m.liveLoadHeadTimeMs = invalid
+            m.liveBaseSeqnum = 0
+            m.liveBaseTimeMs = invalid
+            m.liveBaseEndMs = 0
+            m.liveWindowMs = 0
+            m.liveDurationRuns = [] ' LiveDurationRun[]
+            m.liveLeadMs = 0
+            m.liveDriftMs = 0
+            m.liveLastCheckJumped = false
+            m.reportedLiveCorrection = false
+            m.liveManifestTemplate = ""
+            m.liveManifestTemplateKey = invalid
+            m.reportedLiveHeadFailure = false
         end function
 
-        ' Returns the cached metadata AA for video id `v`, digging the videoQueue
-        ' node (a render-thread rendezvous) only on a cache miss / video change. On a
-        ' miss, also (re)builds the live-segment caches from the same copy.
-        function GetMetadata(v as string, backend as string) as dynamic
-            ' Key on backend too, not just videoId: switching backends replays the
-            ' same videoId but pushes fresh metadata onto the content node (different
-            ' parser, different live fields). Keyed on videoId alone we'd keep serving
-            ' the previous backend's stale copy. The backend is carried on the request
-            ' query (set when the stream urls are built) so we never read the prefs
-            ' node on this hot path.
-            if m.cachedVideoId = v and m.cachedBackend = backend and IsAssociativeArray(m.cachedMetadata)
+        ' Returns the metadata of video load `videoLoadId`, or invalid when the player holds
+        ' another load. A new load also resets the live state.
+        function GetMetadata(videoLoadId as string) as dynamic
+            if m.cachedVideoLoadId = videoLoadId
                 return m.cachedMetadata
             end if
 
-            metadata = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content", "metadata"])
-            if IsAssociativeArray(metadata) and metadata.videoId = v
-                m.cachedMetadata = metadata
-                m.cachedVideoId = v
-                m.cachedBackend = backend
-                m.RebuildLiveCache(metadata)
+            content = ObjectUtils.DigUnsafe(m.videoQueueNode, ["player", "content"])
+            if content = invalid or ValidString(content.videoLoadId) <> videoLoadId
+                return invalid
             end if
+            metadata = content.metadata
+            m.cachedMetadata = metadata
+            m.cachedVideoLoadId = videoLoadId
+            m.ResetLiveState(metadata)
             return metadata
         end function
 
@@ -117,63 +85,61 @@ namespace Http
                 return m.GenerateDashManifestAppendStoryboards(context)
             end if
 
-            v = request.query.v
+            videoLoadId = ValidString(request.query.videoLoadId)
             local = request.query.local
             quality = request.query.quality
 
-            if StringUtils.IsNullOrEmpty(v)
-                response.Default(400, "Missing video id")
-                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 Missing video id")
+            if videoLoadId = ""
+                response.Default(400, "Missing video load id")
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 Missing video load id")
                 return true
             end if
 
-            metadata = m.GetMetadata(v, ValidString(request.query.backend))
-            if not IsAssociativeArray(metadata)
-                response.Default(500, "videoQueue.player.content.metadata is invalid")
-                WriteAsciiFile("cachefs:/last_generated_dash.xml", "500 videoQueue.player.content.metadata is invalid")
-                return true
-            end if
-            if metadata.videoId <> v
-                response.Default(400, "videoQueue.player.content.metadata.videoId does not match the requested video id")
-                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 videoQueue.player.content.metadata.videoId does not match the requested video id")
+            metadata = m.GetMetadata(videoLoadId)
+            if metadata = invalid
+                response.Default(400, "videoQueue.player.content holds no metadata for the requested video load id")
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", "400 videoQueue.player.content holds no metadata for the requested video load id")
                 return true
             end if
 
             m.dashManifest.invidiousInstance = m.invidiousService.GetInstance()
             m.dashManifest.disableAutoDubbed = ValidBool(m.preferencesNode["playback.disable_auto_dubbed"])
-            ' For live streams, segments are addressed to the /api/dash/live-seg proxy
-            ' on this same web server (the video player reaches it over 127.0.0.1).
-            m.dashManifest.liveSegmentBaseUrl = `http://127.0.0.1:${m.serverPort}`
-            m.dashManifest.liveBackend = ValidString(request.query.backend)
+            isLocal = ValidString(local) = "true"
 
-            qualityFilter = m.CreateQualityFilter(quality)
-            xmlContent = m.dashManifest.FromVideoMetadata(metadata, qualityFilter, ValidString(local) = "true")
-
-            if xmlContent.InStr("[ERROR]") <> -1
-                LogErrorNoTelemetry("Dash manifest generated with errors")
-                lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
-                LogTelemetryEvent({
-                    level: "error"
-                    message: "Dash manifest generated with errors"
-                    attachments: [{
-                        filename: "dash.xml"
-                        content_type: "text/plain"
-                        data: xmlContent
-                    }, {
-                        filename: "last_player_response.json"
-                        content_type: "application/json"
-                        data: lastPlayerResponse
-                    }]
-                })
+            if ValidBool(metadata.liveNow)
+                xmlContent = m.GetLiveManifest(metadata, videoLoadId, ValidString(quality), isLocal)
+            else
+                xmlContent = m.dashManifest.FromVideoMetadata(metadata, m.CreateQualityFilter(quality), isLocal)
+                m.ReportManifestErrors(xmlContent, videoLoadId)
+                WriteAsciiFile("cachefs:/last_generated_dash.xml", xmlContent)
             end if
 
             response.http_code = 200
             response.SetBodyDataString(xmlContent)
             response.ContentType("application/dash+xml")
-
-            WriteAsciiFile("cachefs:/last_generated_dash.xml", xmlContent)
-
             return true
+        end function
+
+        function ReportManifestErrors(xmlContent as string, videoLoadId as string) as void
+            if xmlContent.InStr("[ERROR]") = -1
+                return
+            end if
+            LogErrorNoTelemetry("Dash manifest generated with errors")
+            lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
+            LogTelemetryEvent({
+                level: "error"
+                message: `Dash manifest generated with errors\nvideo_load_id: ${videoLoadId}`
+                fingerprint: ["Dash manifest generated with errors"]
+                attachments: [{
+                    filename: "dash.xml"
+                    content_type: "text/plain"
+                    data: xmlContent
+                }, {
+                    filename: "last_player_response.json"
+                    content_type: "application/json"
+                    data: lastPlayerResponse
+                }]
+            })
         end function
 
         function CreateQualityFilter(quality as dynamic) as object
@@ -238,522 +204,203 @@ namespace Http
         end function
 
         ' ------------------------------------------------------------------------
-        ' Live segment proxy
-        '
-        ' Proxies YouTube live segments so Roku can demux them as DASH. YouTube live
-        ' fragments (`&sq=N`) are self-initializing: every fragment is
-        ' `ftyp+moov+emsg+moof+mdat`. Standard DASH (and Roku) want the init segment to
-        ' be `ftyp+moov` only and media segments to be `moof+mdat` only; a per-fragment
-        ' moov makes Roku fail with `Cannot seek to video: error -36`. YouTube serves
-        ' no clean init or moof-only media directly (`&range=` -> 400, the HTTP Range
-        ' header is ignored), so this transform is unavoidable.
-        '
-        ' Endpoint (see DashManifest live SegmentTemplate); segments map 1:1 to native
-        ' fragments, so the DASH segment number is the native sq:
-        '   /api/dash/live-seg?v=<id>&itag=<itag>&init=true -> ftyp+moov of the live-edge fragment
-        '   /api/dash/live-seg?v=<id>&itag=<itag>&sq=<N>    -> moof+mdat of fragment N
-        '
-        ' This is a hot path (called for every audio + video segment, continuously),
-        ' so it is written to minimize per-request work: the itag -> url/type lookups
-        ' and live-edge seqnum are resolved once per video id (shared with /api/dash via
-        ' GetMetadata), the segment URL is a plain string concat (no URL parse/encode),
-        ' and the moof/moov split reads only the needed byte ranges from the temp file.
+        ' The live manifest lists the segments that exist, so its timeline ends at
+        ' the stream's live head, re-read on every manifest request (RefreshLiveHead).
+        ' The player fetches the segments (`&sq=N` fragments) straight from
+        ' googlevideo, init included (see DashManifest.GenerateSegmentInformation).
         ' ------------------------------------------------------------------------
-        @get("/api/dash/live-seg")
-        function GetLiveSegment(context as object) as boolean
-            request = context.request
-            response = context.response
 
-            v = request.query.v
-            itag = request.query.itag
-            isInit = ValidString(request.query.init) = "true"
-            sq = -1
-            if not isInit
-                sq = ValidString(request.query.sq).ToInt()
+        ' Between live manifest requests only the live head and the clock change: the
+        ' manifest is built once per video load and output options, then filled in per request.
+        function GetLiveManifest(metadata as object, videoLoadId as string, quality as string, isLocal as boolean) as string
+            templateKey = `${quality}|${isLocal}|${m.dashManifest.invidiousInstance}|${m.dashManifest.disableAutoDubbed}`
+            isNewTemplate = m.liveManifestTemplateKey <> templateKey
+            if isNewTemplate
+                m.liveManifestTemplate = m.dashManifest.FromVideoMetadata(metadata, m.CreateQualityFilter(quality), isLocal)
+                m.liveManifestTemplateKey = templateKey
             end if
 
-            if StringUtils.IsNullOrEmpty(itag) or StringUtils.IsNullOrEmpty(v) or (not isInit and sq <= 0)
-                response.Default(400, "Missing or invalid v, itag, or sq")
-                return true
+            m.RefreshLiveHead()
+            xmlContent = m.dashManifest.FillLiveManifest(m.liveManifestTemplate, m.liveHeadSeqnum, m.liveDurationRuns, m.liveWindowMs)
+            if isNewTemplate
+                m.ReportManifestErrors(xmlContent, videoLoadId)
             end if
-
-            ' Warm the shared cache for this video (one node dig on a video change;
-            ' the manifest request usually warmed it already).
-            m.GetMetadata(v, ValidString(request.query.backend))
-
-            baseUrl = m.cachedUrls[itag]
-            if StringUtils.IsNullOrEmpty(baseUrl)
-                LogErrorNoTelemetry("[LIVE-SEG] no live format url for v:", v, "itag:", itag, "-> 404")
-                m.ReportSegmentFailure(LiveSegFailure.NoFormatUrl, { v: v, itag: itag, sq: sq })
-                response.Default(404, "No live format url for itag " + itag)
-                return true
-            end if
-
-            if isInit
-                ' ftyp+moov, served from the per-itag cache after the first fetch.
-                output = m.cachedInit[itag]
-                if output = invalid
-                    ' Source from a current fragment: sq=0 is outside the DVR window (404)
-                    ' and the load-time edge ages out, so prefer lastSeenSq; fall back to
-                    ' the load-time seqnum only before any media segment is served.
-                    initSq = m.cachedInitSeqnum
-                    if m.lastSeenSq > 0
-                        initSq = m.lastSeenSq
-                    end if
-                    output = m.AwaitSegmentWithRetry(baseUrl, initSq, v, itag, true, invalid)
-                    if output = invalid
-                        LogErrorNoTelemetry("[LIVE-SEG] INIT fetch failed v:", v, "itag:", itag, "-> 503")
-                        response.Default(503, "Live init segment not ready")
-                        return true
-                    end if
-                    m.cachedInit[itag] = output
-                end if
-            else
-                ' Media DASH segment = one native YouTube fragment, reduced to moof+mdat
-                ' so Roku reads the init segment only once. The manifest addresses the
-                ' proxy 1:1, so the DASH segment number is the native sq.
-                if sq > m.lastSeenSq
-                    m.lastSeenSq = sq
-                end if
-
-                ' Representation switch (ABR video / audio track): the previous itag of
-                ' this kind stops being requested, so evict its warmed fragments now -
-                ' EvictPrefetchOutside is itag-scoped and would never reach them, so
-                ' they'd otherwise leak (temp files + idle transfers) until video change.
-                if m.cachedTypes[itag] = "audio/mp4"
-                    if IsString(m.lastAudioItag) and m.lastAudioItag <> itag
-                        m.EvictPrefetchItag(m.lastAudioItag)
-                    end if
-                    m.lastAudioItag = itag
-                else
-                    if IsString(m.lastVideoItag) and m.lastVideoItag <> itag
-                        m.EvictPrefetchItag(m.lastVideoItag)
-                    end if
-                    m.lastVideoItag = itag
-                end if
-
-                ' Reuse a warmed fetch if present, else start one. Warm the next few
-                ' (Send, no Await) BEFORE blocking here so their downloads overlap this
-                ' fragment's await + playback; then drop entries now outside the window
-                ' (played past, or stranded by a seek) so the cache + temp files stay bounded.
-                entry = m.GetOrStartFetch(baseUrl, sq, v, itag)
-                m.PrefetchAhead(baseUrl, v, itag, sq, LIVE_PREFETCH_SEGMENTS)
-                m.EvictPrefetchOutside(itag, sq + 1, sq + LIVE_PREFETCH_SEGMENTS)
-
-                output = m.AwaitSegmentWithRetry(baseUrl, sq, v, itag, false, entry)
-                if output = invalid
-                    ' 503 makes Roku re-request the same sq and hold the bitrate (verified); the
-                    ' fragment will exist within ~one re-request.
-                    LogErrorNoTelemetry("[LIVE-SEG] media fragment not ready v:", v, "itag:", itag, "sq:", sq, "-> 503")
-                    response.Default(503, "Live media segment not ready")
-                    return true
-                end if
-            end if
-
-            response.http_code = 200
-            response.headers["Content-Type"] = m.cachedTypes[itag]
-            response.headers["Cache-Control"] = "no-cache, must-revalidate"
-            response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
-            response.SetBodyDataBuffer(output)
-            return true
+            WriteAsciiFile("cachefs:/last_generated_dash.xml", xmlContent)
+            return xmlContent
         end function
 
-        ' (Re)build the live-segment lookups (itag -> url/type, live-edge seqnum) from
-        ' an already-dug metadata AA - NO second node dig. Called from GetMetadata on a
-        ' video change. Also sweeps orphaned temp files and re-arms the telemetry guard.
-        function RebuildLiveCache(metadata as object) as void
-            ' Prefetched fetches from the previous video may still be in flight (they
-            ' outlive the request that started them), so cancel them first - otherwise
-            ' they'd race the sweep below (and keep writing temp files).
-            m.ClearPrefetch()
-            ' Video changed: sweep any orphaned segment temp files. Each request
-            ' deletes its own temp files on every path, so this is only a safety net
-            ' for an unexpected error that skipped a delete - without it, tmp:/
-            ' (RAM-backed, never reaped by the OS) could grow across a long session.
-            m.CleanupTempSegments()
-            ' Re-arm the per-video telemetry dedupe (see ReportSegmentFailure).
-            m.reportedFailures = {}
-            ' Init bytes and the sq high-water mark belong to the previous video.
-            m.cachedInit = {}
-            m.lastSeenSq = 0
-
-            urls = {}
-            types = {}
-            adaptiveFormats = ObjectUtils.DigUnsafe(metadata, ["adaptiveFormats"])
-            if IsArray(adaptiveFormats)
-                for each format in adaptiveFormats
-                    if IsString(format.itag) and not StringUtils.IsNullOrEmpty(format.url)
-                        urls[format.itag] = format.url
-                        if IsString(format.type) and format.type.StartsWith("audio")
-                            types[format.itag] = "audio/mp4"
-                        else
-                            types[format.itag] = "video/mp4"
-                        end if
-                    end if
-                end for
-            else
-                LogErrorNoTelemetry("[LIVE-SEG] RebuildLiveCache: adaptiveFormats not an array for v:", metadata.videoId)
-                m.ReportSegmentFailure(LiveSegFailure.FormatsNotArray, { v: ValidString(metadata.videoId) })
-            end if
-
-            m.cachedUrls = urls
-            m.cachedTypes = types
-            ' Live-edge fragment to source the init segment from. Falls back to 0 if
-            ' absent - fine for young streams where sq=0 is still inside the DVR window.
-            m.cachedInitSeqnum = ValidInt(ObjectUtils.DigUnsafe(metadata, ["liveHeadSeqnum"]))
-        end function
-
-        ' Delete any leftover `tmp:/live-seg-*.m4s` files. Only our segment temp
-        ' files match the prefix, so this never touches other tmp: data.
-        function CleanupTempSegments() as void
-            listing = m.fs.GetDirectoryListing("tmp:/")
-            if not IsArray(listing)
+        ' Raise the live head to the stream's newest segment. On failure the timeline
+        ' keeps its end, and the player holds at it until a later check succeeds.
+        function RefreshLiveHead() as void
+            if StringUtils.IsNullOrEmpty(m.liveHeadUrl)
                 return
             end if
-            for each name in listing
-                if IsString(name) and name.StartsWith("live-seg-")
-                    DeleteFile(`tmp:/${name}`)
-                end if
-            end for
-        end function
-
-        ' Start an async fetch of one YouTube live fragment (`&sq=N`) to a unique
-        ' temp file. Returns the in-flight request plus the context the failure
-        ' telemetry needs (v, itag, segUrl). The request is already sent (Send), so
-        ' callers can start a whole group before awaiting any of them.
-        function StartSegmentFetch(baseUrl as string, sq as integer, v as string, itag as string) as object
-            ' Plain concat: the base url is already a fully signed googlevideo url
-            ' (it has a query string), so appending &sq/&rn is safe. Must NOT route
-            ' through UrlUtils here - re-parsing/re-encoding the query breaks the
-            ' signature (sig/n) and googlevideo returns 403; it is also far slower.
-            segUrl = `${baseUrl}&sq=${sq}&rn=0`
-            tmpPath = `tmp:/live-seg-${StringUtils.RandomId()}.m4s`
-            req = HttpClient.Get(segUrl).ToFile(tmpPath).NoCache().Send()
-            return { req: req, tmpPath: tmpPath, sq: sq, v: v, itag: itag, segUrl: segUrl }
-        end function
-
-        ' Return a warmed (prefetched) fetch for this native fragment if present,
-        ' consuming it from the cache; otherwise start a fresh one.
-        function GetOrStartFetch(baseUrl as string, sq as integer, v as string, itag as string) as object
-            key = `${itag}|${sq}`
-            if m.prefetch.DoesExist(key)
-                entry = m.prefetch[key]
-                m.prefetch.Delete(key)
-                return entry
-            end if
-            return m.StartSegmentFetch(baseUrl, sq, v, itag)
-        end function
-
-        ' Send (without awaiting) the next `count` native fragments after `fromSq` so
-        ' their downloads overlap the current segment. Already-warmed ones are left be.
-        function PrefetchAhead(baseUrl as string, v as string, itag as string, fromSq as integer, count as integer) as void
-            for i = 1 to count
-                key = `${itag}|${fromSq + i}`
-                if not m.prefetch.DoesExist(key)
-                    m.prefetch[key] = m.StartSegmentFetch(baseUrl, fromSq + i, v, itag)
-                end if
-            end for
-        end function
-
-        ' Drop warmed fragments for `itag` whose sq is outside [lowSq, highSq] - played
-        ' past or stranded by a seek - cancelling the in-flight transfer and deleting
-        ' its temp file so the cache and tmp:/ stay bounded.
-        function EvictPrefetchOutside(itag as string, lowSq as integer, highSq as integer) as void
-            prefix = `${itag}|`
-            stale = []
-            for each key in m.prefetch
-                if key.StartsWith(prefix)
-                    sq = key.Mid(prefix.Len()).ToInt()
-                    if sq < lowSq or sq > highSq
-                        stale.Push(key)
-                    end if
-                end if
-            end for
-            for each key in stale
-                m.DiscardFetch(m.prefetch[key])
-                m.prefetch.Delete(key)
-            end for
-        end function
-
-        ' Cancel and drop every warmed fragment belonging to `itag` (used when the
-        ' player switches away from a representation).
-        function EvictPrefetchItag(itag as string) as void
-            prefix = `${itag}|`
-            stale = []
-            for each key in m.prefetch
-                if key.StartsWith(prefix)
-                    stale.Push(key)
-                end if
-            end for
-            for each key in stale
-                m.DiscardFetch(m.prefetch[key])
-                m.prefetch.Delete(key)
-            end for
-        end function
-
-        ' Cancel every warmed fetch and clear the cache. Called on a video change
-        ' before the temp-file sweep so in-flight prefetch transfers don't race it.
-        function ClearPrefetch() as void
-            for each key in m.prefetch
-                m.DiscardFetch(m.prefetch[key])
-            end for
-            m.prefetch = {}
-            m.lastVideoItag = invalid
-            m.lastAudioItag = invalid
-        end function
-
-        ' Abort an in-flight fetch and delete its temp file (non-blocking).
-        function DiscardFetch(entry as object) as void
-            if not IsAssociativeArray(entry)
+            if m.liveHeadTimer = invalid
+                m.liveHeadTimer = CreateObject("roTimespan")
+            else if m.liveHeadTimer.TotalMilliseconds() < LIVE_HEAD_MIN_INTERVAL_MS
                 return
             end if
-            if entry.req <> invalid and entry.req.urlTransfer <> invalid
-                entry.req.urlTransfer.AsyncCancel()
+            m.liveHeadTimer.Mark()
+
+            head = m.CheckLiveHead()
+            if head.seqnum < 0
+                m.ReportLiveHeadFailure(head.response)
+                return
             end if
-            DeleteFile(entry.tmpPath)
+            ' Listed segments can't be withdrawn: the head only moves forward.
+            if head.seqnum > m.liveHeadSeqnum
+                m.AlignLiveTimeline(head)
+                m.liveHeadSeqnum = head.seqnum
+            end if
         end function
 
-        ' Await `entry` (invalid -> fetch fresh), transform to the bytes Roku needs (wantInit ->
-        ' ftyp+moov, else moof+mdat), retrying transient failures up to LIVE_SEG_MAX_ATTEMPTS. Each
-        ' retry refetches the same sq, which also un-poisons a prefetched 204. Telemetry fires once.
-        function AwaitSegmentWithRetry(baseUrl as string, sq as integer, v as string, itag as string, wantInit as boolean, entry as object) as dynamic
-            if entry = invalid
-                entry = m.StartSegmentFetch(baseUrl, sq, v, itag)
+        ' A no-sq HEAD: googlevideo answers at once with the X-Head-* headers.
+        function CheckLiveHead() as LiveHeadReading
+            request = Innertube.CreateLiveHeadRequest(m.liveHeadUrl)
+            request.TimeoutSeconds(LIVE_HEAD_TIMEOUT_SECONDS)
+            response = request.Await()
+            return {
+                seqnum: Innertube.ReadLiveHeadSeqnum(response)
+                timeMs: Innertube.ReadLiveHeadTimeMs(response)
+                response: response
+            }
+        end function
+
+        ' Segments are listed at the duration at load, the stream's lifetime average: off
+        ' by a young stream's short first segment and by any change of cadence. Roku plays
+        ' at its clock edge, so a list behind the stream skips segments for the rest of the
+        ' load (measured), and one ahead holds the player further from live. The base is a
+        ' head whose place on the timeline is known (the load head, then the last stall):
+        ' head time since it says where the head ends. Off by more than half a segment
+        ' (within the cushion, at least a segment), segments not yet listed take the cadence
+        ' since the base, or after a stall keep theirs and move the base. Listed segments
+        ' keep their place, so a list ahead stays ahead by liveLeadMs.
+        function AlignLiveTimeline(head as LiveHeadReading) as void
+            if head.timeMs = invalid or m.liveBaseTimeMs = invalid
+                return
+            end if
+            durationRuns = m.liveDurationRuns
+            headEndMs = m.liveBaseEndMs + Cint(head.timeMs - m.liveBaseTimeMs)
+            driftMs = m.dashManifest.LiveSegmentStartMs(durationRuns, head.seqnum + 1) - headEndMs - m.liveLeadMs
+            stepMs = driftMs - m.liveDriftMs
+            m.liveDriftMs = driftMs
+            lastCheckJumped = m.liveLastCheckJumped
+            m.liveLastCheckJumped = false
+            listedDurationMs = durationRuns[durationRuns.Count() - 1].durationMs
+            if Abs(driftMs) * 2 <= listedDurationMs
+                return
             end if
 
-            attempt = 1
-            while true
-                result = m.AttemptSegment(entry, wantInit)
-                if result.ok
-                    return result.bytes
+            ' A cadence error builds up across checks; a stall leaps forward within one. A
+            ' large cadence error can leap too (a young stream between sparse checks): the
+            ' next check measures it.
+            isStall = stepMs < -LIVE_STALL_JUMP_MS and not lastCheckJumped
+            if isStall
+                durationMs = listedDurationMs
+            else
+                durationMs = Cint((head.timeMs - m.liveBaseTimeMs) / (head.seqnum - m.liveBaseSeqnum))
+                if durationMs <= 0
+                    LogWarnNoTelemetry("Live head time went back:", head.timeMs, "ms at", head.seqnum, "after", m.liveBaseTimeMs, "ms at", m.liveBaseSeqnum)
+                    return
                 end if
+            end if
 
-                ' 204 = sq not produced yet. Return 503 and let Roku re-ask (same sq, then resyncs);
-                ' a sleep+refetch here would stall the queued audio ~600ms on the single thread
-                ' (measured). Evict the warmed siblings - fetched too early, they 204'd too.
-                if result.reason = LiveSegFailure.EmptyFragment
-                    if not wantInit
-                        m.EvictPrefetchItag(itag)
-                    end if
-                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, head: m.liveHeadSeqnum, segUrl: entry.segUrl, response: result.response })
-                    return invalid
-                end if
+            fromSeqnum = m.dashManifest.LiveLastListedSeqnum(durationRuns, m.liveHeadSeqnum) + 1
+            alignedStartMs = headEndMs - (head.seqnum + 1 - fromSeqnum) * durationMs
+            startMs = MathUtils.Max(m.dashManifest.LiveSegmentStartMs(durationRuns, fromSeqnum), alignedStartMs)
+            m.liveLeadMs = startMs - alignedStartMs
+            m.liveDriftMs = 0
+            if isStall
+                m.liveBaseSeqnum = head.seqnum
+                m.liveBaseTimeMs = head.timeMs
+                m.liveBaseEndMs = headEndMs
+                m.liveLastCheckJumped = true
+            end if
+            LogInfo("Live timeline", driftMs, "ms off the head, stall:", isStall, "; segments from", fromSeqnum, "take", durationMs, "ms from", startMs, "ms, lead", m.liveLeadMs, "ms")
 
-                if (not result.retryable) or attempt >= LIVE_SEG_MAX_ATTEMPTS
-                    m.ReportSegmentFailure(result.reason, { v: v, itag: itag, sq: sq, head: m.liveHeadSeqnum, segUrl: entry.segUrl, response: result.response })
-                    return invalid
-                end if
-
-                ' Network/5xx: transient; discard and refetch immediately (no sleep).
-                LogWarnNoTelemetry("[LIVE-SEG] retry sq", sq, "itag", itag, "(", result.reason, ") attempt", attempt + 1, "of", LIVE_SEG_MAX_ATTEMPTS)
-
-                attempt += 1
-                entry = m.StartSegmentFetch(baseUrl, sq, v, itag)
+            firstListed = m.dashManifest.LiveFirstListedSeqnum(durationRuns, m.dashManifest.LiveLastListedSeqnum(durationRuns, m.liveHeadSeqnum), m.liveWindowMs)
+            while durationRuns.Count() > 1 and durationRuns[1].fromSeqnum <= firstListed
+                durationRuns.Shift()
             end while
+            durationRuns.Push({ fromSeqnum: fromSeqnum, startMs: startMs, durationMs: durationMs })
 
-            return invalid
+            m.ReportLiveCorrection(head, durationMs, driftMs, stepMs, isStall)
         end function
 
-        ' One fetch+transform attempt. Reads only the needed byte range from the temp
-        ' file and always deletes it. Returns:
-        '   { ok: true, bytes }                        - the transformed segment bytes
-        '   { ok: false, retryable, reason, response } - failed; `retryable` marks fast transient
-        '     NETWORK errors (reset/-10001, 5xx) worth an immediate refetch. 204/empty is handled
-        '     specially by the caller (immediate 503); timeout/4xx/malformed are not retried.
-        function AttemptSegment(entry as object, wantInit as boolean) as object
-            tmpPath = entry.tmpPath
-            sq = entry.sq
-
-            response = entry.req.Await()
-            m.liveHeadSeqnum = m.ReadHeadSeqnum(response)
-            if not response.IsSuccess()
-                status = response.StatusCode()
-                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "failed:", status)
-                DeleteFile(tmpPath)
-                ' status<0 = active error event (reset/-10001), 5xx = server error: both
-                ' transient -> retried. status 0 = timeout (slow/hung) -> not retried.
-                return { ok: false, retryable: status < 0 or status >= 500, reason: LiveSegFailure.FetchFailed, response: response }
-            end if
-
-            stat = m.fs.Stat(tmpPath)
-            fileLen = 0
-            if IsAssociativeArray(stat)
-                fileLen = ValidInt(stat.size)
-            end if
-            if fileLen <= 0
-                LogErrorNoTelemetry("[LIVE-SEG] fetch sq", sq, "empty file (status", response.StatusCode(), ")")
-                DeleteFile(tmpPath)
-                ' 204/empty handled specially by the caller (immediate 503, no in-handler retry).
-                return { ok: false, retryable: false, reason: LiveSegFailure.EmptyFragment, response: response }
-            end if
-
-            boxes = m.LocateBoxes(tmpPath, fileLen)
-
-            out = CreateObject("roByteArray")
-            if wantInit
-                if boxes.moovEnd <= 0 or boxes.moovEnd > fileLen
-                    LogErrorNoTelemetry("[LIVE-SEG] no moov in fragment sq", sq, "(moovEnd:", boxes.moovEnd, ")")
-                    DeleteFile(tmpPath)
-                    return { ok: false, retryable: false, reason: LiveSegFailure.NoMoov, response: response }
-                end if
-                out.ReadFile(tmpPath, 0, boxes.moovEnd)
-            else
-                if boxes.moofStart <= 0 or boxes.moofStart >= fileLen
-                    LogErrorNoTelemetry("[LIVE-SEG] no moof in fragment sq", sq, "(moofStart:", boxes.moofStart, ")")
-                    DeleteFile(tmpPath)
-                    return { ok: false, retryable: false, reason: LiveSegFailure.NoMoof, response: response }
-                end if
-                out.ReadFile(tmpPath, boxes.moofStart, fileLen - boxes.moofStart)
-            end if
-
-            DeleteFile(tmpPath)
-            return { ok: true, bytes: out }
-        end function
-
-        ' Live head sequence number from a fragment response's X-Head-Seqnum header (-1 if
-        ' absent). Stashed (m.liveHeadSeqnum) so ReportSegmentFailure records how far ahead of
-        ' the real edge a failed sq was (delta = sq - head) - the field signal for edge overshoot.
-        function ReadHeadSeqnum(response as object) as integer
-            headers = response.Headers()
-            if IsAssociativeArray(headers) and headers.DoesExist("X-Head-Seqnum")
-                return ValidString(headers["X-Head-Seqnum"]).ToInt()
-            end if
-            return -1
-        end function
-
-        ' Read the leading boxes of a fragment temp file and return moov/moof offsets.
-        ' Starts with m.probeByteCount; if moof falls past the probe (a moov larger
-        ' than expected), grow the probe (doubling, capped by file size and
-        ' MAX_PROBE_BYTE_COUNT) and re-walk. A successful grow persists to
-        ' m.probeByteCount so the rest of the session reads the larger window in one
-        ' shot - the common (small-moov) case still does a single 2 KB read.
-        function LocateBoxes(tmpPath as string, fileLen as integer) as object
-            probeByteCount = m.probeByteCount
-            if probeByteCount > fileLen
-                probeByteCount = fileLen
-            end if
-
-            boxes = {}
-            while true
-                head = CreateObject("roByteArray")
-                head.ReadFile(tmpPath, 0, probeByteCount)
-                boxes = m.WalkBoxes(head)
-
-                ' Self-initializing fragment = ftyp+moov+emsg+moof+mdat, so both
-                ' offsets are present once the probe reaches moof. If the probe already
-                ' covers the whole file (or we've hit the ceiling), stop regardless -
-                ' a still-missing box is a genuine "no moof/moov", reported by caller.
-                foundBoth = boxes.moovEnd > 0 and boxes.moofStart > 0
-                if foundBoth or probeByteCount >= fileLen or probeByteCount >= m.MAX_PROBE_BYTE_COUNT
-                    exit while
-                end if
-
-                nextByteCount = probeByteCount * 2
-                if nextByteCount > fileLen
-                    nextByteCount = fileLen
-                end if
-                if nextByteCount > m.MAX_PROBE_BYTE_COUNT
-                    nextByteCount = m.MAX_PROBE_BYTE_COUNT
-                end if
-                ' Persist the grown probe for subsequent fragments this session.
-                probeByteCount = nextByteCount
-                m.probeByteCount = probeByteCount
-                LogWarnNoTelemetry("[LIVE-SEG] moof past probe; grew probe to", probeByteCount, "bytes")
-            end while
-
-            return boxes
-        end function
-
-        ' Emit a rich, actionable telemetry event for a live-segment failure. The
-        ' per-failure console logs above stay terse; this carries the detail needed to
-        ' diagnose a YouTube-side break: video id, itag, sq, status code, error message,
-        ' and the (signed) segment url.
-        '
-        ' `info` keys (all optional): v, itag, sq, segUrl, response.
-        '
-        ' Deduped to one event per (reason, status) per video session: enough to
-        ' capture a transient blip and a later persistent failure separately, without
-        ' flooding identical failures every few seconds (Sentry quota). Re-armed per
-        ' video in RebuildLiveCache.
-        function ReportSegmentFailure(reason as LiveSegFailure, info as object) as void
-            statusText = "n/a"
-            errorMessage = ""
-            response = info.response
-            if response <> invalid
-                statusText = Str(response.StatusCode()).Trim()
-                errorMessage = ValidString(response.ErrorMessage(false))
-            end if
-
-            dedupeKey = `${reason}:${statusText}`
-            if m.reportedFailures.DoesExist(dedupeKey)
+        ' Telemetry once per video load.
+        function ReportLiveCorrection(head as LiveHeadReading, durationMs as integer, driftMs as integer, stepMs as integer, isStall as boolean) as void
+            if m.reportedLiveCorrection
                 return
             end if
-            m.reportedFailures[dedupeKey] = true
+            m.reportedLiveCorrection = true
 
-            ' Edge overshoot: how far past the live head (X-Head-Seqnum at the failing fetch, via
-            ' info.head) the failed sq was. delta > 0 = a not-yet-produced fragment (the 503 cause).
-            head = ValidInt(info.head)
-            sqNum = ValidInt(info.sq)
-            deltaText = "n/a"
-            if head > 0 and sqNum > 0
-                deltaText = (sqNum - head).ToStr()
+            LogTelemetryEvent({
+                level: "info"
+                message: FormatJson({
+                    "video_load_id": ValidString(m.cachedVideoLoadId)
+                    "video_id": ValidString(ObjectUtils.Dig(m.cachedMetadata, ["videoId"]))
+                    "target_duration_ms": ValidInt(ObjectUtils.Dig(m.cachedMetadata, ["adaptiveFormats", 0, "targetDurationSec"])) * 1000
+                    "load_head_seqnum": m.liveLoadHeadSeqnum
+                    "load_duration_ms": ValidInt(ObjectUtils.Dig(m.cachedMetadata, ["liveSegmentDurationMs"]))
+                    "duration_ms": durationMs
+                    "drift_ms": driftMs
+                    "step_ms": stepMs
+                    "stall": isStall
+                    "segments_since_load": head.seqnum - m.liveLoadHeadSeqnum
+                    "ms_since_load": Cint(head.timeMs - m.liveLoadHeadTimeMs)
+                })
+                fingerprint: ["live timeline correction"]
+            })
+        end function
+
+        ' Until a head check succeeds, the listed timeline stops growing and the player
+        ' holds at its end. Telemetry once per video load.
+        function ReportLiveHeadFailure(response as object) as void
+            statusText = Str(response.StatusCode()).Trim()
+            LogWarnNoTelemetry("Live head check returned no X-Head-Seqnum (HTTP", statusText, "); head stays at", m.liveHeadSeqnum)
+            if m.reportedLiveHeadFailure
+                return
             end if
-            details = [
-                "reason: " + reason
-                "videoId: " + ValidString(info.v)
-                "itag: " + ValidString(info.itag)
-                "sq: " + ToString(info.sq)
-                "head: " + head.ToStr()
-                "delta: " + deltaText
-                "status: " + statusText
-                "error: " + errorMessage
-                "url: " + ValidString(info.segUrl)
-            ]
+            m.reportedLiveHeadFailure = true
 
             LogTelemetryEvent({
                 level: "error"
-                message: `[LIVE-SEG] ${reason} (status ${statusText})`
-                fingerprint: ["live-seg fetch failure", reason]
+                message: `Live head check failed (status ${statusText})`
+                fingerprint: ["live head check failure", statusText]
                 attachments: [{
-                    filename: "live-seg-failure.txt"
+                    filename: "live-head-failure.txt"
                     content_type: "text/plain"
-                    data: details.Join(Chr(10))
+                    data: [
+                        `videoId: ${ValidString(ObjectUtils.Dig(m.cachedMetadata, ["videoId"]))}`
+                        `video_load_id: ${ValidString(m.cachedVideoLoadId)}`
+                        `head: ${m.liveHeadSeqnum}`
+                        `status: ${statusText}`
+                        `error: ${response.ErrorMessage(false)}`
+                        `url: ${m.liveHeadUrl}`
+                    ].Join(`\n`)
                 }]
             })
         end function
 
-        ' Walk top-level ISO-BMFF boxes from the front, returning the byte offset
-        ' where moov ends and where moof starts. Stops at moof, so it only ever
-        ' reads the small leading boxes - never the large mdat.
-        function WalkBoxes(bytes as object) as object
-            moovEnd = 0
-            moofStart = 0
-            count = bytes.Count()
-            i = 0
-            while i + 8 <= count
-                ' 32-bit big-endian box size. Leading boxes are small, so this
-                ' arithmetic is overflow-safe.
-                size = (bytes[i] * 16777216) + (bytes[i + 1] * 65536) + (bytes[i + 2] * 256) + bytes[i + 3]
-                if size <= 0
-                    exit while
-                end if
-                ' Box type chars: 'm'=109 'o'=111 'v'=118 'f'=102. Compare the raw
-                ' bytes (cheaper than building a string per box).
-                b4 = bytes[i + 4]
-                b5 = bytes[i + 5]
-                b6 = bytes[i + 6]
-                b7 = bytes[i + 7]
-                if b4 = 109 and b5 = 111 and b6 = 111 ' "moo*"
-                    if b7 = 118 ' "moov"
-                        moovEnd = i + size
-                    else if b7 = 102 ' "moof"
-                        moofStart = i
-                        exit while
-                    end if
-                end if
-                i += size
-            end while
-            return { moovEnd: moovEnd, moofStart: moofStart }
+        function ResetLiveState(metadata as object) as void
+            m.liveHeadUrl = ValidString(metadata.liveHeadUrl)
+            m.liveHeadTimer = invalid
+            m.liveHeadSeqnum = ValidInt(metadata.liveHeadSeqnum)
+            m.liveLoadHeadSeqnum = m.liveHeadSeqnum
+            m.liveLoadHeadTimeMs = metadata.liveHeadTimeMs
+            segmentDurationMs = ValidInt(metadata.liveSegmentDurationMs)
+            m.liveDurationRuns = [{ fromSeqnum: ValidInt(metadata.liveFirstSeqnum), startMs: ValidInt(metadata.liveTimelineOffsetMs), durationMs: segmentDurationMs }]
+            m.liveBaseSeqnum = m.liveHeadSeqnum
+            m.liveBaseTimeMs = m.liveLoadHeadTimeMs
+            m.liveBaseEndMs = m.dashManifest.LiveSegmentStartMs(m.liveDurationRuns, m.liveHeadSeqnum + 1)
+            m.liveWindowMs = ValidInt(metadata.liveWindowSegments) * segmentDurationMs
+            m.liveLeadMs = 0
+            m.liveDriftMs = 0
+            m.liveLastCheckJumped = false
+            m.reportedLiveCorrection = false
+            m.liveManifestTemplate = ""
+            m.liveManifestTemplateKey = invalid
+            m.reportedLiveHeadFailure = false
         end function
 
     end class

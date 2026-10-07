@@ -94,9 +94,6 @@ namespace TransportController
     ' not a seek into the last instants (which just re-buffers and fights the device's EOF auto-resume).
     ' Matches the SponsorBlock finish rule (SkipTargetForSegment).
     const FINISH_EPSILON_MS = 2000
-    ' Live streams whose DVR window is under this are treated as NOT rewindable (a ~30s window is just the
-    ' buffer): the rewind/scan/replay commands are ignored and the bar drops the "Rewind live TV" label.
-    const LIVE_REWIND_MIN_WINDOW_MS = 60000
     const REPLAY_TOAST_MS = 700 ' how long the transient InstantReplay icon stays before it self-clears
     ' "● LIVE" shows while the offset is within this jitter band of the inherent latency; beyond it the bar
     ' shows the time-behind. The clock-anchored edge advances smoothly, so this only needs to absorb position
@@ -130,8 +127,7 @@ namespace TransportController
         isLive as boolean = false
         private hasStoryboards as boolean = false
         storyboardStepMs as integer = 2000 ' VOD per-tap step + scan base (storyboard L2 interval)
-        ' Live DVR window length (0 = unknown). The generated DASH anchors t=0 to the window start, so the
-        ' rewind floor is edge - window once the session outlives the window (content below it has expired).
+        ' Live DVR window length (0 = unknown); see LiveFloorMs.
         private dvrWindowMs as integer = 0
 
         ' ---- inputs pushed by the coordinator (OnPosition / OnDuration / OnReady) ----
@@ -211,22 +207,9 @@ namespace TransportController
             end if
         end function
 
-        ' Whether this live stream is rewindable at all. The DVR window we receive is the same value the
-        ' generated DASH advertises as timeShiftBufferDepth, so this IS the manifest's signal: a tiny window
-        ' (~30s) is just the buffer, not a rewind feature. Unknown (0) assumes rewindable.
-        function CanRewindLive() as boolean
-            if not m.isLive
-                return false
-            end if
-            if m.dvrWindowMs <= 0
-                return true
-            end if
-            return m.dvrWindowMs >= TransportController.LIVE_REWIND_MIN_WINDOW_MS
-        end function
-
-        ' The rewind FLOOR: the oldest still-available position. t=0 is the window start at manifest build
-        ' time, so as the session outlives the window the floor advances (edge - window); 0 while unknown or
-        ' while the stream is younger than its window.
+        ' The rewind FLOOR: the oldest still-available position. t=0 is the oldest segment at manifest build
+        ' time (the stream's start on a stream younger than the window), so as the session outlives the window
+        ' the floor advances (edge - window); 0 while unknown or until then.
         function LiveFloorMs() as integer
             if m.dvrWindowMs <= 0
                 return 0
@@ -404,10 +387,6 @@ namespace TransportController
                 return
             end if
             if m.isLive
-                ' a non-rewindable live stream (DVR window is just the buffer) takes no transport input.
-                if not m.CanRewindLive()
-                    return
-                end if
                 if command = TransportController.Command.Left
                     m.LiveStep(-1)
                 else if command = TransportController.Command.Right
@@ -714,10 +693,7 @@ namespace TransportController
         function Replay() as void
             ' InstantReplay works from ANY state. From a transport (frozen) it cancels it and RESUMES from
             ' cursor-20s; from idle it just seeks -20s and keeps the play state. Reference is the cursor (= position
-            ' while idle). A non-rewindable live stream takes no replay either.
-            if m.isLive and not m.CanRewindLive()
-                return
-            end if
+            ' while idle).
             wasTransport = (m.transportMode <> TransportController.Mode.Idle)
             ' spamming InstantReplay must ACCUMULATE: while a prior replay seek is still in flight, base off the
             ' LAST target so each press goes another -20s, not off the stale position (all presses landing together).

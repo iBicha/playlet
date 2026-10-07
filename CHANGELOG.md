@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Backend changes from Invidious to Playlet if no instance url is set. This is to avoid playback errors.
 
+### Fixed
+
+- Various Live stream improvements, streamed directly without local proxy, attempt to reduce errors and stutters.
+
 ## [0.48.7] - 2026-10-05
 
 ### Added

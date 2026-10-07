@@ -1,0 +1,27 @@
+import "pkg:/components/Services/Invidious/InvidiousService.bs"
+
+namespace Tests
+
+    @suite
+    class InvidiousServiceTests extends Rooibos.BaseTestSuite
+
+        @describe("Invidious.NeedsLiveStreamInfo")
+
+        @it("needs the live timeline for a live response from an Invidious server")
+        function _()
+            m.assertTrue(Invidious.NeedsLiveStreamInfo({ liveNow: true, adaptiveFormats: [{ url: "https://example.googlevideo.com/videoplayback" }] }))
+        end function
+
+        @it("keeps the live timeline the built-in instance's response carries")
+        function _()
+            m.assertFalse(Invidious.NeedsLiveStreamInfo({ liveNow: true, adaptiveFormats: [{ url: "https://example.googlevideo.com/videoplayback" }], liveHeadUrl: "https://example.googlevideo.com/videoplayback?rn=0" }))
+        end function
+
+        @it("needs nothing for a video that isn't live")
+        function _()
+            m.assertFalse(Invidious.NeedsLiveStreamInfo({ liveNow: false, adaptiveFormats: [{ url: "https://example.googlevideo.com/videoplayback" }] }))
+        end function
+
+    end class
+
+end namespace

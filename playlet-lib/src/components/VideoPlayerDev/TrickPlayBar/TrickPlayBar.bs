@@ -26,7 +26,7 @@ function Init()
     ' language — "EN DIRECT" is far wider than "LIVE"); measured lazily, once.
     m.liveBadgeLaidOut = false
 
-    for each field in ["transportMode", "positionMs", "durationMs", "cursorMs", "isLive", "canRewind", "liveOffsetMs", "atLiveEdge", "forceLiveBadge"]
+    for each field in ["transportMode", "positionMs", "durationMs", "cursorMs", "isLive", "liveOffsetMs", "liveFloorMs", "atLiveEdge", "forceLiveBadge"]
         m.top.ObserveField(field, FuncName(Repaint))
     end for
     m.top.ObserveField("focused", FuncName(OnFocusChange))
@@ -84,12 +84,13 @@ function RenderLiveBar() as void
     ' moved yet at entry, so atLiveEdge alone would keep the badge up.
     showBadge = (m.top.atLiveEdge or m.top.forceLiveBadge) and not transportActive
 
-    ' Fill + playhead are proportional to the cursor's place in the DVR window [0, effEdge], where
+    ' Fill + playhead are proportional to the cursor's place in the reachable range [floor, effEdge], where
     ' effEdge = cursor + offset; at the edge the playhead sits at the right end and the fill clips rightward.
-    effEdge = m.top.cursorMs + m.top.liveOffsetMs
+    floor = m.top.liveFloorMs
+    span = m.top.cursorMs + m.top.liveOffsetMs - floor
     frac = 1.0
-    if effEdge > 0
-        frac = m.top.cursorMs / (effEdge * 1.0)
+    if span > 0
+        frac = (m.top.cursorMs - floor) / (span * 1.0)
     end if
     if frac < 0
         frac = 0
@@ -106,12 +107,7 @@ function RenderLiveBar() as void
     ' Handle raised for the bif while rewinding, resting at the edge otherwise.
     PositionHandle(transportActive)
 
-    ' the rewind hint only when the stream actually rewinds (a buffer-sized DVR window doesn't count).
-    if m.top.canRewind
-        m.currentLabel.text = m.rewindLiveText
-    else
-        m.currentLabel.text = ""
-    end if
+    m.currentLabel.text = m.rewindLiveText
 
     if showBadge
         m.remainingLabel.text = ""

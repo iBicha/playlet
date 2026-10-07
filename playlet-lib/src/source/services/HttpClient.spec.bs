@@ -1,0 +1,64 @@
+import "pkg:/source/services/HttpClient.bs"
+
+namespace Tests
+
+    @suite
+    class HttpClientTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' the logger plugin reads m.global.logger; LogTelemetryEvent writes m.global.telemetry.LogEvent.
+            if m.global.logger = invalid
+                m.global.addField("logger", "node", false)
+                m.global.logger = CreateObject("roSGNode", "Logger")
+            end if
+            if m.global.telemetry = invalid
+                m.global.addField("telemetry", "node", false)
+                telemetry = CreateObject("roSGNode", "Node")
+                telemetry.addField("LogEvent", "assocarray", false)
+                m.global.telemetry = telemetry
+            end if
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        ' Nothing listens on port 1: the connection is refused, a failure that is not a timeout.
+        function RefusedRequest(retryCallback as function) as HttpClient.HttpRequest
+            return HttpClient.Head("http://127.0.0.1:1/").NoCache().TryCount(2).RetryCallback(retryCallback)
+        end function
+
+        @describe("HttpClient.HttpRequest.Await")
+
+        @it("reports a failed attempt the retry callback declines, without retrying")
+        function _()
+            request = m.RefusedRequest(function(context as object) as boolean
+                context.request.declinedError = context.response.ErrorMessage()
+                return false
+            end function)
+            timer = CreateObject("roTimespan")
+            response = request.Await()
+            ' A retry waits at least 1000 ms before its second attempt.
+            m.assertTrue(timer.TotalMilliseconds() < 1000, `took ${timer.TotalMilliseconds()} ms`)
+            m.assertFalse(response.IsSuccess())
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.level, "warning")
+            m.assertEqual(event.message, request.declinedError)
+            m.assertEqual(event.attachments[0].filename, "request.txt")
+        end function
+
+        @it("reports a failed attempt before retrying it")
+        function _()
+            request = m.RefusedRequest(function(context as object) as boolean
+                context.request.retriedError = context.response.ErrorMessage()
+                return true
+            end function)
+            timer = CreateObject("roTimespan")
+            request.Await()
+            m.assertTrue(timer.TotalMilliseconds() >= 1000, `took ${timer.TotalMilliseconds()} ms`)
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.level, "warning")
+            m.assertEqual(event.message, request.retriedError)
+            m.assertEqual(event.attachments[0].filename, "request.txt")
+        end function
+
+    end class
+
+end namespace

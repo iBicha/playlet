@@ -1129,8 +1129,8 @@ namespace Tests
         end function
 
         ' =========================================================================================
-        ' LIVE DVR FLOOR — the generated DASH anchors t=0 to the window start, so once the session
-        ' outlives the window the oldest available position is edge - window, not 0.
+        ' LIVE DVR FLOOR — once the session outlives the window, the oldest available position is
+        ' edge - window, not 0.
         ' =========================================================================================
         @describe("live dvr floor")
 
@@ -1317,36 +1317,6 @@ namespace Tests
             m.assertEqual(t.edgeMs, 300000)
             t.OnLiveEdge(305000) ' the real heartbeat still lands
             m.assertEqual(t.edgeMs, 305000)
-        end function
-
-        ' =========================================================================================
-        ' LIVE REWINDABILITY — a buffer-sized DVR window (the manifest's timeShiftBufferDepth) is not
-        ' a rewind feature: the brain takes no live transport input and the bar drops its label.
-        ' =========================================================================================
-        @describe("live rewindability")
-
-        @it("a buffer-sized window is not rewindable; a real window or an unknown one is")
-        function _()
-            t = m.LiveWindowed() ' 60s window = exactly the threshold
-            m.assertTrue(t.CanRewindLive())
-            t.SetLiveDvrWindow(30000)
-            m.assertFalse(t.CanRewindLive())
-            t.SetLiveDvrWindow(0) ' unknown -> assume rewindable
-            m.assertTrue(t.CanRewindLive())
-            ' VOD is never "live-rewindable"
-            m.assertFalse(m.t.CanRewindLive())
-        end function
-
-        @it("a non-rewindable live stream ignores every transport command (incl. InstantReplay)")
-        function _()
-            t = m.LiveWindowed()
-            t.SetLiveDvrWindow(30000)
-            for each cmd in [TransportController.Command.Left, TransportController.Command.Right, TransportController.Command.Rev, TransportController.Command.Fwd, TransportController.Command.Replay]
-                t.HandleCommand(cmd)
-                m.assertEqual(t.transportMode, TransportController.Mode.Idle, "cmd=" + cmd.ToStr() + " must be ignored")
-                m.assertInvalid(t.TakeVideoIntent())
-            end for
-            m.assertTrue(t.atLiveEdge)
         end function
 
         ' =========================================================================================

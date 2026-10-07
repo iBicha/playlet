@@ -24,6 +24,7 @@ namespace Tests
             content.addField("playletStreamUrls", "array", false)
             content.addField("playletStreamUrlIndex", "integer", false)
             content.addField("playletStreamSource", "string", false)
+            content.addField("videoLoadId", "string", false)
             content.setFields({
                 videoId: "vid1"
                 backend: "playlet"
@@ -31,6 +32,7 @@ namespace Tests
                 playletStreamUrls: urls
                 playletStreamUrlIndex: 0
                 playletStreamSource: "adaptiveFormats"
+                videoLoadId: "load1"
             })
             m.top.content = content
         end function
@@ -107,12 +109,23 @@ namespace Tests
             m.State(VideoState.Error)
             report = m.global.telemetry.LogEvent
             m.assertEqual(report.level, "warning", "retried: not shown to the viewer")
-            m.assertTrue(report.message.InStr("Url: http://a") > 0 and report.message.InStr("Url index: 0") > 0, "got: " + report.message)
+            m.assertTrue(report.message.InStr("Url: http://a") > 0 and report.message.InStr("Url index: 0") > 0, `got: ${report.message}`)
             m.State(VideoState.Playing)
             summary = m.Close()
             m.assertEqual(summary.error_count, 1)
             m.assertEqual(summary.stream_url_index, 1)
             m.assertEqual(summary.outcome, "closed")
+        end function
+
+        @it("the video load id joins the error report to the summary")
+        function _()
+            m.SetContent(["http://stream"])
+            m.HttpError()
+            m.State(VideoState.Error)
+            report = m.global.telemetry.LogEvent
+            m.assertTrue(report.message.InStr("video_load_id: load1") > 0, `got: ${report.message}`)
+            summary = m.Close()
+            m.assertEqual(summary.video_load_id, "load1")
         end function
 
         @it("an error with no retry left ends in error")

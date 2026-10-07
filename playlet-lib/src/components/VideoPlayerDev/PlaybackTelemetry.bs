@@ -32,6 +32,13 @@ namespace PlaybackTelemetry
         return "unknown"
     end function
 
+    function ContentVideoLoadId(content as object) as string
+        if content = invalid
+            return ""
+        end if
+        return ValidString(content.videoLoadId)
+    end function
+
     ' The summary's wire rule: false, 0, "", [] and invalid are omitted, at every depth; a reader takes an absent
     ' field as that default.
     function OmitDefaults(value as dynamic) as dynamic
@@ -254,6 +261,7 @@ namespace PlaybackTelemetry
                 `logged_in: ${loggedIn}`
                 `backend: ${backend}`
                 `is_live: ${isLive}`
+                `video_load_id: ${PlaybackTelemetry.ContentVideoLoadId(content)}`
             ].Join(Chr(10))
             fingerprint = [
                 Locale.VideoPlayer.ErrorPlayingVideo
@@ -300,6 +308,7 @@ namespace PlaybackTelemetry
             summary = {
                 "live": m.transport.isLive
                 "backend": PlaybackTelemetry.ContentBackend(content)
+                "video_load_id": PlaybackTelemetry.ContentVideoLoadId(content)
                 "outcome": m.outcome
                 "metadata_done_at_ms": m.metadataDoneAtMs
                 "first_playing_at_ms": m.firstPlayingAtMs

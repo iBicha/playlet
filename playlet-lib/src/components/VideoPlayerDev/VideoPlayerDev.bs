@@ -289,6 +289,7 @@ function PushTransportToRenderers() as void
     m.trickPlayBar.durationMs = m.transport.durationMs
 
     if mode <> TransportController.Mode.Idle or isLive
+        m.trickPlayBar.liveFloorMs = m.transport.LiveFloorMs()
         m.trickPlayBar.cursorMs = m.transport.cursorMs
         m.trickPlayBar.liveOffsetMs = m.transport.liveOffsetMs
         m.trickPlayBar.atLiveEdge = m.transport.atLiveEdge
@@ -1151,13 +1152,9 @@ function OnVideoContentJobDone(event as object) as void
     ' fill them in for VOD.
     isLive = content <> invalid and content.Live = true
     m.transport.SetContent(isLive, 2000, false)
-    ' live floor: how far back the DVR window reaches (0 = unknown -> the brain keeps the [0, edge] clamp).
-    ' The generated DASH anchors t=0 to the window start, so floor = edge - window as the session outlives it.
-    ' The same window decides rewindability: a buffer-sized window means no live trickplay at all.
-    ' Use the seekable depth (window - cushion) to match the manifest's timeShiftBufferDepth.
+    ' The seekable depth keeps the rewind floor on the manifest's listed segments (see Innertube.GetLiveTimeline).
     m.transport.SetLiveDvrWindow(ValidInt(metadata.liveSeekableWindowSec) * 1000)
     m.trickPlayBar.isLive = isLive
-    m.trickPlayBar.canRewind = m.transport.CanRewindLive()
     m.bifDisplay.tileSet = invalid
 
     ' anchor the live edge clock at the cushioned availabilityStartTime and start the 1s heartbeat: the brain
@@ -1167,7 +1164,7 @@ function OnVideoContentJobDone(event as object) as void
     m.liveFallbackEdgeMs = -1
     m.liveFallbackAtSeconds = 0
     if isLive
-        ast = ValidString(metadata.liveCushionedAvailabilityStartUtc)
+        ast = ValidString(metadata.liveAvailabilityStartUtc)
         if ast <> ""
             astDate = CreateObject("roDateTime")
             astDate.FromISO8601String(ast)

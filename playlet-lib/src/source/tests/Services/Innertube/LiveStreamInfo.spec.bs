@@ -1,0 +1,158 @@
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
+
+namespace Tests
+
+    @suite
+    class LiveStreamInfoTests extends Rooibos.BaseTestSuite
+
+        ' availabilityStartTime + the timeline offset place the first segment's start so that the head
+        ' segment ends a cushion behind now.
+        function AssertAnchored(timeline as object, nowSec as integer, nowMs as integer, cushionMs as integer)
+            ast = CreateObject("roDateTime")
+            ast.FromISO8601String(timeline.liveAvailabilityStartUtc)
+            anchorMs = (ast.AsSeconds() - nowSec) * 1000 + timeline.liveTimelineOffsetMs
+            segmentCount = timeline.liveHeadSeqnum - timeline.liveFirstSeqnum + 1
+            m.assertEqual(anchorMs, nowMs + cushionMs - segmentCount * timeline.liveSegmentDurationMs)
+            m.assertTrue(timeline.liveTimelineOffsetMs >= 0 and timeline.liveTimelineOffsetMs < 1000)
+        end function
+
+        @describe("Innertube.GetLiveTimeline")
+
+        @it("anchors a 12h window on a stream live for 111 days (head time past 32 bits)")
+        function _()
+            timeline = Innertube.GetLiveTimeline(1923180, 9615900000&, 5, 43200, 3, 2000000000, 250)
+            m.assertEqual(timeline.liveSegmentDurationMs, 5000)
+            m.assertEqual(timeline.liveWindowSegments, 8640)
+            m.assertEqual(timeline.liveFirstSeqnum, 1923180 - 8640 + 1)
+            m.assertEqual(timeline.liveSeekableWindowSec, 43200 - 15 - 5)
+            m.AssertAnchored(timeline, 2000000000, 250, 15000)
+        end function
+
+        @it("averages the segment duration over the head time, not targetDurationSec")
+        function _()
+            timeline = Innertube.GetLiveTimeline(10000, 18000000, 5, 43200, 3, 2000000000, 0)
+            m.assertEqual(timeline.liveSegmentDurationMs, 1800)
+        end function
+
+        @it("falls back to targetDurationSec at head 0, with no cushion")
+        function _()
+            timeline = Innertube.GetLiveTimeline(0, 0, 2, 43200, 3, 2000000000, 0)
+            m.assertEqual(timeline.liveSegmentDurationMs, 2000)
+            m.assertEqual(timeline.liveFirstSeqnum, 0)
+            m.AssertAnchored(timeline, 2000000000, 0, 0)
+        end function
+
+        @it("anchors a young stream at its first segment, with the full window to grow into and no cushion")
+        function _()
+            timeline = Innertube.GetLiveTimeline(2, 10000, 5, 43200, 3, 2000000000, 999)
+            m.assertEqual(timeline.liveWindowSegments, 8640)
+            m.assertEqual(timeline.liveFirstSeqnum, 0)
+            m.assertEqual(timeline.liveSeekableWindowSec, 43200 - 5)
+            ' younger than its 3-segment cushion: plays at the head
+            m.AssertAnchored(timeline, 2000000000, 999, 0)
+        end function
+
+        @it("keeps the cushion once the stream is older than it")
+        function _()
+            ' 4 segments (0..3) of 5s against a 3-segment cushion
+            timeline = Innertube.GetLiveTimeline(3, 15000, 5, 43200, 3, 2000000000, 0)
+            m.AssertAnchored(timeline, 2000000000, 0, 15000)
+        end function
+
+        ' The player's rewind floor: (now - availabilityStartTime) - the seekable window, from 0.
+        function FloorMs(timeline as object) as integer
+            ast = CreateObject("roDateTime")
+            ast.FromISO8601String(timeline.liveAvailabilityStartUtc)
+            return MathUtils.Max((2000000000 - ast.AsSeconds()) * 1000 - timeline.liveSeekableWindowSec * 1000, 0)
+        end function
+
+        @it("puts the player's rewind floor a segment into the listed window")
+        function _()
+            timeline = Innertube.GetLiveTimeline(1923180, 9615900000&, 5, 43200, 3, 2000000000, 250)
+            ' the first listed segment starts at the timeline offset; whole seconds round the floor
+            secondStartMs = timeline.liveTimelineOffsetMs + timeline.liveSegmentDurationMs
+            floorMs = m.FloorMs(timeline)
+            m.assertTrue(floorMs > secondStartMs - 1000 and floorMs < secondStartMs + 1000, `floor ${floorMs} vs second segment at ${secondStartMs}`)
+        end function
+
+        @it("puts a young stream's rewind floor at its start")
+        function _()
+            m.assertEqual(m.FloorMs(Innertube.GetLiveTimeline(40, 200000, 5, 43200, 3, 2000000000, 700)), 0)
+        end function
+
+        @it("caps the window at maxDvrDurationSec")
+        function _()
+            timeline = Innertube.GetLiveTimeline(100000, 500000000, 5, 3600, 3, 2000000000, 0)
+            m.assertEqual(timeline.liveWindowSegments, 720)
+        end function
+
+        @it("caps the window at 12h when maxDvrDurationSec is missing")
+        function _()
+            timeline = Innertube.GetLiveTimeline(100000, 500000000, 5, 0, 3, 2000000000, 0)
+            m.assertEqual(timeline.liveWindowSegments, 8640)
+        end function
+
+        @it("raises the readahead to 3 seconds' worth (ultra low latency: 2 chunks of 1s)")
+        function _()
+            timeline = Innertube.GetLiveTimeline(100000, 100000000, 1, 43200, 2, 2000000000, 0)
+            m.AssertAnchored(timeline, 2000000000, 0, 3000)
+        end function
+
+        @it("raises the readahead to 3 seconds of the measured duration, not targetDurationSec")
+        function _()
+            ' declared 5s, measured 1.8s: 1 chunk would be 1.8s
+            timeline = Innertube.GetLiveTimeline(10000, 18000000, 5, 43200, 1, 2000000000, 0)
+            m.AssertAnchored(timeline, 2000000000, 0, 2 * 1800)
+        end function
+
+        @it("defaults a missing readahead to 3 chunks and caps it at 8")
+        function _()
+            m.AssertAnchored(Innertube.GetLiveTimeline(100000, 500000000, 5, 43200, 0, 2000000000, 0), 2000000000, 0, 15000)
+            m.AssertAnchored(Innertube.GetLiveTimeline(100000, 500000000, 5, 43200, 20, 2000000000, 0), 2000000000, 0, 40000)
+        end function
+
+        @it("carries the sub-second remainder into the timeline offset")
+        function _()
+            timeline = Innertube.GetLiveTimeline(10000, 18000000, 2, 43200, 3, 2000000000, 900)
+            m.AssertAnchored(timeline, 2000000000, 900, 5400)
+        end function
+
+        @describe("Innertube.ReadLiveHeadSeqnum")
+
+        @it("reads X-Head-Seqnum")
+        function _()
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse({ "X-Head-Seqnum": "9059091" })), 9059091)
+        end function
+
+        @it("returns -1 without the header")
+        function _()
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse({ "X-Walltime-Ms": "1791305190669" })), -1)
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse(invalid)), -1)
+        end function
+
+        @describe("Innertube.ReadLiveHeadTimeMs")
+
+        @it("reads X-Head-Time-Millis past 32 bits")
+        function _()
+            m.assertEqual(Innertube.ReadLiveHeadTimeMs(m.FakeResponse({ "X-Head-Time-Millis": "17900000123", "X-Head-Time-Sec": "17900000" })), 17900000123&)
+        end function
+
+        @it("returns invalid without X-Head-Time-Millis, X-Head-Time-Sec or not")
+        function _()
+            m.assertInvalid(Innertube.ReadLiveHeadTimeMs(m.FakeResponse({ "X-Head-Time-Sec": "17900000" })))
+            m.assertEqual(Innertube.ReadLiveHeadTimeSecAsMs(m.FakeResponse({ "X-Head-Time-Sec": "17900000" })), 17900000000&)
+            m.assertInvalid(Innertube.ReadLiveHeadTimeSecAsMs(m.FakeResponse({ "X-Head-Time-Millis": "17900000123" })))
+        end function
+
+        function FakeResponse(headers as dynamic) as object
+            return {
+                headerData: headers
+                Headers: function() as dynamic
+                    return m.headerData
+                end function
+            }
+        end function
+
+    end class
+
+end namespace

@@ -1,0 +1,301 @@
+import "pkg:/components/Web/PlayletWebServer/Middleware/DashRouter.bs"
+
+namespace Tests
+
+    @suite
+    class DashRouterTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' the logger plugin reads m.global.logger; LogTelemetryEvent writes m.global.telemetry.LogEvent.
+            if m.global.logger = invalid
+                m.global.addField("logger", "node", false)
+                m.global.logger = CreateObject("roSGNode", "Logger")
+            end if
+            if m.global.telemetry = invalid
+                m.global.addField("telemetry", "node", false)
+                telemetry = CreateObject("roSGNode", "Node")
+                telemetry.addField("LogEvent", "assocarray", false)
+                m.global.telemetry = telemetry
+            end if
+            m.content = CreateObject("roSGNode", "Node")
+            m.content.addFields({ metadata: {}, videoLoadId: "" })
+            player = CreateObject("roSGNode", "Node")
+            player.addFields({ content: m.content })
+            queueNode = CreateObject("roSGNode", "Node")
+            queueNode.addFields({ player: player })
+            m.router = new Http.DashRouter({
+                sceneNodes: { videoQueue: queueNode, invidious: invalid, preferences: invalid }
+                settings: { Port: 8888 }
+            })
+        end function
+
+        ' What VideoContentJob sets on the player's content for a video load.
+        function PushLoad(videoLoadId as string, metadata as object)
+            m.content.metadata = metadata
+            m.content.videoLoadId = videoLoadId
+        end function
+
+        function PushMetadata(videoLoadId as string, videoId as string)
+            m.PushLoad(videoLoadId, { videoId: videoId, adaptiveFormats: [] })
+        end function
+
+        @describe("DashRouter.GetMetadata")
+
+        @it("digs the node once per video load")
+        function _()
+            m.PushMetadata("load1", "first")
+            m.assertEqual(m.router.GetMetadata("load1").videoId, "first")
+            m.PushMetadata("load1", "pushed later")
+            m.assertEqual(m.router.GetMetadata("load1").videoId, "first")
+        end function
+
+        @it("re-digs on a new video load, even for the same video")
+        function _()
+            m.PushMetadata("load1", "same")
+            m.router.GetMetadata("load1")
+            m.PushLoad("load2", { videoId: "same", adaptiveFormats: [], title: "re-signed" })
+            m.assertEqual(m.router.GetMetadata("load2").title, "re-signed")
+        end function
+
+        @it("returns invalid for a load the node doesn't hold, keeping the cached one")
+        function _()
+            m.PushMetadata("load1", "first")
+            m.router.GetMetadata("load1")
+            m.PushMetadata("load2", "second")
+            m.assertInvalid(m.router.GetMetadata("stale"))
+            m.assertEqual(m.router.GetMetadata("load1").videoId, "first")
+        end function
+
+        @describe("DashRouter.RefreshLiveHead")
+
+        ' A live load whose head was 2 at 2630 ms (a 0.63s first segment, then 2s: the
+        ' load-time average is 1315 ms), with `overrides` on its metadata and head checks
+        ' answering `heads` in order ({ seqnum, timeMs }) and always due.
+        function LoadLive(heads as object, overrides = {} as object)
+            metadata = {
+                videoId: "v"
+                adaptiveFormats: [{ targetDurationSec: 2 }]
+                liveHeadUrl: "https://example.googlevideo.com/videoplayback?rn=0"
+                liveHeadSeqnum: 2
+                liveHeadTimeMs: 2630
+                liveFirstSeqnum: 0
+                liveSegmentDurationMs: 1315
+                liveTimelineOffsetMs: 0
+                liveWindowSegments: 8640
+            }
+            metadata.Append(overrides)
+            m.PushLoad("live1", metadata)
+            m.router.GetMetadata("live1")
+            m.router.heads = heads
+            m.router.headChecks = 0
+            m.router.CheckLiveHead = function() as object
+                m.headChecks += 1
+                head = m.heads.Shift()
+                head.response = {
+                    StatusCode: function() as integer
+                        return 403
+                    end function
+                    ErrorMessage: function(_includeBody = true as boolean) as string
+                        return "Reason:Forbidden"
+                    end function
+                }
+                return head
+            end function
+        end function
+
+        function RefreshDue()
+            m.router.liveHeadTimer = invalid
+            m.router.RefreshLiveHead()
+        end function
+
+        ' The listed <S> entries at the router's head.
+        function ListedSegments() as string
+            return m.router.dashManifest.FillLiveManifest(LIVE_SEGMENTS_TOKEN, m.router.liveHeadSeqnum, m.router.liveDurationRuns, m.router.liveWindowMs)
+        end function
+
+        @it("only moves the head forward")
+        function _()
+            m.LoadLive([{ seqnum: 10, timeMs: 18630 }, { seqnum: 8, timeMs: 14630 }])
+            m.RefreshDue()
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 10)
+        end function
+
+        @it("shares one head check between manifest requests closer than LIVE_HEAD_MIN_INTERVAL_MS")
+        function _()
+            m.LoadLive([{ seqnum: 10, timeMs: 18630 }, { seqnum: 11, timeMs: 20630 }])
+            m.router.RefreshLiveHead()
+            m.router.RefreshLiveHead()
+            m.assertEqual(m.router.headChecks, 1)
+            m.assertEqual(m.router.liveHeadSeqnum, 10)
+        end function
+
+        @it("keeps the head on a failed check, reporting the first failure of a video load only")
+        function _()
+            m.LoadLive([{ seqnum: -1, timeMs: invalid }, { seqnum: -1, timeMs: invalid }, { seqnum: -1, timeMs: invalid }])
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 2)
+            m.assertEqual(m.global.telemetry.LogEvent.fingerprint, ["live head check failure", "403"])
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            m.assertEmpty(m.global.telemetry.LogEvent)
+            ' a new video load reports again
+            m.PushLoad("live2", { videoId: "v", adaptiveFormats: [], liveHeadUrl: "https://example.googlevideo.com/videoplayback?rn=0" })
+            m.router.GetMetadata("live2")
+            m.RefreshDue()
+            m.assertNotEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("gives a list behind the head the cadence since load; the load head ended where the list stays ahead")
+        function _()
+            ' the load head (2) ended at 3 x 1315; head 7 ends 10000 ms later, at 13945, but is
+            ' listed to end at 8 x 1315 = 10520. Segments from 2 take 2000 ms; placed to end
+            ' head 7 at 13945 they'd start at 1945, before segment 1 ends (2630): contiguous,
+            ' the list 685 ms ahead.
+            m.LoadLive([{ seqnum: 7, timeMs: 12630 }, { seqnum: 20, timeMs: 38630 }])
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 0, startMs: 0, durationMs: 1315 }, { fromSeqnum: 2, startMs: 2630, durationMs: 2000 }])
+            m.assertEqual(m.router.liveLeadMs, 685)
+            m.assertEqual(m.global.telemetry.LogEvent.fingerprint, ["live timeline correction"])
+            m.assertEqual(StringUtils.ParseJsonSafe(m.global.telemetry.LogEvent.message), {
+                "video_load_id": "live1"
+                "video_id": "v"
+                "target_duration_ms": 2000
+                "load_head_seqnum": 2
+                "load_duration_ms": 1315
+                "duration_ms": 2000
+                "drift_ms": -3425
+                "step_ms": -3425
+                "stall": false
+                "segments_since_load": 5
+                "ms_since_load": 10000
+            })
+            ' still 685 ms ahead at head 20: no new run
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+        end function
+
+        @it("realigns past a gap when the list falls behind, then drops runs the list slid past, reporting once")
+        function _()
+            ' 2000 ms at load, 2200 ms real; a 20 s window. The load head (2) ends at 6000.
+            m.LoadLive([{ seqnum: 5, timeMs: 4000 + 3 * 2200 }, { seqnum: 15, timeMs: 4000 + 13 * 2200 }, { seqnum: 40, timeMs: 89600 }], { liveHeadTimeMs: 4000, liveSegmentDurationMs: 2000, liveWindowSegments: 10 })
+            ' head 5: 600 ms behind, within half a segment
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 1)
+            ' head 15 ends at 6000 + 28600 = 34600, listed at 32000: 5 onwards (4 is the last
+            ' listed) take 2200 ms, placed to end 15 there: from 10400, past 4's end (10000)
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 0, startMs: 0, durationMs: 2000 }, { fromSeqnum: 5, startMs: 10400, durationMs: 2200 }])
+            m.assertEqual(m.router.liveLeadMs, 0)
+            m.assertNotEmpty(m.global.telemetry.LogEvent)
+            ' head 40 ends at 91600, listed at 89600: 15 onwards take 85600 / 38 = 2253 ms,
+            ' from 91600 - 26 x 2253. The list starts at 6 by then: the first run is dropped.
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 5, startMs: 10400, durationMs: 2200 }, { fromSeqnum: 15, startMs: 91600 - 26 * 2253, durationMs: 2253 }])
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("takes a stall as a gap: the cadence stays, and the list stays on the head after it")
+        function _()
+            ' 2000 ms exact; head time leaps 90 s between heads 7 and 12, then runs on
+            heads = [{ seqnum: 7, timeMs: 4000 + 5 * 2000 }, { seqnum: 12, timeMs: 4000 + 10 * 2000 + 90000 }]
+            for i = 1 to 360
+                heads.Push({ seqnum: 12 + 5 * i, timeMs: 4000 + (10 + 5 * i) * 2000 + 90000 })
+            end for
+            m.LoadLive(heads, { liveHeadTimeMs: 4000, liveSegmentDurationMs: 2000 })
+            m.RefreshDue()
+            m.global.telemetry.LogEvent = {}
+            m.RefreshDue()
+            ' head 12 ends at 6000 + 110000, listed at 26000: from 7 (unlisted), placed to end 12 there
+            m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 0, startMs: 0, durationMs: 2000 }, { fromSeqnum: 7, startMs: 116000 - 6 * 2000, durationMs: 2000 }])
+            event = StringUtils.ParseJsonSafe(m.global.telemetry.LogEvent.message)
+            m.assertTrue(event.stall)
+            m.assertEqual(event.step_ms, -90000)
+            for i = 1 to 360
+                m.RefreshDue()
+            end for
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+            m.assertEqual(m.router.liveLeadMs, 0)
+        end function
+
+        @it("takes a list ahead by more than the stall bound as cadence: a stall before load heals at once")
+        function _()
+            ' head 5 at 30 s: a 20 s stall before load averages 6000 ms; real 2000
+            m.LoadLive([{ seqnum: 10, timeMs: 40000 }, { seqnum: 15, timeMs: 50000 }], { liveHeadSeqnum: 5, liveHeadTimeMs: 30000, liveSegmentDurationMs: 6000 })
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns[1].durationMs, 2000)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+        end function
+
+        @it("takes a second leap on the next check as cadence")
+        function _()
+            m.LoadLive([{ seqnum: 12, timeMs: 4000 + 10 * 2000 + 90000 }, { seqnum: 17, timeMs: 4000 + 15 * 2000 + 180000 }], { liveHeadTimeMs: 4000, liveSegmentDurationMs: 2000 })
+            m.RefreshDue()
+            m.assertTrue(m.router.liveLastCheckJumped)
+            m.RefreshDue()
+            m.assertFalse(m.router.liveLastCheckJumped)
+            ' the cadence since the stall's base (head 12): 100000 ms over 5 segments
+            m.assertEqual(m.router.liveDurationRuns[2].durationMs, 20000)
+        end function
+
+        @it("measures a young stream's cadence on the check after one that leapt past the stall bound")
+        function _()
+            ' head 1 at load after a 0.63 s first segment (630 ms average), 2000 ms real, checks
+            ' 20 s apart: 10 segments x 1370 ms behind per check
+            m.LoadLive([{ seqnum: 11, timeMs: 630 + 10 * 2000 }, { seqnum: 21, timeMs: 630 + 20 * 2000 }, { seqnum: 31, timeMs: 630 + 30 * 2000 }], { liveHeadSeqnum: 1, liveHeadTimeMs: 630, liveSegmentDurationMs: 630 })
+            m.RefreshDue()
+            m.assertTrue(m.router.liveLastCheckJumped)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns[m.router.liveDurationRuns.Count() - 1].durationMs, 2000)
+            runCount = m.router.liveDurationRuns.Count()
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), runCount)
+        end function
+
+        @it("keeps the listed segments' times across a correction")
+        function _()
+            m.LoadLive([{ seqnum: 5, timeMs: 4000 + 3 * 2200 }, { seqnum: 15, timeMs: 4000 + 13 * 2200 }], { liveHeadTimeMs: 4000, liveSegmentDurationMs: 2000 })
+            m.RefreshDue()
+            before = m.ListedSegments()
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+            after = m.ListedSegments()
+            m.assertEqual(after.Left(before.Len()), before)
+        end function
+
+        @it("leaves a list within half a segment of the head")
+        function _()
+            ' 1318 ms real against 1315 listed: 114 ms behind at head 40
+            m.LoadLive([{ seqnum: 40, timeMs: 2630 + 38 * 1318 }])
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 0, startMs: 0, durationMs: 1315 }])
+        end function
+
+        @it("skips a head check without a time, and corrects at a later one")
+        function _()
+            m.LoadLive([{ seqnum: 7, timeMs: invalid }, { seqnum: 12, timeMs: 22630 }])
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 7)
+            m.assertEqual(m.router.liveDurationRuns.Count(), 1)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+        end function
+
+        @it("times the head of a stream live for 111 days (head time past 32 bits)")
+        function _()
+            ' 5000 ms at load, 5300 real: head +10 ends 53000 ms later, listed 50000 later
+            m.LoadLive([{ seqnum: 1923190, timeMs: 9615900000& + 53000 }], { liveHeadSeqnum: 1923180, liveHeadTimeMs: 9615900000&, liveFirstSeqnum: 1914541, liveSegmentDurationMs: 5000, liveTimelineOffsetMs: 250 })
+            m.RefreshDue()
+            ' the load head ends at 250 + 8640 x 5000; 1923180 onwards stay contiguous, 300 ms ahead
+            m.assertEqual(m.router.liveDurationRuns[1], { fromSeqnum: 1923180, startMs: 250 + 8639 * 5000, durationMs: 5300 })
+            m.assertEqual(m.router.liveLeadMs, 300)
+        end function
+
+    end class
+
+end namespace

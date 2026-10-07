@@ -1,20 +1,24 @@
+import "pkg:/components/Services/Dash/LiveTimeline.types.bs"
 import "pkg:/components/Web/WebServer/Http/HttpUtils.bs"
 import "pkg:/source/services/XmlObject.bs"
 import "pkg:/source/utils/CodecCapabilities.bs"
 import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
+
+' Placeholders in a live manifest, filled on every refresh.
+const LIVE_NOW_TOKEN = "{{now}}"
+const LIVE_START_NUMBER_TOKEN = "{{startNumber}}"
+const LIVE_SEGMENTS_TOKEN = "{{segments}}"
+' How often the player re-fetches a live manifest. Between fetches the listed end
+' trails the live head by up to this, and the player plays on from its buffer.
+const LIVE_MANIFEST_REFRESH_MS = 10000
 
 class DashManifest
 
     public invidiousInstance as dynamic
     public disableAutoDubbed as boolean
-    ' Base URL (scheme://host:port) of Playlet's local web server, so live
-    ' SegmentTemplate URLs can address the /api/dash/live-seg proxy. Set by DashRouter.
-    public liveSegmentBaseUrl as string = ""
-    ' Backend the metadata came from, echoed onto every live-seg URL so the
-    ' DashRouter cache keys on it without reading the prefs node. Set by DashRouter.
-    public liveBackend as string = ""
     private canDecodeAv1Cache as dynamic
 
     function new(invidiousInstance as string, disableAutoDubbed = false as boolean)
@@ -47,15 +51,7 @@ class DashManifest
         adaptiveFormats.Append(metadata.adaptiveFormats)
 
         if local and m.invidiousInstance <> Invidious.PLAYLET_BUILT_IN_INSTANCE
-            parsedInvidiousUrl = UrlUtils.ParseUrl(m.invidiousInstance)
-            for i = 0 to adaptiveFormats.Count() - 1
-                if StringUtils.IsNullOrEmpty(adaptiveFormats[i].url)
-                    continue for
-                end if
-                parsedUrl = UrlUtils.ParseUrl(adaptiveFormats[i].url)
-                parsedInvidiousUrl.path = UrlUtils.AppendQueryParams(parsedUrl.path, { host: parsedUrl.host })
-                adaptiveFormats[i].url = UrlUtils.BuildUrlFromParts(parsedInvidiousUrl)
-            end for
+            adaptiveFormats = m.ProxyFormatsThroughInvidious(adaptiveFormats)
         end if
 
         duration = m.GetDuration(metadata)
@@ -104,27 +100,21 @@ class DashManifest
             "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance"
             "xsi:schemaLocation": "urn:mpeg:dash:schema:mpd:2011 http://standards.iso.org/ittf/PubliclyAvailableStandards/MPEG-DASH_schema_files/DASH-MPD.xsd"
         }
-        nowUtc = ""
         if isLive
-            dvrWindowSec = ValidInt(metadata.liveDvrWindowSec)
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:isoff-live:2011"
             mpdAttributes["type"] = "dynamic"
-            ' Roku needs an authoritative "now" to track the live edge from wall-clock; UTCTiming +
-            ' publishTime carry the current UTC, restamped each refresh.
-            nowUtc = CreateObject("roDateTime").ToISOString()
-            mpdAttributes["publishTime"] = nowUtc
-            ' 20s: the duration SegmentTemplate extrapolates the edge between refreshes.
-            mpdAttributes["minimumUpdatePeriod"] = "PT20S"
-            ' Cushion already lives in availabilityStartTime; present at minBufferTime.
-            mpdAttributes["suggestedPresentationDelay"] = mpdAttributes["minBufferTime"]
-            if not StringUtils.IsNullOrEmpty(metadata.liveCushionedAvailabilityStartUtc)
-                mpdAttributes["availabilityStartTime"] = metadata.liveCushionedAvailabilityStartUtc
-            end if
-            if dvrWindowSec > 0
-                ' Seekable range = window - cushion; the player's DVR floor uses the same value.
-                mpdAttributes["timeShiftBufferDepth"] = `PT${ValidInt(metadata.liveSeekableWindowSec)}S`
+            mpdAttributes["publishTime"] = LIVE_NOW_TOKEN
+            segmentDurationMs = ValidInt(metadata.liveSegmentDurationMs)
+            windowSegments = ValidInt(metadata.liveWindowSegments)
+            if windowSegments > 0 and segmentDurationMs > 0
+                mpdAttributes["availabilityStartTime"] = metadata.liveAvailabilityStartUtc
+                mpdAttributes["minimumUpdatePeriod"] = m.FormatDuration(MathUtils.Max(LIVE_MANIFEST_REFRESH_MS, segmentDurationMs))
+                ' The whole window, also while the listed timeline grows into it: Roku renumbers
+                ' segments listed beyond timeShiftBufferDepth, and takes no seek in a live stream
+                ' whose timeShiftBufferDepth started short (measured).
+                mpdAttributes["timeShiftBufferDepth"] = m.FormatDuration(windowSegments * segmentDurationMs)
             else
-                LogWarn("Live stream has no DVR window; omitting timeShiftBufferDepth (live seek may fail). videoId:", metadata.videoId)
+                xml.Comment(`[ERROR] Live stream metadata has no timeline (liveWindowSegments / liveSegmentDurationMs) for video: ${metadata.videoId}`)
             end if
         else
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:full:2011"
@@ -151,12 +141,32 @@ class DashManifest
             if isLive
                 xml.EmptyNode("UTCTiming", {
                     "schemeIdUri": "urn:mpeg:dash:utc:direct:2014"
-                    "value": nowUtc
+                    "value": LIVE_NOW_TOKEN
                 })
             end if
             xml.End()
         end if
         return xml.ToXmlString()
+    end function
+
+    ' The formats with their urls routed through the Invidious instance, as copies: the
+    ' metadata outlives this manifest (cached across manifest requests), and rewriting a
+    ' url twice would route it through the instance as its own host.
+    function ProxyFormatsThroughInvidious(formats as object) as object
+        parsedInvidiousUrl = UrlUtils.ParseUrl(m.invidiousInstance)
+        proxied = []
+        for each format in formats
+            if not StringUtils.IsNullOrEmpty(format.url)
+                parsedUrl = UrlUtils.ParseUrl(format.url)
+                parsedInvidiousUrl.path = UrlUtils.AppendQueryParams(parsedUrl.path, { host: parsedUrl.host })
+                proxiedFormat = {}
+                proxiedFormat.Append(format)
+                proxiedFormat.url = UrlUtils.BuildUrlFromParts(parsedInvidiousUrl)
+                format = proxiedFormat
+            end if
+            proxied.Push(format)
+        end for
+        return proxied
     end function
 
     function GetDuration(metadata as object) as dynamic
@@ -172,36 +182,72 @@ class DashManifest
         return ValidInt(metadata["lengthSeconds"])
     end function
 
-    ' DASH segment number at availabilityStartTime (the DVR-window anchor, not
-    ' genesis). The segments map 1:1 to native fragments, so it's the live-edge
-    ' fragment (headSeqnum) minus the window's worth of fragments. Clamped to 0 for
-    ' young streams whose history is shorter than the window.
-    function GetLiveStartNumber(metadata as object, durationMs as integer) as integer
-        headSeqnum = ValidInt(metadata.liveHeadSeqnum)
-        windowSec = ValidInt(metadata.liveDvrWindowSec)
-        if headSeqnum <= 0 or durationMs <= 0
-            return 0
-        end if
-        startNumber = headSeqnum - (windowSec * 1000 \ durationMs)
-        if startNumber < 0
-            return 0
-        end if
-        return startNumber
+    ' `durationRuns` ascending.
+    function FillLiveManifest(template as string, headSeqnum as integer, durationRuns as LiveDurationRun[], windowMs as integer) as string
+        lastSeqnum = m.LiveLastListedSeqnum(durationRuns, headSeqnum)
+        ' S@t keeps each listed segment at its place on the timeline.
+        startNumber = m.LiveFirstListedSeqnum(durationRuns, lastSeqnum, windowMs)
+
+        segments = ""
+        for i = 0 to durationRuns.Count() - 1
+            durationRun = durationRuns[i]
+            runLast = lastSeqnum
+            if i + 1 < durationRuns.Count()
+                runLast = MathUtils.Min(runLast, durationRuns[i + 1].fromSeqnum - 1)
+            end if
+            runFirst = MathUtils.Max(durationRun.fromSeqnum, startNumber)
+            if runFirst <= runLast
+                segments += `<S t="${m.LiveSegmentStartMs(durationRuns, runFirst)}" d="${durationRun.durationMs}" r="${runLast - runFirst}" />`
+            end if
+        end for
+
+        ' Roku needs an authoritative "now" to track the live edge from wall-clock:
+        ' UTCTiming + publishTime carry the current UTC.
+        nowUtc = CreateObject("roDateTime").ToISOString()
+        return template.Replace(LIVE_NOW_TOKEN, nowUtc).Replace(LIVE_START_NUMBER_TOKEN, startNumber.ToStr()).Replace(LIVE_SEGMENTS_TOKEN, segments)
     end function
 
-    ' Effective per-native-fragment duration (ms) for live. Prefers the value
-    ' derived from the live head (headTime/headSeqnum, set by GetLiveStreamInfo);
-    ' falls back to targetDurationSec, then to 2s.
-    function GetLiveFragmentDurationMs(metadata as object) as integer
-        fragMs = ValidInt(metadata.liveFragmentDurationMs)
-        if fragMs > 0
-            return fragMs
-        end if
-        targetSec = ValidInt(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "targetDurationSec"]))
-        if targetSec < 1
-            targetSec = 2
-        end if
-        return targetSec * 1000
+    ' The newest segment may not have reached every edge server yet, and Roku
+    ' retries a segment answered 204 only 20-100s later (measured), stalling.
+    function LiveLastListedSeqnum(durationRuns as LiveDurationRun[], headSeqnum as integer) as integer
+        return MathUtils.Max(headSeqnum - 1, durationRuns[0].fromSeqnum)
+    end function
+
+    ' The list grows from the first segment at load until it spans the window, then
+    ' slides with the head.
+    function LiveFirstListedSeqnum(durationRuns as LiveDurationRun[], lastSeqnum as integer, windowMs as integer) as integer
+        return m.LiveSegmentAtOrAfter(durationRuns, m.LiveSegmentStartMs(durationRuns, lastSeqnum + 1) - windowMs)
+    end function
+
+    function LiveSegmentStartMs(durationRuns as LiveDurationRun[], seqnum as integer) as integer
+        durationRun = durationRuns[0]
+        for each candidate in durationRuns
+            if candidate.fromSeqnum <= seqnum
+                durationRun = candidate
+            end if
+        end for
+        return durationRun.startMs + (seqnum - durationRun.fromSeqnum) * durationRun.durationMs
+    end function
+
+    ' The first segment starting at or after `timeMs` on the live timeline, or the
+    ' first run's first segment if `timeMs` is before it.
+    function LiveSegmentAtOrAfter(durationRuns as LiveDurationRun[], timeMs as integer) as integer
+        seqnum = durationRuns[0].fromSeqnum
+        for i = 0 to durationRuns.Count() - 1
+            durationRun = durationRuns[i]
+            if timeMs <= durationRun.startMs
+                return durationRun.fromSeqnum
+            end if
+            seqnum = durationRun.fromSeqnum + (timeMs - durationRun.startMs + durationRun.durationMs - 1) \ durationRun.durationMs
+            if i + 1 < durationRuns.Count() and seqnum < durationRuns[i + 1].fromSeqnum
+                exit for
+            end if
+        end for
+        return seqnum
+    end function
+
+    function FormatDuration(ms as integer) as string
+        return `PT${ms \ 1000}.${Right("00" + (ms mod 1000).ToStr(), 3)}S`
     end function
 
     function CreateFormatGroupings(formats as object, isPostLiveDvr as boolean, isLive as boolean) as object
@@ -626,35 +672,27 @@ class DashManifest
                 xml.End()
             end if
         else if metadata.liveNow = true
-            ' Live: segments are `&sq=N` with the live edge advancing over time. A
-            ' duration-based SegmentTemplate (no fixed SegmentTimeline) lets the
-            ' player compute the current segment from availabilityStartTime and keep
-            ' extending as the stream grows.
-
-            ' Live segments are self-initializing (ftyp+moov+emsg+moof+mdat) and
-            ' YouTube serves no clean init or moof-only media, so Roku can't demux
-            ' them directly (it reads the init segment once; a per-segment moov
-            ' yields `error -36`). The /api/dash/live-seg proxy transforms them
-            ' (init -> ftyp+moov, media -> moof+mdat) one native fragment per DASH
-            ' segment, addressed by itag + DASH segment number ($Number$, == native sq).
-            ' Per-fragment duration. NOT targetDurationSec (unreliable for long streams -
-            ' see GetLiveFragmentDurationMs); the head-derived value keeps the player's
-            ' wall-clock -> $Number$ -> sq mapping on the live edge.
-            durationMs = m.GetLiveFragmentDurationMs(metadata)
-            ' availabilityStartTime is anchored to the DVR window, not genesis (see
-            ' GetLiveStreamInfo), so segment 0 is no longer the live edge's ancestor.
-            ' Shift startNumber to the segment at that anchor (live-edge fragment minus
-            ' the window) so the wall-clock -> $Number$ -> sq mapping stays on the edge.
-            startNumber = m.GetLiveStartNumber(metadata, durationMs)
-            ' The `v` (video id) lets the proxy cache the per-video format lookup.
-            segBase = `${m.liveSegmentBaseUrl}/api/dash/live-seg?v=${metadata.videoId}&itag=${stream.itag}&backend=${m.liveBackend}`
-            xml.EmptyNode("SegmentTemplate", {
-                "initialization": `${segBase}&init=true`
-                "media": `${segBase}&sq=$Number$`
-                "timescale": "1000"
-                "duration": durationMs
-                "startNumber": startNumber.ToStr()
-            })
+            ' Live: list only the segments that exist - a SegmentTimeline over the DVR
+            ' window, ending just behind the newest produced segment (see
+            ' FillLiveManifest). Roku never requests past the listed end, so a stream
+            ' that produces slower than the wall clock, or stalls, holds the player at
+            ' the list end instead of sending it after segments that don't exist yet.
+            ' Segments are `&sq=N` fragments fetched straight from googlevideo. They are
+            ' self-initializing (ftyp+moov+emsg+moof+mdat), so one doubles as the init, as
+            ' for OTF: one listed at load, which googlevideo keeps past the signed url's
+            ' expiry (measured ~12h back, even with DVR off).
+            if xml.Node("SegmentTemplate", {
+                    "initialization": `${stream.url}&sq=${MathUtils.Max(ValidInt(metadata.liveHeadSeqnum) - 1, 0)}`
+                    "media": `${stream.url}&sq=$Number$`
+                    "timescale": "1000"
+                    "startNumber": LIVE_START_NUMBER_TOKEN
+                })
+                if xml.Node("SegmentTimeline")
+                    xml.Text(LIVE_SEGMENTS_TOKEN)
+                    xml.End()
+                end if
+                xml.End()
+            end if
         else
             xml.TextNode("BaseURL", ValidString(stream.url))
 

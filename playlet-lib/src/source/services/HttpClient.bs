@@ -468,9 +468,32 @@ namespace HttpClient
             triesLeft -= 1
 
             while triesLeft > 0
-                backoffMs = 1000 + Rnd(2000)
                 tryNumber = m._tryCount - triesLeft + 1
-                LogWarnNoTelemetry("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
+                shouldRetry = true
+                if IsFunction(m._retryCallback)
+                    try
+                        callbackResult = m._retryCallback({
+                            tryNumber: tryNumber
+                            tryCount: m._tryCount
+                            request: m
+                            response: response
+                        })
+                        shouldRetry = not IsBool(callbackResult) or callbackResult
+                    catch error
+                        #if DEBUG
+                            throw error
+                        #else
+                            LogError("Retry callback failed:", ErrorUtils.Format(error))
+                        #end if
+                    end try
+                end if
+
+                backoffMs = 1000 + Rnd(2000)
+                if shouldRetry
+                    LogWarnNoTelemetry("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
+                else
+                    LogWarnNoTelemetry("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nNot retrying: the retry callback declined`)
+                end if
                 LogTelemetryEvent({
                     level: "warning"
                     message: response.ErrorMessage()
@@ -480,27 +503,8 @@ namespace HttpClient
                         data: m.ToCurlCommand()
                     }]
                 })
-
-                if IsFunction(m._retryCallback)
-                    try
-                        shouldRetry = m._retryCallback({
-                            tryNumber: tryNumber
-                            tryCount: m._tryCount
-                            request: m
-                            response: response
-                        })
-
-                        if IsBool(shouldRetry) and not shouldRetry
-                            LogInfo("Retry callback returned false. Not retrying.")
-                            return response
-                        end if
-                    catch error
-                        #if DEBUG
-                            throw error
-                        #else
-                            LogError("Retry callback failed:", ErrorUtils.Format(error))
-                        #end if
-                    end try
+                if not shouldRetry
+                    return response
                 end if
 
                 m.urlTransfer = invalid

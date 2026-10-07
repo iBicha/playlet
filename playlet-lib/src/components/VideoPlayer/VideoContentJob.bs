@@ -122,17 +122,19 @@ function ExecuteJob() as void
     end if
     contentNode.live = metadata.liveNow
 
+    ' Identifies this video load (one metadata fetch).
+    videoLoadId = StringUtils.RandomId()
     if metadata.error <> invalid
         ' Adding metadata allows us to play next recommended video after displaying the error
-        contentNode.addFields({ metadata: metadata })
+        contentNode.addFields({ metadata: metadata, videoLoadId: videoLoadId })
         JobError(metadata.error)
         return
     end if
 
     streamSource = SelectStreamSource(metadata)
-    streamUrls = CreateStreamUrls(streamSource, metadata, service, preferencesNode, backend, playletServerPort)
+    streamUrls = CreateStreamUrls(streamSource, metadata, videoLoadId, service, preferencesNode, backend, playletServerPort)
     if streamUrls.Count() = 0
-        contentNode.addFields({ metadata: metadata })
+        contentNode.addFields({ metadata: metadata, videoLoadId: videoLoadId })
         error = "No playable streams found for this video."
         lastPlayerResponse = ValidString(ReadAsciiFile("cachefs:/last_player_response.json"))
         LogTelemetryEvent({
@@ -170,6 +172,7 @@ function ExecuteJob() as void
     contentNode.ForwardQueryStringParams = false
     contentNode.addFields({
         metadata: metadata
+        videoLoadId: videoLoadId
         ' StreamUrls is taken
         playletStreamUrls: streamUrls
         playletStreamUrlIndex: 0
@@ -279,7 +282,7 @@ function SelectStreamSource(metadata as object) as string
     return StreamSource.None
 end function
 
-function CreateStreamUrls(source as string, metadata as object, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
+function CreateStreamUrls(source as string, metadata as object, videoLoadId as string, service as Invidious.InvidiousService, preferences as object, backend as string, playletServerPort as integer) as object
     instance = service.GetInstance()
     proxyVideos = preferences["invidious.proxy_videos"]
     preferredQuality = preferences["playback.preferred_quality"]
@@ -292,7 +295,7 @@ function CreateStreamUrls(source as string, metadata as object, service as Invid
         })
         streamUrls.push(dashUrl)
     else if source = StreamSource.AdaptiveFormats
-        AddDashUrls(streamUrls, metadata, preferredQuality, backend, proxyVideos, playletServerPort)
+        AddDashUrls(streamUrls, metadata, videoLoadId, preferredQuality, backend, proxyVideos, playletServerPort)
     else if source = StreamSource.FormatStreams
         for each stream in metadata.formatStreams
             if StringUtils.IsNullOrEmpty(stream.url)
@@ -385,12 +388,12 @@ function AddHlsUrls(streamUrls as object, metadata as object, preferredQuality a
     AddUrls(streamUrls, hlsUrl, hlsUrlLocal, hlsUrlFiltered, hlsUrlFilteredLocal, proxyVideos)
 end function
 
-function AddDashUrls(streamUrls as object, metadata as object, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
+function AddDashUrls(streamUrls as object, metadata as object, videoLoadId as string, preferredQuality as string, backend as string, proxyVideos as string, playletServerPort as integer) as void
     ' Redirect to Playet's local web server, where will will be
     ' dynamically generating the DASH manifest, and filter quality
     dashUrl = UrlUtils.AppendQueryParams(`http://127.0.0.1:${playletServerPort}/api/dash`, {
         v: metadata.videoId
-        backend: backend
+        "videoLoadId": videoLoadId
     })
 
     dashUrlLocal = invalid

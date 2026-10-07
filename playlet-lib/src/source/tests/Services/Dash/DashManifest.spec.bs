@@ -1,0 +1,147 @@
+import "pkg:/components/Services/Dash/DashManifest.bs"
+
+namespace Tests
+
+    @suite
+    class DashManifestTests extends Rooibos.BaseTestSuite
+
+        @describe("DashManifest.ProxyFormatsThroughInvidious")
+
+        @it("routes each url through the instance, keeping the original host as a param")
+        function _()
+            manifest = new DashManifest("https://inv.example")
+            proxied = manifest.ProxyFormatsThroughInvidious([{ itag: "137", url: "https://rr1.googlevideo.com/videoplayback?id=abc" }])
+            m.assertEqual(proxied[0].url, "https://inv.example/videoplayback?id=abc&host=rr1.googlevideo.com")
+            m.assertEqual(proxied[0].itag, "137")
+        end function
+
+        @it("leaves the source formats untouched, so a second pass routes the same")
+        function _()
+            manifest = new DashManifest("https://inv.example")
+            formats = [{ itag: "137", url: "https://rr1.googlevideo.com/videoplayback?id=abc" }]
+            first = manifest.ProxyFormatsThroughInvidious(formats)
+            second = manifest.ProxyFormatsThroughInvidious(formats)
+            m.assertEqual(formats[0].url, "https://rr1.googlevideo.com/videoplayback?id=abc")
+            m.assertEqual(second[0].url, first[0].url)
+        end function
+
+        @it("passes formats without a url through")
+        function _()
+            manifest = new DashManifest("https://inv.example")
+            proxied = manifest.ProxyFormatsThroughInvidious([{ itag: "140" }])
+            m.assertEqual(proxied.Count(), 1)
+            m.assertEqual(proxied[0].itag, "140")
+            m.assertInvalid(proxied[0].url)
+        end function
+
+        @describe("DashManifest.FillLiveManifest")
+
+        ' The filled startNumber, <S> entries ({ t, d, r }) and now.
+        function FillTemplate(headSeqnum as integer, firstSeqnum = 100 as integer, windowSegments = 10 as integer, durationRuns = invalid as dynamic) as object
+            if durationRuns = invalid
+                durationRuns = [{ fromSeqnum: firstSeqnum, startMs: 250, durationMs: 5000 }]
+            end if
+            manifest = new DashManifest("")
+            template = `${LIVE_START_NUMBER_TOKEN}|${LIVE_SEGMENTS_TOKEN}|${LIVE_NOW_TOKEN}`
+            parts = manifest.FillLiveManifest(template, headSeqnum, durationRuns, windowSegments * durationRuns[0].durationMs).Split("|")
+            entries = []
+            for each match in CreateObject("roRegex", "<S t=.(\d+). d=.(\d+). r=.(\d+). />", "").MatchAll(parts[1])
+                entries.Push({ t: match[1].ToInt(), d: match[2].ToInt(), r: match[3].ToInt() })
+            end for
+            return { startNumber: parts[0].ToInt(), s: entries, now: parts[2] }
+        end function
+
+        @it("grows a young stream's list from its first segment")
+        function _()
+            atLoad = m.FillTemplate(3, 0, 8640)
+            m.assertEqual(atLoad.startNumber, 0)
+            m.assertEqual(atLoad.s[0].r, 2)
+            later = m.FillTemplate(50, 0, 8640)
+            m.assertEqual(later.startNumber, 0)
+            m.assertEqual(later.s[0].t, 250)
+            m.assertEqual(later.s[0].r, 49)
+        end function
+
+        @it("lists the window behind the head at load: from the first segment to head - 1")
+        function _()
+            filled = m.FillTemplate(109)
+            m.assertEqual(filled.startNumber, 100)
+            m.assertEqual(filled.s, [{ t: 250, d: 5000, r: 8 }])
+        end function
+
+        @it("slides startNumber and S@t together as the head advances")
+        function _()
+            filled = m.FillTemplate(115)
+            m.assertEqual(filled.startNumber, 105)
+            m.assertEqual(filled.s, [{ t: 5 * 5000 + 250, d: 5000, r: 9 }])
+        end function
+
+        @it("still lists the head when it is the first segment: an empty timeline isn't expressible")
+        function _()
+            filled = m.FillTemplate(100)
+            m.assertEqual(filled.startNumber, 100)
+            m.assertEqual(filled.s[0].r, 0)
+        end function
+
+        @it("starts sliding exactly when a young stream's list fills the window")
+        function _()
+            full = m.FillTemplate(10, 0, 10)
+            m.assertEqual(full.startNumber, 0)
+            m.assertEqual(full.s[0].r, 9)
+            sliding = m.FillTemplate(11, 0, 10)
+            m.assertEqual(sliding.startNumber, 1)
+            m.assertEqual(sliding.s, [{ t: 5000 + 250, d: 5000, r: 9 }])
+        end function
+
+        @it("lists segments past a re-measured duration with it, keeping the earlier ones' times")
+        function _()
+            filled = m.FillTemplate(20, 0, 33230, [{ fromSeqnum: 0, startMs: 250, durationMs: 1300 }, { fromSeqnum: 10, startMs: 13250, durationMs: 2000 }])
+            m.assertEqual(filled.startNumber, 0)
+            m.assertEqual(filled.s, [{ t: 250, d: 1300, r: 9 }, { t: 13250, d: 2000, r: 9 }])
+        end function
+
+        @it("keeps a gap before a run that starts past the previous one's end")
+        function _()
+            ' segments 0-9 end at 13250; segment 10 realigned to 20250
+            runs = [{ fromSeqnum: 0, startMs: 250, durationMs: 1300 }, { fromSeqnum: 10, startMs: 20250, durationMs: 2000 }]
+            filled = m.FillTemplate(15, 0, 33230, runs)
+            m.assertEqual(filled.s, [{ t: 250, d: 1300, r: 9 }, { t: 20250, d: 2000, r: 4 }])
+            ' a time inside the gap (13250-20250) maps to the run after it
+            manifest = new DashManifest("")
+            m.assertEqual(manifest.LiveSegmentAtOrAfter(runs, 18250), 10)
+            m.assertEqual(manifest.LiveSegmentAtOrAfter(runs, 13000), 10)
+            m.assertEqual(manifest.LiveSegmentAtOrAfter(runs, 11000), 9)
+        end function
+
+        @it("slides by time over mixed durations: the list never spans more than the window")
+        function _()
+            ' window 10 x 1000 ms; segments 0-4 at 1000, 5+ at 2000; head 12 lists up to 11
+            filled = m.FillTemplate(12, 0, 10, [{ fromSeqnum: 0, startMs: 250, durationMs: 1000 }, { fromSeqnum: 5, startMs: 5250, durationMs: 2000 }])
+            m.assertEqual(filled.startNumber, 7)
+            m.assertEqual(filled.s, [{ t: 250 + 5 * 1000 + 2 * 2000, d: 2000, r: 4 }])
+        end function
+
+        @it("fills every placeholder, with the current time as now")
+        function _()
+            filled = m.FillTemplate(109)
+            m.assertEqual(filled.now.Instr("{{"), -1)
+            now = CreateObject("roDateTime")
+            stamped = CreateObject("roDateTime")
+            stamped.FromISO8601String(filled.now)
+            m.assertTrue(Abs(now.AsSeconds() - stamped.AsSeconds()) <= 1)
+        end function
+
+        @describe("DashManifest.FormatDuration")
+
+        @it("formats milliseconds as an xs:duration")
+        function _()
+            manifest = new DashManifest("")
+            m.assertEqual(manifest.FormatDuration(0), "PT0.000S")
+            m.assertEqual(manifest.FormatDuration(999), "PT0.999S")
+            m.assertEqual(manifest.FormatDuration(1500), "PT1.500S")
+            m.assertEqual(manifest.FormatDuration(10000), "PT10.000S")
+        end function
+
+    end class
+
+end namespace

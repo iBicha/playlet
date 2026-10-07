@@ -1,5 +1,5 @@
-import "pkg:/components/Services/Innertube/Context.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
@@ -8,146 +8,175 @@ import "pkg:/source/utils/UrlUtils.bs"
 ' under INT32_MAX (~24.8 days at timescale=1000). YouTube caps live DVR at 12h.
 const LIVE_MAX_DVR_WINDOW_SEC = 43200
 
-' Hold the live edge this many fragments behind the head so a momentary edge-miss refetches
-' instead of erroring. Baked into liveCushionedAvailabilityStartUtc. 0 = ride the head.
-const LIVE_EDGE_CUSHION_SEGMENTS = 3
+' videoDetails.liveChunkReadahead when /player omits it: what YouTube sends for normal
+' and low latency streams.
+const LIVE_DEFAULT_CHUNK_READAHEAD = 3
+' liveChunkReadahead is clamped to at least 3 seconds' worth and at most this many segments.
+const LIVE_MAX_CHUNK_READAHEAD = 8
 
 namespace Innertube
 
     ' Live streams come back with no hlsManifestUrl/dashManifestUrl, just
-    ' adaptiveFormats with a `targetDurationSec` and segments addressed by `&sq=N`
-    ' (identical to Post-Live DVR). To build a dynamic DASH manifest we need the
-    ' current live edge (X-Head-Seqnum) and a wall-clock anchor for the DASH
-    ' `availabilityStartTime`. X-Head-Time-Millis is the stream-time of the head
-    ' segment, so genesis = now - headTime.
+    ' adaptiveFormats with a `targetDurationSec` and segments addressed by `&sq=N`.
+    ' The generated dynamic DASH manifest lists the segments that exist (a
+    ' SegmentTimeline ending behind the live head, see DashManifest), anchored here once
+    ' per video load: availabilityStartTime and the segment numbering must not change
+    ' across manifest refreshes.
     '
-    ' Backend-agnostic: works off the signed `adaptiveFormats[0].url` alone. The
-    ' innertube path passes its `client`/`cpn` (so the HEAD carries innertube
-    ' headers); the Invidious path passes invalid for both - the url is already
-    ' signed and googlevideo returns the X-Head-* headers regardless.
-    function GetLiveStreamInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as dynamic, cancellation as object) as void
-        if adaptiveFormats.Count() = 0
-            LogWarn("GetLiveStreamInfo: No adaptive formats available")
+    ' Works off the signed `adaptiveFormats[0].url` alone: googlevideo answers the head
+    ' check with the X-Head-* headers whatever the backend. Without them there is no
+    ' timeline to list, so the load fails with the cause in parsedResponse.error.
+    function GetLiveStreamInfo(parsedResponse as object, adaptiveFormats as object, chunkReadahead as integer, cpn as dynamic, cancellation as object) as void
+        if adaptiveFormats.Count() = 0 or StringUtils.IsNullOrEmpty(adaptiveFormats[0]["url"])
+            parsedResponse["error"] = "Live stream has no format url to read its head from"
             return
         end if
 
-        url = adaptiveFormats[0]["url"]
-        if StringUtils.IsNullOrEmpty(url)
-            LogWarn("GetLiveStreamInfo: URL is empty")
-            return
-        end if
-
-        maxDvrDurationSec = ValidInt(adaptiveFormats[0]["maxDvrDurationSec"])
-
-        ' HEAD the base url with NO `sq`: that queries the stream's live edge and
-        ' returns the X-Head-* headers (X-Head-Seqnum / X-Head-Time-Sec). Pinning
-        ' `sq=0` instead makes googlevideo answer about segment 0 specifically, and for
-        ' some streams (observed targetDurationSec=5) it then omits X-Head-* entirely
-        ' (only X-Sequence-Num/X-Walltime-Ms) - which left availabilityStartTime unset
-        ' and Roku failed with "availabilityStartTime not available for live stream".
-        queryComponents = UrlUtils.ParseQueryComponents(url)
-        queryComponents["rn"] = "0"
-        if not StringUtils.IsNullOrEmpty(cpn)
-            queryComponents["cpn"] = cpn
-        end if
-
-        url = UrlUtils.SetQueryParams(url, queryComponents)
-
-        request = HttpClient.Head(url)
-        if client <> invalid
-            requestHeaders = Innertube.CreateHeaders(client)
-        else
-            requestHeaders = {}
-        end if
-        requestHeaders["origin"] = "https://www.youtube.com"
-        requestHeaders["referer"] = "https://www.youtube.com"
-        requestHeaders["DNT"] = "?1"
-        request.Headers(requestHeaders)
-
+        headUrl = GetLiveHeadUrl(adaptiveFormats[0]["url"], cpn)
+        request = CreateLiveHeadRequest(headUrl)
         request.TryCount(2)
+        request.RetryCallback(function(context as object) as boolean
+            response = context.response
+            return Innertube.ReadLiveHeadSeqnum(response) < 0 or (Innertube.ReadLiveHeadTimeMs(response) = invalid and Innertube.ReadLiveHeadTimeSecAsMs(response) = invalid)
+        end function)
         request.Cancellation(cancellation)
         response = request.Await()
 
-        ' Do NOT gate on HTTP status. A no-sq HEAD that queries the live edge can come
-        ' back non-2xx yet still carry the X-Head-* headers we need (observed: one
-        ' stream returns 500, another 200; both include them). Read the headers
-        ' regardless and only bail if they're genuinely absent (e.g. a network error
-        ' with no response at all).
-        headers = response.Headers()
-
-        if not headers.DoesExist("X-Head-Seqnum")
-            LogErrorNoTelemetry("[LIVE-INFO] No X-Head-Seqnum in response (HTTP " + ValidInt(response.StatusCode()).ToStr() + ")", url, headers)
+        headSeqnum = ReadLiveHeadSeqnum(response)
+        headTimeMs = ReadLiveHeadTimeMs(response)
+        averagedTimeMs = headTimeMs
+        if averagedTimeMs = invalid
+            averagedTimeMs = ReadLiveHeadTimeSecAsMs(response)
+        end if
+        if headSeqnum < 0 or averagedTimeMs = invalid
+            parsedResponse["error"] = `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP ${response.StatusCode()})\n${response.ErrorMessage(false)}`
             return
         end if
-        headSeqnum = ValidString(headers["X-Head-Seqnum"]).ToInt()
 
-        ' Head time: NEVER parse X-Head-Time-Millis with .ToInt(). For a long-running
-        ' 24/7 stream (e.g. 76 days = 6.58e9 ms) it overflows BrightScript's 32-bit
-        ' int, corrupting both the genesis anchor AND the derived fragment duration
-        ' (seen as a bogus 327ms vs the real 1000ms). Prefer X-Head-Time-Sec
-        ' (~6.58e6, fits int32, equals X-Head-Seqnum here at 1 fragment/second); if
-        ' only millis is present, ParseJson decodes it as a 64-bit double untruncated.
-        if headers.DoesExist("X-Head-Time-Sec")
-            headTimeSec = ValidString(headers["X-Head-Time-Sec"]).ToInt()
-        else if headers.DoesExist("X-Head-Time-Millis")
-            headTimeSec = Cint(StringUtils.ParseJsonSafe(ValidString(headers["X-Head-Time-Millis"])) / 1000.0)
-        else
-            LogErrorNoTelemetry("[LIVE-INFO] Missing X-Head-Time-Sec / -Millis in headers", url, headers)
-            return
+        now = CreateObject("roDateTime")
+        timeline = GetLiveTimeline(headSeqnum, averagedTimeMs, ValidInt(adaptiveFormats[0]["targetDurationSec"]), ValidInt(adaptiveFormats[0]["maxDvrDurationSec"]), chunkReadahead, now.AsSeconds(), now.GetMilliseconds())
+        parsedResponse.Append(timeline)
+        parsedResponse["liveHeadUrl"] = headUrl
+        parsedResponse["liveHeadTimeMs"] = headTimeMs
+    end function
+
+    ' The live timeline fields for a stream whose head (newest segment) is
+    ' `headSeqnum`, `headTimeMs` into the stream, observed at `nowSec`.`nowMs`.
+    function GetLiveTimeline(headSeqnum as integer, headTimeMs as dynamic, targetDurationSec as integer, maxDvrDurationSec as integer, chunkReadahead as integer, nowSec as integer, nowMs as integer) as object
+        ' Media time per segment: the head's stream time over its seqnum, the fragments'
+        ' cadence whatever targetDurationSec declares.
+        segmentDurationMs = 0
+        if headSeqnum > 0
+            segmentDurationMs = Cint(headTimeMs / headSeqnum)
         end if
-        nowSec = CreateObject("roDateTime").AsSeconds()
+        if segmentDurationMs <= 0
+            segmentDurationMs = MathUtils.Max(targetDurationSec, 1) * 1000
+        end if
 
-        ' Anchor availabilityStartTime to the DVR window, NOT the true stream genesis.
-        ' A 24/7 channel can be live for weeks; with timescale=1000 the player's
-        ' (now - availabilityStartTime) presentation time in ms then exceeds INT32_MAX
-        ' (~24.8 days) and the live-edge segment math wraps - the playhead falls back
-        ' near the period start, hours/days behind real time. Segments older than the
-        ' DVR window 404 anyway, so the window IS the real availability start.
-        ' DashManifest shifts startNumber to match this anchor.
+        ' The DVR window, in segments ending at the head: a 24/7 channel is anchored at the
+        ' window, not its genesis (see LIVE_MAX_DVR_WINDOW_SEC). A young stream has less
+        ' history than the window: it is anchored at its first segment (sq 0), and the
+        ' listed timeline grows into the window.
         windowSec = maxDvrDurationSec
         if windowSec <= 0 or windowSec > LIVE_MAX_DVR_WINDOW_SEC
             windowSec = LIVE_MAX_DVR_WINDOW_SEC
         end if
-        ' A young stream has less history than the DVR window.
-        if headTimeSec > 0 and windowSec > headTimeSec
-            windowSec = headTimeSec
+        windowSegments = MathUtils.Max(windowSec * 1000 \ segmentDurationMs, 1)
+        firstSeqnum = MathUtils.Max(headSeqnum - windowSegments + 1, 0)
+
+        ' Distance the player stays behind the head: liveChunkReadahead segments of the
+        ' measured duration. A momentary head miss is absorbed instead of stalling at the
+        ' list end.
+        chunks = chunkReadahead
+        if chunks <= 0
+            chunks = LIVE_DEFAULT_CHUNK_READAHEAD
+        end if
+        minChunks = MathUtils.Max((3000 + segmentDurationMs - 1) \ segmentDurationMs, 1)
+        chunks = MathUtils.Clamp(chunks, minChunks, LIVE_MAX_CHUNK_READAHEAD)
+        cushionMs = chunks * segmentDurationMs
+        ' A stream younger than the cushion plays at its head: a cushion reaching back to its
+        ' first segment fails the start (demux.dash -36, 2 of 4 starts, measured).
+        if cushionMs >= (headSeqnum - firstSeqnum + 1) * segmentDurationMs
+            cushionMs = 0
         end if
 
-        ' Effective per-fragment duration, derived from the stream's own counters.
-        ' YouTube's reported targetDurationSec is unreliable for long-running streams
-        ' (observed 5s vs a real ~1.8s cadence); using it desyncs the duration-based
-        ' SegmentTemplate so the player requests segments far outside the DVR window
-        ' (404). headTime/headSeqnum is the true average and keeps the manifest's
-        ' wall-clock -> sq mapping anchored to the same (headTime, headSeqnum) pair
-        ' that availabilityStartTime is built from.
-        fragmentDurationMs = 0
-        if headSeqnum > 0
-            fragmentDurationMs = Cint((headTimeSec / headSeqnum) * 1000.0)
-        end if
-
-        astSec = nowSec - windowSec
+        ' Anchor: the head segment ends at (now - availabilityStartTime) + cushion, so the
+        ' player's clock edge sits a cushion behind the head. availabilityStartTime is
+        ' whole seconds; the sub-second remainder shifts the timeline instead. The window
+        ' never exceeds LIVE_MAX_DVR_WINDOW_SEC, so offsetting by it keeps `\` and `mod`
+        ' on a non-negative operand.
+        shiftedMs = LIVE_MAX_DVR_WINDOW_SEC * 1000 + nowMs + cushionMs - (headSeqnum - firstSeqnum + 1) * segmentDurationMs
         astDate = CreateObject("roDateTime")
-        astDate.FromSeconds(astSec)
-        cushionSec = Cint(LIVE_EDGE_CUSHION_SEGMENTS * fragmentDurationMs / 1000.0)
-        ' Younger than the cushion: shifting the anchor past now would break the edge math.
-        if cushionSec >= windowSec
-            cushionSec = 0
-        end if
-        ' Shift the anchor later by the cushion so the computed edge lands a cushion behind the head.
-        cushionedAstDate = CreateObject("roDateTime")
-        cushionedAstDate.FromSeconds(astSec + cushionSec)
-        ' Window minus the cushion; the full window would seek below startNumber.
-        seekableWindowSec = windowSec - cushionSec
+        astDate.FromSeconds(nowSec - LIVE_MAX_DVR_WINDOW_SEC + shiftedMs \ 1000)
 
-        parsedResponse["liveHeadSeqnum"] = headSeqnum
-        ' The real (uncushioned) availabilityStartTime, kept for diagnostics.
-        parsedResponse["liveAvailabilityStartUtc"] = astDate.ToISOString()
-        parsedResponse["liveCushionedAvailabilityStartUtc"] = cushionedAstDate.ToISOString()
-        parsedResponse["liveDvrWindowSec"] = windowSec
-        parsedResponse["liveSeekableWindowSec"] = seekableWindowSec
-        if fragmentDurationMs > 0
-            parsedResponse["liveFragmentDurationMs"] = fragmentDurationMs
+        return {
+            "liveHeadSeqnum": headSeqnum
+            "liveFirstSeqnum": firstSeqnum
+            "liveWindowSegments": windowSegments
+            "liveSegmentDurationMs": segmentDurationMs
+            "liveTimelineOffsetMs": shiftedMs mod 1000
+            "liveAvailabilityStartUtc": astDate.ToISOString()
+            ' The player's seek floor: the window less the cushion, and less a segment for
+            ' the listed timeline's alignment (DashRouter.AlignLiveTimeline).
+            "liveSeekableWindowSec": MathUtils.Max((windowSegments - 1) * segmentDurationMs - cushionMs, 0) \ 1000
+        }
+    end function
+
+    ' The format url with NO `sq` queries the stream's live head: googlevideo answers
+    ' at once with the X-Head-* headers (X-Head-Seqnum = newest available segment).
+    ' Pinning `sq=0` instead makes googlevideo answer about segment 0 specifically, and for
+    ' some streams (observed targetDurationSec=5) it then omits X-Head-* entirely
+    ' (only X-Sequence-Num/X-Walltime-Ms).
+    function GetLiveHeadUrl(formatUrl as string, cpn as dynamic) as string
+        queryComponents = UrlUtils.ParseQueryComponents(formatUrl)
+        queryComponents["rn"] = "0"
+        if not StringUtils.IsNullOrEmpty(cpn)
+            queryComponents["cpn"] = cpn
         end if
+        return UrlUtils.SetQueryParams(formatUrl, queryComponents)
+    end function
+
+    function CreateLiveHeadRequest(headUrl as string) as object
+        request = HttpClient.Head(headUrl)
+        request.Headers({
+            "origin": "https://www.youtube.com"
+            "referer": "https://www.youtube.com"
+            "DNT": "?1"
+        })
+        return request
+    end function
+
+    ' X-Head-Seqnum of a live head response, -1 if absent. Not gated on HTTP status: a
+    ' head check can come back non-2xx yet still carry the X-Head-* headers
+    ' (observed: one stream returns 500, another 200; both include them).
+    function ReadLiveHeadSeqnum(response as object) as integer
+        headers = response.Headers()
+        if not IsAssociativeArray(headers) or not headers.DoesExist("X-Head-Seqnum")
+            return -1
+        end if
+        return ValidString(headers["X-Head-Seqnum"]).ToInt()
+    end function
+
+    ' How far into the stream the head is (ms, X-Head-Time-Millis), invalid if absent. A
+    ' long-running stream's (e.g. 207 days = 1.79e10 ms) overflows BrightScript's 32-bit
+    ' int: ParseJson keeps it as a LongInteger, which .ToInt() and Cdbl() would truncate
+    ' (measured).
+    function ReadLiveHeadTimeMs(response as object) as dynamic
+        headers = response.Headers()
+        if not IsAssociativeArray(headers)
+            return invalid
+        end if
+        return StringUtils.ParseJsonSafe(ValidString(headers["X-Head-Time-Millis"]))
+    end function
+
+    ' X-Head-Time-Sec in ms, invalid if absent: whole seconds, too coarse to average a
+    ' young stream's few segments or to time the head between checks.
+    function ReadLiveHeadTimeSecAsMs(response as object) as dynamic
+        headers = response.Headers()
+        if not IsAssociativeArray(headers) or not headers.DoesExist("X-Head-Time-Sec")
+            return invalid
+        end if
+        return ValidString(headers["X-Head-Time-Sec"]).ToInt() * 1000&
     end function
 
 end namespace
