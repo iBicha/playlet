@@ -1,0 +1,23 @@
+namespace Tests
+
+    ' Log* calls read m.global.logger; LogError, LogWarn and LogTelemetryEvent write fields on m.global.telemetry.
+    ' Both are the app's own nodes, installed by their Init on first creation and shared by every suite after it.
+    ' Telemetry never runs, so nothing is sent.
+    function SetUpLoggingGlobals() as void
+        if m.global.logger = invalid
+            CreateObject("roSGNode", "Logger")
+        end if
+        if m.global.telemetry = invalid
+            CreateObject("roSGNode", "Telemetry")
+        end if
+    end function
+
+    ' For suites that drive error paths on purpose. Returns the level to restore in tearDown: the logger is shared.
+    function MuteLogger() as integer
+        SetUpLoggingGlobals()
+        logLevel = m.global.logger.logLevel
+        m.global.logger.logLevel = -1
+        return logLevel
+    end function
+
+end namespace

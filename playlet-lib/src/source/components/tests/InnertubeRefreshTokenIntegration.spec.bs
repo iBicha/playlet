@@ -1,5 +1,6 @@
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Innertube/OAuth.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 namespace Tests
@@ -9,14 +10,11 @@ namespace Tests
     class InnertubeRefreshTokenIntegrationTests extends Rooibos.BaseTestSuite
 
         protected override function setup()
-            m.logger = CreateObject("roSGNode", "Logger")
-            m.logger.logLevel = -1
-            ' A failed refresh goes through HttpClient's retry loop, which emits a
-            ' telemetry warning; give the stub a no-op telemetry sink to write to.
-            telemetry = CreateObject("roSGNode", "Node")
-            telemetry.addField("LogWarn", "string", false)
-            telemetry.addField("LogEvent", "assocarray", false)
-            m.global.addFields({ telemetry: telemetry })
+            m.logLevel = Tests.MuteLogger()
+        end function
+
+        protected override function tearDown()
+            m.global.logger.logLevel = m.logLevel
         end function
 
         @describe("Innertube refresh-token terminal classification (live)")
@@ -38,7 +36,7 @@ namespace Tests
             threw = false
             try
                 InnertubeService.AuthRefreshAccessToken(accessTokenObject, invalid)
-            catch error
+            catch _error
                 threw = true
             end try
 

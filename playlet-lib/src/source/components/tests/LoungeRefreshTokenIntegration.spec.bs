@@ -1,4 +1,5 @@
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 namespace Tests
@@ -8,13 +9,11 @@ namespace Tests
     class LoungeRefreshTokenIntegrationTests extends Rooibos.BaseTestSuite
 
         protected override function setup()
-            m.logger = CreateObject("roSGNode", "Logger")
-            m.logger.logLevel = -1
-            ' LoungeApi's failure paths emit telemetry; give the stub a no-op sink to write to.
-            telemetry = CreateObject("roSGNode", "Node")
-            telemetry.addField("LogWarn", "string", false)
-            telemetry.addField("LogEvent", "assocarray", false)
-            m.global.addFields({ telemetry: telemetry })
+            m.logLevel = Tests.MuteLogger()
+        end function
+
+        protected override function tearDown()
+            m.global.logger.logLevel = m.logLevel
         end function
 
         @describe("Lounge token-refresh recovery (live)")

@@ -2,6 +2,7 @@
 ' per-component one-liner (calls the shared Initialize); OnNodeReady is invoked by TestSetup with stub deps (no
 ' AutoBind). The spec drives the device via the Test* interface functions (callFunc reaches only interface funcs).
 import "pkg:/components/VideoPlayerDev/VideoPlayerDev.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
 
 function Init()
     ' intentionally empty: Initialize runs in TestSetup (at test time, when the global logger is ready), NOT at
@@ -19,21 +20,7 @@ end function
 ' TestSetup — stand up the deps the coordinator's OnNodeReady needs (no AutoBind), then run it so the device
 ' observers (state/position/duration) and the SponsorBlock/error controllers are wired exactly as in production.
 function TestSetup() as void
-    ' the coordinator logs; the logger-plugin reads m.global.logger.logLevel on every Log* call. The test app doesn't
-    ' always set that global (it isn't in an isolated/@only run), so ensure it exists before any coordinator code.
-    if m.global.logger = invalid
-        m.global.addField("logger", "node", false)
-        m.global.logger = CreateObject("roSGNode", "Logger")
-    end if
-
-    ' LogTelemetryEvent (error reports, the playback summary on close) writes m.global.telemetry.LogEvent; stub it.
-    if m.global.telemetry = invalid
-        m.global.addField("telemetry", "node", false)
-        telemetry = CreateObject("roSGNode", "Node")
-        telemetry.addField("LogEvent", "assocarray", false)
-        telemetry.addField("LogWarn", "string", false)
-        m.global.telemetry = telemetry
-    end if
+    Tests.SetUpLoggingGlobals()
 
     Initialize() ' the real coordinator init body (m.transport, findNode children, timer observers, getHttpAgent)
 
@@ -49,7 +36,10 @@ function TestSetup() as void
     container.fullscreen = true
     m.top.container = container
 
-    m.top.jobQueue = createObject("roSGNode", "Node")
+    ' swallows the jobs the coordinator queues (JobSystem.QueueJob writes request) without running them
+    jobQueue = createObject("roSGNode", "Node")
+    jobQueue.addField("request", "assocarray", false)
+    m.top.jobQueue = jobQueue
     m.top.notifications = createObject("roSGNode", "Node")
     m.top.preferences = createObject("roSGNode", "Node")
     m.top.invidious = createObject("roSGNode", "Node")
