@@ -1,0 +1,57 @@
+import "pkg:/components/Web/WebServer/Middleware/CsrfMiddleware.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class CsrfMiddlewareTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.middleware = new Http.CsrfMiddleware("X-Playlet", ["/dial/"])
+        end function
+
+        function Check(method as string, route as string, headers as object) as object
+            context = {
+                request: { method: method, route: route, headers: headers }
+                response: {
+                    code: invalid
+                    Default: function(code as integer, _text as string)
+                        m.code = code
+                    end function
+                }
+            }
+            handled = m.middleware.RequireHeader(context)
+            return { handled: handled, code: context.response.code }
+        end function
+
+        @describe("CsrfMiddleware.RequireHeader")
+
+        @it("lets reads through without the header")
+        function _()
+            for each method in ["GET", "HEAD", "OPTIONS"]
+                m.assertFalse(m.Check(method, "/api/state", {}).handled)
+            end for
+        end function
+
+        @it("rejects writes without the header")
+        function _()
+            for each method in ["POST", "PUT", "DELETE"]
+                result = m.Check(method, "/api/playlet-lib-urls", {})
+                m.assertTrue(result.handled)
+                m.assertEqual(result.code, 403)
+            end for
+        end function
+
+        @it("lets writes through with the header, in any case")
+        function _()
+            m.assertFalse(m.Check("POST", "/api/queue", { "x-playlet": "1" }).handled)
+        end function
+
+        @it("lets writes to an exempt prefix through without the header")
+        function _()
+            m.assertFalse(m.Check("POST", "/dial/abc/YouTube", {}).handled)
+        end function
+    end class
+
+end namespace

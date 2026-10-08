@@ -1,0 +1,40 @@
+import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
+
+namespace Http
+
+    class CsrfMiddleware extends HttpRouter
+        private headerName
+        private exemptRoutePrefixes
+
+        function new(headerName as string, exemptRoutePrefixes as object)
+            super()
+
+            m.headerName = headerName
+            m.exemptRoutePrefixes = exemptRoutePrefixes
+        end function
+
+        @all("*")
+        function RequireHeader(context as object) as boolean
+            request = context.request
+
+            method = request.method
+            if method = "GET" or method = "HEAD" or method = "OPTIONS"
+                return false
+            end if
+
+            if request.headers[m.headerName] <> invalid
+                return false
+            end if
+
+            for each prefix in m.exemptRoutePrefixes
+                if request.route.StartsWith(prefix)
+                    return false
+                end if
+            end for
+
+            context.response.Default(403, `Missing ${m.headerName} header`)
+            return true
+        end function
+    end class
+
+end namespace

@@ -1,4 +1,3 @@
-import { getHost } from "lib/Api/Host";
 import { PlayletApi } from "lib/Api/PlayletApi";
 import { BotGuardClient, getChallenge } from "bgutils-js/botguard";
 import { WebPoMinter } from "bgutils-js/webpo";
@@ -65,13 +64,7 @@ export class PoTokenMinter {
             CacheSeconds: -1,
         };
 
-        const response = await fetch(`http://${getHost()}/api/innertube/proxy`, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            method: "POST",
-            body: JSON.stringify(args)
-        });
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/innertube/proxy`, args);
 
         const responseData = await response.json();
 

@@ -17,6 +17,7 @@ import "pkg:/components/Web/PlayletWebServer/Middleware/StateApiRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/VideoQueueRouter.bs"
 import "pkg:/components/Web/PlayletWebServer/Middleware/ViewRouter.bs"
 import "pkg:/components/Web/WebServer/Middleware/CorsMiddleware.bs"
+import "pkg:/components/Web/WebServer/Middleware/CsrfMiddleware.bs"
 import "pkg:/components/Web/WebServer/Middleware/EtagMiddleware.bs"
 import "pkg:/components/Web/WebServer/Middleware/HttpStaticFilesRouter.bs"
 import "pkg:/components/Web/WebServer/WebSockets/WebSocketMiddleware.bs"
@@ -54,8 +55,17 @@ function SetupRoutes(server as object)
         'CORS is mostly for developing the web app
         server.UseRouter(new Http.CorsMiddleware())
     #else
+        ' CsrfMiddleware relies on this: a page whose origin is allowed can send its header.
         server.UseRouter(new Http.CorsMiddleware(""))
     #end if
+    server.UseRouter(new Http.CsrfMiddleware("X-Playlet", [
+        ' Phones and smart speakers can't send the header.
+        "/dial/"
+        ' The player's license requests change nothing on the device, and a page can't read the license.
+        "/api/innertube/get_drm_license"
+        ' Every write needs the caller's bearer token.
+        "/playlet-invidious-backend/"
+    ]))
     if server.settings.WebSocketsEnabled
         server.UseRouter(new Http.WebSocketMiddleware())
     end if

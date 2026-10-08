@@ -1,5 +1,7 @@
 import { getHost } from "lib/Api/Host";
 
+const CsrfHeader = "X-Playlet";
+
 export class PlayletApi {
     static host = () => `http://${getHost()}`
 
@@ -56,7 +58,7 @@ export class PlayletApi {
     }
 
     static async saveUserPreference(key, value) {
-        const response = await this.putJson(`${PlayletApi.host()}/api/preferences`, { [key]: value });
+        const response = await PlayletApi.send("PUT", `${PlayletApi.host()}/api/preferences`, { [key]: value });
         return await response;
     }
 
@@ -66,11 +68,11 @@ export class PlayletApi {
     }
 
     static async activateProfile(profileId) {
-        await this.postJson(`${PlayletApi.host()}/api/profiles/activate`, { id: profileId });
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/profiles/activate`, { id: profileId });
     }
 
     static async logout(profileId) {
-        return await fetch(`${PlayletApi.host()}/api/profiles?id=${profileId}`, { method: "DELETE" });
+        return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/profiles?id=${profileId}`);
     }
 
     static async playVideo(args) {
@@ -90,7 +92,7 @@ export class PlayletApi {
             }
         }
 
-        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue/play`, args);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/queue/play`, args);
     }
 
     static async playPlaylist(args) {
@@ -98,7 +100,7 @@ export class PlayletApi {
             return;
         }
 
-        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue/play`, args);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/queue/play`, args);
     }
 
     static async queueVideo(args) {
@@ -118,14 +120,14 @@ export class PlayletApi {
             }
         }
 
-        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/queue`, args);
     }
 
     static async queuePlaylist(args) {
         if (!args.playlistId) {
             return;
         }
-        await PlayletApi.postJson(`${PlayletApi.host()}/api/queue`, args);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/queue`, args);
     }
 
     static async openPlaylist(playlistId, continuationVideoId) {
@@ -152,16 +154,16 @@ export class PlayletApi {
     }
 
     static async addSearchHistory(query: string) {
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/search-history`, { query });
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/search-history`, { query });
         return await response.json();
     }
 
     static async clearSearchHistory() {
-        return await fetch(`${PlayletApi.host()}/api/search-history`, { method: "DELETE" });
+        return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/search-history`);
     }
 
     static async clearCache() {
-        return await fetch(`${PlayletApi.host()}/api/cache`, { method: "DELETE" });
+        return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/cache`);
     }
 
     static async getDevicePoToken() {
@@ -174,7 +176,7 @@ export class PlayletApi {
     }
 
     static async sendPoToken(identity: string, poToken: string, mintedAt: number, expiresAt: number) {
-        const response = await PlayletApi.postJson(`${PlayletApi.host()}/api/innertube/potoken`, { identity, poToken, mintedAt, expiresAt });
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/innertube/potoken`, { identity, poToken, mintedAt, expiresAt });
         if (!response.ok) {
             const body = await response.text().catch(() => "");
             throw new Error(`Device rejected poToken (HTTP ${response.status}): ${body}`);
@@ -182,7 +184,7 @@ export class PlayletApi {
     }
 
     static async clearPoTokens() {
-        return await fetch(`${PlayletApi.host()}/api/innertube/potoken/all`, { method: "DELETE" });
+        return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/innertube/potoken/all`);
     }
 
     static async getBookmarkFeeds() {
@@ -236,29 +238,18 @@ export class PlayletApi {
                     type: 'custom'
                 })
             }
-            await PlayletApi.postJson(`${PlayletApi.host()}/api/playlet-lib-urls`, urls);
+            await PlayletApi.send("POST", `${PlayletApi.host()}/api/playlet-lib-urls`, urls);
         } else {
-            return await fetch(`${PlayletApi.host()}/api/playlet-lib-urls`, { method: "DELETE" });
+            return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/playlet-lib-urls`);
         }
     }
 
-    private static postJson(url, payload) {
-        return fetch(url, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            method: "POST",
-            body: JSON.stringify(payload)
-        })
-    }
-
-    private static putJson(url, payload) {
-        return fetch(url, {
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            method: "PUT",
-            body: JSON.stringify(payload)
-        })
+    static send(method: "POST" | "PUT" | "DELETE", url: string, payload?: unknown) {
+        const headers: Record<string, string> = { [CsrfHeader]: "1" };
+        if (payload === undefined) {
+            return fetch(url, { method, headers });
+        }
+        headers["Content-Type"] = "application/json";
+        return fetch(url, { method, headers, body: JSON.stringify(payload) });
     }
 }

@@ -4,6 +4,8 @@ const fs = require('fs');
 const { ArgumentParser, BooleanOptionalAction } = require('argparse');
 const getEnvVars = require('./get-env-vars');
 
+const CsrfHeader = 'X-Playlet';
+
 (async () => {
     const parser = new ArgumentParser({
         description: 'Manage registry'
@@ -46,6 +48,7 @@ const getEnvVars = require('./get-env-vars');
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                [CsrfHeader]: '1',
             },
             body: JSON.stringify(registry),
         });
@@ -83,6 +86,9 @@ const getEnvVars = require('./get-env-vars');
     else if (clear) {
         const response = await fetch(playletServer, {
             method: 'DELETE',
+            headers: {
+                [CsrfHeader]: '1',
+            },
         });
 
         if (!response.ok) {
