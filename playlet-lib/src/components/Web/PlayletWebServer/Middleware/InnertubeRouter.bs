@@ -15,6 +15,7 @@ namespace Http
 
             m.innertube = server.sceneNodes.innertube
             m.profilesService = server.sceneNodes.profilesService
+            m.proxyRequestAllowedKeys = { "Method": true, "Url": true, "Headers": true, "Body": true, "CacheSeconds": true }
         end function
 
         @get("/api/innertube/potoken")
@@ -108,10 +109,17 @@ namespace Http
             response = context.response
 
             requestArgs = request.BodyJson()
-            if requestArgs = invalid
+            if not IsAssociativeArray(requestArgs)
                 response.Default(400, "Invalid request body")
                 return true
             end if
+
+            for each key in requestArgs
+                if not m.proxyRequestAllowedKeys.DoesExist(key)
+                    response.Default(400, `Unsupported key: "${key}"`)
+                    return true
+                end if
+            end for
 
             requestHeaders = requestArgs.Headers
             ' Proxied web-app requests (e.g. BotGuard attestation) may omit a
