@@ -61,28 +61,33 @@
     },
   ];
 
-  function transformValue(key, value) {
+  function linkFor(key, value) {
     switch (key) {
       case "app_version":
       case "lib_version":
       case "lib_version_latest":
-        return `<a class="link" href="https://github.com/iBicha/playlet/releases/tag/v${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
+        return `https://github.com/iBicha/playlet/releases/tag/v${encodeURIComponent(value)}`;
       case "lib_url":
-        const filename =
-          value &&
-          value.includes("/") &&
-          (value.endsWith(".zip") || value.endsWith(".pkg"))
-            ? value.substring(value.lastIndexOf("/") + 1)
-            : value;
-        return `<a class="link" href="${value}" target="_blank" rel="noopener noreferrer">${filename}</a>`;
+        return /^https?:\/\//.test(value) ? value : undefined;
       case "app_git_commit_hash":
       case "lib_git_commit_hash":
         if (value === "unknown") {
-          return value;
+          return undefined;
         }
-        return `<a class="link" href="https://github.com/iBicha/playlet/commit/${value}" target="_blank" rel="noopener noreferrer">${value}</a>`;
+        return `https://github.com/iBicha/playlet/commit/${encodeURIComponent(value)}`;
       default:
-        break;
+        return undefined;
+    }
+  }
+
+  function displayValue(key, value) {
+    if (
+      key === "lib_url" &&
+      value &&
+      value.includes("/") &&
+      (value.endsWith(".zip") || value.endsWith(".pkg"))
+    ) {
+      return value.substring(value.lastIndexOf("/") + 1);
     }
     return value;
   }
@@ -268,7 +273,19 @@ ${JSON.stringify(profilesInfo, null, 2)}
         {#each displayNames as item}
           <tr>
             <td>{item.displayText}</td>
-            <td>{@html transformValue(item.key, appInfo[item.key])}</td>
+            <td>
+              {#if linkFor(item.key, appInfo[item.key])}
+                <a
+                  class="link"
+                  href={linkFor(item.key, appInfo[item.key])}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >{displayValue(item.key, appInfo[item.key])}</a
+                >
+              {:else}
+                {displayValue(item.key, appInfo[item.key])}
+              {/if}
+            </td>
           </tr>
         {/each}
 

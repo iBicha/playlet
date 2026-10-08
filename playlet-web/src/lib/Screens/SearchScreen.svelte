@@ -172,9 +172,9 @@
                 <li class="p-1">
                   <button
                     type="button"
-                    on:click={async (e) => {
-                      await suggestionClicked(e.currentTarget.innerText);
-                    }}>{@html suggestion}</button
+                    on:click={async () => {
+                      await suggestionClicked(suggestion);
+                    }}>{suggestion}</button
                   >
                 </li>
               {/each}
