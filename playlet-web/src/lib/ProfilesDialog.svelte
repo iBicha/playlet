@@ -23,14 +23,12 @@
   let profiles = [];
   let currentProfile;
 
-  let authUrl;
   let currentInstance;
   let currentInstanceName;
 
   let accordionState = null;
 
   playletStateStore.subscribe((value) => {
-    authUrl = value?.invidious?.auth_url;
     currentInstance = value?.invidious?.invidious_instance || "";
     if (!currentInstance) {
       const trFn = get(translate);
@@ -72,12 +70,16 @@
       return;
     }
 
-    if (!authUrl) {
-      alert("Error with login, please refresh the page.");
+    window.location.href = "/invidious/login";
+  }
+
+  function relogin(profile) {
+    if (profile.type === "youtube") {
+      loginToYoutube();
       return;
     }
 
-    window.location = authUrl;
+    window.location.href = `/invidious/login?profile=${encodeURIComponent(profile.id)}`;
   }
 
   function loginToYoutube() {
@@ -133,6 +135,10 @@
                   "The session has expired. Please sign in again with this profile, or switch to another profile."
                 )}
               </div>
+              <button
+                on:click={() => relogin(profile)}
+                class="btn btn-primary m-1">{$translate("Login")}</button
+              >
             {/if}
             {#if profile.id !== currentProfile?.id}
               <button

@@ -21,9 +21,23 @@ namespace Http
             request = context.request
             response = context.response
 
-            server = ValidString(request.query["server"])
+            ' The login link carries the nonce, so its server comes from the
+            ' device (a profile's, or the configured instance), never the URL.
+            server = ""
+            profileId = request.query["profile"]
+            if profileId <> invalid
+                server = m.GetProfileServer(ValidString(profileId))
+                if server = invalid
+                    response.Default(400, "Unknown profile")
+                    return true
+                end if
+            end if
 
-            authLink = m.invidiousNode@.GetAuthorizeTokenLink(server)
+            if m.loginNonce = invalid
+                m.loginNonce = CreateObject("roDeviceInfo").GetRandomUUID()
+            end if
+
+            authLink = m.invidiousService.GetAuthorizeTokenLink(server, m.loginNonce)
             if authLink = invalid
                 response.Default(503, "Invidious server not configured")
                 return true
@@ -37,7 +51,16 @@ namespace Http
             request = context.request
             response = context.response
 
-            if request.query["token"] <> invalid and request.query["ref"] <> invalid
+            if request.query["token"] <> invalid and request.query["ref"] <> invalid and request.query["username"] <> invalid
+                ' The callback is a plain GET any web page can trigger, so it only
+                ' accepts a login that went through a link this device handed out.
+                nonce = request.query["nonce"]
+                if m.loginNonce = invalid or not IsString(nonce) or nonce <> m.loginNonce
+                    response.Default(403, "Invalid login link. Please start the login again.")
+                    return true
+                end if
+                m.loginNonce = invalid
+
                 ' Invidious encodes token and username twice
                 token = request.query["token"].DecodeUriComponent().DecodeUriComponent()
                 username = request.query["username"].DecodeUriComponent().DecodeUriComponent()
@@ -52,6 +75,17 @@ namespace Http
             end if
             response.Redirect("/")
             return true
+        end function
+
+        function GetProfileServer(profileId as string) as dynamic
+            profilesDto = m.profilesNode@.GetProfilesDto(false)
+            profiles = profilesDto.profiles
+            for each profile in profiles
+                if profile.id = profileId and profile.type = "invidious"
+                    return profile.serverUrl
+                end if
+            end for
+            return invalid
         end function
 
         ' This is an endpoint allowing the web app to make an authenticated request
