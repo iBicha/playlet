@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Small security fixes
+
 ### Changed
 
 - Changing Playlet library url (e.g. to test a Canary version) now requires entering a verification code
