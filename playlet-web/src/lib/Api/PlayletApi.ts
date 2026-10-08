@@ -193,11 +193,11 @@ export class PlayletApi {
     }
 
     static async showExportRegistryCode() {
-        await fetch(`${PlayletApi.host()}/api/registry/export/code`);
+        await PlayletApi.send("POST", `${PlayletApi.host()}/api/registry/export/code`);
     }
 
     static async exportRegistry(code: string) {
-        const response = await fetch(`${PlayletApi.host()}/api/registry/export?code=${code}`);
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/registry/export?code=${encodeURIComponent(code)}`);
         if (!response.ok) {
             const error = `Error from /api/registry/export: ${response.statusText}`;
             console.error(error);
@@ -218,29 +218,46 @@ export class PlayletApi {
         return { filename, content };
     }
 
-    static async setPlayletLibVersion(tag) {
-        if (tag !== "") {
-            const urls = [{
-                link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.squashfs.pkg`,
+    static playletLibUrlsForTag(tag: string) {
+        const urls = [{
+            link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.squashfs.pkg`,
+            type: 'custom'
+        }, {
+            link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
+            type: 'custom'
+        }]
+        // When an official release is out, it replaces the current canary release.
+        // To avoid the "not found" error, we fallback to the default "latest" release.
+        if (tag === "canary") {
+            urls.push({
+                link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.squashfs.pkg`,
                 type: 'custom'
             }, {
-                link: `https://github.com/iBicha/playlet/releases/download/${tag}/playlet-lib.zip`,
+                link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip`,
                 type: 'custom'
-            }]
-            // When an official release is out, it replaces the current canary release.
-            // To avoid the "not found" error, we fallback to the default "latest" release.
-            if (tag === "canary") {
-                urls.push({
-                    link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.squashfs.pkg`,
-                    type: 'custom'
-                }, {
-                    link: `https://github.com/iBicha/playlet/releases/latest/download/playlet-lib.zip`,
-                    type: 'custom'
-                })
-            }
-            await PlayletApi.send("POST", `${PlayletApi.host()}/api/playlet-lib-urls`, urls);
-        } else {
-            return await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/playlet-lib-urls`);
+            })
+        }
+        return urls;
+    }
+
+    static async showSetPlayletLibUrlsCode() {
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/playlet-lib-urls/code`);
+        if (!response.ok) {
+            throw new Error(`Error from /api/playlet-lib-urls/code: ${response.status} ${await response.text()}`);
+        }
+    }
+
+    static async setPlayletLibUrls(urls: { link: string, type: string }[], code: string) {
+        const response = await PlayletApi.send("POST", `${PlayletApi.host()}/api/playlet-lib-urls?code=${encodeURIComponent(code)}`, urls);
+        if (!response.ok) {
+            throw new Error(`Error from /api/playlet-lib-urls: ${response.status} ${await response.text()}`);
+        }
+    }
+
+    static async resetPlayletLibUrls() {
+        const response = await PlayletApi.send("DELETE", `${PlayletApi.host()}/api/playlet-lib-urls`);
+        if (!response.ok) {
+            throw new Error(`Error from /api/playlet-lib-urls: ${response.status} ${await response.text()}`);
         }
     }
 

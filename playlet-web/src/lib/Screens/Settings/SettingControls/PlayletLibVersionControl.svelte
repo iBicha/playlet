@@ -97,18 +97,43 @@
     const trFn = get(translate);
 
     if (
-      confirm(
+      !confirm(
         trFn(
           "Are you sure you want to change the Playlet Library version to %1?"
-        ).replace("%1", version)
-      ) +
-      `\n` +
-      trFn("This will restart Playlet.")
+        ).replace("%1", version) +
+          `\n` +
+          trFn("This will restart Playlet.")
+      )
     ) {
-      await PlayletApi.setPlayletLibVersion(selectedRelease);
-      alert(trFn("Playlet Library version changed. Playlet will now restart."));
-      await ExternalControlProtocol.restartApp(appId);
+      return;
     }
+
+    try {
+      if (selectedRelease === "") {
+        await PlayletApi.resetPlayletLibUrls();
+      } else {
+        await PlayletApi.showSetPlayletLibUrlsCode();
+        const code = prompt(trFn("Enter the code you see on your Roku device"));
+        if (!code) {
+          return;
+        }
+        await PlayletApi.setPlayletLibUrls(
+          PlayletApi.playletLibUrlsForTag(selectedRelease),
+          code
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      alert(
+        trFn(
+          "Failed to change the Playlet Library version. Please try again. See console for details."
+        )
+      );
+      return;
+    }
+
+    alert(trFn("Playlet Library version changed. Playlet will now restart."));
+    await ExternalControlProtocol.restartApp(appId);
   }
 </script>
 

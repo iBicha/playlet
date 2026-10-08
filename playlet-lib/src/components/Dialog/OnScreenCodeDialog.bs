@@ -1,0 +1,44 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Proves the caller can see the TV: a LAN peer can press remote keys over
+' ECP, but cannot read the screen.
+
+const CODE_LIFETIME_MINUTES = 2
+
+function Init()
+    code = Rnd(999999).ToStr()
+    if code.Len() < 6
+        code = string(6 - code.Len(), "0") + code
+    end if
+    m.code = code
+
+    ' TODO:P2 localization
+    m.top.message = [
+        `The code is: ${code.Left(3)} ${code.Right(3)}.`
+        `This code will expire in ${CODE_LIFETIME_MINUTES} minutes.`
+        "If you did not request this, please close this dialog."
+    ]
+    m.top.buttons = [Tr(Locale.Buttons.OK)]
+    m.top.alwaysOnTop = true
+
+    m.expiryTimer = CreateObject("roSGNode", "Timer")
+    m.expiryTimer.duration = CODE_LIFETIME_MINUTES * 60
+    m.expiryTimer.observeFieldScoped("fire", FuncName(CloseDialog))
+    m.expiryTimer.control = "start"
+
+    m.top.observeField("wasClosed", FuncName(OnDialogClosed))
+end function
+
+function OnDialogClosed()
+    m.expiryTimer.control = "stop"
+    m.expiryTimer.unobserveFieldScoped("fire")
+end function
+
+function Consume(purpose as string, code as dynamic) as boolean
+    expectedCode = m.code
+    m.code = invalid
+    CloseDialog()
+
+    return expectedCode <> invalid and purpose = m.top.purpose and IsString(code) and code.Replace(" ", "") = expectedCode
+end function

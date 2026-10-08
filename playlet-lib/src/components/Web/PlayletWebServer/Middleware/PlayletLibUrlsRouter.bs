@@ -1,3 +1,4 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
@@ -29,10 +30,30 @@ namespace Http
             return true
         end function
 
+        @post("/api/playlet-lib-urls/code")
+        function ShowSetPlayletLibUrlsCode(context as object) as boolean
+            response = context.response
+
+            ' TODO:P2 localization
+            dialog = DialogUtils.ShowOnScreenCodeDialog(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, "Change Playlet library")
+            if dialog = invalid
+                response.Default(429, "Too Many Requests")
+                return true
+            end if
+
+            response.Default(204, "OK")
+            return true
+        end function
+
         @post("/api/playlet-lib-urls")
         function SetPlayletLibUrls(context as object) as boolean
             request = context.request
             response = context.response
+
+            if not DialogUtils.ConsumeOnScreenCode(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, request.query.code)
+                response.Default(400, "Invalid code")
+                return true
+            end if
 
             payload = request.BodyJson()
             if payload = invalid or not IsArray(payload)

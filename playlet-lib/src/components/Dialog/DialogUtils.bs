@@ -8,6 +8,13 @@ namespace DialogUtils
     ' Very large messages can lead to execution timeout
     const MESSAGE_LENGTH_LIMIT = 1000
 
+    const ON_SCREEN_CODE_MIN_INTERVAL_MS = 2000
+
+    enum OnScreenCodePurpose
+        ExportRegistry = "ExportRegistry"
+        SetPlayletLibUrls = "SetPlayletLibUrls"
+    end enum
+
     function ShowDialogEx(options as object) as object
         currentDialog = m.top.getScene().dialog
         alwaysOnTop = false
@@ -116,6 +123,29 @@ namespace DialogUtils
         dialog.focusDefaultButton = true
 
         return dialog
+    end function
+
+    function ShowOnScreenCodeDialog(purpose as DialogUtils.OnScreenCodePurpose, title as string) as object
+        if m._onScreenCodeShownTimer = invalid
+            m._onScreenCodeShownTimer = CreateObject("roTimespan")
+        else if m._onScreenCodeShownTimer.TotalMilliseconds() < ON_SCREEN_CODE_MIN_INTERVAL_MS
+            return invalid
+        end if
+        m._onScreenCodeShownTimer.Mark()
+
+        dialog = CreateObject("roSGNode", "OnScreenCodeDialog")
+        dialog.purpose = purpose
+        dialog.title = title
+        m.top.getScene().dialog = dialog
+        return dialog
+    end function
+
+    function ConsumeOnScreenCode(purpose as DialogUtils.OnScreenCodePurpose, code as dynamic) as boolean
+        dialog = m.top.getScene().dialog
+        if dialog = invalid or dialog.subtype() <> "OnScreenCodeDialog"
+            return false
+        end if
+        return dialog@.Consume(purpose, code)
     end function
 
     function ShowDialogOnce(options as object) as object

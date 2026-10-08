@@ -1,0 +1,48 @@
+import "pkg:/components/Dialog/DialogUtils.bs"
+
+namespace Tests
+
+    @suite
+    class OnScreenCodeDialogTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.dialog = CreateObject("roSGNode", "OnScreenCodeDialog")
+            m.dialog.purpose = DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls
+            match = CreateObject("roRegex", "(\d{3}) (\d{3})", "").Match(m.dialog.message[0])
+            m.code = match[1] + match[2]
+        end function
+
+        @describe("OnScreenCodeDialog.Consume")
+
+        @it("accepts the code shown, and closes")
+        function _()
+            displayedCode = `${m.code.Left(3)} ${m.code.Right(3)}`
+            m.assertTrue(m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, displayedCode))
+            m.assertTrue(m.dialog.close)
+        end function
+
+        @it("is single use")
+        function _()
+            m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, m.code)
+            m.assertFalse(m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, m.code))
+        end function
+
+        @it("burns the code on a wrong guess")
+        function _()
+            m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, "wrong")
+            m.assertTrue(m.dialog.close)
+            m.assertFalse(m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, m.code))
+        end function
+
+        @it("rejects the code for another purpose")
+        function _()
+            m.assertFalse(m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.ExportRegistry, m.code))
+        end function
+
+        @it("rejects a code that is not a string")
+        function _()
+            m.assertFalse(m.dialog@.Consume(DialogUtils.OnScreenCodePurpose.SetPlayletLibUrls, m.code.ToInt()))
+        end function
+    end class
+
+end namespace

@@ -1,100 +1,38 @@
 import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
-import "pkg:/source/utils/StringUtils.bs"
-import "pkg:/source/utils/TimeUtils.bs"
 
 const REGISTRY_EXPORT_VERSION = 1
 
 namespace Http
 
-    ' TODO:P2 localization
     class RegistryRouter extends HttpRouter
 
-        function new(server as object)
+        function new()
             super()
-
-            m.task = server.task
-            m.lastRequestCodeTimeSeconds = 0
-            m.requestCode = invalid
         end function
 
-        @get("/api/registry/export/code")
+        @post("/api/registry/export/code")
         function ShowExportRegistryCode(context as object) as boolean
             response = context.response
 
-            requestCodeTimeSeconds = TimeUtils.Now().AsSeconds()
-
-            m.requestCode = invalid
-            scene = m.task.getScene()
-            dialog = scene.dialog
-            if dialog <> invalid and dialog.hasField("isExportRegistryCodeDialog")
-                dialog.close = true
-            end if
-
-            if requestCodeTimeSeconds - m.lastRequestCodeTimeSeconds < 2
+            ' TODO:P2 localization
+            dialog = DialogUtils.ShowOnScreenCodeDialog(DialogUtils.OnScreenCodePurpose.ExportRegistry, "Export registry")
+            if dialog = invalid
                 response.Default(429, "Too Many Requests")
                 return true
-            end if
-
-            requestCode = rnd(999999).ToStr()
-            if requestCode.Len() < 6
-                requestCode = string(6 - requestCode.Len(), "0") + requestCode
-            end if
-
-            m.requestCode = requestCode
-            m.lastRequestCodeTimeSeconds = requestCodeTimeSeconds
-            requestCode = requestCode.Left(3) + " " + requestCode.Right(3)
-
-            message = `The code to export the registry data is: ${requestCode}.
-This code will expire in 2 minutes.
-If you did not request to export the registry, please close this dialog.`
-            dialog = DialogUtils.ShowDialogEx({
-                message: message
-                title: "Export registry"
-                alwaysOnTop: true
-            })
-            if dialog <> invalid
-                dialog.addField("isExportRegistryCodeDialog", "boolean", false)
             end if
 
             response.Default(204, "OK")
             return true
         end function
 
-        @get("/api/registry/export")
+        @post("/api/registry/export")
         function ExportRegistry(context as object) as boolean
             request = context.request
             response = context.response
 
-            requestCode = m.requestCode
-            m.requestCode = invalid
-            dialog = m.task.getScene().dialog
-            if dialog = invalid or not dialog.hasField("isExportRegistryCodeDialog")
-                response.Default(400, "Invalid code")
-                return true
-            end if
-            dialog.close = true
-
-            requestTimeSeconds = TimeUtils.Now().AsSeconds()
-            if requestTimeSeconds - m.lastRequestCodeTimeSeconds > 120
-                response.Default(400, "Invalid code")
-                return true
-            end if
-
-            if requestCode = invalid
-                response.Default(400, "Invalid code")
-                return true
-            end if
-
-            code = request.query.code
-            if StringUtils.IsNullOrEmpty(code)
-                response.Default(400, "Invalid code")
-                return true
-            end if
-
-            code = code.Replace(" ", "")
-            if code <> requestCode
+            if not DialogUtils.ConsumeOnScreenCode(DialogUtils.OnScreenCodePurpose.ExportRegistry, request.query.code)
                 response.Default(400, "Invalid code")
                 return true
             end if
