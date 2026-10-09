@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- "Stats for nerds" button in the video player: shows playback diagnostics (resolution, codecs, bitrate, container) for the current video
+
 ### Fixed
 
 - Small security fixes

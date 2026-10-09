@@ -1,0 +1,357 @@
+import "pkg:/source/utils/Locale.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/TimeUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "pkg:/source/utils/UrlUtils.bs"
+
+' The coordinator owns `visible`; this renders the wired Video node's diagnostics. While hidden only
+' streamingSegment is observed: it alternates audio and video segments, so the last video segment is retained
+' for the next reveal. Every other field persists on the node, so it is read on reveal and observed only while
+' the overlay is painted — a hidden overlay does no per-second or label work.
+
+const ROW_HEIGHT = 21
+const ROW_SPACING = 6
+const ROW_PADDING = 12
+
+function Init() as void
+    m.top.focusable = false
+
+    rows = [
+        ["videoId", Tr(Locale.VideoPlayer.StatsVideoId)]
+        ["state", Tr(Locale.VideoPlayer.StatsState)]
+        ["playback", Tr(Locale.VideoPlayer.StatsPlayback)]
+        ["viewport", Tr(Locale.VideoPlayer.StatsViewport)]
+        ["resolution", Tr(Locale.VideoPlayer.StatsResolution)]
+        ["codecs", Tr(Locale.VideoPlayer.StatsCodecs)]
+        ["bitrate", Tr(Locale.VideoPlayer.StatsBitrate)]
+        ["container", Tr(Locale.VideoPlayer.StatsContainer)]
+    ]
+    rowsGroup = m.top.findNode("rows")
+    m.values = {}
+    for each row in rows
+        line = rowsGroup.createChild("LayoutGroup")
+        line.layoutDirection = "horiz"
+        line.itemSpacings = [8]
+        name = CreateRowLabel(line, 150)
+        name.text = row[1]
+        value = CreateRowLabel(line, 238)
+        value.id = row[0] + "Value"
+        m.values[row[0]] = value
+    end for
+    m.top.findNode("background").height = ROW_PADDING * 2 + rows.Count() * ROW_HEIGHT + (rows.Count() - 1) * ROW_SPACING
+
+    ' Video fields observed only while painted (streamingSegment is observed for the Video's lifetime).
+    m.paintedFields = ["content", "state", "position", "duration", "width", "height", "videoFormat", "audioFormat", "streamInfo"]
+    m.video = invalid
+    m.content = invalid
+    m.videoSegment = invalid
+    m.painting = false
+
+    m.top.observeFieldScoped("visible", FuncName(OnVisibleChange))
+    m.top.observeFieldScoped("video", FuncName(OnVideoChange))
+    OnVideoChange()
+end function
+
+function CreateRowLabel(parent as object, width as integer) as object
+    label = parent.createChild("Label")
+    label.width = width
+    label.height = ROW_HEIGHT
+    label.vertAlign = "center"
+    label.wrap = false
+    label.color = "#EBEBEBFF"
+    label.font = "font:SmallestSystemFont"
+    return label
+end function
+
+function OnVideoChange() as void
+    video = m.top.video
+    if m.video <> invalid and video <> invalid and m.video.isSameNode(video)
+        return
+    end if
+
+    StopPainting()
+    if m.video <> invalid and m.video.hasField("streamingSegment")
+        m.video.unobserveFieldScoped("streamingSegment")
+    end if
+    m.video = video
+    m.videoSegment = invalid
+    ClearValues()
+
+    if m.video <> invalid and m.video.hasField("streamingSegment")
+        RetainVideoSegment(m.video.streamingSegment)
+        m.video.observeFieldScoped("streamingSegment", FuncName(OnStreamingSegment))
+    end if
+    OnVisibleChange()
+end function
+
+function OnVisibleChange() as void
+    if m.top.visible and m.video <> invalid
+        StartPainting()
+    else
+        StopPainting()
+    end if
+end function
+
+function StartPainting() as void
+    if not m.painting
+        for each fieldName in m.paintedFields
+            if m.video.hasField(fieldName)
+                m.video.observeFieldScoped(fieldName, FuncName(OnPaintedFieldChange))
+            end if
+        end for
+        BindContent()
+        m.painting = true
+    end if
+    PaintAll()
+end function
+
+function StopPainting() as void
+    if not m.painting
+        return
+    end if
+    for each fieldName in m.paintedFields
+        if m.video.hasField(fieldName)
+            m.video.unobserveFieldScoped(fieldName)
+        end if
+    end for
+    UnbindContent()
+    m.painting = false
+end function
+
+' The stream URL changes in place when playback falls back to the next playletStreamUrls entry.
+function BindContent() as void
+    content = GetField(m.video, "content")
+    if m.content <> invalid and content <> invalid and m.content.isSameNode(content)
+        return
+    end if
+    UnbindContent()
+    if content <> invalid and content.hasField("url")
+        m.content = content
+        m.content.observeFieldScoped("url", FuncName(PaintContainer))
+    end if
+end function
+
+function UnbindContent() as void
+    if m.content <> invalid
+        m.content.unobserveFieldScoped("url")
+        m.content = invalid
+    end if
+end function
+
+function OnPaintedFieldChange(event as object) as void
+    fieldName = event.getField()
+    if fieldName = "state"
+        SetValue("state", ValidString(event.getData()))
+    else if fieldName = "position" or fieldName = "duration"
+        PaintPlayback()
+    else if fieldName = "width" or fieldName = "height"
+        PaintViewport()
+    else if fieldName = "videoFormat" or fieldName = "audioFormat"
+        PaintCodecs()
+    else if fieldName = "streamInfo"
+        PaintBitrate()
+    else if fieldName = "content"
+        BindContent()
+        PaintVideoId()
+        PaintContainer()
+    end if
+end function
+
+function OnStreamingSegment(event as object) as void
+    if RetainVideoSegment(event.getData()) and m.painting
+        PaintResolution()
+        PaintBitrate()
+    end if
+end function
+
+' Keeps segments that carry video (segType 2=video, 0=mux). Audio (1) and caption (3) segments have no
+' dimensions and their own bitrate, so they must not replace the video segment's values.
+function RetainVideoSegment(segment as dynamic) as boolean
+    if not IsAssociativeArray(segment)
+        return false
+    end if
+    segType = ValidInt(segment.segType)
+    if segType <> 0 and segType <> 2
+        return false
+    end if
+    m.videoSegment = segment
+    return true
+end function
+
+function PaintAll() as void
+    PaintVideoId()
+    SetValue("state", ValidString(GetField(m.video, "state")))
+    PaintPlayback()
+    PaintViewport()
+    PaintResolution()
+    PaintCodecs()
+    PaintBitrate()
+    PaintContainer()
+end function
+
+function PaintVideoId() as void
+    content = GetField(m.video, "content")
+    videoId = ""
+    if content <> invalid and content.hasField("videoId")
+        videoId = ValidString(content.videoId)
+    end if
+    SetValue("videoId", videoId)
+end function
+
+function PaintPlayback() as void
+    ' GetFormattedTime renders 0 as unknown (""): right for a not-yet-loaded duration, not for a position.
+    position = WholeNumber(GetField(m.video, "position"))
+    positionText = TimeUtils.GetFormattedTime(position)
+    if position = 0
+        positionText = "0:00"
+    end if
+    durationText = TimeUtils.GetFormattedTime(WholeNumber(GetField(m.video, "duration")))
+    SetValue("playback", JoinNonEmpty(positionText, durationText))
+end function
+
+function PaintViewport() as void
+    SetValue("viewport", FormatDimensions(GetField(m.video, "width"), GetField(m.video, "height")))
+end function
+
+function PaintResolution() as void
+    resolution = ""
+    if m.videoSegment <> invalid
+        resolution = FormatDimensions(m.videoSegment.width, m.videoSegment.height)
+    end if
+    SetValue("resolution", resolution)
+end function
+
+function PaintCodecs() as void
+    SetValue("codecs", JoinNonEmpty(ValidString(GetField(m.video, "videoFormat")), ValidString(GetField(m.video, "audioFormat"))))
+end function
+
+' The playing video segment's bitrate; streamInfo covers streams without segments (progressive).
+function PaintBitrate() as void
+    bitrate = -1
+    if m.videoSegment <> invalid
+        bitrate = WholeNumber(m.videoSegment.segBitrateBps)
+    end if
+    if bitrate <= 0
+        streamInfo = GetField(m.video, "streamInfo")
+        if IsAssociativeArray(streamInfo)
+            bitrate = WholeNumber(streamInfo.streamBitrate)
+        end if
+    end if
+    SetValue("bitrate", FormatBitrate(bitrate))
+end function
+
+function PaintContainer() as void
+    content = GetField(m.video, "content")
+    url = ""
+    if content <> invalid and content.hasField("url")
+        url = ValidString(content.url)
+    end if
+    SetValue("container", ContainerFromUrl(url))
+end function
+
+function SetValue(name as string, text as string) as void
+    label = m.values[name]
+    if label.text <> text
+        label.text = text
+    end if
+end function
+
+function ClearValues() as void
+    for each name in m.values
+        SetValue(name, "")
+    end for
+end function
+
+function GetField(node as object, fieldName as string) as dynamic
+    if node <> invalid and node.hasField(fieldName)
+        return node[fieldName]
+    end if
+    return invalid
+end function
+
+' Truncates a Roku numeric field to whole units; -1 when the value is not a number.
+function WholeNumber(value as dynamic) as integer
+    if IsInt(value)
+        return value
+    else if IsFloat(value) or IsDouble(value)
+        return Int(value)
+    end if
+    return -1
+end function
+
+function JoinNonEmpty(first as string, second as string) as string
+    if StringUtils.IsNullOrEmpty(first)
+        return second
+    else if StringUtils.IsNullOrEmpty(second)
+        return first
+    end if
+    return first + " / " + second
+end function
+
+function FormatDimensions(width as dynamic, height as dynamic) as string
+    parsedWidth = WholeNumber(width)
+    parsedHeight = WholeNumber(height)
+    if parsedWidth <= 0 or parsedHeight <= 0
+        return ""
+    end if
+    return parsedWidth.ToStr() + " x " + parsedHeight.ToStr()
+end function
+
+function FormatBitrate(bitrate as integer) as string
+    if bitrate <= 0
+        return ""
+    end if
+    if bitrate >= 1000000
+        scaled = (bitrate + 50000) \ 100000
+        return (scaled \ 10).ToStr() + "." + (scaled mod 10).ToStr() + " Mbps"
+    else if bitrate >= 1000
+        return (bitrate \ 1000).ToStr() + " kbps"
+    end if
+    return bitrate.ToStr() + " bps"
+end function
+
+' Playlet's own manifest endpoints and YouTube/Invidious manifest paths identify adaptive streams; progressive
+' URLs carry a mime query param (e.g. mime=video/mp4) or a file extension.
+function ContainerFromUrl(url as string) as string
+    if StringUtils.IsNullOrEmpty(url)
+        return ""
+    end if
+    path = url
+    queryIndex = url.InStr("?")
+    if queryIndex <> -1
+        path = url.Left(queryIndex)
+    end if
+    path = LCase(path)
+
+    if path.EndsWith("/api/dash") or path.EndsWith(".mpd") or path.InStr("/manifest/dash/") <> -1
+        return "dash"
+    else if path.EndsWith("/api/hls") or path.EndsWith(".m3u8") or path.InStr("/manifest/hls") <> -1
+        return "hls"
+    end if
+
+    if queryIndex <> -1
+        query = UrlUtils.ParseQueryComponents(url)
+        mime = ValidString(query["mime"])
+        slashIndex = mime.InStr("/")
+        if slashIndex <> -1
+            return LCase(mime.Mid(slashIndex + 1))
+        end if
+    end if
+
+    for each extension in ["mp4", "webm", "mkv"]
+        if path.EndsWith("." + extension)
+            return extension
+        end if
+    end for
+    return ""
+end function
+
+function OnDispose() as void
+    StopPainting()
+    if m.video <> invalid and m.video.hasField("streamingSegment")
+        m.video.unobserveFieldScoped("streamingSegment")
+    end if
+    m.video = invalid
+    m.top.unobserveFieldScoped("visible")
+    m.top.unobserveFieldScoped("video")
+end function

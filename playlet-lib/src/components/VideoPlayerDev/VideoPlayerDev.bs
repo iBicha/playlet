@@ -58,6 +58,7 @@ function Initialize()
     m.seekToPercent = invalid
 
     m.errorDialogNode = invalid
+    m.statsEnabled = false ' per player (= per video): starts off, never written to preferences
     m.ignoreNextFinished = false ' a retry replay -> swallow the next "finished" edge
     m.videoPlayedSuccessfully = false ' true once the stream has actually played (gates error-retry)
 
@@ -93,6 +94,9 @@ function Initialize()
     m.largePause = m.top.findNode("largePause")
     m.buttonRow = m.top.findNode("buttonRow")
     m.fullScreenHint = m.top.findNode("fullScreenHint")
+    m.statsForNerds = m.top.findNode("statsForNerds")
+    m.statsForNerds.visible = false
+    m.statsForNerds.video = m.top
 
     m.autoHide = m.top.findNode("autoHide")
     m.transportTimer = m.top.findNode("transportTimer")
@@ -168,6 +172,8 @@ function OnNodeReady()
     m.top.ObserveField("control", FuncName(OnControlChange))
     m.top.ObserveField("bufferingStatus", FuncName(OnBufferingStatus))
     m.top.ObserveField("playStartInfo", FuncName(OnPlayStartInfo))
+    ' the PiP grow animation drives translation; stats wait for it to settle at maxRect (SyncStatsForNerds).
+    m.top.ObserveField("translation", FuncName(SyncStatsForNerds))
 
     ' a player that starts minimized shows the PiP hint (1s after the shrink settles, auto-hides after 5s).
     m.showFullScreenHint = not m.container.fullscreen
@@ -544,6 +550,8 @@ end function
 function ActivateButton(index as integer) as void
     if index = PlayerCoordinatorLogic.PlayerButton.PlayPause
         TogglePlayPause()
+    else if index = PlayerCoordinatorLogic.PlayerButton.Stats
+        ToggleStatsForNerds()
     else if index = PlayerCoordinatorLogic.PlayerButton.Minimize
         MinimizeReset()
         VideoQueueUtils.ToggleVideoPictureInPicture(m.videoQueue)
@@ -560,7 +568,30 @@ function SyncFocus() as void
     m.buttonRow.rowFocused = chromeShown and (m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Buttons)
     m.buttonRow.focusedIndex = m.focusedButton
     m.buttonRow.playing = (m.top.state = VideoState.Playing)
+    m.buttonRow.statsEnabled = m.statsEnabled
     m.trickPlayBar.focused = chromeShown and (m.focusTarget = PlayerCoordinatorLogic.FocusTarget.Bar)
+end function
+
+' Stats are per-video: a new player (VideoQueue creates one per video) starts with them off. The ButtonRow
+' icon follows m.statsEnabled through SyncFocus (ActivateButton calls it).
+function ToggleStatsForNerds() as void
+    m.statsEnabled = not m.statsEnabled
+    SyncStatsForNerds()
+    ArmAutoHide()
+end function
+
+' The overlay paints only while enabled and fullscreen at rest: minimizing hides it at once, and a PiP restore
+' holds it until the grow animation lands the player on maxRect (otherwise it would ride the shrunk player).
+function SyncStatsForNerds() as void
+    visible = false
+    if m.statsEnabled and m.container.fullscreen
+        maxRect = m.top.maxRect
+        translation = m.top.translation
+        visible = translation[0] = maxRect.x and translation[1] = maxRect.y
+    end if
+    if m.statsForNerds.visible <> visible
+        m.statsForNerds.visible = visible
+    end if
 end function
 
 '===============================================================================
@@ -1007,6 +1038,7 @@ function OnFullScreenChange() as void
     ' the fullScreenHint strip rides the shrink: show it ~1s after minimizing, auto-hide 5s later.
     m.showFullScreenHint = not fullscreen
     RefreshFullScreenHint()
+    SyncStatsForNerds()
 end function
 
 ' (re)arm the hint timer for the current phase: while minimized, 1s before showing (let the shrink finish),
@@ -1476,6 +1508,7 @@ function OnClose() as void
     m.top.unobserveField("control")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("playStartInfo")
+    m.top.unobserveField("translation")
     m.top.unobserveField("close")
     content = m.top.content
     if content <> invalid
@@ -1516,6 +1549,7 @@ function OnClose() as void
         m.sponsorblock.Dispose()
         m.sponsorblock = invalid
     end if
+    m.statsForNerds.dispose = true
     DismissErrorDialog()
 
     parent = m.top.getParent()
