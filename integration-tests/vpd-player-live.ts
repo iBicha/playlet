@@ -5,7 +5,7 @@
 //   cd references/playlet-legacy && npx tsx ./integration-tests/vpd-player-live.ts
 //   PLAYER_LIVE_ID=<id> npx tsx ./integration-tests/vpd-player-live.ts   # override the stream
 
-import { Key, Mode, Glyph, press, launch, finish, group, field, expectField, expectSoft, waitFor, frames } from './vpd-player-harness';
+import { Key, Mode, Glyph, odc, press, launch, finish, group, field, expectField, expectSoft, waitFor, frames } from './vpd-player-harness';
 import { getLiveVideoId } from './live-id';
 
 (async () => {
@@ -49,6 +49,17 @@ import { getLiveVideoId } from './live-id';
     group('OK commits the ladder back to idle');
     await press(Key.Ok);
     await expectField('#trickPlayBar.transportMode', Mode.idle);
+
+    group('an external seek (setSeek) takes over the live-DVR ladder and resumes behind the edge');
+    await waitFor('#VideoPlayer.state', (v) => v === 'playing', 'settle the commit before rewinding again');
+    await press(Key.Rewind);
+    await expectField('#trickPlayBar.transportMode', Mode.liveDvr);
+    const behindS = Number(await field('#VideoPlayer.position')) - 60;
+    await odc.setValue({ base: 'scene', keyPath: '#VideoPlayer.setSeek', value: behindS });
+    await expectField('#trickPlayBar.transportMode', Mode.idle);
+    await expectField('#bifDisplay.visible', false);
+    await waitFor('#VideoPlayer.state', (v) => v === 'playing', 'plays from the setSeek target');
+    await expectSoft('#trickPlayBar.atLiveEdge', (v) => v === false, 'behind the edge after the setSeek');
 
     // Pause a live stream, let the edge run on, resume -> you're behind the edge, so the badge swaps "● LIVE" for
     // the time-behind offset. The brain drops off the edge the moment the device reports the user pause

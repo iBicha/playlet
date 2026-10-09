@@ -100,6 +100,13 @@ the playing edge; the device auto-resumes on any seek).
 ## Lounge takeover
 
 A transport freezes the video, so an external resume from the linked phone (Lounge sets `control=resume` on the
-player) is caught in `OnControlChange` and takes over: cancel the transport, hide the bif/chrome, and play from
-the phone-seeked position. VPD itself only ever resumes at idle, so a resume under a transport is unambiguously
-external.
+player) is caught in `OnControlChange` and takes over: cancel the transport, hide the bif/chrome, and play. VPD
+itself only ever resumes at idle, so a resume under a transport is unambiguously external.
+
+## Seeks
+
+`ApplySeek` is the one writer of the device's `seek`. Anything outside the player seeks through the `setSeek`
+field: `OnSetSeek` routes it through the transport (`ForceIdleSeek`). It keeps the play state, as the
+YouTube receiver does (the device resumes on any seek, so a paused video is re-paused on landing); a seek under a
+transport takes over like the resume above, cancelling it and resuming from the target. One that arrives while
+the content loads becomes the content-load seek.

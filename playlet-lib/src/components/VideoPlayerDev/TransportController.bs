@@ -417,7 +417,7 @@ namespace TransportController
             if firstEnter
                 if m.transportMode = TransportController.Mode.Idle
                     m.FreezeForTransport() ' the video FREEZES (deferred if a play-through seek is still settling)
-                    m.cursorMs = m.SnapToGrid(m.positionMs, m.storyboardStepMs)
+                    m.cursorMs = m.SnapToGrid(m.cursorMs, m.storyboardStepMs)
                 end if
                 m.transportMode = TransportController.Mode.Scrub
                 m.scanLevel = 0
@@ -467,7 +467,6 @@ namespace TransportController
             if m.transportMode <> TransportController.Mode.Scan
                 if m.transportMode = TransportController.Mode.Idle
                     m.FreezeForTransport()
-                    m.cursorMs = m.positionMs
                 end if
                 m.transportMode = TransportController.Mode.Scan
                 m.scrubHeldDir = 0
@@ -506,7 +505,6 @@ namespace TransportController
             if m.transportMode = TransportController.Mode.LiveDvr
                 return false
             end if
-            m.cursorMs = m.positionMs
             m.transportMode = TransportController.Mode.LiveDvr
             m.scanLevel = 0
             m.scanDir = 0
@@ -692,17 +690,15 @@ namespace TransportController
         ' ------------------------------------------------------------------------------------------------
         function Replay() as void
             ' InstantReplay works from ANY state. From a transport (frozen) it cancels it and RESUMES from
-            ' cursor-20s; from idle it just seeks -20s and keeps the play state. Reference is the cursor (= position
-            ' while idle).
+            ' cursor-20s; from idle it just seeks -20s and keeps the play state. Reference is the cursor (while idle,
+            ' the playhead, or a seek target that has not landed yet).
             wasTransport = (m.transportMode <> TransportController.Mode.Idle)
             ' spamming InstantReplay must ACCUMULATE: while a prior replay seek is still in flight, base off the
             ' LAST target so each press goes another -20s, not off the stale position (all presses landing together).
             if m.replayPending
                 base = m.replayTargetMs
-            else if wasTransport
-                base = m.cursorMs ' was frozen -> resume from where the cursor sits
             else
-                base = m.positionMs
+                base = m.cursorMs
             end if
             control = TransportController.Control.None ' from idle: keep playing, no state change
             if wasTransport
@@ -757,11 +753,26 @@ namespace TransportController
             end if
         end function
 
-        ' An EXTERNAL authority (SponsorBlock skip) seeks while a transport may be active. Route it THROUGH the
-        ' brain so the device never diverges: reset to idle and emit the seek as a normal intent. keepPlaying
-        ' preserves the current play state (control=none); else resume.
+        ' An EXTERNAL authority seeks while a transport may be active. The cursor goes to the target before the
+        ' seek lands, so the idle bar, a Replay, and a transport entered meanwhile all start from it. On live, a
+        ' target at or past the effective edge seeks to the edge, as a commit there does.
         function ForceIdleSeek(targetMs as integer, keepPlaying as boolean) as void
             m.ResetToIdle()
+            m.replayPending = false
+            if m.isLive
+                if TransportController.IsLiveEdgeSentinelMs(targetMs) or (m.edgeMs > 0 and targetMs >= m.LiveEdgeMs())
+                    targetMs = TransportController.LIVE_EDGE_SEEK_MS
+                    m.cursorMs = m.LiveEdgeMs()
+                else
+                    targetMs = m.ClampToTimeline(targetMs, m.LiveFloorMs(), m.edgeMs)
+                    m.cursorMs = targetMs
+                end if
+                m.RecomputeLive()
+            else
+                targetMs = m.ClampToTimeline(targetMs, 0, m.durationMs)
+                m.positionMs = targetMs ' the idle VOD bar reads positionMs
+                m.cursorMs = targetMs
+            end if
             control = TransportController.Control.Resume
             if keepPlaying
                 control = TransportController.Control.None
@@ -864,6 +875,15 @@ namespace TransportController
             m.timerCmdId = id
             m.timerCmdDelayMs = 0
             m.timerCmdRepeat = false
+        end function
+
+        ' Clamp to [lo, hi]; hi <= 0 is a timeline end not known yet, so only the floor applies. An external seek
+        ' can arrive while the content loads; transport input is dropped until the first frame, when it is known.
+        function ClampToTimeline(value as integer, lo as integer, hi as integer) as integer
+            if hi <= 0
+                hi = -1
+            end if
+            return m.Clamp(value, lo, hi)
         end function
 
         function Clamp(value as integer, lo as integer, hi as integer) as integer

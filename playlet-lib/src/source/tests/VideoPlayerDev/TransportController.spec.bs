@@ -8,6 +8,7 @@
 '     L1->2->3->1, reverse clamps at the DVR floor, forward auto-resumes at the edge; offset counts up frozen.
 '   - LIVE step<->ladder sub-mode transitions clear the other sub-mode's scratch (no stale-tick bleed).
 '   - InstantReplay from idle AND from any transport (scrub/scan/live), and the not-ready input drop.
+'   - External seek (ForceIdleSeek) from idle and from a transport: cursor on the target, clamped; replay chain dropped.
 
 import "pkg:/components/VideoPlayerDev/TransportController.bs"
 
@@ -1067,17 +1068,157 @@ namespace Tests
         end function
 
         ' =========================================================================================
+        ' EXTERNAL SEEK (ForceIdleSeek) — a seek from outside the brain, from any state: back to idle, the cursor
+        ' on the target (clamped to the timeline), a seek intent.
+        ' =========================================================================================
+        @describe("external seek")
+
+        @it("from idle: stays idle, moves the cursor + position to the target, and seeks keeping the play state")
+        function _()
+            m.t.ForceIdleSeek(150000, true)
+            m.assertEqual(m.t.transportMode, TransportController.Mode.Idle)
+            m.assertEqual(m.t.cursorMs, 150000)
+            m.assertEqual(m.t.positionMs, 150000)
+            intent = m.t.TakeVideoIntent()
+            m.assertEqual(intent.control, TransportController.Control.None)
+            m.assertTrue(intent.hasSeek)
+            m.assertEqual(intent.seekMs, 150000)
+        end function
+
+        @it("from a scrub: back to idle with the scratch cleared, and resumes at the target")
+        function _()
+            m.t.HandleKey(TransportController.Command.Left, true)
+            m.t.TakeVideoIntent()
+            m.t.ForceIdleSeek(150000, false)
+            m.assertEqual(m.t.transportMode, TransportController.Mode.Idle)
+            m.assertEqual(m.t.glyph, TransportController.Glyph.None)
+            m.assertEqual(m.t.scrubHeldDir, 0)
+            m.assertEqual(m.t.cursorMs, 150000)
+            intent = m.t.TakeVideoIntent()
+            m.assertEqual(intent.control, TransportController.Control.Resume)
+            m.assertEqual(intent.seekMs, 150000)
+        end function
+
+        @it("clamps a VOD target to [0, duration]")
+        function _()
+            m.t.ForceIdleSeek(500000, true)
+            m.assertEqual(m.t.cursorMs, 210000)
+            m.assertEqual(m.t.TakeVideoIntent().seekMs, 210000)
+            m.t.ForceIdleSeek(-5000, true)
+            m.assertEqual(m.t.cursorMs, 0)
+            m.assertEqual(m.t.TakeVideoIntent().seekMs, 0)
+        end function
+
+        @it("keeps the target when the duration is not known yet")
+        function _()
+            t = new TransportController.Controller()
+            t.SetContent(false, 2000, true)
+            t.ForceIdleSeek(150000, true)
+            m.assertEqual(t.cursorMs, 150000)
+            m.assertEqual(t.TakeVideoIntent().seekMs, 150000)
+        end function
+
+        @it("drops a pending InstantReplay: the next replay goes back from the external target")
+        function _()
+            m.t.HandleCommand(TransportController.Command.Replay)
+            m.assertTrue(m.t.replayPending)
+            m.t.ForceIdleSeek(150000, true)
+            m.assertFalse(m.t.replayPending)
+            m.t.TakeVideoIntent()
+            m.t.HandleCommand(TransportController.Command.Replay)
+            m.assertEqual(m.t.TakeVideoIntent().seekMs, 130000)
+        end function
+
+        ' a live brain 5s behind its raw edge (learned latency): edge 300s, effective edge 295s, window 60s ->
+        ' floor 240s. Tells the raw edge, the effective edge and the playhead apart.
+        function LiveLagging() as object
+            t = new TransportController.Controller()
+            t.SetContent(true, 0, false)
+            t.SetLiveDvrWindow(60000)
+            t.OnLiveEdge(300000)
+            t.OnPosition(295000)
+            t.OnPosition(295000) ' confirmed latency floor: 5s
+            t.OnReady()
+            return t
+        end function
+
+        @it("on live, moves the cursor to the target clamped to the floor and recomputes the offset")
+        function _()
+            t = m.LiveLagging()
+            m.assertEqual(t.LiveEdgeMs(), 295000)
+            t.ForceIdleSeek(270000, true)
+            m.assertEqual(t.cursorMs, 270000)
+            m.assertEqual(t.positionMs, 295000, "the live playhead stays the last real sample")
+            m.assertEqual(t.liveOffsetMs, 25000) ' (300 - 270) - 5 latency
+            m.assertFalse(t.atLiveEdge)
+            m.assertEqual(t.TakeVideoIntent().seekMs, 270000)
+            t.ForceIdleSeek(100000, true)
+            m.assertEqual(t.cursorMs, 240000)
+            m.assertEqual(t.TakeVideoIntent().seekMs, 240000)
+        end function
+
+        @it("on live, a target at or past the effective edge seeks to the edge, as a commit there does")
+        function _()
+            t = m.LiveLagging()
+            t.ForceIdleSeek(297000, true) ' between the effective (295s) and the raw (300s) edge
+            m.assertEqual(t.cursorMs, 295000)
+            m.assertTrue(t.atLiveEdge)
+            m.assertEqual(t.TakeVideoIntent().seekMs, TransportController.LIVE_EDGE_SEEK_MS)
+            t.ForceIdleSeek(295000, true)
+            m.assertEqual(t.TakeVideoIntent().seekMs, TransportController.LIVE_EDGE_SEEK_MS)
+        end function
+
+        @it("on live, the edge sentinel puts the cursor at the effective edge and seeks with the sentinel")
+        function _()
+            t = m.LiveLagging()
+            t.HandleCommand(TransportController.Command.Left)
+            t.ForceIdleSeek(TransportController.LIVE_EDGE_SEEK_MS, false)
+            m.assertEqual(t.transportMode, TransportController.Mode.Idle)
+            m.assertEqual(t.cursorMs, 295000)
+            m.assertTrue(t.atLiveEdge)
+            m.assertEqual(t.TakeVideoIntent().seekMs, TransportController.LIVE_EDGE_SEEK_MS)
+        end function
+
+        @it("before the seek lands, a scrub, a scan and a Replay start from the target (VOD)")
+        function _()
+            m.t.ForceIdleSeek(150000, true)
+            m.t.HandleCommand(TransportController.Command.Left)
+            m.assertEqual(m.t.cursorMs, 148000)
+            m.t.ForceIdleSeek(150000, true)
+            m.t.HandleCommand(TransportController.Command.Fwd)
+            m.t.Tick(TransportController.Timer.Scan)
+            m.assertTrue(m.t.cursorMs > 150000, "the scan runs on from the target")
+            m.t.ForceIdleSeek(150000, true)
+            m.t.TakeVideoIntent()
+            m.t.HandleCommand(TransportController.Command.Replay)
+            m.assertEqual(m.t.TakeVideoIntent().seekMs, 130000)
+        end function
+
+        @it("before the seek lands, a live rewind and a Replay start from the target")
+        function _()
+            t = m.LiveLagging()
+            t.ForceIdleSeek(270000, true)
+            t.HandleCommand(TransportController.Command.Left)
+            m.assertEqual(t.transportMode, TransportController.Mode.LiveDvr)
+            m.assertEqual(t.cursorMs, 265000)
+            t.ForceIdleSeek(270000, true)
+            t.TakeVideoIntent()
+            t.HandleCommand(TransportController.Command.Replay)
+            m.assertEqual(t.TakeVideoIntent().seekMs, 250000)
+        end function
+
+        ' =========================================================================================
         ' SEEK-SETTLING FREEZE DEFER (INV-B12) — a transport entered while a play-through seek (commit /
-        ' SponsorBlock skip / replay) is still in flight must NOT slam control=pause: that pause lands mid-seek
+        ' external seek / replay) is still in flight must NOT slam control=pause: that pause lands mid-seek
         ' and wedges the device (the reported bif-over-black bug). Defer the freeze; the coordinator's
         ' EnforceTransportFreeze re-pauses once the seek reaches "playing". seekSettling models the in-flight seek.
         ' =========================================================================================
         @describe("seek-settling freeze defer")
 
-        @it("a non-pause seek (SponsorBlock skip / commit / replay) marks seekSettling; pause+no-seek do not")
+        @it("a non-pause seek (external / commit / replay) marks seekSettling; pause+no-seek do not")
         function _()
             m.assertFalse(m.t.seekSettling)
-            m.t.ForceIdleSeek(120000, true) ' SponsorBlock skip, keep playing -> in flight
+            m.t.ForceIdleSeek(120000, true) ' an external seek, keep playing -> in flight
             m.assertTrue(m.t.seekSettling)
             m.t.MarkSeekSettled()
             m.assertFalse(m.t.seekSettling)
@@ -1097,9 +1238,9 @@ namespace Tests
             m.t.HandleCommand(TransportController.Command.Right)
             m.assertEqual(m.t.transportMode, TransportController.Mode.Scrub) ' still enters scrub
             m.assertInvalid(m.t.TakeVideoIntent()) ' but the FREEZE was deferred (no pause)
-            ' the scrub still snaps + steps off the LAST KNOWN position (60000) — the seek to 120000 hasn't
-            ' landed yet (that IS the "press Right immediately" race), so cursor = 60000 grid + 2000 step.
-            m.assertEqual(m.t.cursorMs, 62000)
+            ' the scrub steps off the seek target, not the stale position (60000): the seek to 120000 hasn't
+            ' landed yet (that IS the "press Right immediately" race), so cursor = 120000 + 2000 step.
+            m.assertEqual(m.t.cursorMs, 122000)
         end function
 
         @it("entering scan while a seek is settling DEFERS the freeze")

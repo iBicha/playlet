@@ -56,6 +56,8 @@ function Initialize()
     m.reportWatchTime = false
     m.onCloseCalled = false
     m.seekToPercent = invalid
+    ' a setSeek that arrived while the content loads (ms, -1 = none): the content-load seek goes there instead.
+    m.loadingSetSeekMs = -1
 
     m.errorDialogNode = invalid
     m.ignoreNextFinished = false ' a retry replay -> swallow the next "finished" edge
@@ -70,9 +72,9 @@ function Initialize()
     m.armedTimerId = TransportController.Timer.None ' which module timer the single transportTimer holds
     m.lastCommitSeq = 0
     m.lastFinishSeq = 0
-    ' a keep-playing seek (SponsorBlock skip / InstantReplay) was issued while the device was PAUSED. The
-    ' device auto-resumes on any seek (autoplayAfterSeek only governs resume-after-REBUFFER per the Video
-    ' docs), so the paused state is preserved by re-pausing on the next playing edge.
+    ' a keep-playing seek was issued while the device was PAUSED. The device auto-resumes on any seek
+    ' (autoplayAfterSeek only governs resume-after-REBUFFER per the Video docs), so the paused state is preserved
+    ' by re-pausing on the next playing edge.
     m.repauseAfterSeek = false
     ' live edge clock anchor: the manifest's availabilityStartTime (Playlet generates it), as epoch seconds.
     ' The edge is then wallClock - anchor — continuous through pauses/rebuffers/startup. The fallback pair
@@ -166,6 +168,7 @@ function OnNodeReady()
     m.top.ObserveField("thumbnailTiles", FuncName(OnThumbnailTiles))
     ' an external resume/play (the linked phone via Lounge) under an active transport must take over.
     m.top.ObserveField("control", FuncName(OnControlChange))
+    m.top.ObserveField("setSeek", FuncName(OnSetSeek))
     m.top.ObserveField("bufferingStatus", FuncName(OnBufferingStatus))
     m.top.ObserveField("playStartInfo", FuncName(OnPlayStartInfo))
 
@@ -186,10 +189,10 @@ end function
 '===============================================================================
 function ApplyTransport() as void
     ' A transport freezes the video. While one is active, disable auto-resume-after-rebuffer so an in-flight or
-    ' pending seek (a replay that kept playing, a SponsorBlock skip) can't un-pause the freeze when it completes;
-    ' restored to the default at idle so commit's resume + the normal seek-resume behave. But NOT while a
-    ' play-through seek is still settling: that seek must still reach "playing" so EnforceTransportFreeze can
-    ' freeze it cleanly — disabling autoplay here would strand it buffering. seekSettling clears at state=playing.
+    ' pending keep-playing seek can't un-pause the freeze when it completes; restored to the default at idle so
+    ' commit's resume + the normal seek-resume behave. But NOT while a play-through seek is still settling: that
+    ' seek must still reach "playing" so EnforceTransportFreeze can freeze it cleanly — disabling autoplay here
+    ' would strand it buffering. seekSettling clears at state=playing.
     ' Write-guarded: this runs on every position tick, and most ticks don't change the value.
     autoplayAfterSeek = (m.transport.transportMode = TransportController.Mode.Idle) or m.transport.seekSettling
     if m.top.autoplayAfterSeek <> autoplayAfterSeek
@@ -307,7 +310,8 @@ function PushTransportToRenderers() as void
     end if
 end function
 
-' Apply a seek (ms). The live "jump to edge" sentinel maps to the live-end seek the OS understands.
+' Apply a seek (ms): the one writer of the device's `seek`. The live "jump to edge" sentinel maps to the
+' live-end seek the OS understands.
 function ApplySeek(seekMs as integer) as void
     if TransportController.IsLiveEdgeSentinelMs(seekMs)
         m.top.seek = 999999
@@ -1035,8 +1039,8 @@ function OnFullScreenHintTimer() as void
 end function
 
 ' A resume/play arriving while a transport is active is necessarily external: VPD only ever resumes/plays at
-' idle, so this is the linked phone (Lounge) seeking + resuming. The phone action wins — cancel the scrub/scan
-' (the bif + chrome clear) and let the video play from where the phone seeked.
+' idle, so this is the linked phone (Lounge) resuming. The phone action wins — cancel the scrub/scan (the bif +
+' chrome clear) and let the video play.
 function OnControlChange(event as object) as void
     if m.onCloseCalled = true
         return
@@ -1050,6 +1054,26 @@ function OnControlChange(event as object) as void
         m.repauseAfterSeek = false ' the external play wins over any pending re-pause
         m.top.autoplayAfterSeek = true
         m.top.control = VideoControl.Resume
+    end if
+end function
+
+' Keeps the play state; a frozen transport resumes, as its commit would.
+function OnSetSeek(event as object) as void
+    if m.onCloseCalled = true
+        return
+    end if
+    seekMs = Int(event.getData() * 1000)
+    LogDebug("external seek ->", seekMs)
+    if m.videoContentJob <> invalid
+        m.loadingSetSeekMs = seekMs
+        return
+    end if
+    m.seekToPercent = invalid
+    wasTransport = (m.transport.transportMode <> TransportController.Mode.Idle)
+    m.transport.ForceIdleSeek(seekMs, not wasTransport)
+    ApplyTransport()
+    if wasTransport
+        HideChromeNow()
     end if
 end function
 
@@ -1250,15 +1274,21 @@ function SeekToInitialPosition(content as object) as void
     if content = invalid
         return
     end if
+    if m.loadingSetSeekMs <> -1
+        LogDebug("seeking to the setSeek that arrived while loading:", m.loadingSetSeekMs)
+        ApplySeek(m.loadingSetSeekMs)
+        m.loadingSetSeekMs = -1
+        return
+    end if
     if content.Live = true
         LogDebug("seeking to end of live stream")
-        m.top.seek = 999999
+        ApplySeek(TransportController.LIVE_EDGE_SEEK_MS)
         return
     end if
     timestamp = ValidInt(content.timestamp)
     if timestamp > 0
         LogDebug("seeking to timestamp:", timestamp)
-        m.top.seek = content.timestamp
+        ApplySeek(timestamp * 1000)
         return
     end if
     percentDurationWatched = ValidFloat(content.percentDurationWatched)
@@ -1285,7 +1315,7 @@ function SeekToPercentOfDuration() as void
     seek = (MathUtils.Clamp(seekToPercent, 0, 100) / 100.0) * duration
     if seek > 0
         LogDebug("seeking to percent watched ->", seek)
-        m.top.seek = seek
+        ApplySeek(Int(seek * 1000))
     end if
 end function
 
@@ -1474,6 +1504,7 @@ function OnClose() as void
     m.top.unobserveField("duration")
     m.top.unobserveField("thumbnailTiles")
     m.top.unobserveField("control")
+    m.top.unobserveField("setSeek")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("playStartInfo")
     m.top.unobserveField("close")

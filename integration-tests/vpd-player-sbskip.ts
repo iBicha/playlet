@@ -41,8 +41,8 @@ async function snap(label: string): Promise<Record<string, unknown>> {
     const duration = await odcN('#VideoPlayer.duration');
     console.log(`  BBB duration=${duration}s -> outro skip 618.7 is ${duration > 620.7 ? 'a REAL in-flight SEEK' : 'FINISH (near EOF)'}`);
 
-    group('fixture: fast-forward to just before the outro (idle ODC seek)');
-    await odc.setValue({ base: 'scene', keyPath: '#VideoPlayer.seek', value: FF_SEEK_S });
+    group('fixture: fast-forward to just before the outro (setSeek over ODC)');
+    await odc.setValue({ base: 'scene', keyPath: '#VideoPlayer.setSeek', value: FF_SEEK_S });
     for (let i = 0; i < 30; i++) { if ((await odcN('#VideoPlayer.position')) >= FF_SEEK_S - 3) break; await ecp.sleep(250); }
     await snap('fast-forward landing');
 

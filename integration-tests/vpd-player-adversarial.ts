@@ -4,7 +4,7 @@
 //
 //   cd references/playlet-legacy && npx tsx ./integration-tests/vpd-player-adversarial.ts
 
-import { Key, odc, launchVod, finish, group, pressChecked, assertPlayerInvariants } from './vpd-player-harness';
+import { Key, odc, launchVod, finish, group, pressChecked, assertPlayerInvariants, waitFor } from './vpd-player-harness';
 
 const CONTENT_ID = 'aqz-KE-bpKQ'; // Big Buck Bunny — 10min, has storyboards
 
@@ -41,6 +41,27 @@ const CONTENT_ID = 'aqz-KE-bpKQ'; // Big Buck Bunny — 10min, has storyboards
     await pressChecked(Key.Left, 'scrub-after-replay');
     await pressChecked(Key.Replay, 'replay-from-scrub');
     await pressChecked(Key.Ok, 'settle');
+
+    // A seek from outside the player (Lounge sets setSeek): it takes over any transport and keeps the play state.
+    group('external seek (setSeek) under every transport, mid-seek, and paused');
+    const externalSeek = async (seconds: number, label: string) => {
+        await odc.setValue({ base: 'scene', keyPath: '#VideoPlayer.setSeek', value: seconds });
+        await assertPlayerInvariants(label);
+    };
+    await pressChecked(Key.Left, 'scrub-for-setSeek');
+    await externalSeek(200, 'setSeek under scrub');
+    await pressChecked(Key.Forward, 'scan-for-setSeek');
+    await externalSeek(150, 'setSeek under scan');
+    await pressChecked(Key.Left, 'scrub-for-commit');
+    await pressChecked(Key.Ok, 'commit-then-setSeek');
+    await externalSeek(250, 'setSeek while the commit settles');
+    await pressChecked(Key.Replay, 'replay-then-setSeek');
+    await externalSeek(300, 'setSeek with a replay in flight');
+    await waitFor('#VideoPlayer.state', (v) => v === 'playing', 'settle before pausing');
+    await pressChecked(Key.Play, 'pause-then-setSeek');
+    await externalSeek(100, 'setSeek while paused');
+    await waitFor('#VideoPlayer.state', (v) => v === 'paused', 'setSeek keeps the pause', 8000);
+    await pressChecked(Key.Play, 'resume-after-setSeek');
 
     group('double-OK + scan-to-scrub');
     await pressChecked(Key.Rewind, 'scan');

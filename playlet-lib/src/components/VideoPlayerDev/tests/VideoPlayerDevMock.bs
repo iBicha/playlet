@@ -70,7 +70,7 @@ function TestSetup() as void
     ' nudge counter above — stacked observers fire a handler once per prior TestSetup on every write,
     ' and OnPosition's latency learning reads two identical fires as a CONFIRMED min-gap, poisoning
     ' LiveEdgeMs for any live test that runs after another test in the suite.
-    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control", "bufferingStatus", "playStartInfo"]
+    for each deviceField in ["state", "position", "duration", "close", "thumbnailTiles", "control", "setSeek", "bufferingStatus", "playStartInfo"]
         m.top.unobserveField(deviceField)
     end for
 
@@ -81,8 +81,14 @@ function TestSetup() as void
     m.top.position = 0
     m.top.duration = 0
     m.top.seek = 0
+    m.top.suppressCaptions = false ' a test that minimized leaves it set; the container below starts fullscreen
+    m.top.autoplayAfterSeek = true
 
     OnNodeReady()
+
+    ' the children survive across tests too: clear what a previous test's transport or live content left.
+    m.transportTimer.control = "none"
+    m.trickPlayBar.isLive = false
 end function
 
 function OnTestNudge() as void
@@ -120,6 +126,21 @@ end function
 function TestSeedSponsorBlock(segments as object) as void
     m.sponsorblock.enabled = true
     m.sponsorblock.segments = segments
+end function
+
+' TestSeekToInitialPosition — the content-load seek (live edge / resume timestamp / percent watched), minus the
+' content job.
+function TestSeekToInitialPosition(content as object) as void
+    SeekToInitialPosition(content)
+end function
+
+' TestSetContentLoading — a VideoContentJob in flight (or not), minus the job.
+function TestSetContentLoading(loading as boolean) as void
+    if loading
+        m.videoContentJob = CreateObject("roSGNode", "Node")
+    else
+        m.videoContentJob = invalid
+    end if
 end function
 
 ' TestFireLiveBadgeHold — fire the liveBadgeHold timer's handler now (the spec can't wait out the real timer).
@@ -235,6 +256,35 @@ function TestSnapshot() as object
         forceLiveBadge: m.trickPlayBar.forceLiveBadge
         liveBadgeShown: m.trickPlayBar.findNode("liveLabel").visible
         barRemainingText: m.trickPlayBar.findNode("remainingLabel").text
+        replayPending: m.transport.replayPending
+        transportTimerControl: m.transportTimer.control
+        buttonRowVisible: m.buttonRow.visible
+        barPositionMs: m.trickPlayBar.positionMs
+        spinnerMode: m.spinner.mode
+        brain: TestBrainSnapshot()
+    }
+end function
+
+' The brain's output fields in the shape PlayerInvariants.CheckBrain expects.
+function TestBrainSnapshot() as object
+    t = m.transport
+    return {
+        transportMode: t.transportMode
+        glyph: t.glyph
+        scanLevel: t.scanLevel
+        scanDir: t.scanDir
+        scrubHeldDir: t.scrubHeldDir
+        scrubHoldTicks: t.scrubHoldTicks
+        scrubStepMs: t.scrubStepMs
+        storyboardStepMs: t.storyboardStepMs
+        cursorMs: t.cursorMs
+        positionMs: t.positionMs
+        durationMs: t.durationMs
+        edgeMs: t.edgeMs
+        liveOffsetMs: t.liveOffsetMs
+        atLiveEdge: t.atLiveEdge
+        isLive: t.isLive
+        replayPending: t.replayPending
     }
 end function
 
