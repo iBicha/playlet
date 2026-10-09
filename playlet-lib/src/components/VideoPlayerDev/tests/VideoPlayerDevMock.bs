@@ -36,9 +36,12 @@ function TestSetup() as void
     container.fullscreen = true
     m.top.container = container
 
-    ' swallows the jobs the coordinator queues (JobSystem.QueueJob writes request) without running them
+    ' swallows the jobs the coordinator queues (JobSystem.QueueJob writes request) without running them,
+    ' counting the SponsorBlock viewed-segment reports (alwaysNotify: a repeated identical report must count).
     jobQueue = createObject("roSGNode", "Node")
-    jobQueue.addField("request", "assocarray", false)
+    jobQueue.addField("request", "assocarray", true)
+    m.top.sponsorViewedCount = 0
+    jobQueue.observeFieldScoped("request", FuncName(OnTestJobRequest))
     m.top.jobQueue = jobQueue
     m.top.notifications = createObject("roSGNode", "Node")
     m.top.preferences = createObject("roSGNode", "Node")
@@ -95,6 +98,12 @@ function OnTestNudge() as void
     m.top.nudgeCount += 1
 end function
 
+function OnTestJobRequest(event as object) as void
+    if event.getData().jobName = Jobs.SponsorBlockSegmentViewedJob
+        m.top.sponsorViewedCount += 1
+    end if
+end function
+
 ' TestKey — drive a remote key through the REAL OnKeyEvent (scrub/scan/commit/etc).
 function TestKey(key as string, down as boolean) as boolean
     return OnKeyEvent(key, down)
@@ -126,6 +135,7 @@ end function
 function TestSeedSponsorBlock(segments as object) as void
     m.sponsorblock.enabled = true
     m.sponsorblock.segments = segments
+    m.sponsorblock.timeline = SponsorBlock.BuildTimeline(segments)
 end function
 
 ' TestSeekToInitialPosition — the content-load seek (live edge / resume timestamp / percent watched), minus the

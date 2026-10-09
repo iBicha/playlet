@@ -1,0 +1,107 @@
+import "pkg:/components/Services/SponsorBlock/SponsorBlockTimeline.types.bs"
+import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
+
+namespace SponsorBlock
+
+    ' Flatten (possibly overlapping) segments into disjoint intervals, each owned by one segment: auto-skip,
+    ' then manual-skip with a prompt, then the rest; a tie goes to the segment ending later, then to the first.
+    function BuildTimeline(segments as object) as SponsorBlockTimeline
+        starts = []
+        ends = []
+        segmentIndexes = []
+
+        points = []
+        for each segment in segments
+            points.Push(segment.start)
+            points.Push(segment.end)
+        end for
+        points.Sort()
+
+        segmentCount = segments.Count()
+        for i = 0 to points.Count() - 2
+            intervalStart = points[i]
+            intervalEnd = points[i + 1]
+            if intervalEnd <= intervalStart
+                continue for
+            end if
+
+            middle = (intervalStart + intervalEnd) / 2
+            owner = -1
+            for j = 0 to segmentCount - 1
+                segment = segments[j]
+                if segment.start <= middle and middle <= segment.end
+                    if owner = -1 or SponsorBlock.Outranks(segment, segments[owner])
+                        owner = j
+                    end if
+                end if
+            end for
+            if owner = -1
+                continue for
+            end if
+
+            last = segmentIndexes.Count() - 1
+            if last >= 0 and segmentIndexes[last] = owner and ends[last] = intervalStart
+                ends[last] = intervalEnd
+            else
+                starts.Push(intervalStart)
+                ends.Push(intervalEnd)
+                segmentIndexes.Push(owner)
+            end if
+        end for
+
+        return {
+            starts: starts
+            ends: ends
+            segmentIndexes: segmentIndexes
+        }
+    end function
+
+    ' The index of the segment owning `time` (seconds), or -1.
+    function FindTimelineSegmentIndex(timeline as SponsorBlockTimeline, time as dynamic) as integer
+        starts = timeline.starts
+        low = 0
+        high = starts.Count() - 1
+        found = -1
+        while low <= high
+            middle = (low + high) \ 2
+            if starts[middle] <= time
+                found = middle
+                low = middle + 1
+            else
+                high = middle - 1
+            end if
+        end while
+        if found = -1 or time > timeline.ends[found]
+            return -1
+        end if
+        return timeline.segmentIndexes[found]
+    end function
+
+    function Outranks(segment as object, other as object) as boolean
+        rank = SponsorBlock.TimelineRank(segment)
+        otherRank = SponsorBlock.TimelineRank(other)
+        if rank <> otherRank
+            return rank > otherRank
+        end if
+        return segment.end > other.end
+    end function
+
+    function TimelineRank(segment as object) as integer
+        if segment.option = SponsorBlock.SegmentAction.AutoSkip
+            return 2
+        end if
+        if SponsorBlock.IsSkippable(segment)
+            return 1
+        end if
+        return 0
+    end function
+
+    ' Auto-skip, or manual-skip with its prompt: the prompt is the only way to skip a manual segment.
+    function IsSkippable(segment as object) as boolean
+        if segment.option = SponsorBlock.SegmentAction.AutoSkip
+            return true
+        end if
+        return segment.option = SponsorBlock.SegmentAction.ManualSkip and segment.showNotification
+    end function
+
+end namespace

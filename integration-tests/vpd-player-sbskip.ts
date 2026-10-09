@@ -70,7 +70,7 @@ async function snap(label: string): Promise<Record<string, unknown>> {
         await ecp.sendKeypress(Key.Home);
         process.exit(1);
     }
-    await ecp.sleep(2500); // let OnPosition fire a few times -> stash manualSkipSegment + show the notice
+    await ecp.sleep(2500); // let OnPosition fire a few times -> arm the manual segment + show the notice
     const posBefore = await odcN('#VideoPlayer.position');
     console.log(`  position before OK=${posBefore}s`);
 

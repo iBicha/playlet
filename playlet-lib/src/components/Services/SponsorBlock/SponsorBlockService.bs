@@ -1,4 +1,5 @@
 import "pkg:/components/Services/SponsorBlock/SponsorBlockConfig.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockTimeline.types.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/CryptoUtils.bs"
 
@@ -64,36 +65,48 @@ namespace SponsorBlock
             HttpClient.Post(url, "").Cancellation(cancellation).Await()
         end function
 
-        function GenerateProgressBarBackground(segments as object, lengthSeconds as integer, path as string)
+        function GenerateProgressBarBackground(segments as object, timeline as SponsorBlockTimeline, lengthSeconds as integer, path as string)
             ' 1144 = trackbar width, so the bar renders 1:1 without horizontal scaling
             bar = CreateObject("roBitmap", { width: 1144, height: 20, AlphaEnable: true })
             bar.Clear(&hFFFFFF80)
-            width = bar.GetWidth()
-            height = bar.GetHeight()
+            starts = timeline.starts
+            ends = timeline.ends
+            segmentIndexes = timeline.segmentIndexes
+            for i = 0 to starts.Count() - 1
+                m.DrawSegment(bar, segments[segmentIndexes[i]], starts[i], ends[i], lengthSeconds)
+            end for
+            ' a zero-length segment (a highlight) owns no interval: draw it on top.
             for each segment in segments
-                videoDuration = lengthSeconds
-                if videoDuration = 0 or videoDuration = invalid
-                    ' We should ignore segment.videoDuration https://github.com/iBicha/playlet/pull/23#issuecomment-1431520676
-                    ' But in case where we don't have lengthSeconds from Invidious, it's better than nothing
-                    videoDuration = segment.videoDuration
+                if segment.start = segment.end
+                    m.DrawSegment(bar, segment, segment.start, segment.end, lengthSeconds)
                 end if
-                if videoDuration = 0 or videoDuration = invalid
-                    continue for
-                end if
-
-                pixelStart = (segment.start / videoDuration) * width
-                pixelEnd = (segment.end / videoDuration) * width
-                color = m.config.SegmentColor(segment.category)
-                ' highlight's duration is zero, so it is not visble on the bar.
-                ' Add a few pixels to see it
-                if pixelStart = pixelEnd
-                    pixelEnd += 5
-                end if
-                bar.DrawRect(pixelStart, 0, pixelEnd - pixelStart, height, color)
             end for
             bar.Finish()
-            buffer = bar.GetPng(0, 0, width, height)
+            buffer = bar.GetPng(0, 0, bar.GetWidth(), bar.GetHeight())
             buffer.WriteFile(path)
+        end function
+
+        function DrawSegment(bar as object, segment as object, startSeconds as float, endSeconds as float, lengthSeconds as integer) as void
+            videoDuration = lengthSeconds
+            if videoDuration = 0 or videoDuration = invalid
+                ' We should ignore segment.videoDuration https://github.com/iBicha/playlet/pull/23#issuecomment-1431520676
+                ' But in case where we don't have lengthSeconds from Invidious, it's better than nothing
+                videoDuration = segment.videoDuration
+            end if
+            if videoDuration = 0 or videoDuration = invalid
+                return
+            end if
+
+            ' integer edges, so adjacent intervals meet without a truncation seam.
+            width = bar.GetWidth()
+            pixelStart = Int((startSeconds / videoDuration) * width)
+            pixelEnd = Int((endSeconds / videoDuration) * width)
+            ' highlight's duration is zero, so it is not visble on the bar.
+            ' Add a few pixels to see it
+            if startSeconds = endSeconds
+                pixelEnd += 5
+            end if
+            bar.DrawRect(pixelStart, 0, pixelEnd - pixelStart, bar.GetHeight(), m.config.SegmentColor(segment.category))
         end function
     end class
 end namespace

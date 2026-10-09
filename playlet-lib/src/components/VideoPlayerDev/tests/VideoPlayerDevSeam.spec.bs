@@ -627,6 +627,110 @@ namespace Tests
             m.assertTrue(m.top.videoQueue.closePlayer, "no next video -> the finish closed the player")
         end function
 
+        ' =========================================================================================
+        ' SponsorBlock skip — the device lands a seek on the sync frame BEFORE its target when it can't seek
+        ' accurately (measured 3.3-6.7s short); the position ticks then echo the target before the landing.
+        ' =========================================================================================
+
+        function AutoSegment(startS as float, endS as float) as object
+            return [{ start: startS, end: endS, option: "auto_skip", title: "Sponsor", shortTitle: "Sponsor", actionText: "Skipped", showNotification: false, UUID: "seg-auto", category: "sponsor" }]
+        end function
+
+        ' -1 = the coordinator wrote no seek since the spec armed the probe.
+        function ArmSeekProbe() as void
+            m.top.seek = -1
+        end function
+
+        function AssertSeekedTo(targetS as float, message as string) as void
+            m.assertTrue(Abs(m.top.seek - targetS) < 0.01, message + " (seek=" + m.top.seek.ToStr() + ")")
+        end function
+
+        @it("an auto-skip seeks once: the target echo and a landing short of it inside the segment don't re-seek")
+        function _()
+            m.top.duration = 300
+            m.top.callFunc("TestSeedSponsorBlock", m.AutoSegment(60.0, 75.3))
+            m.top.position = 60.0
+            m.AssertSeekedTo(75.3, "entering the segment skips to its end")
+
+            m.ArmSeekProbe()
+            for each positionS in [75.3, 72.0, 73.0, 74.0, 75.0, 76.0]
+                m.top.position = positionS
+            end for
+            m.assertEqual(m.top.seek, -1.0, "the skip loop: a landing inside the segment re-armed it")
+            m.assertEqual(m.top.sponsorViewedCount, 1)
+        end function
+
+        @it("a landing before a short segment's start doesn't re-seek when playback re-enters it")
+        function _()
+            m.top.duration = 300
+            m.top.callFunc("TestSeedSponsorBlock", m.AutoSegment(131.5, 137.7))
+            m.top.position = 132.0
+            m.AssertSeekedTo(137.7, "entering the segment skips to its end")
+
+            m.ArmSeekProbe()
+            for each positionS in [137.7, 131.0, 132.0, 133.0, 137.0, 138.0]
+                m.top.position = positionS
+            end for
+            m.assertEqual(m.top.seek, -1.0, "the skip loop: re-entering the segment from the landing re-armed it")
+        end function
+
+        @it("a user seek back into a skipped segment skips it again, and reports it once")
+        function _()
+            m.top.duration = 300
+            m.top.callFunc("TestSeedSponsorBlock", m.AutoSegment(60.0, 100.0))
+            m.top.position = 60.0
+            m.top.position = 100.0
+            m.top.position = 95.0
+
+            m.top.callFunc("TestKey", RemoteKeys.Replay, true) ' InstantReplay: 95s - 20s
+            m.AssertSeekedTo(75.0, "the replay seek")
+            m.top.position = 75.0
+            m.AssertSeekedTo(100.0, "the user's seek woke the segment: it skips again")
+            m.assertEqual(m.top.sponsorViewedCount, 1, "a segment is reported once per viewing")
+        end function
+
+        @it("a setSeek back into a skipped segment skips it again")
+        function _()
+            m.top.duration = 300
+            m.top.callFunc("TestSeedSponsorBlock", m.AutoSegment(60.0, 100.0))
+            m.top.position = 60.0
+            m.top.position = 100.0
+            m.top.position = 95.0
+
+            m.top.setSeek = 70.0
+            m.AssertSeekedTo(70.0, "the external seek")
+            m.top.position = 70.0
+            m.AssertSeekedTo(100.0, "the external seek woke the segment: it skips again")
+        end function
+
+        @it("an OK skip landing short inside the segment doesn't re-arm the notice")
+        function _()
+            m.top.duration = 100
+            m.top.callFunc("TestSeedSponsorBlock", m.ManualSegment(10.0, 40.0))
+            m.top.position = 12.0
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            m.AssertSeekedTo(40.0, "OK skips to the segment end")
+
+            m.top.position = 40.0
+            m.top.position = 34.0
+            m.top.position = 35.0
+            m.assertFalse(m.Snap().sponsorNoticeShown, "the landing re-armed the notice")
+        end function
+
+        @it("the manual notice comes down once OK can no longer skip")
+        function _()
+            m.top.duration = 100
+            m.top.callFunc("TestSeedSponsorBlock", m.ManualSegment(10.0, 40.0))
+            m.top.position = 12.0
+            m.assertTrue(m.Snap().sponsorNoticeShown)
+            m.top.position = 38.5 ' within 2s of the end: a skip is no longer worth a rebuffer
+            m.assertFalse(m.Snap().sponsorNoticeShown)
+
+            seekBefore = m.top.seek
+            m.top.callFunc("TestKey", RemoteKeys.Ok, true)
+            m.assertEqual(m.top.seek, seekBefore, "OK no longer skips")
+        end function
+
         @it("the non-transport keys act on the key-DOWN edge only")
         function _()
             ' Back goes first: only from the start state does its DOWN edge close the player.

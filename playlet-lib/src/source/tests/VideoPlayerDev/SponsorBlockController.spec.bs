@@ -1,5 +1,5 @@
 ' SponsorBlockController unit suite — the pure SponsorBlock decision logic in isolation. No real job: seed the
-' segments array directly + a fake `top` (for duration) and assert the find/skip/chapter decisions. The
+' segments + their timeline directly + a fake `top` (for duration) and assert the skip/chapter decisions. The
 ' notification + job plumbing live in the coordinator; manual-skip is tested via the stash + position guard.
 
 import "pkg:/components/VideoPlayerDev/SponsorBlockController.bs"
@@ -19,37 +19,20 @@ namespace Tests
                 top: m.fakeTop
             })
             ' Despacito-like segments: music_offtopic [0,21.808] manual, sponsor [100,110] auto, music_offtopic
-            ' [249.38,281.521] manual. Sorted by start.
+            ' [249.38,281.521] manual.
             m.segments = [
                 { start: 0.0, end: 21.808, option: "manual_skip", title: "Music: Non-Music Section", shortTitle: "Non-Music", showNotification: true, UUID: "seg-a", category: "music_offtopic" }
                 { start: 100.0, end: 110.0, option: "auto_skip", title: "Sponsor", shortTitle: "Sponsor", showNotification: false, UUID: "seg-b", category: "sponsor" }
                 { start: 249.38, end: 281.521, option: "manual_skip", title: "Music: Non-Music Section", shortTitle: "Non-Music", showNotification: true, UUID: "seg-c", category: "music_offtopic" }
             ]
-            ' seed the controller as if the job had returned (the enable gate + stored segments).
+            m.Seed(m.segments)
+        end function
+
+        ' seed the controller as if the job had returned (the enable gate + stored segments + their timeline).
+        function Seed(segments as object) as void
             m.sb.enabled = true
-            m.sb.segments = m.segments
-        end function
-
-        @describe("find segment by time")
-
-        @it("finds the segment containing the time")
-        function _()
-            seg = SponsorBlockController.FindSegmentByTime(m.segments, 12.0)
-            m.assertEqual(seg.UUID, "seg-a")
-            seg = SponsorBlockController.FindSegmentByTime(m.segments, 105.0)
-            m.assertEqual(seg.UUID, "seg-b")
-        end function
-
-        @it("returns invalid between segments")
-        function _()
-            m.assertInvalid(SponsorBlockController.FindSegmentByTime(m.segments, 50.0))
-            m.assertInvalid(SponsorBlockController.FindSegmentByTime(m.segments, 200.0))
-        end function
-
-        @it("includes the segment boundaries")
-        function _()
-            m.assertEqual(SponsorBlockController.FindSegmentByTime(m.segments, 0.0).UUID, "seg-a")
-            m.assertEqual(SponsorBlockController.FindSegmentByTime(m.segments, 21.808).UUID, "seg-a")
+            m.sb.segments = segments
+            m.sb.timeline = SponsorBlock.BuildTimeline(segments)
         end function
 
         @describe("skip target")
@@ -57,31 +40,31 @@ namespace Tests
         @it("returns the segment end (ms) as the seek target")
         function _()
             seg = m.segments[1] ' [100,110] auto
-            result = SponsorBlockController.SkipTargetForSegment(seg, 102.0, m.fakeTop.duration)
-            m.assertEqual(result.skipSeekMs, 110000)
+            result = SponsorBlockController.SkipTargetMs(seg, 102.0, m.fakeTop.duration)
+            m.assertEqual(result, 110000)
         end function
 
         @it("returns finish when the segment ends within 2s of the video end")
         function _()
             ' [249.38,281.521], duration 282 -> end within 2s of duration -> finish.
             seg = m.segments[2]
-            result = SponsorBlockController.SkipTargetForSegment(seg, 250.0, m.fakeTop.duration)
-            m.assertTrue(result.finish = true)
+            result = SponsorBlockController.SkipTargetMs(seg, 250.0, m.fakeTop.duration)
+            m.assertEqual(result, SponsorBlockController.FINISH_SENTINEL)
         end function
 
-        @it("returns invalid when the skip distance is under 2s")
+        @it("returns NO_SKIP when the skip distance is under 2s")
         function _()
             seg = m.segments[1] ' [100,110]
-            result = SponsorBlockController.SkipTargetForSegment(seg, 109.0, m.fakeTop.duration)
-            m.assertInvalid(result)
+            result = SponsorBlockController.SkipTargetMs(seg, 109.0, m.fakeTop.duration)
+            m.assertEqual(result, SponsorBlockController.NO_SKIP)
         end function
 
         @it("clamps the segment end to the video duration")
         function _()
             m.fakeTop.duration = 105.0
             seg = m.segments[1] ' [100,110] -> clamped to 105 == duration -> within 2s -> finish
-            result = SponsorBlockController.SkipTargetForSegment(seg, 101.0, m.fakeTop.duration)
-            m.assertTrue(result.finish = true)
+            result = SponsorBlockController.SkipTargetMs(seg, 101.0, m.fakeTop.duration)
+            m.assertEqual(result, SponsorBlockController.FINISH_SENTINEL)
         end function
 
         @describe("OnPosition auto-skip")
@@ -89,18 +72,18 @@ namespace Tests
         @it("returns a skip seek target while inside an auto-skip segment")
         function _()
             result = m.sb.OnPosition(105000) ' 105s, inside [100,110] auto
-            m.assertEqual(result.skipSeekMs, 110000)
+            m.assertEqual(result, 110000)
         end function
 
-        @it("returns invalid inside a manual-skip segment + stashes it for OK")
+        @it("returns NO_SKIP inside a manual-skip segment + arms it for OK")
         function _()
             m.sb.notifications = CreateObject("roSGNode", "Group")
             result = m.sb.OnPosition(5000) ' inside [0,21.808] manual
-            m.assertInvalid(result)
-            m.assertEqual(m.sb.manualSkipSegment.UUID, "seg-a")
+            m.assertEqual(result, SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.manualSkipIndex, 0)
         end function
 
-        @it("TrySkip returns the stashed manual segment's end while still inside it")
+        @it("TrySkip returns the armed manual segment's end while still inside it")
         function _()
             m.sb.notifications = CreateObject("roSGNode", "Group")
             m.sb.OnPosition(5000) ' stash [0,21.808]
@@ -108,20 +91,148 @@ namespace Tests
             m.assertEqual(target, 21808)
         end function
 
-        @it("TrySkip returns -1 with nothing stashed")
+        @it("does not re-arm the manual notice when the OK skip lands back inside the segment")
         function _()
-            m.assertEqual(m.sb.TrySkip(6000), -1)
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000)
+            m.assertEqual(m.sb.TrySkip(6000), 21808)
+            m.sb.OnSeek(21808)
+            m.assertEqual(m.sb.OnPosition(18000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
         end function
 
-        @it("returns invalid outside any segment")
+        @it("withdraws the manual notice once OK can no longer skip")
         function _()
-            m.assertInvalid(m.sb.OnPosition(50000))
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000)
+            m.assertEqual(m.sb.notifications.getChildCount(), 1)
+            m.sb.OnPosition(20500) ' within 2s of the end [0,21.808]
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
         end function
 
-        @it("returns invalid when disabled")
+        @it("withdraws the manual notice when the position leaves the segment")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.sb.OnPosition(5000)
+            m.sb.OnPosition(50000)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
+            m.assertFalse(m.sb.DismissManual())
+        end function
+
+        @it("TrySkip returns NO_SKIP with nothing armed")
+        function _()
+            m.assertEqual(m.sb.TrySkip(6000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("returns NO_SKIP outside any segment")
+        function _()
+            m.assertEqual(m.sb.OnPosition(50000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("does not re-skip when an inexact seek lands back inside the skipped segment")
+        function _()
+            m.assertEqual(m.sb.OnPosition(100000), 110000)
+            m.sb.OnSeek(110000)
+            ' the player reports the target, then the sync frame it actually landed on, short of the end.
+            m.assertEqual(m.sb.OnPosition(110000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(106700), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(108000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("stays quiet on a target echo that single precision reads a few ms past the target")
+        function _()
+            m.assertEqual(m.sb.OnPosition(100000), 110000)
+            m.sb.OnSeek(110000)
+            m.assertEqual(m.sb.OnPosition(110004), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(106700), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("does not re-skip a short segment when the seek lands before its start")
+        function _()
+            m.Seed([
+                { start: 111.0, end: 114.0, option: "auto_skip", showNotification: false, UUID: "seg-x" }
+            ])
+            m.assertEqual(m.sb.OnPosition(111000), 114000)
+            m.sb.OnSeek(114000)
+            m.assertEqual(m.sb.OnPosition(114000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(106700), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(111000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(113000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(115000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("does not skip an earlier segment the seek lands in")
+        function _()
+            m.Seed([
+                { start: 100.0, end: 110.0, option: "auto_skip", showNotification: false, UUID: "seg-x" }
+                { start: 111.0, end: 114.0, option: "auto_skip", showNotification: false, UUID: "seg-y" }
+            ])
+            m.assertEqual(m.sb.OnPosition(111000), 114000)
+            m.sb.OnSeek(114000)
+            m.assertEqual(m.sb.OnPosition(114000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(106700), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(110000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(112000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(115000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("skips again after a user seek back into the skipped segment")
+        function _()
+            m.sb.OnPosition(100000)
+            m.sb.OnSeek(110000)
+            m.sb.OnPosition(106700)
+            m.sb.OnSeek(102000)
+            m.assertEqual(m.sb.OnPosition(102000), 110000)
+        end function
+
+        @it("skips an adjacent segment entered straight from the skipped one")
+        function _()
+            m.Seed([
+                { start: 100.0, end: 110.0, option: "auto_skip", showNotification: false, UUID: "seg-x" }
+                { start: 110.0, end: 120.0, option: "auto_skip", showNotification: false, UUID: "seg-y" }
+            ])
+            m.sb.OnPosition(100000)
+            m.assertEqual(m.sb.OnPosition(107000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(110500), 120000)
+        end function
+
+        @it("skips an auto-skip segment nested in a seekbar-only one")
+        function _()
+            m.Seed([
+                { start: 0.0, end: 250.0, option: "show_in_seekbar", showNotification: false, UUID: "seg-x", title: "Filler" }
+                { start: 100.0, end: 130.0, option: "auto_skip", showNotification: false, UUID: "seg-y", title: "Sponsor" }
+            ])
+            m.assertEqual(m.sb.OnPosition(101000), 130000)
+            m.assertEqual(m.sb.ChapterTextForCursor(101000), "Sponsor")
+            m.assertEqual(m.sb.ChapterTextForCursor(140000), "Filler")
+        end function
+
+        @it("reports a segment once per viewing, however often it is skipped")
+        function _()
+            m.sb.jobQueue = { request: invalid }
+            m.sb.OnPosition(100000)
+            m.assertNotInvalid(m.sb.jobQueue.request)
+            m.sb.jobQueue.request = invalid
+            m.sb.OnSeek(102000)
+            m.assertEqual(m.sb.OnPosition(102000), 110000)
+            m.assertInvalid(m.sb.jobQueue.request)
+        end function
+
+        @it("shows no auto-skip notice when the segment is too close to its end to skip")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.segments[1].showNotification = true
+            m.assertEqual(m.sb.OnPosition(109000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
+        end function
+
+        @it("returns NO_SKIP when disabled")
         function _()
             m.sb.enabled = false
-            m.assertInvalid(m.sb.OnPosition(105000))
+            m.assertEqual(m.sb.OnPosition(105000), SponsorBlockController.NO_SKIP)
         end function
 
         @describe("manual notice dismissal (Back)")
@@ -131,11 +242,47 @@ namespace Tests
             m.sb.notifications = CreateObject("roSGNode", "Group")
             m.sb.OnPosition(5000) ' arm + show the manual notice for [0,21.808]
             m.assertTrue(m.sb.DismissManual())
-            m.assertInvalid(m.sb.manualSkipSegment)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
             ' still inside the segment: the notice must NOT re-arm/re-show on the next position ticks.
-            m.assertInvalid(m.sb.OnPosition(6000))
-            m.assertInvalid(m.sb.manualSkipSegment)
-            m.assertEqual(m.sb.TrySkip(7000), -1)
+            m.assertEqual(m.sb.OnPosition(6000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.TrySkip(7000), SponsorBlockController.NO_SKIP)
+        end function
+
+        @it("withdraws a manual notice for a nested auto-skip segment and re-arms it after the skip lands")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.Seed([
+                { start: 90.0, end: 200.0, option: "manual_skip", showNotification: true, UUID: "seg-x" }
+                { start: 100.0, end: 130.0, option: "auto_skip", showNotification: false, UUID: "seg-y" }
+            ])
+            m.sb.OnPosition(95000)
+            m.assertEqual(m.sb.manualSkipIndex, 0)
+            m.assertEqual(m.sb.OnPosition(101000), 130000)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
+            m.sb.OnSeek(130000)
+            m.assertEqual(m.sb.OnPosition(126000), SponsorBlockController.NO_SKIP)
+            m.sb.OnPosition(131000)
+            m.assertEqual(m.sb.manualSkipIndex, 0)
+            m.assertEqual(m.sb.TrySkip(132000), 200000)
+        end function
+
+        @it("a dismissed segment stays quiet around an auto-skip segment nested in it")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.Seed([
+                { start: 90.0, end: 200.0, option: "manual_skip", showNotification: true, UUID: "seg-x" }
+                { start: 100.0, end: 130.0, option: "auto_skip", showNotification: false, UUID: "seg-y" }
+            ])
+            m.sb.OnPosition(95000)
+            m.assertTrue(m.sb.DismissManual())
+            m.assertEqual(m.sb.OnPosition(101000), 130000)
+            m.sb.OnSeek(130000)
+            m.assertEqual(m.sb.OnPosition(126000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(131000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.manualSkipIndex, -1)
+            m.assertEqual(m.sb.notifications.getChildCount(), 0)
         end function
 
         @it("DismissManual is a no-op without an armed notice")
@@ -149,9 +296,22 @@ namespace Tests
             m.sb.notifications = CreateObject("roSGNode", "Group")
             m.sb.OnPosition(5000)
             m.assertTrue(m.sb.DismissManual())
-            m.sb.OnPosition(50000) ' outside any segment -> the dismissal is forgotten
-            m.sb.OnPosition(7000) ' back inside -> armed again
-            m.assertEqual(m.sb.manualSkipSegment.UUID, "seg-a")
+            m.sb.OnPosition(50000)
+            m.sb.OnPosition(7000)
+            m.assertEqual(m.sb.manualSkipIndex, 0)
+        end function
+
+        @it("a dismissal leaves the next segment active")
+        function _()
+            m.sb.notifications = CreateObject("roSGNode", "Group")
+            m.Seed([
+                { start: 100.0, end: 110.0, option: "manual_skip", showNotification: true, UUID: "seg-x" }
+                { start: 110.0, end: 120.0, option: "auto_skip", showNotification: false, UUID: "seg-y" }
+            ])
+            m.sb.OnPosition(101000)
+            m.assertTrue(m.sb.DismissManual())
+            m.assertEqual(m.sb.OnPosition(105000), SponsorBlockController.NO_SKIP)
+            m.assertEqual(m.sb.OnPosition(110500), 120000)
         end function
 
         @describe("chapter text")

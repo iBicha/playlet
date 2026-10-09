@@ -313,6 +313,7 @@ end function
 ' Apply a seek (ms): the one writer of the device's `seek`. The live "jump to edge" sentinel maps to the
 ' live-end seek the OS understands.
 function ApplySeek(seekMs as integer) as void
+    m.sponsorblock.OnSeek(seekMs)
     if TransportController.IsLiveEdgeSentinelMs(seekMs)
         m.top.seek = 999999
         return
@@ -406,7 +407,7 @@ end function
 ' on-screen "Press OK to skip" must win over the button/bar focus tiers.
 function TrySponsorBlockSkip() as boolean
     skip = m.sponsorblock.TrySkip(Int(m.top.position * 1000))
-    if skip = -1
+    if skip = SponsorBlockController.NO_SKIP
         return false
     end if
     LogDebug("OK skip resolved=", skip, " (FINISH=", SponsorBlockController.FINISH_SENTINEL, ") posS=", m.top.position, " mode=", m.transport.transportMode)
@@ -887,14 +888,12 @@ function OnPosition(event as object) as void
     end if
 
     ' SponsorBlock auto-skip off the real position (the controller decides; we apply the seek / finish).
-    sb = m.sponsorblock.OnPosition(posMs)
-    if sb <> invalid
-        if sb.finish = true
-            OnPlaybackFinished()
-        else
-            m.transport.ForceIdleSeek(sb.skipSeekMs, true) ' through the module (no out-of-band seek); keep playing
-            ApplyTransport()
-        end if
+    skipMs = m.sponsorblock.OnPosition(posMs)
+    if skipMs = SponsorBlockController.FINISH_SENTINEL
+        OnPlaybackFinished()
+    else if skipMs <> SponsorBlockController.NO_SKIP
+        m.transport.ForceIdleSeek(skipMs, true) ' through the module (no out-of-band seek); keep playing
+        ApplyTransport()
     end if
 
     ' report watch progress to the account in 20-second steps.

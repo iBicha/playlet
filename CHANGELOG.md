@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Small security fixes
+- SponsorBlock skip looping back to the start of a segment on some devices, and overlapping segments
 
 ### Changed
 

@@ -1,5 +1,6 @@
 import "pkg:/components/Services/SponsorBlock/SponsorBlockConfig.bs"
 import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockTimeline.bs"
 import "pkg:/components/VideoPlayer/SponsorBlockSegmentAction.bs"
 import "pkg:/source/utils/Types.bs"
 
@@ -20,6 +21,7 @@ function ExecuteJob() as void
     skipSegments = ProcessSkipSegments(skipSegments, showNotifications, categories, config)
 
     barPath = invalid
+    timeline = invalid
     if skipSegments <> invalid
         barDir = "tmp:/sponsorblock"
         fs = CreateObject("roFileSystem")
@@ -27,24 +29,21 @@ function ExecuteJob() as void
         fs.CreateDirectory(barDir)
         ' path contains video id to avoid texture cache reuse
         barPath = `${barDir}/${videoId}.png`
-        service.GenerateProgressBarBackground(skipSegments, lengthSeconds, barPath)
-    end if
+        service.GenerateProgressBarBackground(skipSegments, SponsorBlock.BuildTimeline(skipSegments), lengthSeconds, barPath)
 
-    ' Usually segment.start and segment.end are equal for poi_highlight
-    ' We pad the duration for poi_highlight segments so that the chapter label
-    ' can be visible when seeking in trickplay.
-    ' Padding poi_highlight is done after generating the progress bar, so that the
-    ' highlight is not too long in the bar.
-    skipSegments = PadHightlightSegment(skipSegments, lengthSeconds)
-
-    ' Sort the segments by start time, so we can binary search them later.
-    if skipSegments <> invalid
-        skipSegments.SortBy("start")
+        ' Usually segment.start and segment.end are equal for poi_highlight
+        ' We pad the duration for poi_highlight segments so that the chapter label
+        ' can be visible when seeking in trickplay.
+        ' Padding poi_highlight is done after generating the progress bar, so that the
+        ' highlight is not too long in the bar.
+        skipSegments = PadHightlightSegment(skipSegments, lengthSeconds)
+        timeline = SponsorBlock.BuildTimeline(skipSegments)
     end if
 
     JobSuccessData({
         videoId: videoId
         skipSegments: skipSegments
+        timeline: timeline
         barPath: barPath
     })
 end function

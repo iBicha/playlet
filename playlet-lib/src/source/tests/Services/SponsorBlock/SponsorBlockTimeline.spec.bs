@@ -1,0 +1,135 @@
+import "pkg:/components/Services/SponsorBlock/SponsorBlockTimeline.bs"
+
+namespace Tests
+
+    @suite
+    class SponsorBlockTimelineTests extends Rooibos.BaseTestSuite
+
+        function Auto(startS as float, endS as float) as object
+            return { start: startS, end: endS, option: "auto_skip", showNotification: false }
+        end function
+
+        function Manual(startS as float, endS as float) as object
+            return { start: startS, end: endS, option: "manual_skip", showNotification: true }
+        end function
+
+        function Seekbar(startS as float, endS as float) as object
+            return { start: startS, end: endS, option: "show_in_seekbar", showNotification: false }
+        end function
+
+        function AssertTimeline(timeline as object, starts as object, ends as object, segmentIndexes as object) as void
+            m.assertEqual(timeline.starts, starts)
+            m.assertEqual(timeline.ends, ends)
+            m.assertEqual(timeline.segmentIndexes, segmentIndexes)
+        end function
+
+        @describe("SponsorBlock.BuildTimeline")
+
+        @it("keeps disjoint segments as they are, in time order")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Auto(100, 110), m.Manual(0, 21.5)])
+            m.AssertTimeline(timeline, [0.0, 100.0], [21.5, 110.0], [1, 0])
+        end function
+
+        @it("gives the part an auto-skip segment covers to it, inside a seekbar-only one")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Seekbar(90, 300), m.Auto(100, 130)])
+            m.AssertTimeline(timeline, [90.0, 100.0, 130.0], [100.0, 130.0, 300.0], [0, 1, 0])
+        end function
+
+        @it("ranks auto-skip over a prompting manual segment over the rest")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Seekbar(0, 30), m.Manual(0, 20), m.Auto(0, 10)])
+            m.AssertTimeline(timeline, [0.0, 10.0, 20.0], [10.0, 20.0, 30.0], [2, 1, 0])
+        end function
+
+        @it("ranks a manual segment without a prompt with the seekbar-only ones")
+        function _()
+            silent = m.Manual(0, 20)
+            silent.showNotification = false
+            timeline = SponsorBlock.BuildTimeline([silent, m.Seekbar(0, 30)])
+            m.AssertTimeline(timeline, [0.0], [30.0], [1])
+        end function
+
+        @it("gives an overlap between equal ranks to the segment ending later")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Auto(100, 130), m.Auto(120, 150)])
+            m.AssertTimeline(timeline, [100.0, 120.0], [120.0, 150.0], [0, 1])
+        end function
+
+        @it("gives a full tie to the first segment")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Auto(100, 130), m.Auto(110, 130)])
+            m.AssertTimeline(timeline, [100.0], [130.0], [0])
+        end function
+
+        @it("orders integer and float bounds numerically, as the API's JSON mixes them")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([
+                { start: 0, end: 21.808, option: "manual_skip", showNotification: true }
+                { start: 10, end: 15.5, option: "auto_skip", showNotification: false }
+            ])
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 5.0), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 12.0), 1)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 18.0), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 22.0), -1)
+        end function
+
+        @it("lets a containing segment of equal rank own a nested one")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Auto(100, 200), m.Auto(120, 130), m.Auto(300, 310)])
+            m.AssertTimeline(timeline, [100.0, 300.0], [200.0, 310.0], [0, 2])
+        end function
+
+        @it("gives a zero-length segment no interval")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Seekbar(50, 50), m.Auto(100, 110)])
+            m.AssertTimeline(timeline, [100.0], [110.0], [1])
+        end function
+
+        @it("returns an empty timeline for no segments")
+        function _()
+            m.AssertTimeline(SponsorBlock.BuildTimeline([]), [], [], [])
+        end function
+
+        @describe("SponsorBlock.FindTimelineSegmentIndex")
+
+        @it("finds the owner inside an interval and -1 in a gap")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Manual(0, 21.5), m.Auto(100, 110), m.Manual(249, 281)])
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 12.0), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 105.0), 1)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 260.0), 2)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 50.0), -1)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 300.0), -1)
+        end function
+
+        @it("includes both interval ends")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Manual(0, 21.5)])
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 0.0), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 21.5), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 21.6), -1)
+        end function
+
+        @it("gives a point two intervals share to the later one")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Auto(100, 110), m.Manual(110, 120)])
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 110.0), 1)
+        end function
+
+        @it("finds a containing segment past a later-starting nested one")
+        function _()
+            timeline = SponsorBlock.BuildTimeline([m.Seekbar(100, 200), m.Auto(120, 130), m.Seekbar(300, 310)])
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 150.0), 0)
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(timeline, 125.0), 1)
+        end function
+
+        @it("returns -1 on an empty timeline")
+        function _()
+            m.assertEqual(SponsorBlock.FindTimelineSegmentIndex(SponsorBlock.BuildTimeline([]), 10.0), -1)
+        end function
+
+    end class
+
+end namespace
