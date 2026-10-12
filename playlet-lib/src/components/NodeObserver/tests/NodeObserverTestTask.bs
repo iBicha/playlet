@@ -1,0 +1,17 @@
+' Observes source.value through a NodeObserver made on this task's thread, and blocks in wait until it changes.
+function Init()
+    m.top.functionName = "WaitForChange"
+end function
+
+function WaitForChange() as void
+    port = CreateObject("roMessagePort")
+    observer = CreateObject("roSGNode", "NodeObserver")
+    observer.target = { node: m.top.source, fieldName: "value" }
+    observer.ObserveField("changed", port)
+    clock = CreateObject("roTimespan")
+    m.top.ready = true
+    if wait(2000, port) <> invalid
+        m.top.changedAtMs = clock.TotalMilliseconds()
+    end if
+    observer.nodeDestroy = true
+end function

@@ -1,0 +1,115 @@
+namespace Tests
+
+    @suite
+    class NodeObserverTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.source = CreateObject("roSGNode", "Node")
+            m.source.addField("value", "integer", false)
+            m.port = CreateObject("roMessagePort")
+        end function
+
+        function CreateObserver() as object
+            observer = CreateObject("roSGNode", "NodeObserver")
+            observer.target = { node: m.source, fieldName: "value" }
+            return observer
+        end function
+
+        ' Every message on the port within waitMs of the previous one, as "<field>=<data>".
+        function Messages(waitMs as integer) as object
+            messages = []
+            message = wait(waitMs, m.port)
+            while message <> invalid
+                messages.Push(`${message.GetField()}=${message.GetData()}`)
+                message = wait(waitMs, m.port)
+            end while
+            return messages
+        end function
+
+        @describe("NodeObserver")
+
+        @it("sets changed on the field's first change only")
+        function _()
+            observer = m.CreateObserver()
+            observer.ObserveField("changed", m.port)
+            m.source.value = 1
+            m.assertEqual(m.Messages(500), ["changed=true"])
+            m.source.value = 2
+            m.assertEqual(m.Messages(100), [])
+        end function
+
+        @it("stops observing on nodeDestroy")
+        function _()
+            observer = m.CreateObserver()
+            observer.ObserveField("changed", m.port)
+            observer.nodeDestroy = true
+            m.source.value = 1
+            m.assertEqual(m.Messages(100), [])
+            m.assertFalse(observer.changed)
+        end function
+
+        @it("moves to a new target, leaving the previous one")
+        function _()
+            other = CreateObject("roSGNode", "Node")
+            other.addField("value", "integer", false)
+            observer = m.CreateObserver()
+            observer.ObserveField("changed", m.port)
+            observer.target = { node: other, fieldName: "value" }
+            m.source.value = 1
+            m.assertEqual(m.Messages(100), [])
+            other.value = 1
+            m.assertEqual(m.Messages(500), ["changed=true"])
+        end function
+
+        @it("stops without dropping the field's other observers")
+        function _()
+            m.source.ObserveFieldScoped("value", m.port)
+            stopped = m.CreateObserver()
+            kept = m.CreateObserver()
+            kept.ObserveField("changed", m.port)
+            stopped.nodeDestroy = true
+            m.source.value = 1
+            m.assertEqual(m.Messages(500), ["value=1", "changed=true"])
+            m.source.value = 2
+            m.assertEqual(m.Messages(100), ["value=2"])
+        end function
+
+        @it("wakes a task blocked in wait when another thread sets the field")
+        function _()
+            task = CreateObject("roSGNode", "NodeObserverTestTask")
+            task.source = m.source
+            task.control = "run"
+            clock = CreateObject("roTimespan")
+            while task.ready <> true and clock.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            sleep(100)
+            m.source.value = 1
+            while task.changedAtMs = -1 and clock.TotalMilliseconds() < 5000
+                sleep(10)
+            end while
+            m.assertTrue(task.changedAtMs >= 100 and task.changedAtMs < 500, `changed at ${task.changedAtMs} ms`)
+        end function
+
+        @it("leaves nothing observing the field once it changed or stopped")
+        function _()
+            ' Held, so only the observer's own unobserve can end its observation.
+            held = []
+            for i = 1 to 1000
+                held.Push(m.CreateObserver())
+                m.source.value = i
+                stopped = m.CreateObserver()
+                stopped.nodeDestroy = true
+                held.Push(stopped)
+            end for
+            ' A field set costs about 1µs per observation the field holds, or has held at once.
+            clock = CreateObject("roTimespan")
+            for i = 1 to 200
+                m.source.value = -i
+            end for
+            m.assertTrue(clock.TotalMilliseconds() < 50, `200 sets took ${clock.TotalMilliseconds()} ms`)
+        end function
+
+    end class
+
+end namespace

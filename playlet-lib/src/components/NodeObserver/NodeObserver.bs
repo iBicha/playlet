@@ -1,0 +1,37 @@
+import "pkg:/source/utils/AssertUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Observes a field from this component's scope, so stopping drops only this observation: UnobserveFieldScoped
+' drops every observation of the field made from the calling component.
+
+function Init()
+    m.top.ObserveField("target", FuncName(OnTargetChange))
+    m.top.ObserveField("nodeDestroy", FuncName(OnNodeDestroy))
+end function
+
+function OnTargetChange(event as object) as void
+    StopObserving()
+    target = event.GetData()
+    #if DEBUG
+        Assert.NodeHasField(target.node, target.fieldName)
+    #end if
+    m.node = target.node
+    m.fieldName = target.fieldName
+    m.node.ObserveFieldScoped(m.fieldName, FuncName(OnFieldChange))
+end function
+
+function OnFieldChange() as void
+    StopObserving()
+    m.top.changed = true
+end function
+
+function OnNodeDestroy() as void
+    StopObserving()
+end function
+
+function StopObserving() as void
+    if m.node <> invalid
+        m.node.UnobserveFieldScoped(m.fieldName)
+        m.node = invalid
+    end if
+end function

@@ -1,0 +1,64 @@
+import "pkg:/components/NodeObserver/NodeObserver.bs"
+
+namespace Tests
+
+    ' Runs inside a NodeObserver, so a spec can call its handlers: a throw in a field's handler crashes the app
+    ' instead of reaching the code that set the field.
+    @SGNode("NodeObserver")
+    @suite
+    class NodeObserverOnRenderThreadTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            m.source = CreateObject("roSGNode", "Node")
+            m.source.addField("value", "integer", false)
+            m.port = CreateObject("roMessagePort")
+        end function
+
+        function CreateObserver() as object
+            observer = CreateObject("roSGNode", "NodeObserver")
+            observer.target = { node: m.source, fieldName: "value" }
+            observer.ObserveField("changed", m.port)
+            return observer
+        end function
+
+        @describe("NodeObserver made on the render thread")
+
+        @it("sets changed on the field's first change only")
+        function _()
+            observer = m.CreateObserver()
+            m.source.value = 1
+            m.assertNotInvalid(wait(500, m.port))
+            m.source.value = 2
+            m.assertInvalid(wait(100, m.port))
+            m.assertTrue(observer.changed)
+        end function
+
+        @it("stops observing on nodeDestroy")
+        function _()
+            observer = m.CreateObserver()
+            observer.nodeDestroy = true
+            m.source.value = 1
+            m.assertInvalid(wait(100, m.port))
+            m.assertFalse(observer.changed)
+        end function
+
+        @it("throws in DEBUG on a field the node doesn't have")
+        function _()
+            event = {
+                target: { node: m.source, fieldName: "missing" }
+                GetData: function() as object
+                    return m.target
+                end function
+            }
+            message = invalid
+            try
+                OnTargetChange(event)
+            catch error
+                message = error.message
+            end try
+            m.assertEqual(message, "Assertion failed: Node does not have field 'missing'. <invalid>")
+        end function
+
+    end class
+
+end namespace
