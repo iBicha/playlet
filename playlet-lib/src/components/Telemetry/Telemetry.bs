@@ -53,9 +53,6 @@ function TelemetryLoop() as void
     m.top.observeField("LogError", msgPort)
     m.top.observeField("LogEvent", msgPort)
 
-    ReportSessionStart()
-    ReportLastExitCrash()
-
     #if SUPPORTS_BATCHING
         debouceMs = 2000
         debounceCountLimit = 20
@@ -63,8 +60,11 @@ function TelemetryLoop() as void
         debounceTimer = CreateObject("roTimeSpan")
     #end if
 
-    retryAfter = 0
     retryAfterTimer = CreateObject("roTimeSpan")
+    retryAfter = Sentry.SendEvents(CreateLaunchEvents())
+    if retryAfter > 0
+        retryAfterTimer.Mark()
+    end if
 
     levelMap = {
         "LogInfo": "info"
@@ -160,8 +160,8 @@ function TelemetryLoop() as void
     end while
 end function
 
-function ReportSessionStart() as void
-    Sentry.SendEvents([{
+function CreateLaunchEvents() as object
+    events = [{
         level: "info"
         message: "[SESSION] start"
         fingerprint: ["session start"]
@@ -169,7 +169,12 @@ function ReportSessionStart() as void
         dist: m.dist
         tags: m.tags
         userId: m.userId
-    }])
+    }]
+    lastExitCrashEvent = CreateLastExitCrashEvent()
+    if lastExitCrashEvent <> invalid
+        events.Push(lastExitCrashEvent)
+    end if
+    return events
 end function
 
 function GetTags() as object

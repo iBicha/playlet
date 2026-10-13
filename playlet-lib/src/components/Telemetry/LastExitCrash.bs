@@ -1,19 +1,17 @@
 #const DEBUG_THROW_ON_UNKNOWN_EXIT_CODE = true
 
-import "pkg:/components/Telemetry/Sentry.bs"
-import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
 
-function ReportLastExitCrash() as void
+function CreateLastExitCrashEvent() as dynamic
     scene = m.top.getScene()
     if scene = invalid or not scene.hasField("lastExitInfo")
-        return
+        return invalid
     end if
 
     lastExitInfo = scene.lastExitInfo
     scene.lastExitInfo = invalid
     if not IsAssociativeArray(lastExitInfo)
-        return
+        return invalid
     end if
 
     crashExitCodes = {
@@ -63,7 +61,7 @@ function ReportLastExitCrash() as void
     #end if
 
     if crashExitCodes[exitCode] = false
-        return
+        return invalid
     end if
 
     message = `[FATAL][LastExit] App crashed: ${exitCode}`
@@ -71,7 +69,7 @@ function ReportLastExitCrash() as void
         message += `\n${key}: ${ToString(lastExitInfo[key])}`
     end for
 
-    Sentry.SendEvents([{
+    return {
         level: "fatal"
         message: message
         timestamp: ValidString(lastExitInfo.timestamp)
@@ -80,5 +78,5 @@ function ReportLastExitCrash() as void
         dist: m.dist
         tags: m.tags
         userId: m.userId
-    }])
+    }
 end function
