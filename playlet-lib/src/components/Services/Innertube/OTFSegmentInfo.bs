@@ -49,9 +49,9 @@ namespace Innertube
         while true
             while formatsToProcess.Count() > 0 and pendingFormats.Count() < OTF_MAX_REQUEST_COUNT
                 formatToProcess = formatsToProcess.Pop()
-                request = OTFMakeSegmentInfoRequest(formatToProcess.format, formatToProcess.filePath, requestHeaders, errors, cancellation)
-                if request <> invalid
-                    formatToProcess.request = request
+                pending = OTFSendSegmentInfoRequest(formatToProcess.format, formatToProcess.filePath, requestHeaders, errors, cancellation)
+                if pending <> invalid
+                    formatToProcess.pending = pending
                     pendingFormats.Push(formatToProcess)
                 end if
             end while
@@ -62,10 +62,13 @@ namespace Innertube
 
             pendingFormat = pendingFormats.Shift()
             ' returns false if processing should stop (e.g., cancelled)
-            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.request, pendingFormat.filePath, segmentDurationsRegex, errors, requestHeaders, cancellation)
+            if not OTFProcessPendingFormat(pendingFormat.format, pendingFormat.pending, pendingFormat.filePath, segmentDurationsRegex, errors, requestHeaders, cancellation)
                 exit while
             end if
         end while
+        for each pendingFormat in pendingFormats
+            pendingFormat.pending.Cancel()
+        end for
 
         fs.Delete("tmp:/otf_segments")
 
@@ -87,7 +90,7 @@ namespace Innertube
         end if
     end function
 
-    function OTFMakeSegmentInfoRequest(format as object, filePath as string, requestHeaders as object, errors as object, cancellation as object) as object
+    function OTFSendSegmentInfoRequest(format as object, filePath as string, requestHeaders as object, errors as object, cancellation as object) as dynamic
         url = format.url
         if StringUtils.IsNullOrEmpty(url)
             errors.message += `URL is empty for itag ${format.itag}.\n`
@@ -101,15 +104,14 @@ namespace Innertube
 
         request = HttpClient.Get(otfUrl)
         request.Headers(requestHeaders)
-        request.ToFile(filePath)
+        request.SaveBodyToFile(filePath)
+        request.NoCache()
         request.Cancellation(cancellation)
-        request.Send()
-
-        return request
+        return request.Send()
     end function
 
-    function OTFProcessPendingFormat(format as object, request as object, filePath as string, segmentDurationsRegex as object, errors as object, requestHeaders as object, cancellation as object) as boolean
-        response = request.Await()
+    function OTFProcessPendingFormat(format as object, pending as HttpClient.PendingResponse, filePath as string, segmentDurationsRegex as object, errors as object, requestHeaders as object, cancellation as object) as boolean
+        response = pending.Await()
 
         if response.IsCancelled()
             return false

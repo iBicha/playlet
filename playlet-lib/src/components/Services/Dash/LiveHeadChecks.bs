@@ -1,0 +1,119 @@
+import "pkg:/components/Services/Dash/LiveTimeline.types.bs"
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/MathUtils.bs"
+
+' Roku waits over 10s on a manifest refresh, but the response holds every route of the web server
+' meanwhile, and from 5s Roku sends a second request (measured).
+const LIVE_HEAD_WAIT_MS = 2000
+' One check per LIVE_MANIFEST_REFRESH_MS over HttpClient's 30s default attempt timeout.
+const LIVE_HEAD_MAX_CHECKS_IN_FLIGHT = 3
+
+class LiveHeadChecks
+    public counts as object
+
+    private headUrl as string
+    private inFlight as LiveHeadCheck[]
+    private refreshes as integer = 0
+    private refreshesWithoutNewerHead as integer = 0
+    private newestSeqnum as integer = -1
+
+    function new(headUrl as string)
+        m.headUrl = headUrl
+        m.inFlight = []
+        m.counts = {
+            "checks_sent": 0
+            "answered_after_wait": 0
+            "timed_out": 0
+            "answered_without_head": 0
+            "refreshes_without_newer_head_max_streak": 0
+        }
+    end function
+
+    ' A check unanswered within LIVE_HEAD_WAIT_MS stays in flight; a later refresh returns its answer. A check that
+    ' answers with a head cancels the checks sent before it: they can only answer with an older one.
+    function Refresh() as LiveHeadReading[]
+        m.refreshes += 1
+        answers = m.CollectAnswers()
+        if m.inFlight.Count() < LIVE_HEAD_MAX_CHECKS_IN_FLIGHT
+            check = { pending: m.Send(), sentAtRefresh: m.refreshes }
+            m.counts["checks_sent"] += 1
+            response = check.pending.Wait(LIVE_HEAD_WAIT_MS)
+            ' Earlier checks answered during the wait.
+            answers.Append(m.CollectAnswers())
+            if response = invalid
+                m.inFlight.Push(check)
+            else
+                head = m.Read(check, response)
+                answers.Push(head)
+                if head.seqnum >= 0
+                    m.Cancel()
+                end if
+            end if
+        end if
+
+        m.refreshesWithoutNewerHead += 1
+        for each head in answers
+            if head.seqnum > m.newestSeqnum
+                m.newestSeqnum = head.seqnum
+                m.refreshesWithoutNewerHead = 0
+            end if
+        end for
+        m.counts["refreshes_without_newer_head_max_streak"] = MathUtils.Max(m.counts["refreshes_without_newer_head_max_streak"], m.refreshesWithoutNewerHead)
+        return answers
+    end function
+
+    ' Cancels the checks in flight: the video load they were sent for is over, or a newer check answered.
+    function Cancel() as void
+        for each check in m.inFlight
+            check.pending.Cancel()
+        end for
+        m.inFlight = []
+    end function
+
+    private function Send() as HttpClient.PendingResponse
+        return Innertube.CreateLiveHeadRequest(m.headUrl).Send()
+    end function
+
+    ' The answers of the checks in flight, in the order they were sent.
+    private function CollectAnswers() as LiveHeadReading[]
+        answers = []
+        stillInFlight = []
+        for each check in m.inFlight
+            response = check.pending.Poll()
+            if response = invalid
+                stillInFlight.Push(check)
+            else
+                head = m.Read(check, response)
+                answers.Push(head)
+                if head.seqnum >= 0
+                    for each sentBefore in stillInFlight
+                        sentBefore.pending.Cancel()
+                    end for
+                    stillInFlight = []
+                end if
+            end if
+        end for
+        m.inFlight = stillInFlight
+        return answers
+    end function
+
+    private function Read(check as LiveHeadCheck, response as HttpClient.Response) as LiveHeadReading
+        head = {
+            seqnum: Innertube.ReadLiveHeadSeqnum(response)
+            timeMs: Innertube.ReadLiveHeadTimeMs(response)
+            response: response
+        }
+        if response.IsTimedOut()
+            m.counts["timed_out"] += 1
+            return head
+        end if
+        if check.sentAtRefresh < m.refreshes
+            m.counts["answered_after_wait"] += 1
+        end if
+        if head.seqnum < 0
+            m.counts["answered_without_head"] += 1
+        end if
+        return head
+    end function
+end class

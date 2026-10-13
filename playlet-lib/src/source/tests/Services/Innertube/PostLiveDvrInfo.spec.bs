@@ -1,0 +1,57 @@
+import "pkg:/components/Services/Innertube/PostLiveDvrInfo.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class PostLiveDvrInfoTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        @describe("Innertube.FetchPostLiveDvrHead")
+
+        @it("reads a HEAD's status and headers")
+        function _()
+            m.server.routes = { "/dvr/head": { status: 200, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } } }
+            result = Innertube.FetchPostLiveDvrHead(Tests.HttpTestServerUrl("/dvr/head?itag=1"), invalid, "cpn1", Innertube.ClientType.Tv, invalid)
+            m.assertEqual(result.statusCode, 200)
+            m.assertTrue(Innertube.HasPostLiveDvrHead(result))
+            m.assertEqual(Tests.HttpTestServerHits(m.server, result.url), 1)
+        end function
+
+        @it("sends a failed HEAD once more")
+        function _()
+            m.server.routes = { "/dvr/failing": { status: 503 } }
+            result = Innertube.FetchPostLiveDvrHead(Tests.HttpTestServerUrl("/dvr/failing?itag=1"), "0", invalid, Innertube.ClientType.Tv, invalid)
+            m.assertEqual(result.statusCode, 503)
+            m.assertFalse(Innertube.HasPostLiveDvrHead(result))
+            m.assertEqual(Tests.HttpTestServerHits(m.server, result.url), 2)
+        end function
+
+        @describe("Innertube.GetPostLiveDvrInfo")
+
+        @it("reads the duration and segment count from the live edge's head")
+        function _()
+            m.server.routes = { "/dvr/ended": { status: 200, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } } }
+            parsedResponse = {}
+            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: Tests.HttpTestServerUrl("/dvr/ended?itag=1") }], invalid, Innertube.ClientType.Tv, invalid)
+            m.assertEqual(parsedResponse.postLiveDvrDurationMs, 80000)
+            m.assertEqual(parsedResponse.postLiveDvrSegmentCount, 40)
+        end function
+
+    end class
+
+end namespace

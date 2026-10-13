@@ -1,9 +1,115 @@
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
 
 namespace Tests
 
     @suite
     class InvidiousServiceTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function CreateService(backend = "invidious" as string) as object
+            return new Invidious.InvidiousService({
+                preferences: { "backend.selected": backend, "invidious.instance": Tests.HttpTestServerUrl("/inv") }
+                apiDefinitions: {
+                    cached: { url: "/api/v1/cached/{id}", cacheSeconds: 60 }
+                    flaky: { url: "/api/v1/flaky", tryCount: 2 }
+                    video_info: { url: "/api/v1/videos/{id}", responseHandler: "VideoInfoHandler" }
+                }
+            })
+        end function
+
+        function AssertContains(text as string, part as string)
+            m.assertTrue(text.InStr(part) <> -1, `"${text}" doesn't contain "${part}"`)
+        end function
+
+        @describe("Invidious.InvidiousService.MakeRequest")
+
+        @it("serves an endpoint from the cache for its cacheSeconds")
+        function _()
+            DeleteFile(HttpCache.GetFilePath(Tests.HttpTestServerUrl("/inv/api/v1/cached/x"), {}, invalid))
+            m.server.routes = { "/inv/api/v1/cached/x": { status: 200, body: "[1,2]" } }
+            service = m.CreateService()
+            m.assertEqual(service.MakeRequest({ endpoint: "cached", pathParams: { id: "x" } }).result.items, [1, 2])
+            m.assertEqual(service.MakeRequest({ endpoint: "cached", pathParams: { id: "x" } }).result.items, [1, 2])
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/inv/api/v1/cached/x"), 1)
+        end function
+
+        @it("makes an endpoint's tryCount attempts, then fails with the last one's error")
+        function _()
+            m.server.routes = { "/inv/api/v1/flaky": { status: 503, body: "busy" } }
+            result = m.CreateService().MakeRequest({ endpoint: "flaky" })
+            m.assertFalse(result.success)
+            m.assertFalse(result.cancelled)
+            m.AssertContains(result.error, "StatusCode: 503")
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/inv/api/v1/flaky"), 2)
+        end function
+
+        @it("succeeds with the placeholder a handler makes of a failed response")
+        function _()
+            m.server.routes = { "/inv/api/v1/videos/gone": { status: 500 } }
+            result = m.CreateService().MakeRequest({ endpoint: "video_info", pathParams: { id: "gone" } })
+            m.assertTrue(result.success)
+            m.assertEqual(result.result.items[0].videoId, "gone")
+            m.assertEqual(result.result.items[0].title, "[Video not available]")
+        end function
+
+        @it("asks the web server for the built-in backend's response, without the network")
+        function _()
+            httpServer = {
+                calls: []
+                ProcessRequestLocal: function(method as string, uri as string, _headers as object, body as string) as object
+                    m.calls.Push({ method: method, uri: uri, body: body })
+                    responseBody = CreateObject("roByteArray")
+                    responseBody.FromAsciiString("[3]")
+                    return { http_code: 200, headers: {}, body: responseBody }
+                end function
+            }
+            result = m.CreateService("playlet").MakeRequest({ endpoint: "cached", pathParams: { id: "local" } }, { httpServer: httpServer })
+            m.assertEqual(result.result.items, [3])
+            m.assertEqual(httpServer.calls, [{ method: "GET", uri: "/playlet-invidious-backend/api/v1/cached/local", body: "" }])
+        end function
+
+        @it("fails with the built-in backend's status and body")
+        function _()
+            httpServer = {
+                ProcessRequestLocal: function(_method as string, _uri as string, _headers as object, _body as string) as object
+                    responseBody = CreateObject("roByteArray")
+                    responseBody.FromAsciiString("backend down")
+                    return { http_code: 500, headers: {}, body: responseBody }
+                end function
+            }
+            result = m.CreateService("playlet").MakeRequest({ endpoint: "cached", pathParams: { id: "failing" } }, { httpServer: httpServer })
+            m.assertFalse(result.success)
+            m.assertEqual(result.error, `StatusCode: 500\nBody: backend down`)
+        end function
+
+        @describe("Invidious.InvidiousService.GetVideoMetadata")
+
+        @it("doesn't retry a failure other than curl's HTTP/0.9 error, and reports it")
+        function _()
+            m.server.routes = { "/inv/api/v1/videos/missing": { status: 500 } }
+            metadata = m.CreateService().GetVideoMetadata("missing")
+            m.AssertContains(metadata.error, "StatusCode: 500")
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/inv/api/v1/videos/missing"), 1)
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.level, "warning")
+            m.assertEqual(event.message, metadata.error)
+            m.AssertContains(event.attachments[0].data, "/inv/api/v1/videos/missing")
+        end function
 
         @describe("Invidious.NeedsLiveStreamInfo")
 

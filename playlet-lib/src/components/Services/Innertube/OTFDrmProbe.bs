@@ -29,19 +29,20 @@ namespace Innertube
         ' Bare and sq responses are full media on a healthy URL — stream those to files
         ' instead of buffering them into strings.
         variants = [
-            { name: "GET bare", request: HttpClient.Get(url).ToFile(`${Innertube.DRM_PROBE_DIR}/bare.bin`) }
+            { name: "GET bare", request: HttpClient.Get(url).SaveBodyToFile(`${Innertube.DRM_PROBE_DIR}/bare.bin`) }
             { name: "GET Range header", request: HttpClient.Get(url).Header("Range", "bytes=0-16383") }
             { name: "GET range param", request: HttpClient.Get(rangeUrl) }
-            { name: "GET sq=0", request: HttpClient.Get(sqUrl).ToFile(`${Innertube.DRM_PROBE_DIR}/sq.bin`) }
-            { name: "POST empty range param", request: HttpClient.Post(rangeUrl, "") }
-            { name: "POST {15:0} range param", request: HttpClient.Post(rangeUrl, "").FromFile(`${Innertube.DRM_PROBE_DIR}/post_body.bin`) }
+            { name: "GET sq=0", request: HttpClient.Get(sqUrl).SaveBodyToFile(`${Innertube.DRM_PROBE_DIR}/sq.bin`) }
+            { name: "POST empty range param", request: HttpClient.Post(rangeUrl) }
+            { name: "POST {15:0} range param", request: HttpClient.Post(rangeUrl).FileBody(`${Innertube.DRM_PROBE_DIR}/post_body.bin`) }
         ]
 
         for each variant in variants
             variant.request.Headers(requestHeaders)
-            variant.request.TimeoutSeconds(Innertube.DRM_PROBE_TIMEOUT_SECONDS)
+            variant.request.AttemptTimeoutMs(Innertube.DRM_PROBE_TIMEOUT_SECONDS * 1000)
             variant.request.Cancellation(cancellation)
-            variant.request.Send()
+            variant.request.NoCache()
+            variant.pending = variant.request.Send()
         end for
 
         lines = [`drm probe itag=${format.itag} drmFamilies=${ValidArray(format.drmFamilies).Join(",")}`]
@@ -62,7 +63,7 @@ namespace Innertube
 
     function DrmProbeCollect(variant as object) as string
         name = variant.name
-        response = variant.request.Await()
+        response = variant.pending.Await()
 
         if response.IsCancelled()
             return `${name} -> cancelled`
@@ -72,12 +73,7 @@ namespace Innertube
             return `${name} -> timed out after ${Innertube.DRM_PROBE_TIMEOUT_SECONDS}s`
         end if
 
-        line = `${name} -> ${response.StatusCode()}`
-        responseHeaders = response.Headers()
-        if IsAssociativeArray(responseHeaders)
-            line += ` headers=${ToString(responseHeaders)}`
-        end if
-        return line
+        return `${name} -> ${response.StatusCode()} headers=${ToString(response.Headers())}`
     end function
 
 end namespace

@@ -1,0 +1,13 @@
+import "pkg:/source/services/HttpClient.bs"
+
+' Awaits url on this task's thread, as a job does, cancellable through cancellationNode.cancel.
+function Init()
+    m.top.functionName = "AwaitUrl"
+end function
+
+function AwaitUrl() as void
+    cancellation = CancellationUtils.CreateCancellation(m.top.cancellationNode, "cancel", true)
+    pending = HttpClient.Get(m.top.url).Cancellation(cancellation).Send()
+    m.top.sending = true
+    m.top.cancelled = pending.Await().IsCancelled()
+end function

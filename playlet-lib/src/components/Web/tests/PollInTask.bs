@@ -1,0 +1,19 @@
+import "pkg:/source/services/HttpClient.bs"
+
+' Polls url's response on this task's thread without ever waiting on a port, cancellable through cancellationNode.cancel.
+function Init()
+    m.top.functionName = "PollUrl"
+end function
+
+function PollUrl() as void
+    cancellation = CancellationUtils.CreateCancellation(m.top.cancellationNode, "cancel", true)
+    pending = HttpClient.Get(m.top.url).Cancellation(cancellation).Send()
+    m.top.sending = true
+    response = invalid
+    timer = CreateObject("roTimespan")
+    while response = invalid and timer.TotalMilliseconds() < 5000
+        response = pending.Poll()
+        sleep(10)
+    end while
+    m.top.cancelled = response <> invalid and response.IsCancelled()
+end function

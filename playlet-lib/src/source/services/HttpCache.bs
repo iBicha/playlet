@@ -1,0 +1,104 @@
+import "pkg:/source/utils/CryptoUtils.bs"
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+' Responses to GET requests, kept on disk until they expire. An entry is one file: a JSON line
+' { expiresAt, statusCode, headers }, then the body as is.
+namespace HttpCache
+
+    ' An entry per url, headers and file the body is saved to.
+    function GetFilePath(url as string, headers as object, bodyFilePath as dynamic) as string
+        key = url + FormatJson(headers)
+        if bodyFilePath <> invalid
+            key += bodyFilePath
+        end if
+        return `cachefs:/request_v3_${CryptoUtils.GetMd5(key)}.json`
+    end function
+
+    ' The entry as { statusCode, headers, text }; invalid when there is none, it expired, or the file its body was
+    ' saved to is gone. Such an entry, or a corrupt one, is deleted; a corrupt one warns, whether its body file exists
+    ' or not.
+    function Read(filePath as string, bodyFilePath as dynamic) as dynamic
+        ' ReadAsciiFile prints an error to the console for a file that doesn't exist.
+        fileSystem = CreateObject("roFileSystem")
+        if fileSystem = invalid or not fileSystem.Exists(filePath)
+            return invalid
+        end if
+        text = ReadAsciiFile(filePath)
+        metadataEnd = text.InStr(`\n`)
+        if metadataEnd = -1
+            LogWarn("Failed to parse cache.")
+            DeleteFile(filePath)
+            return invalid
+        end if
+        metadata = StringUtils.ParseJsonSafe(text.Left(metadataEnd))
+        if not IsAssociativeArray(metadata) or not IsInt(metadata.expiresAt) or not IsInt(metadata.statusCode)
+            LogWarn("Failed to parse metadata from cache.")
+            DeleteFile(filePath)
+            return invalid
+        end if
+        if not IsAssociativeArray(metadata.headers)
+            LogWarn("Failed to parse headers from cache.")
+            DeleteFile(filePath)
+            return invalid
+        end if
+
+        if metadata.expiresAt < CreateObject("roDateTime").AsSeconds()
+            DeleteFile(filePath)
+            return invalid
+        end if
+        if bodyFilePath <> invalid and not fileSystem.Exists(bodyFilePath)
+            DeleteFile(filePath)
+            return invalid
+        end if
+
+        ' ParseJson's keys are case-sensitive; a response's headers aren't.
+        headers = {}
+        headers.Append(metadata.headers)
+        return {
+            statusCode: metadata.statusCode
+            headers: headers
+            text: text.Mid(metadataEnd + 1)
+        }
+    end function
+
+    ' cacheSeconds: invalid for the headers' Cache-Control max-age; without one, nothing is written.
+    function Write(filePath as string, cacheSeconds as dynamic, statusCode as integer, headers as object, body as string) as void
+        if cacheSeconds = invalid
+            cacheSeconds = ParseMaxAgeSeconds(headers)
+            if cacheSeconds = invalid
+                return
+            end if
+        end if
+        metadata = FormatJson({
+            expiresAt: CreateObject("roDateTime").AsSeconds() + cacheSeconds
+            statusCode: statusCode
+            headers: headers
+        })
+        WriteAsciiFile(filePath, metadata + `\n` + body)
+    end function
+
+    ' Cache-Control's max-age, invalid when absent or when no-store/no-cache forbid caching.
+    function ParseMaxAgeSeconds(headers as object) as dynamic
+        cacheControl = headers["cache-control"]
+        if not IsString(cacheControl)
+            return invalid
+        end if
+        maxAgeSeconds = invalid
+        for each directive in cacheControl.Split(",")
+            parts = directive.Trim().Split("=")
+            name = LCase(parts[0].Trim())
+            if name = "no-store" or name = "no-cache"
+                return invalid
+            else if name = "max-age" and parts.Count() > 1
+                maxAgeSeconds = parts[1].Trim().ToInt()
+            end if
+        end for
+        if maxAgeSeconds = invalid or maxAgeSeconds <= 0
+            return invalid
+        end if
+        return maxAgeSeconds
+    end function
+
+end namespace

@@ -85,9 +85,10 @@ namespace Tests
             m.State(VideoState.Playing)
             m.StartInfo("init")
             summary = m.SendAt(62000)
-            m.assertEqual(m.SortedKeys(summary), ["backend", "first_playing_at_ms", "lifetime_ms", "metadata_done_at_ms", "outcome", "play_start_count", "play_start_infos", "playing_ms", "stream_source"])
+            m.assertEqual(m.SortedKeys(summary), ["backend", "first_playing_at_ms", "lifetime_ms", "metadata_done_at_ms", "outcome", "play_start_count", "play_start_infos", "playing_ms", "stream_source", "video_id"])
             m.assertEqual(summary.backend, "playlet")
             m.assertEqual(summary.stream_source, "adaptiveFormats")
+            m.assertEqual(summary.video_id, "vid1")
             m.assertEqual(summary.outcome, "closed")
             m.assertEqual(summary.metadata_done_at_ms, 1000)
             m.assertEqual(summary.first_playing_at_ms, 2000)
@@ -121,7 +122,6 @@ namespace Tests
             m.assertEqual(summary.underrun_samples[9].ms, 1000)
             m.assertTrue(summary.live)
             m.assertFalse(summary.DoesExist("ended_in_underrun"))
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("a buffering whose first bufferingStatus is no underrun is not counted")
@@ -152,7 +152,7 @@ namespace Tests
             m.assertEqual(summary.underrun_samples[0], { at_ms: 100, ms: 2000 })
         end function
 
-        @it("a buffering with no valid bufferingStatus is counted as one, with the video id")
+        @it("a buffering with no valid bufferingStatus is counted as one")
         function _()
             m.At(1000)
             m.State(VideoState.Playing)
@@ -165,7 +165,6 @@ namespace Tests
             m.assertEqual(summary.bufferings_without_status_count, 1)
             m.assertFalse(summary.DoesExist("underrun_count"))
             m.assertEqual(summary.playing_ms, 4850)
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("a buffering cut short before any status is not counted: a pause, an error, the close")
@@ -210,7 +209,6 @@ namespace Tests
             summary = m.SendAt(7000)
             m.assertEqual(summary.is_underrun_change_count, 2)
             m.assertFalse(summary.DoesExist("underrun_count"))
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("a bufferingStatus outside a buffering is ignored")
@@ -273,7 +271,7 @@ namespace Tests
             m.assertEqual(summary.play_start_infos[1].start_type, "cseek")
         end function
 
-        @it("a video that never played: -1 for what never happened, with its video id")
+        @it("a video that never played: -1 for what never happened")
         function _()
             m.At(100)
             m.State(VideoState.Buffering)
@@ -283,7 +281,6 @@ namespace Tests
             m.assertFalse(summary.DoesExist("bufferings_without_status_count"), "a buffering open at the close never reached playing")
             m.assertFalse(summary.DoesExist("play_start_infos"))
             m.assertFalse(summary.DoesExist("playing_ms"))
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("DRM content from the DASH manifest url, after a retry")
@@ -316,7 +313,6 @@ namespace Tests
             m.assertEqual(summary.outcome, "error")
             m.assertEqual(summary.error_count, 1)
             m.assertEqual(summary.playing_ms, 1000)
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("playing under the error dialog: recovered, so the error did not end it")
@@ -329,7 +325,6 @@ namespace Tests
             summary = m.SendAt(4000)
             m.assertEqual(summary.outcome, "closed")
             m.assertEqual(summary.error_count, 1)
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
         @it("a finished video ends in finished")
@@ -342,7 +337,6 @@ namespace Tests
             summary = m.SendAt(9000)
             m.assertEqual(summary.outcome, "finished")
             m.assertEqual(summary.playing_ms, 8000)
-            m.assertFalse(summary.DoesExist("video_id"), "a clean finish carries no video id")
         end function
 
         @it("heals: all counted, the first 3 sampled, no event of their own")
@@ -361,10 +355,9 @@ namespace Tests
             m.assertEqual(summary.heal_count, 5)
             m.assertEqual(summary.heal_samples.Count(), 3)
             m.assertEqual(summary.heal_samples[0], { at_ms: 1000, source: "OnPosition", mode: TransportController.Mode.Scrub, position_ms: 51200, cursor_ms: 48000, floor_ms: -1 })
-            m.assertEqual(summary.video_id, "vid1")
         end function
 
-        @it("tail resolves: all counted, the first 3 sampled, no event of their own, no video id")
+        @it("tail resolves: all counted, the first 3 sampled, no event of their own")
         function _()
             m.fakeTransport.isLive = true
             m.fakeTransport.cursorMs = 6134000
@@ -384,7 +377,6 @@ namespace Tests
             m.assertEqual(summary.tail_resolve_count, 4)
             m.assertEqual(summary.tail_resolve_samples.Count(), 3)
             m.assertEqual(summary.tail_resolve_samples[0], { at_ms: 1000, source: "OnVideoState", position_ms: 6137000, cursor_ms: 6134000, floor_ms: 6134000, edge_ms: 6640000 })
-            m.assertFalse(summary.DoesExist("video_id"))
         end function
 
         @it("no content: an unknown backend, no content fields")
@@ -394,6 +386,68 @@ namespace Tests
             m.assertEqual(summary.backend, "unknown")
             m.assertFalse(summary.DoesExist("video_id"))
             m.assertFalse(summary.DoesExist("stream_source"))
+        end function
+
+        @it("the live head check counts of the video load, without defaults, read once")
+        function _()
+            m.fakeTransport.isLive = true
+            m.fakeTop.content.videoLoadId = "live1"
+            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, FormatJson({ "video_load_id": "live1", "counts": { "checks_sent": 6, "answered_after_wait": 1, "timed_out": 0 } }))
+            summary = m.SendAt(1000)
+            m.assertEqual(summary.live_head, { "checks_sent": 6, "answered_after_wait": 1 })
+            m.assertFalse(CreateObject("roFileSystem").Exists(LIVE_HEAD_COUNTS_PATH), "read once")
+            m.assertFalse(m.SendAt(2000).DoesExist("live_head"))
+        end function
+
+        @it("a live play without live head check counts has none")
+        function _()
+            m.fakeTransport.isLive = true
+            m.fakeTop.content.videoLoadId = "live1"
+            DeleteFile(LIVE_HEAD_COUNTS_PATH)
+            m.assertFalse(m.SendAt(1000).DoesExist("live_head"))
+        end function
+
+        @it("leaves the live head check counts of another video load")
+        function _()
+            m.fakeTransport.isLive = true
+            m.fakeTop.content.videoLoadId = "live1"
+            handoff = FormatJson({ "video_load_id": "live2", "counts": { "checks_sent": 6 } })
+            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, handoff)
+            m.assertFalse(m.SendAt(1000).DoesExist("live_head"))
+            m.assertEqual(ReadAsciiFile(LIVE_HEAD_COUNTS_PATH), handoff)
+            DeleteFile(LIVE_HEAD_COUNTS_PATH)
+        end function
+
+        @it("a live play: the first video segment's bitrate and the network's at the first playing")
+        function _()
+            m.fakeTransport.isLive = true
+            m.fakeTop.streamInfo = { measuredBitrate: 5000000, streamBitrate: 1200000 }
+            m.State(VideoState.Buffering)
+            m.assertFalse(m.recorder.OnStreamingSegment({ segType: SegmentType.Audio, segBitrateBps: 128000 }), "audio")
+            m.assertTrue(m.recorder.OnStreamingSegment({ segType: SegmentType.Video, segBitrateBps: 1200000 }), "video")
+            m.At(1000)
+            m.State(VideoState.Playing)
+            m.fakeTop.streamInfo = { measuredBitrate: 9000000 }
+            m.State(VideoState.Buffering)
+            m.State(VideoState.Playing)
+            summary = m.SendAt(2000)
+            m.assertEqual(summary.start_segment_bitrate_bps, 1200000)
+            m.assertEqual(summary.start_measured_bitrate_bps, 5000000)
+        end function
+
+        @it("a muxed segment carries video; a segment without a type does not")
+        function _()
+            m.assertFalse(m.recorder.OnStreamingSegment({ segBitrateBps: 1 }))
+            m.assertFalse(m.recorder.OnStreamingSegment(invalid))
+            m.assertTrue(m.recorder.OnStreamingSegment({ segType: SegmentType.Mux, segBitrateBps: 800000 }))
+        end function
+
+        @it("a live play that never streamed video omits the starting bitrates")
+        function _()
+            m.fakeTransport.isLive = true
+            summary = m.SendAt(1000)
+            m.assertFalse(summary.DoesExist("start_segment_bitrate_bps"))
+            m.assertFalse(summary.DoesExist("start_measured_bitrate_bps"))
         end function
 
         @it("a video error report: its level, fingerprint and the summary's error count")

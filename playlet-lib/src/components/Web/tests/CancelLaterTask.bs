@@ -1,0 +1,17 @@
+' Sets cancellationNode.cancel cancelAfterMs after that field is set, while the caller's thread blocks.
+function Init()
+    m.top.functionName = "CancelLater"
+end function
+
+function CancelLater() as void
+    node = CreateObject("roSGNode", "Node")
+    node.addField("cancel", "boolean", false)
+    port = CreateObject("roMessagePort")
+    m.top.ObserveField("cancelAfterMs", port)
+    m.top.cancellationNode = node
+    ' Waiting on the port lets other threads rendezvous with this one.
+    while type(wait(0, port)) <> "roSGNodeEvent"
+    end while
+    wait(m.top.cancelAfterMs, port)
+    node.cancel = true
+end function

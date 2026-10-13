@@ -1,0 +1,220 @@
+import "pkg:/source/utils/Types.bs"
+
+' Responds to one request per connection, by path:
+'   /status/<code>                the status
+'   /seq/<id>/<code>,<code>,...   the next status in the list for that path, then its last one;
+'                                 <code>@<ms> responds after <ms>
+'   /delay/<ms>                   200 after <ms>
+'   /echo                         200 with the request's { method, path, headers, body } as JSON
+'   /maxage/<seconds>/<id>        200 with Cache-Control: max-age=<seconds>
+' A path in routes (its query aside) responds as its route says instead: { status, headers, body, delayMs }.
+' A route { drop: true } closes the connection without a response.
+' Every response carries X-Hit, the request's count for its path. Connections are read and responded to
+' without blocking each other, so a slow or abandoned one holds up nothing.
+' The last request read is in lastRequest: { method, path, headers, body }.
+
+' Roku's roUrlTransfer sometimes never completes when the whole response and the close reach it over
+' loopback within a millisecond of its request (9 of 8000 such requests; 0 of 16000 at 5ms or 20ms).
+const MIN_RESPONSE_DELAY_MS = 5
+' A connection whose request isn't complete by then is dropped.
+const READ_TIMEOUT_MS = 2000
+
+function Init()
+    m.top.functionName = "Serve"
+end function
+
+function Serve() as void
+    messagePort = CreateObject("roMessagePort")
+    listener = CreateObject("roStreamSocket")
+    listener.SetReuseAddr(true)
+    address = CreateObject("roSocketAddress")
+    address.SetAddress(`127.0.0.1:${m.top.port}`)
+    listener.SetAddress(address)
+    listener.SetMessagePort(messagePort)
+    listener.NotifyReadable(true)
+    if not listener.Listen(8)
+        return
+    end if
+    m.top.ObserveField("shouldQuit", messagePort)
+    m.hits = {}
+    m.clock = CreateObject("roTimespan")
+    reading = []
+    responses = []
+    m.top.isRunning = true
+
+    while true
+        ' 0: no deadline, wait for the next socket event.
+        waitMs = 0
+        for each item in reading
+            waitMs = ShorterWaitMs(waitMs, item.sinceMs + READ_TIMEOUT_MS)
+        end for
+        for each response in responses
+            waitMs = ShorterWaitMs(waitMs, response.sendAtMs)
+        end for
+        message = wait(waitMs, messagePort)
+        if type(message) = "roSGNodeEvent"
+            exit while
+        end if
+
+        if listener.IsReadable()
+            connection = listener.Accept()
+            while connection <> invalid
+                connection.SetMessagePort(messagePort)
+                connection.NotifyReadable(true)
+                reading.Push({ connection: connection, data: "", byteCount: 0, sinceMs: m.clock.TotalMilliseconds() })
+                connection = listener.Accept()
+            end while
+        end if
+
+        stillReading = []
+        for each item in reading
+            connection = item.connection
+            closed = false
+            if connection.IsReadable()
+                count = connection.GetCountRcvBuf()
+                if count > 0
+                    ' ReceiveStr ends at a NUL byte; a binary body is counted in bytes, read as text up to its first NUL.
+                    bytes = CreateObject("roByteArray")
+                    bytes[count - 1] = 0
+                    item.byteCount += connection.Receive(bytes, 0, count)
+                    item.data += bytes.ToAsciiString()
+                else
+                    ' Readable with nothing to read: the peer closed.
+                    closed = true
+                end if
+            end if
+            response = BuildResponse(item)
+            if response <> invalid
+                connection.NotifyReadable(false)
+                responses.Push(response)
+            else if closed or m.clock.TotalMilliseconds() - item.sinceMs >= READ_TIMEOUT_MS
+                connection.Close()
+            else
+                stillReading.Push(item)
+            end if
+        end for
+        reading = stillReading
+
+        unsent = []
+        for each response in responses
+            if response.sendAtMs <= m.clock.TotalMilliseconds()
+                response.connection.SendStr(response.text)
+                response.connection.Close()
+            else
+                unsent.Push(response)
+            end if
+        end for
+        responses = unsent
+    end while
+
+    for each item in reading
+        item.connection.Close()
+    end for
+    for each response in responses
+        response.connection.Close()
+    end for
+    listener.Close()
+    m.top.isRunning = false
+end function
+
+' The wait until deadlineMs, or waitMs if that is shorter; 0 means no wait limit yet.
+function ShorterWaitMs(waitMs as integer, deadlineMs as integer) as integer
+    untilDeadlineMs = deadlineMs - m.clock.TotalMilliseconds()
+    if untilDeadlineMs < 1
+        untilDeadlineMs = 1
+    end if
+    if waitMs = 0 or untilDeadlineMs < waitMs
+        return untilDeadlineMs
+    end if
+    return waitMs
+end function
+
+' The response to the connection's request and when to send it, or invalid until the request is complete.
+function BuildResponse(item as object) as object
+    headEnd = item.data.InStr(`\r\n\r\n`)
+    if headEnd = -1
+        return invalid
+    end if
+    head = item.data.Left(headEnd)
+    headers = {}
+    for each line in head.Split(`\r\n`)
+        colon = line.InStr(":")
+        if colon > 0
+            headers[LCase(line.Left(colon))] = line.Mid(colon + 1).Trim()
+        end if
+    end for
+    requestBody = item.data.Mid(headEnd + 4)
+    if item.byteCount - headEnd - 4 < ValidString(headers["content-length"]).ToInt()
+        return invalid
+    end if
+
+    requestLine = head.Split(`\r\n`)[0].Split(" ")
+    if requestLine.Count() < 2
+        return invalid
+    end if
+    method = requestLine[0]
+    path = requestLine[1]
+
+    m.hits[path] = ValidInt(m.hits[path]) + 1
+    hit = m.hits[path]
+    m.top.hits = m.hits
+    request = { method: method, path: path, headers: headers, body: requestBody }
+    m.top.lastRequest = request
+
+    delayMs = MIN_RESPONSE_DELAY_MS
+    route = ValidAssociativeArray(m.top.routes)[path.Split("?")[0]]
+    if route <> invalid
+        if ValidInt(route.delayMs) > delayMs
+            delayMs = route.delayMs
+        end if
+        if route.drop = true
+            return { connection: item.connection, text: "", sendAtMs: m.clock.TotalMilliseconds() + delayMs }
+        end if
+        text = `HTTP/1.1 ${route.status} Test\r\nContent-Length: ${ValidString(route.body).Len()}\r\nX-Hit: ${hit}\r\nConnection: close\r\n`
+        for each name in ValidAssociativeArray(route.headers)
+            text += `${name}: ${route.headers[name]}\r\n`
+        end for
+        text += `\r\n`
+        if method <> "HEAD"
+            text += ValidString(route.body)
+        end if
+        return { connection: item.connection, text: text, sendAtMs: m.clock.TotalMilliseconds() + delayMs }
+    end if
+
+    status = 404
+    segments = path.Split("?")[0].Split("/")
+    if segments.Count() = 3 and segments[1] = "status"
+        status = segments[2].ToInt()
+    else if segments.Count() = 4 and segments[1] = "seq"
+        codes = segments[3].Split(",")
+        index = hit - 1
+        if index >= codes.Count()
+            index = codes.Count() - 1
+        end if
+        entry = codes[index].Split("@")
+        status = entry[0].ToInt()
+        if entry.Count() > 1
+            delayMs = entry[1].ToInt()
+        end if
+    else if segments.Count() = 3 and segments[1] = "delay"
+        delayMs = segments[2].ToInt()
+        status = 200
+    else if segments.Count() = 2 and segments[1] = "echo"
+        status = 200
+    else if segments.Count() = 4 and segments[1] = "maxage"
+        status = 200
+    end if
+
+    body = `hit ${hit}`
+    extraHeaders = ""
+    if segments[1] = "echo"
+        body = FormatJson(request)
+    else if segments[1] = "maxage"
+        extraHeaders = `Cache-Control: max-age=${segments[2]}\r\n`
+    end if
+    text = `HTTP/1.1 ${status} Test\r\nContent-Type: text/plain\r\nContent-Length: ${body.Len()}\r\nX-Hit: ${hit}\r\n${extraHeaders}Connection: close\r\n\r\n`
+    if method <> "HEAD"
+        text += body
+    end if
+    return { connection: item.connection, text: text, sendAtMs: m.clock.TotalMilliseconds() + delayMs }
+end function

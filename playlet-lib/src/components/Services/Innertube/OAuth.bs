@@ -21,6 +21,14 @@ namespace Innertube
         return oauthError = RefreshErrorCode.InvalidGrant or oauthError = RefreshErrorCode.InvalidClient or oauthError = RefreshErrorCode.UnauthorizedClient
     end function
 
+    ' A failed refresh is retried, unless the token endpoint rejected the credential or the client.
+    function RefreshRetryReason(response as HttpClient.Response) as string
+        if response.IsSuccess() or IsTerminalRefreshError(response.Json())
+            return ""
+        end if
+        return response.ErrorMessage()
+    end function
+
     function GetClientIdentity(cancellation = invalid as dynamic) as object
         request = HttpClient.Get("https://www.youtube.com/tv")
         request.Headers({
@@ -87,7 +95,7 @@ namespace Innertube
             "device_model": "ytlr::"
         }
 
-        request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/device/code", payload)
+        request = HttpClient.Post("https://www.youtube.com/o/oauth2/device/code").JsonBody(payload)
         request.Cancellation(cancellation)
         response = request.Await()
 
@@ -123,7 +131,7 @@ namespace Innertube
         intervalMs = deviceAndUserCode.interval * 1000
 
         while true
-            request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/token", payload)
+            request = HttpClient.Post("https://www.youtube.com/o/oauth2/token").JsonBody(payload)
             request.Cancellation(cancellation)
             response = request.Await()
 
@@ -181,12 +189,10 @@ namespace Innertube
             "grant_type": "refresh_token"
         }
 
-        request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/token", payload)
+        request = HttpClient.Post("https://www.youtube.com/o/oauth2/token").JsonBody(payload)
         request.Cancellation(cancellation)
-        request.TryCount(3)
-        request.RetryCallback(function(context as object) as boolean
-            return not Innertube.IsTerminalRefreshError(context.response.Json())
-        end function)
+        request.RetryCount(2)
+        request.RetryIf(Innertube.RefreshRetryReason)
         response = request.Await()
 
         if not response.IsSuccess()
@@ -215,7 +221,7 @@ namespace Innertube
     end function
 
     function RevokeToken(token as string, cancellation = invalid as dynamic) as boolean
-        request = HttpClient.PostJson("https://www.youtube.com/o/oauth2/revoke", {
+        request = HttpClient.Post("https://www.youtube.com/o/oauth2/revoke").JsonBody({
             "token": token
         })
         request.Cancellation(cancellation)
@@ -240,7 +246,7 @@ namespace Innertube
             }
         }
 
-        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/account/accounts_list", payload)
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/account/accounts_list").JsonBody(payload)
         headers = {
             "Authorization": `Bearer ${accessToken}`
         }

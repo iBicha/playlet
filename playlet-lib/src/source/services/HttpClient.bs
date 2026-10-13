@@ -5,8 +5,9 @@
 ' Only use this for debugging purposes.
 #const NETWORK_THROTTLE = false
 
+import "pkg:/source/services/HttpCache.bs"
+import "pkg:/source/utils/AssertUtils.bs"
 import "pkg:/source/utils/CancellationUtils.bs"
-import "pkg:/source/utils/CryptoUtils.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
@@ -14,9 +15,26 @@ import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
+' A Request holds what to send. Sending it starts a Fetch, which ends in one Response:
+'
+'   response = HttpClient.Get(url).Await()                ' blocks until the response
+'
+'   pending = HttpClient.Get(url).Send()                  ' a Fetch on a port of its own
+'   response = pending.Wait(2000)                         ' the response, or invalid after 2s; the fetch goes on
+'   response = pending.Poll()                             ' the response, or invalid; never blocks
+'
+'   pending = HttpClient.Post(url).Send()                 ' in a task loop, which blocks only on its own port
+'   while true
+'       message = wait(500, port)
+'       response = pending.Poll()                         ' at each wake: the response once it is in, up to 500ms late
+'       ...                                               ' the loop's own messages
+'
+' Retries run inside the fetch, on the thread that started it, while Await, Wait or Poll runs.
 namespace HttpClient
 
     const COMPRESSION_ENABLED = true
+    const DEFAULT_ATTEMPT_TIMEOUT_MS = 30000
+    const DEFAULT_RETRY_DELAY_MS = 1000
 
     ' https://developer.roku.com/en-ca/docs/references/brightscript/events/rourlevent.md#getresponsecode-as-integer
     ' Seem to mirror the curl error codes https://curl.se/libcurl/c/libcurl-errors.html
@@ -92,892 +110,798 @@ namespace HttpClient
         CURLE_SSL_SHUTDOWN_FAILED = -80
     end enum
 
-    function Get(url as string) as HttpRequest
-        return (new HttpRequest()).Method("GET").Url(url)
+    function Get(url as string) as Request
+        return new Request("GET", url)
     end function
 
-    function Post(url as string, data as string) as HttpRequest
-        return (new HttpRequest()).Method("POST").Url(url).Body(data)
+    function Head(url as string) as Request
+        return new Request("HEAD", url)
     end function
 
-    function PostJson(url as string, data as object) as HttpRequest
-        return (new HttpRequest()).Method("POST").Url(url).Json(data)
+    function Post(url as string) as Request
+        return new Request("POST", url)
     end function
 
-    function Put(url as string, data as string) as HttpRequest
-        return (new HttpRequest()).Method("PUT").Url(url).Body(data)
+    function Put(url as string) as Request
+        return new Request("PUT", url)
     end function
 
-    function PutJson(url as string, data as object) as HttpRequest
-        return (new HttpRequest()).Method("PUT").Url(url).Json(data)
+    function Delete(url as string) as Request
+        return new Request("DELETE", url)
     end function
 
-    function Delete(url as string) as HttpRequest
-        return (new HttpRequest()).Method("DELETE").Url(url)
-    end function
-
-    function Head(url as string) as HttpRequest
-        return (new HttpRequest()).Method("HEAD").Url(url)
-    end function
-
-    function FromObject(obj as object) as HttpRequest
-        request = new HttpRequest()
-
-        for each key in obj
-            if IsFunction(request[key])
-                request[key](obj[key])
-            else
-                throw `Invalid key: "${key}" in object passed to HttpClient.FromObject`
-            end if
-        end for
-
-        return request
-    end function
-
-    class HttpRequest
-
-        public urlTransfer as object
-
-        function new()
-            m._timeoutSeconds = 30
-            m._tryCount = 1
-            m._method = "GET"
+    class Request
+        ' For any method, such as a proxied request's; Get, Head, Post, Put and Delete are shorter.
+        function new(method as string, url as string)
+            m._method = UCase(method)
+            m._url = url
+            m._headers = {}
+            m._attemptTimeoutMs = DEFAULT_ATTEMPT_TIMEOUT_MS
+            m._retryCount = 0
+            m._retryDelayMs = DEFAULT_RETRY_DELAY_MS
         end function
 
-        function Method(method as string) as HttpRequest
-            m._method = Ucase(method)
+        function Header(key as string, value as string) as Request
+            m._headers[key] = value
             return m
+        end function
+
+        function Headers(headers as object) as Request
+            m._headers.Append(headers)
+            return m
+        end function
+
+        function QueryParam(key as string, value as dynamic) as Request
+            #if DEBUG
+                Assert.IsValid(value, `QueryParam("${key}", invalid): the value can't be invalid`)
+            #end if
+            if m._queryParams = invalid
+                m._queryParams = {}
+            end if
+            m._queryParams[key] = value
+            m._fullUrl = invalid
+            return m
+        end function
+
+        function QueryParams(queryParams as object) as Request
+            if m._queryParams = invalid
+                m._queryParams = {}
+            end if
+            m._queryParams.Append(queryParams)
+            m._fullUrl = invalid
+            return m
+        end function
+
+        function QueryParamArray(key as string, values as object, arrayType as UrlUtils.QueryParamArrayType) as Request
+            #if DEBUG
+                Assert.IsValid(values, `QueryParamArray("${key}", invalid): the values can't be invalid`)
+            #end if
+            return m.QueryParam(key, { value: values, arrayType: arrayType })
+        end function
+
+        ' Fills {key} in the url.
+        function PathParam(key as string, value as string) as Request
+            if m._pathParams = invalid
+                m._pathParams = {}
+            end if
+            m._pathParams[key] = value
+            m._fullUrl = invalid
+            return m
+        end function
+
+        function PathParams(pathParams as object) as Request
+            if m._pathParams = invalid
+                m._pathParams = {}
+            end if
+            m._pathParams.Append(pathParams)
+            m._fullUrl = invalid
+            return m
+        end function
+
+        function TextBody(text as string) as Request
+            #if DEBUG
+                Assert.IsTrue(m._method <> "GET" and m._method <> "HEAD", `TextBody on a ${m._method} request: ${m._method} sends no body`)
+            #end if
+            m._textBody = text
+            m._fileBodyPath = invalid
+            return m
+        end function
+
+        function JsonBody(value as object) as Request
+            #if DEBUG
+                Assert.IsTrue(m._method <> "GET" and m._method <> "HEAD", `JsonBody on a ${m._method} request: ${m._method} sends no body`)
+            #end if
+            m._textBody = FormatJson(value)
+            m._fileBodyPath = invalid
+            m._headers["Content-Type"] = "application/json"
+            return m
+        end function
+
+        ' fields: an AA, or an array of { key, value } where the order matters.
+        function FormBody(fields as object) as Request
+            #if DEBUG
+                Assert.IsTrue(m._method <> "GET" and m._method <> "HEAD", `FormBody on a ${m._method} request: ${m._method} sends no body`)
+            #end if
+            m._textBody = UrlUtils.GetUrlEncodedForm(fields)
+            m._fileBodyPath = invalid
+            m._headers["Content-Type"] = "application/x-www-form-urlencoded"
+            return m
+        end function
+
+        function FileBody(filePath as string) as Request
+            #if DEBUG
+                Assert.IsTrue(m._method <> "GET" and m._method <> "HEAD", `FileBody on a ${m._method} request: ${m._method} sends no body`)
+            #end if
+            m._fileBodyPath = filePath
+            m._textBody = invalid
+            return m
+        end function
+
+        ' How long one attempt may take, from when it is sent. The deadline is checked only when the response is
+        ' waited on or polled, after the answer already in, if any: that answer is returned even if it came after the
+        ' deadline, as an roUrlEvent carries no arrival time. Await and Wait time out on time; a late Poll can return
+        ' a late answer, for the caller to judge whether it is too stale.
+        function AttemptTimeoutMs(timeoutMs as integer) as Request
+            #if DEBUG
+                Assert.IsTrue(timeoutMs > 0, `AttemptTimeoutMs(${timeoutMs}): the timeout must be above 0`)
+            #end if
+            m._attemptTimeoutMs = timeoutMs
+            return m
+        end function
+
+        ' How many more attempts may follow a failed one. A timed-out attempt is never retried: after AttemptTimeoutMs
+        ' the user needs an answer, not another wait. The first attempt is retried on any failure (anything not 2xx
+        ' or 3xx) except a request roUrlTransfer couldn't send, which completes at once; a later one only on a 5xx or a
+        ' network failure, as a 2xx-4xx answer to a retry is final. RetryIf picks among those.
+        function RetryCount(retryCount as integer) as Request
+            #if DEBUG
+                Assert.IsTrue(retryCount >= 0, `RetryCount(${retryCount}): the count can't be negative`)
+            #end if
+            m._retryCount = retryCount
+            return m
+        end function
+
+        ' Each retry is sent delayMs to 2 × delayMs after the previous attempt ended.
+        function RetryDelayMs(delayMs as integer) as Request
+            #if DEBUG
+                Assert.IsTrue(delayMs >= 0, `RetryDelayMs(${delayMs}): the delay can't be negative`)
+            #end if
+            m._retryDelayMs = delayMs
+            return m
+        end function
+
+        ' Picks the attempts to retry instead of every failed one: predicate(response) returns the reason to retry,
+        ' which the retry's warning reports, or "" or invalid not to. It sees the attempts RetryCount allows to retry,
+        ' the first one's success included. A cancelled fetch never retries. A predicate that throws is logged as an
+        ' error, and its attempt retries if it failed; DEBUG builds rethrow.
+        function RetryIf(predicate as function) as Request
+            m._retryPredicate = predicate
+            return m
+        end function
+
+        ' A retried attempt, or a failure RetryIf declines to retry, is logged without a telemetry event: for requests
+        ' where failing and retrying is normal.
+        function NoTelemetry() as Request
+            m._noTelemetry = true
+            return m
+        end function
+
+        ' A successful GET is served from disk for that many seconds, instead of its Cache-Control max-age.
+        function CacheForSeconds(seconds as integer) as Request
+            #if DEBUG
+                Assert.AreEqual("GET", m._method, `CacheForSeconds on a ${m._method} request: only GET can`)
+                Assert.IsTrue(seconds > 0, `CacheForSeconds(${seconds}): the duration must be above 0`)
+            #end if
+            m._cacheSeconds = seconds
+            return m
+        end function
+
+        ' A successful GET is served from disk for its Cache-Control max-age by default; NoCache turns that off,
+        ' CacheForSeconds included.
+        function NoCache() as Request
+            m._noCache = true
+            return m
+        end function
+
+        ' The response's body goes to filePath instead of its Text.
+        function SaveBodyToFile(filePath as string) as Request
+            #if DEBUG
+                Assert.AreEqual("GET", m._method, `SaveBodyToFile on a ${m._method} request: only GET can`)
+            #end if
+            m._saveBodyToFilePath = filePath
+            return m
+        end function
+
+        ' cancellation: from CancellationUtils.CreateCancellation, or invalid for none.
+        function Cancellation(cancellation as dynamic) as Request
+            #if DEBUG
+                Assert.IsTrue(cancellation = invalid or (IsAssociativeArray(cancellation) and cancellation.node <> invalid and IsString(cancellation.field)), "Cancellation takes CancellationUtils.CreateCancellation(node, field, value), or invalid")
+            #end if
+            m._cancellation = cancellation
+            return m
+        end function
+
+        function LogCurlCommand(enabled = true as boolean) as Request
+            m._logCurlCommand = enabled
+            return m
+        end function
+
+        ' The url as given, with its path params filled in and its query params appended.
+        function GetFullUrl() as string
+            if m._fullUrl = invalid
+                m._fullUrl = UrlUtils.BuildUrl(m._url, m._pathParams, m._queryParams)
+            end if
+            return m._fullUrl
         end function
 
         function GetMethod() as string
             return m._method
         end function
 
-        function Url(url as string) as HttpRequest
-            m._url = url
-            return m
-        end function
-
-        function QueryParam(key as string, value as dynamic) as HttpRequest
-            if value = invalid
-                return m
-            end if
-            if m._queryParams = invalid
-                m._queryParams = {}
-            end if
-            m._queryParams[key] = value
-            return m
-        end function
-
-        function QueryParamArray(key as string, valueArray as dynamic, arrayType as UrlUtils.QueryParamArrayType) as HttpRequest
-            if valueArray = invalid
-                return m
-            end if
-            if m._queryParams = invalid
-                m._queryParams = {}
-            end if
-
-            m._queryParams[key] = {
-                value: valueArray
-                arrayType: arrayType
-            }
-
-            return m
-        end function
-
-        function QueryParams(queryParams as object) as HttpRequest
-            if m._queryParams = invalid
-                m._queryParams = {}
-            end if
-            m._queryParams.append(queryParams)
-            return m
-        end function
-
-        function PathParam(key as string, value as string) as HttpRequest
-            if m._pathParams = invalid
-                m._pathParams = {}
-            end if
-            m._pathParams[key] = value
-            return m
-        end function
-
-        function PathParams(pathParams as object) as HttpRequest
-            if m._pathParams = invalid
-                m._pathParams = {}
-            end if
-            m._pathParams.append(pathParams)
-            return m
-        end function
-
-        function Header(key as string, value as string) as HttpRequest
-            if m._headers = invalid
-                m._headers = {}
-            end if
-            m._headers[key] = value
-            return m
-        end function
-
-        function Headers(headers as object) as HttpRequest
-            if m._headers = invalid
-                m._headers = {}
-            end if
-            m._headers.append(headers)
-            return m
-        end function
-
         function GetHeaders() as object
-            if m._headers = invalid
-                m._headers = {}
-            end if
             return m._headers
         end function
 
-        function Body(body as dynamic) as HttpRequest
-            m._body = ValidString(body)
-            return m
-        end function
-
-        function GetBody() as dynamic
-            return m._body
-        end function
-
-        function FromFile(filePath as string) as HttpRequest
-            m._bodyFilePath = filePath
-            return m
-        end function
-
-        function Json(body as object) as HttpRequest
-            m.Body(FormatJson(body))
-            m.Header("Content-Type", "application/json")
-            return m
-        end function
-
-        function UrlEncodedForm(form as object) as HttpRequest
-            m.Body(UrlUtils.GetUrlEncodedForm(form))
-            m.Header("Content-Type", "application/x-www-form-urlencoded")
-            return m
-        end function
-
-        function TimeoutSeconds(timeoutSeconds as integer) as HttpRequest
-            m._timeoutSeconds = timeoutSeconds
-            return m
-        end function
-
-        function TryCount(tryCount as integer) as HttpRequest
-            m._tryCount = ValidInt(tryCount)
-            if m._tryCount < 1
-                m._tryCount = 1
-            end if
-            return m
-        end function
-
-        function RetryCallback(callback as function) as HttpRequest
-            m._retryCallback = callback
-            return m
-        end function
-
-        function NoCache() as HttpRequest
-            m._noCache = true
-            return m
-        end function
-
-        function CacheSeconds(expireSeconds as integer) as HttpRequest
-            m._expireSeconds = expireSeconds
-            if expireSeconds < 0
-                m.NoCache()
-            end if
-            return m
-        end function
-
-        function UseHttp2() as HttpRequest
-            m._useHttp2 = true
-            return m
-        end function
-
-        function Cancellation(cancellation as object) as HttpRequest
-            m._cancellation = cancellation
-            return m
-        end function
-
-        function LogCurlCommand(doLog as boolean) as HttpRequest
-            m._logCurlCommand = doLog
-            return m
-        end function
-
-        function ToFile(filePath as string) as HttpRequest
-            m._toFilePath = filePath
-            return m
+        ' invalid when the body is a file, or there is none.
+        function GetTextBody() as dynamic
+            return m._textBody
         end function
 
         function ToCurlCommand() as string
-            command = `curl "${m.BuildUrl()}"`
+            command = `curl "${m.GetFullUrl()}"`
             if m._method = "HEAD"
                 command += ` \\\n  --head`
             else if m._method <> "GET"
                 command += ` \\\n  --request ${m._method}`
             end if
-
-            command += ` \\\n  --max-time ${m._timeoutSeconds}`
-            command += ` \\\n  --location`
-            command += ` \\\n  --show-error`
-
+            command += ` \\\n  --max-time ${m._attemptTimeoutMs / 1000}`
+            command += ` \\\n  --location \\\n  --show-error`
             if COMPRESSION_ENABLED
                 command += ` \\\n  --compressed`
             end if
-
-            if m._useHttp2 = true
-                command += ` \\\n  --http2`
+            for each key in m._headers
+                value = m._headers[key]
+                #if DEBUG
+                #else
+                    if LCase(key) = "authorization"
+                        value = "<REDACTED>"
+                    end if
+                #end if
+                command += ` \\\n  -H '${key}: ${value}'`
+            end for
+            if not StringUtils.IsNullOrEmpty(m._textBody)
+                command += ` \\\n  -d '${m._textBody}'`
             end if
-
-            if m._headers <> invalid
-                for each key in m._headers
-                    #if DEBUG
-                        command += ` \\\n  -H '${key}: ${m._headers[key]}'`
-                    #else
-                        if LCase(key) = "authorization"
-                            command += ` \\\n  -H '${key}: <REDACTED>'`
-                        else
-                            command += ` \\\n  -H '${key}: ${m._headers[key]}'`
-                        end if
-                    #end if
-                end for
+            if m._fileBodyPath <> invalid
+                command += ` \\\n  --data-binary @${m._fileBodyPath}`
             end if
-
-            if not StringUtils.IsNullOrEmpty(m._body)
-                command += ` \\\n  -d '${m._body}'`
-            end if
-
-            if not StringUtils.IsNullOrEmpty(m._bodyFilePath)
-                command += ` \\\n  --data-binary @${m._bodyFilePath}`
-            end if
-
             return command
         end function
 
-        ' Note: Calling Send() only without Await() will not guarentee a request will be sent.
-        ' If a Task finishes before the request is sent, the request might be dropped.
-        function Send() as HttpRequest
-            if m.urlTransfer <> invalid or m._cache <> invalid
-                return m
+        function Await() as Response
+            return m.Send().Await()
+        end function
+
+        ' Starts a fetch on a port of its own, which Await, Wait or Poll runs: a request never waited on or polled may
+        ' be dropped when its task ends, and its retries never run.
+        function Send() as PendingResponse
+            messagePort = CreateObject("roMessagePort")
+            ' Observed before the fetch starts, so a cancellation set between its check and the observation isn't missed.
+            cancellationObserver = invalid
+            if m._cancellation <> invalid
+                cancellationObserver = CreateObject("roSGNode", "NodeObserver")
+                ' Observed before the target is set: the NodeObserver's callback on the render-thread cancellation moves the
+                ' NodeObserver to the render thread, after which each access to it is a rendezvous.
+                cancellationObserver.ObserveField("changed", messagePort)
+                cancellationObserver.target = { node: m._cancellation.node, fieldName: m._cancellation.field }
+            end if
+            startedFetch = new Fetch(m, messagePort)
+            startedFetch.Start()
+            return new PendingResponse(startedFetch, messagePort, m._cancellation, cancellationObserver)
+        end function
+    end class
+
+    ' A request being sent: its attempts, timeouts, retries and cache, run by the PendingResponse that Send returns.
+    ' It reads the request as it goes, so the request isn't changed after it is sent. Its port is its own: it gets
+    ' only the attempts' answers and the cancellation's events.
+    class Fetch
+        function new(request as Request, messagePort as object)
+            m._request = request
+            m._messagePort = messagePort
+            m._attemptCount = 0
+            m._transferId = invalid
+        end function
+
+        function Start() as void
+            m._clock = CreateObject("roTimespan")
+            request = m._request
+
+            if CancellationUtils.IsCancelled(request._cancellation)
+                m.Cancel()
+                return
             end if
 
+            cacheable = request._method = "GET" and request._noCache <> true
             #if DISABLE_CACHE
                 #if DEBUG
-                    m._noCache = true
+                    cacheable = false
                 #end if
             #end if
-
-            if m._noCache <> true
-                cache = HttpClientCache.Get(m)
-                if cache <> invalid
-                    LogInfo("Cache hit", m._method, m.BuildUrl())
-                    m._cache = cache
-                    return m
+            if cacheable
+                m._cacheFilePath = HttpCache.GetFilePath(request.GetFullUrl(), request._headers, request._saveBodyToFilePath)
+                cached = HttpCache.Read(m._cacheFilePath, request._saveBodyToFilePath)
+                if cached <> invalid
+                    m._response = m.NewResponse({
+                        cached: true
+                        statusCode: cached.statusCode
+                        headers: cached.headers
+                        text: cached.text
+                        bodyFilePath: request._saveBodyToFilePath
+                    })
+                    LogInfo("Cache hit", request._method, request.GetFullUrl())
+                    m.Throttle()
+                    return
                 end if
             end if
+            m.StartAttempt()
+        end function
 
-            m.urlTransfer = m.CreateRoUrlTransfer()
-            if m.urlTransfer = invalid
-                LogError("Failed to create roUrlTransfer. We're probably not in a background thread.")
-                return m
+        ' How long a wait on the port may last before the next HandleMessage, while the response isn't in: until the
+        ' attempt's deadline while it is sent, until the retry is due between attempts. At least 1, as wait(0) has no
+        ' time limit.
+        function MaxWaitMs() as integer
+            if m._urlTransfer <> invalid
+                waitMs = m._attemptDeadlineMs - m._clock.TotalMilliseconds()
+            else
+                waitMs = m._retryAtMs - m._clock.TotalMilliseconds()
+            end if
+            if waitMs < 1
+                return 1
+            end if
+            return waitMs
+        end function
+
+        ' message: what was taken from the port, invalid when nothing was. The deadline is checked after the message:
+        ' an answer is taken even past the deadline; past it, any other message, or none, times the attempt out.
+        ' Returns the response once the fetch completed, invalid until then.
+        function HandleMessage(message as dynamic) as dynamic
+            if m._response = invalid
+                ' GetInt() is 1 when the transfer completed; an earlier attempt's transfer has another identity.
+                if type(message) = "roUrlEvent" and m._urlTransfer <> invalid and message.GetInt() = 1 and message.GetSourceIdentity() = m._urlTransfer.GetIdentity()
+                    m.OnAttemptEnded(m.NewResponse({ urlEvent: message, bodyFilePath: m._request._saveBodyToFilePath }))
+                end if
+                if m._urlTransfer <> invalid and m._clock.TotalMilliseconds() >= m._attemptDeadlineMs
+                    m.OnAttemptTimeout()
+                end if
+                if m._response = invalid and m._urlTransfer = invalid and m._clock.TotalMilliseconds() >= m._retryAtMs
+                    ' Read here too, as its event may never come.
+                    if CancellationUtils.IsCancelled(m._request._cancellation)
+                        m.Cancel()
+                    else
+                        m.StartAttempt()
+                    end if
+                end if
+            end if
+            return m._response
+        end function
+
+        ' Completes the fetch as cancelled, unless it already completed.
+        function Cancel() as void
+            if m._response <> invalid
+                return
+            end if
+            if m._urlTransfer <> invalid
+                m._urlTransfer.AsyncCancel()
+                m._urlTransfer = invalid
+            else
+                ' Cancelled before an attempt was sent, or between two.
+                m._transferId = invalid
+            end if
+            LogInfo("Cancelled", m.Describe())
+            m.Complete(m.NewResponse({ cancelled: true }))
+        end function
+
+        private function StartAttempt() as void
+            m._attemptCount += 1
+            m._transferId = invalid
+            request = m._request
+            method = request._method
+            urlTransfer = CreateUrlTransfer(request.GetFullUrl(), request._headers, m._messagePort)
+            if urlTransfer = invalid
+                LogError("Failed to create roUrlTransfer")
+                m.Throttle()
+                m.Complete(m.NewResponse({ notSentReason: "roUrlTransfer couldn't be created" }))
+                return
             end if
 
-            m.urlTransfer.setUrl(m.BuildUrl())
-            if m._headers <> invalid
-                m.urlTransfer.SetHeaders(m._headers)
-            end if
-
-            m.urlTransfer.SetMessagePort(CreateObject("roMessagePort"))
-
-            LogInfo("Sending", m._method, m.urlTransfer.GetURL(), "ID:", m.urlTransfer.GetIdentity())
-
+            LogInfo("Sending", method, request.GetFullUrl(), "ID:", urlTransfer.GetIdentity())
             #if DEBUG
-                if m._logCurlCommand <> false
-                    LogDebug(`======== curl command ========\n${m.ToCurlCommand()}\n==============================`)
+                if request._logCurlCommand <> false
+                    LogDebug(`======== curl command ========\n${request.ToCurlCommand()}\n==============================`)
                 end if
             #else
-                if m._logCurlCommand = true
-                    LogInfo(`======== curl command ========\n${m.ToCurlCommand()}\n==============================`)
+                if request._logCurlCommand = true
+                    LogInfo(`======== curl command ========\n${request.ToCurlCommand()}\n==============================`)
                 end if
             #end if
 
-            if m._toFilePath <> invalid and m._method <> "GET"
-                throw "ToFile() can only be used with GET requests."
-            end if
-
-            if m._bodyFilePath <> invalid and m._method <> "POST"
-                throw "FromFile() can only be used with POST requests."
-            end if
-
-            if m._method = "POST"
-                if m._bodyFilePath <> invalid
-                    m._sent = m.urlTransfer.AsyncPostFromFile(m._bodyFilePath)
+            if method = "GET"
+                if request._saveBodyToFilePath <> invalid
+                    sent = urlTransfer.AsyncGetToFile(request._saveBodyToFilePath)
                 else
-                    body = m._body
-                    if body = invalid
-                        body = ""
-                    end if
-                    m._sent = m.urlTransfer.AsyncPostFromString(body)
+                    sent = urlTransfer.AsyncGetToString()
                 end if
-            else if m._method = "GET"
-                if m._toFilePath <> invalid
-                    m._sent = m.urlTransfer.AsyncGetToFile(m._toFilePath)
-                else
-                    m._sent = m.urlTransfer.AsyncGetToString()
-                end if
-            else if m._method = "HEAD"
-                m._sent = m.urlTransfer.AsyncHead()
+            else if method = "HEAD"
+                sent = urlTransfer.AsyncHead()
             else
-                m.urlTransfer.SetRequest(m._method)
-                body = m._body
-                if body = invalid
-                    body = ""
+                if method <> "POST"
+                    urlTransfer.SetRequest(method)
                 end if
-                m._sent = m.urlTransfer.AsyncPostFromString(body)
+                if request._fileBodyPath <> invalid
+                    sent = urlTransfer.AsyncPostFromFile(request._fileBodyPath)
+                else
+                    sent = urlTransfer.AsyncPostFromString(ValidString(request._textBody))
+                end if
             end if
 
-            if m._sent <> true
+            if not sent
                 LogError("Failed to send request")
-            else
-                m._timer = CreateObject("roTimeSpan")
+                m.Throttle()
+                m.Complete(m.NewResponse({ notSentReason: "roUrlTransfer refused the request" }))
+                return
             end if
-
-            return m
+            m._urlTransfer = urlTransfer
+            m._transferId = urlTransfer.GetIdentity()
+            m._attemptDeadlineMs = m._clock.TotalMilliseconds() + request._attemptTimeoutMs
         end function
 
-        function IsCancelled() as boolean
-            if m._cancelled = true
-                return m._cancelled
-            end if
-
-            if CancellationUtils.IsCancelled(m._cancellation)
-                m._cancelled = true
-            end if
-
-            return m._cancelled = true
+        ' A response that reads the request's cancellation when asked whether it is cancelled.
+        private function NewResponse(properties as object) as Response
+            properties.cancellation = m._request._cancellation
+            return new Response(properties)
         end function
 
-        function Await() as HttpResponse
-            triesLeft = m._tryCount
-            response = invalid
-
-            response = m.AwaitInternal()
-            if response.IsSuccess() or response.IsTimedOut() or response.IsCancelled()
-                return response
-            end if
-            triesLeft -= 1
-
-            while triesLeft > 0
-                tryNumber = m._tryCount - triesLeft + 1
-                shouldRetry = true
-                if IsFunction(m._retryCallback)
-                    try
-                        callbackResult = m._retryCallback({
-                            tryNumber: tryNumber
-                            tryCount: m._tryCount
-                            request: m
-                            response: response
-                        })
-                        shouldRetry = not IsBool(callbackResult) or callbackResult
-                    catch error
-                        #if DEBUG
-                            throw error
-                        #else
-                            LogError("Retry callback failed:", ErrorUtils.Format(error))
-                        #end if
-                    end try
-                end if
-
-                backoffMs = 1000 + Rnd(2000)
-                if shouldRetry
-                    LogWarnNoTelemetry("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nRetrying: (`, tryNumber, "/", m._tryCount, ") in", backoffMs, "ms")
-                else
-                    LogWarnNoTelemetry("Request failed ID:", m.urlTransfer.GetIdentity(), "ErrorMessage:", response.ErrorMessage(), `\nNot retrying: the retry callback declined`)
-                end if
-                LogTelemetryEvent({
-                    level: "warning"
-                    message: response.ErrorMessage()
-                    attachments: [{
-                        filename: "request.txt"
-                        content_type: "text/plain"
-                        data: m.ToCurlCommand()
-                    }]
-                })
-                if not shouldRetry
-                    return response
-                end if
-
-                m.urlTransfer = invalid
-                m._cache = invalid
-                m._sent = invalid
-
-                sleep(backoffMs)
-
-                response = m.AwaitInternal()
-                if response.IsTimedOut() or response.IsCancelled() or (response.StatusCode() >= 200 and response.StatusCode() < 500)
-                    return response
-                end if
-                triesLeft -= 1
-            end while
-
-            return response
+        private function OnAttemptTimeout() as void
+            LogInfo("Timeout", m.Describe(), "after", m._request._attemptTimeoutMs, "ms")
+            m._urlTransfer.AsyncCancel()
+            m.OnAttemptEnded(m.NewResponse({ timedOut: true }))
         end function
 
-        private function AwaitInternal() as HttpResponse
-            if m.urlTransfer = invalid and m._cache = invalid
-                m.Send()
+        private function OnAttemptEnded(response as Response) as void
+            m._urlTransfer = invalid
+            m.Throttle()
+            request = m._request
+            ' No retry can follow: complete without reading the cancellation, a rendezvous.
+            if m._attemptCount > request._retryCount or not m.MayRetry(response) or (request._retryPredicate = invalid and response.IsSuccess())
+                m.Complete(response)
+                return
+            end if
+            ' Cancelled before its event was read: neither retried nor reported.
+            if response.IsCancelled()
+                m.Complete(response)
+                return
+            end if
+            retryReason = m.RetryReason(response)
+            if retryReason = ""
+                if not response.IsSuccess()
+                    m.ReportAttempt(response.ErrorMessage(), `\nNot retrying: the retry callback declined`)
+                end if
+                m.Complete(response)
+                return
             end if
 
-            if m._sent <> true or m._cache <> invalid
-                #if NETWORK_THROTTLE
-                    #if DEBUG
-                        sleep(1000 + Rnd(2000))
-                    #end if
-                #end if
+            delayMs = request._retryDelayMs + Rnd(request._retryDelayMs + 1) - 1
+            m.ReportAttempt(retryReason, `\nRetrying in ${delayMs} ms`)
+            m._retryAtMs = m._clock.TotalMilliseconds() + delayMs
+        end function
 
-                return new HttpResponse(m, invalid)
+        ' A warning, and a telemetry event unless NoTelemetry, for an attempt that could have been retried.
+        private function ReportAttempt(message as string, outcome as string) as void
+            request = m._request
+            LogWarnNoTelemetry(m.Describe(), "attempt", m._attemptCount, "ended:", message, outcome)
+            if request._noTelemetry = true
+                return
             end if
+            LogTelemetryEvent({
+                level: "warning"
+                message: message
+                attachments: [{
+                    filename: "request.txt"
+                    content_type: "text/plain"
+                    data: request.ToCurlCommand()
+                }]
+            })
+        end function
 
-            if m.IsCancelled()
-                return new HttpResponse(m, invalid)
-            end if
-
-            messagePort = m.urlTransfer.GetMessagePort()
-            if messagePort = invalid
-                throw "Can't await request without a message port. use Send(andForget=false) in order to await request."
-            end if
-
-            CancellationUtils.ObserveCancellationScoped(m._cancellation, messagePort)
-
-            msg = wait(m._timeoutSeconds * 1000, messagePort)
-
+        ' NETWORK_THROTTLE: a cache hit, an attempt not sent, and every attempt's end come 1 to 3s late.
+        private function Throttle() as void
             #if NETWORK_THROTTLE
                 #if DEBUG
                     sleep(1000 + Rnd(2000))
                 #end if
             #end if
-
-            CancellationUtils.UnobserveCancellationScoped(m._cancellation)
-
-            if msg = invalid
-                ' timeout
-                LogInfo("Timeout", "ID:", m.urlTransfer.GetIdentity())
-                m.urlTransfer.AsyncCancel()
-            else
-                eventType = type(msg)
-                if eventType = "roUrlEvent"
-                    LogInfo("Finished ID:", m.urlTransfer.GetIdentity(), "after", m._timer.TotalMilliseconds(), "ms")
-                else if CancellationUtils.IsCancellationEvent(m._cancellation, msg)
-                    LogInfo("Cancelled", "ID:", m.urlTransfer.GetIdentity())
-                    m._cancelled = true
-                    m.urlTransfer.AsyncCancel()
-                end if
-            end if
-
-            response = new HttpResponse(m, msg)
-
-            if m.IsCancelled()
-                return response
-            end if
-
-            HttpClientCache.Set(response)
-            return response
         end function
 
-        function IsCompleted() as boolean
-            if m.urlTransfer = invalid
+        ' The attempts RetryCount allows to retry: not a timed-out one; after the first, only a 5xx or a network failure.
+        private function MayRetry(response as Response) as boolean
+            if response.IsTimedOut()
                 return false
             end if
-
-            messagePort = m.urlTransfer.GetMessagePort()
-            message = messagePort.PeekMessage()
-            if message <> invalid
+            if m._attemptCount = 1
                 return true
             end if
+            statusCode = response.StatusCode()
+            return statusCode < 200 or statusCode >= 500
+        end function
 
-            if m._timer <> invalid
-                elapsedMs = m._timer.TotalMilliseconds()
-                if elapsedMs > m._timeoutSeconds * 1000
-                    return true
+        ' Why to retry the attempt, "" not to: RetryIf's reason, or else the failure's error message.
+        private function RetryReason(response as Response) as string
+            ' Called through a local, so the predicate's m isn't the request.
+            retryPredicate = m._request._retryPredicate
+            if retryPredicate = invalid
+                return response.ErrorMessage()
+            end if
+            try
+                reason = retryPredicate(response)
+            catch error
+                #if DEBUG
+                    throw error
+                #else
+                    LogError("RetryIf failed:", ErrorUtils.Format(error))
+                    return response.ErrorMessage()
+                #end if
+            end try
+            #if DEBUG
+                Assert.IsTrue(IsString(reason) or type(reason) = "Invalid", `RetryIf returned a ${type(reason)}: it returns the reason to retry, "" or invalid not to`)
+            #end if
+            if not IsString(reason)
+                return ""
+            end if
+            return reason
+        end function
+
+        ' The method and url, then the transfer ID of the attempt sent last, the RequestId of its error message: none
+        ' for a cache hit, an attempt not sent, or a cancellation outside an attempt.
+        private function Describe() as string
+            description = `${m._request._method} ${m._request.GetFullUrl()}`
+            if m._transferId <> invalid
+                description += ` ID: ${m._transferId}`
+            end if
+            return description
+        end function
+
+        private function Complete(response as Response) as void
+            m._response = response
+            LogInfo("Completed", m.Describe(), response.StatusCode(), "after", m._clock.TotalMilliseconds(), "ms,", m._attemptCount, "attempt(s)")
+            ' A 3xx counts as a success, but isn't cached.
+            if m._cacheFilePath = invalid or response.StatusCode() < 200 or response.StatusCode() >= 300
+                return
+            end if
+            ' A body saved to a file is in the file; an empty text body isn't cached.
+            body = ""
+            if response._bodyFilePath = invalid
+                body = response.Text()
+                if body = ""
+                    return
                 end if
             end if
-
-            return false
-        end function
-
-        private function CreateRoUrlTransfer() as object
-            urlTransfer = CreateObject("roUrlTransfer")
-            if urlTransfer = invalid
-                return invalid
-            end if
-
-            if COMPRESSION_ENABLED
-                ' Enables gzip encoding of transfers
-                urlTransfer.EnableEncodings(true)
-            end if
-
-            urlTransfer.RetainBodyOnError(true)
-            if LCase(left(m._url, 6)).StartsWith("https:")
-                urlTransfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
-                urlTransfer.InitClientCertificates()
-            end if
-
-            if m._useHttp2 = true
-                urlTransfer.SetHttpVersion("http2")
-            end if
-
-            return urlTransfer
-        end function
-
-        function BuildUrl() as string
-            if m._fullUrl <> invalid
-                return m._fullUrl
-            end if
-
-            m._fullUrl = UrlUtils.BuildUrl(m._url, m._pathParams, m._queryParams)
-            return m._fullUrl
+            HttpCache.Write(m._cacheFilePath, m._request._cacheSeconds, response.StatusCode(), response.Headers(), body)
         end function
     end class
 
-    class HttpResponse
-
-        public request as HttpRequest
-        public event as object
-
-        function new(request as HttpRequest, event as object)
-            m.request = request
-            m.event = event
+    ' A fetch on a port of its own, which Await, Wait and Poll wait on. They return the same response once it is in.
+    ' Whoever sends the request takes its response or calls Cancel(): either ends the observation of its cancellation.
+    class PendingResponse
+        function new(startedFetch as Fetch, messagePort as object, cancellation as dynamic, cancellationObserver as dynamic)
+            m._fetch = startedFetch
+            m._messagePort = messagePort
+            m._cancellation = cancellation
+            m._cancellationObserver = cancellationObserver
+            m._clock = CreateObject("roTimespan")
         end function
 
+        function Await() as Response
+            return m.WaitForResponse(-1)
+        end function
+
+        ' The response, or invalid if it isn't in within timeoutMs.
+        function Wait(timeoutMs as integer) as dynamic
+            #if DEBUG
+                Assert.IsTrue(timeoutMs > 0, `Wait(${timeoutMs}): timeoutMs must be above 0; Poll() checks without blocking`)
+            #end if
+            return m.WaitForResponse(timeoutMs)
+        end function
+
+        function Poll() as dynamic
+            return m.WaitForResponse(0)
+        end function
+
+        function Cancel() as void
+            m._fetch.Cancel()
+            m.StopObservingCancellation()
+        end function
+
+        ' timeoutMs: -1 for as long as it takes, 0 to take only what is already on the port.
+        private function WaitForResponse(timeoutMs as integer) as dynamic
+            m._clock.Mark()
+            ' Messages already on the port go first: an answer there is taken even past the deadline.
+            message = m._messagePort.GetMessage()
+            while m._response = invalid
+                ' The port's only node events are the cancellation observer's.
+                if type(message) = "roSGNodeEvent" and CancellationUtils.IsCancelled(m._cancellation)
+                    m._fetch.Cancel()
+                end if
+                m._response = m._fetch.HandleMessage(message)
+                if m._response = invalid
+                    message = m._messagePort.GetMessage()
+                    if message = invalid
+                        waitMs = m._fetch.MaxWaitMs()
+                        if timeoutMs >= 0
+                            remainingMs = timeoutMs - m._clock.TotalMilliseconds()
+                            if remainingMs <= 0
+                                return invalid
+                            end if
+                            if remainingMs < waitMs
+                                waitMs = remainingMs
+                            end if
+                        end if
+                        message = wait(waitMs, m._messagePort)
+                    end if
+                end if
+            end while
+            m.StopObservingCancellation()
+            return m._response
+        end function
+
+        private function StopObservingCancellation() as void
+            if m._cancellationObserver <> invalid
+                m._cancellationObserver.nodeDestroy = true
+                m._cancellationObserver = invalid
+            end if
+        end function
+    end class
+
+    class Response
+        function new(properties as object)
+            m._urlEvent = properties.urlEvent
+            m._statusCode = properties.statusCode
+            m._headers = properties.headers
+            m._text = properties.text
+            m._bodyFilePath = properties.bodyFilePath
+            m._cached = properties.cached = true
+            m._timedOut = properties.timedOut = true
+            m._cancelled = properties.cancelled = true
+            m._cancellation = properties.cancellation
+            m._notSentReason = properties.notSentReason
+        end function
+
+        ' The HTTP status; 0 when no response came, a negative curl code when the transfer failed.
         function StatusCode() as integer
-            if m._statusCode <> invalid
-                return m._statusCode
+            if m._statusCode = invalid
+                if m._urlEvent <> invalid
+                    m._statusCode = m._urlEvent.GetResponseCode()
+                else
+                    m._statusCode = 0
+                end if
             end if
-
-            if m.IsCached()
-                m._statusCode = m.request._cache.statusCode
-                return m._statusCode
-            end if
-
-            if type(m.event) <> "roUrlEvent"
-                m._statusCode = 0
-            else
-                m._statusCode = m.event.GetResponseCode()
-            end if
-
             return m._statusCode
         end function
 
-        function OverrideStatusCode(statusCode as integer)
-            m._statusCode = statusCode
-        end function
-
-        function OverrideText(text as string)
-            m._text = text
-        end function
-
-        function OverrideJson(json as object)
-            m._json = json
-        end function
-
-        function OverrideHeaders(headers as object)
-            m._headers = headers
-        end function
-
-        function OverrideErrorMessage(errorMessage as string)
-            m._errorMessage = errorMessage
-        end function
-
+        ' A 2xx or 3xx status. Redirects are followed, so a 3xx is one that couldn't be.
         function IsSuccess() as boolean
             statusCode = m.StatusCode()
             return statusCode >= 200 and statusCode < 400
         end function
 
-        function IsCached() as boolean
-            return m.request._cache <> invalid
-        end function
-
         function IsTimedOut() as boolean
-            return not m.IsCached() and m.event = invalid
+            return m._timedOut
         end function
 
+        ' Cancelled by its fetch, or since: the request's cancellation is read at each call, so an answer taken before
+        ' a later cancel reads as cancelled too. Once it reads as cancelled it stays so, the cancellation reset or not.
         function IsCancelled() as boolean
-            return m.request.IsCancelled()
+            if not m._cancelled and CancellationUtils.IsCancelled(m._cancellation)
+                m._cancelled = true
+            end if
+            return m._cancelled
         end function
 
-        function Text() as dynamic
-            if m._text <> invalid
-                return m._text
-            end if
-
-            if m.IsCached()
-                m._text = m.request._cache.body
-                return m._text
-            end if
-
-            if type(m.event) <> "roUrlEvent"
-                return invalid
-            else
-                m._text = m.event.GetString()
-            end if
-            return m._text
+        function IsCached() as boolean
+            return m._cached
         end function
 
-        function Json() as object
-            if m._json <> invalid
-                return m._json
-            end if
-
-            text = m.Text()
-            if text = invalid
-                return invalid
-            end if
-            m._json = StringUtils.ParseJsonSafe(text)
-            return m._json
-        end function
-
+        ' Case-insensitive keys.
         function Headers() as object
-            if m._headers <> invalid
-                return m._headers
-            end if
-
-            if m.IsCached()
-                m._headers = m.request._cache.headers
-                return m._headers
-            end if
-
-            if type(m.event) = "roUrlEvent"
-                m._headers = m.event.GetResponseHeaders()
-            else
-                m._headers = {}
+            if m._headers = invalid
+                if m._urlEvent <> invalid
+                    m._headers = m._urlEvent.GetResponseHeaders()
+                else
+                    m._headers = {}
+                end if
             end if
             return m._headers
         end function
 
-        function ErrorMessage(includeBody = true as boolean) as string
-            if m._errorMessage <> invalid
-                return m._errorMessage
+        ' The Retry-After header in seconds; invalid when it is absent or an HTTP date.
+        function RetryAfterSeconds() as dynamic
+            retryAfter = m.Headers()["retry-after"]
+            if not IsString(retryAfter)
+                return invalid
             end if
-
-            if m.IsSuccess()
-                m._errorMessage = ""
-            else
-                if m.request._sent <> true
-                    m._errorMessage = Tr(Locale.HttpClient.RequestNotSent)
-                else if m.IsCancelled()
-                    m._errorMessage = Tr(Locale.HttpClient.RequestCancelled)
-                else if m.IsTimedOut()
-                    m._errorMessage = Tr(Locale.HttpClient.RequestTimedOut)
-                else if type(m.event) = "roUrlEvent"
-                    m._errorMessage = `${Tr(Locale.HttpClient.Reason)}:${m.event.GetFailureReason() }\nStatusCode: ${m.StatusCode()}\nRequestId: ${m.event.GetSourceIdentity()}`
-                    if includeBody
-                        m._errorMessage += `\nBody: ${m.event.GetString()}`
-                    end if
-                end if
+            retryAfter = retryAfter.Trim()
+            seconds = retryAfter.ToInt()
+            if seconds < 0 or seconds.ToStr() <> retryAfter
+                return invalid
             end if
-
-            return m._errorMessage
+            return seconds
         end function
 
+        function Text() as string
+            #if DEBUG
+                Assert.IsTrue(m._bodyFilePath = invalid, `Text and Json on a SaveBodyToFile response: the body is in ${m._bodyFilePath}`)
+            #end if
+            if m._text = invalid
+                if m._urlEvent <> invalid
+                    m._text = m._urlEvent.GetString()
+                else
+                    m._text = ""
+                end if
+            end if
+            return m._text
+        end function
+
+        ' The parsed body; invalid when it isn't JSON.
+        function Json() as dynamic
+            if m._json = invalid
+                m._json = StringUtils.ParseJsonSafe(m.Text())
+            end if
+            return m._json
+        end function
+
+        ' Empty on success.
+        function ErrorMessage() as string
+            if m.IsSuccess()
+                return ""
+            end if
+            if m._notSentReason <> invalid
+                return `${Tr(Locale.HttpClient.RequestNotSent)} ${m._notSentReason}`
+            end if
+            if m.IsCancelled()
+                return Tr(Locale.HttpClient.RequestCancelled)
+            end if
+            if m._timedOut
+                return Tr(Locale.HttpClient.RequestTimedOut)
+            end if
+            ' A response built in the app, such as the built-in Invidious backend's, has no transfer to report.
+            if m._urlEvent = invalid
+                message = `StatusCode: ${m.StatusCode()}`
+            else
+                message = `${Tr(Locale.HttpClient.Reason)}:${m._urlEvent.GetFailureReason()}\nStatusCode: ${m.StatusCode()}\nRequestId: ${m._urlEvent.GetSourceIdentity()}`
+            end if
+            if m._bodyFilePath = invalid
+                message += `\nBody: ${m.Text()}`
+            end if
+            return message
+        end function
     end class
 
-end namespace
-
-namespace HttpClientCache
-    function GetLocation(request as HttpClient.HttpRequest) as dynamic
-        if request._cacheLocation <> invalid
-            return request._cacheLocation
+    function CreateUrlTransfer(url as string, headers as object, messagePort as object) as object
+        urlTransfer = CreateObject("roUrlTransfer")
+        if urlTransfer = invalid
+            return invalid
         end if
-        cacheKey = request.BuildUrl()
-        if request._headers <> invalid
-            headersString = FormatJson(request._headers)
-            cacheKey = cacheKey + headersString
+        if COMPRESSION_ENABLED
+            urlTransfer.EnableEncodings(true)
         end if
-
-        hash = CryptoUtils.GetMd5(cacheKey)
-        request._cacheLocation = `cachefs:/request_v2_${hash}.json`
-        return request._cacheLocation
+        urlTransfer.RetainBodyOnError(true)
+        if LCase(Left(url, 6)) = "https:"
+            urlTransfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+            urlTransfer.InitClientCertificates()
+        end if
+        urlTransfer.SetUrl(url)
+        urlTransfer.SetHeaders(headers)
+        urlTransfer.SetMessagePort(messagePort)
+        return urlTransfer
     end function
 
-    function GetFileSystem(request as HttpClient.HttpRequest) as object
-        if request._fileSystem = invalid
-            request._fileSystem = CreateObject("roFileSystem")
-        end if
-        return request._fileSystem
-    end function
-
-    function Exists(request as HttpClient.HttpRequest) as boolean
-        fileSystem = GetFileSystem(request)
-        if fileSystem = invalid
-            return false
-        end if
-        cacheLocation = GetLocation(request)
-        return fileSystem.Exists(cacheLocation)
-    end function
-
-    function Get(request as HttpClient.HttpRequest) as object
-        if request._noCache = true
-            return invalid
-        end if
-
-        if request._method <> "GET"
-            return invalid
-        end if
-
-        if not Exists(request)
-            return invalid
-        end if
-
-        cacheLocation = GetLocation(request)
-        cacheText = ReadAsciiFile(cacheLocation)
-        if cacheText = ""
-            return invalid
-        end if
-
-        firstLineIndex = cacheText.InStr(`\n`)
-        if firstLineIndex = -1
-            LogWarn("Failed to parse cache.")
-            Delete(request)
-            return invalid
-        end if
-
-        metadataText = cacheText.Left(firstLineIndex)
-        metadata = StringUtils.ParseJsonSafe(metadataText)
-        if metadata = invalid
-            LogWarn("Failed to parse metadata from cache.")
-            Delete(request)
-            return invalid
-        end if
-
-        headersText = cacheText.Mid(firstLineIndex + 1, metadata.headers)
-        headers = StringUtils.ParseJsonSafe(headersText)
-        if headers = invalid
-            LogWarn("Failed to parse headers from cache.")
-            Delete(request)
-            return invalid
-        end if
-
-        expireSeconds = request._expireSeconds
-
-        if expireSeconds = invalid and headers <> invalid
-            expireSeconds = ParseHeadersForCacheControl(headers)
-        end if
-
-        if expireSeconds = invalid
-            return invalid
-        end if
-
-        date = CreateObject("roDateTime")
-        nowTimestamp = date.AsSeconds()
-        if metadata.timestamp + expireSeconds < nowTimestamp
-            Delete(request)
-            return invalid
-        end if
-
-        body = ""
-        if metadata.body > 0
-            body = cacheText.Mid(firstLineIndex + 1 + metadata.headers, metadata.body)
-        end if
-
-        return {
-            statusCode: metadata.statusCode
-            headers: headers
-            body: body
-        }
-    end function
-
-    function Set(response as HttpClient.HttpResponse) as void
-        if response.request._noCache = true or response.request._method <> "GET"
-            return
-        end if
-
-        if not response.IsSuccess()
-            return
-        end if
-
-        if response.request._expireSeconds = invalid
-            headers = response.Headers()
-            if headers = invalid
-                return
-            end if
-            if ParseHeadersForCacheControl(headers) = invalid
-                return
-            end if
-        end if
-
-        fileSystem = GetFileSystem(response.request)
-        if fileSystem = invalid
-            return
-        end if
-
-        body = ValidString(response.Text())
-        if body = ""
-            return
-        end if
-
-        date = CreateObject("roDateTime")
-        timestamp = date.AsSeconds()
-
-        ' Cache file format:
-        ' First line is a json payload of metadata:
-        ' {
-        '     timestamp: number,
-        '     statusCode: number,
-        '     headers: number, ' this is the size of the headers json array in chars
-        '     body: number ' this is the size of the body in chars
-        ' }
-        ' {headers} ' a json objects with headers, string size matching metadata.headers
-        ' {body} ' the body as is, string size matching metadata.body
-
-        jsonHeaders = FormatJson(response.Headers())
-
-        cacheMetadata = {
-            timestamp: timestamp
-            statusCode: response.StatusCode()
-            headers: jsonHeaders.Len()
-            body: body.Len()
-        }
-
-        jsonMetadata = FormatJson(cacheMetadata)
-
-        cacheLocation = GetLocation(response.request)
-
-        WriteAsciiFile(cacheLocation, jsonMetadata + `\n` + jsonHeaders + body)
-    end function
-
-    function Delete(request as HttpClient.HttpRequest) as boolean
-        fileSystem = GetFileSystem(request)
-        if fileSystem = invalid
-            return false
-        end if
-
-        cacheLocation = GetLocation(request)
-        return fileSystem.Delete(cacheLocation)
-    end function
-
-    function ParseHeadersForCacheControl(headers as object) as dynamic
-        cacheControl = headers["cache-control"]
-        if cacheControl = invalid
-            return invalid
-        end if
-
-        cacheControlDirectives = cacheControl.split(",")
-        for each cacheControlDirective in cacheControlDirectives
-            keyValue = cacheControlDirective.Trim().split("=")
-            name = keyValue[0].Trim()
-            if keyValue.Count() > 1
-                value = keyValue[1].Trim()
-            else
-                value = invalid
-            end if
-
-            if name = "no-store" or name = "no-cache"
-                return invalid
-            else if name = "max-age"
-                return val(value)
-            end if
-        end for
-
-        return invalid
-    end function
 end namespace

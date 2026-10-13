@@ -1,0 +1,57 @@
+import "pkg:/components/Services/SponsorBlock/SponsorBlockConfig.bs"
+import "pkg:/components/Services/SponsorBlock/SponsorBlockService.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class SponsorBlockServiceTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            config = new SponsorBlock.SponsorBlockConfig()
+            config.config = { serverAddress: Tests.HttpTestServerUrl("/sb") }
+            m.service = new SponsorBlock.SponsorBlockService(config)
+        end function
+
+        function RouteSkipSegments(videoId as string, route as object)
+            routes = {}
+            routes[`/sb/api/skipSegments/${CryptoUtils.GetSha256(videoId).Left(4)}`] = route
+            m.server.routes = routes
+        end function
+
+        @describe("SponsorBlock.SponsorBlockService")
+
+        @it("finds the video's segments in its hash prefix's list")
+        function _()
+            m.RouteSkipSegments("video1", { status: 200, body: `[{"videoId":"other","segments":[]},{"videoId":"video1","segments":[{"segment":[1,2]}]}]` })
+            segments = m.service.GetSkipSegmentsForVideo("video1")
+            m.assertEqual(segments[0].segment, [1, 2])
+        end function
+
+        @it("has no segments when the server fails")
+        function _()
+            m.RouteSkipSegments("video2", { status: 500 })
+            m.assertInvalid(m.service.GetSkipSegmentsForVideo("video2"))
+        end function
+
+        @it("posts a viewed segment's UUID")
+        function _()
+            m.server.routes = { "/sb/api/viewedVideoSponsorTime": { status: 200 } }
+            m.service.PostSegmentViewed("segment1")
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/sb/api/viewedVideoSponsorTime?UUID=segment1"), 1)
+        end function
+
+    end class
+
+end namespace

@@ -171,6 +171,7 @@ function OnNodeReady()
     m.top.ObserveField("setSeek", FuncName(OnSetSeek))
     m.top.ObserveField("bufferingStatus", FuncName(OnBufferingStatus))
     m.top.ObserveField("playStartInfo", FuncName(OnPlayStartInfo))
+    m.top.ObserveField("streamingSegment", FuncName(OnStreamingSegment))
 
     ' a player that starts minimized shows the PiP hint (1s after the shrink settles, auto-hides after 5s).
     m.showFullScreenHint = not m.container.fullscreen
@@ -803,6 +804,16 @@ function OnPlayStartInfo(event as object) as void
         return
     end if
     m.playbackTelemetry.OnPlayStartInfo(event.getData())
+end function
+
+' Only the first video segment is wanted: no callback per segment for the rest of the play.
+function OnStreamingSegment(event as object) as void
+    if m.onCloseCalled = true
+        return
+    end if
+    if m.playbackTelemetry.OnStreamingSegment(event.getData())
+        m.top.unobserveField("streamingSegment")
+    end if
 end function
 
 ' A transport freezes the video; if the device is playing under an active transport (Roku resumes a paused
@@ -1506,6 +1517,7 @@ function OnClose() as void
     m.top.unobserveField("setSeek")
     m.top.unobserveField("bufferingStatus")
     m.top.unobserveField("playStartInfo")
+    m.top.unobserveField("streamingSegment")
     m.top.unobserveField("close")
     content = m.top.content
     if content <> invalid

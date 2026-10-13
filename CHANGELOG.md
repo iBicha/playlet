@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Small security fixes
 - SponsorBlock skip looping back to the start of a segment on some devices, and overlapping segments
+- Live streams buffering on slow networks
 
 ### Changed
 
@@ -20,11 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Backend changes from Invidious to Playlet if no instance url is set. This is to avoid playback errors.
+- Backend changes from Invidious to Playlet if no instance url is set. This is to avoid playback errors
 
 ### Fixed
 
-- Various Live stream improvements, streamed directly without local proxy, attempt to reduce errors and stutters.
+- Various Live stream improvements, streamed directly without local proxy, attempt to reduce errors and stutters
 
 ## [0.48.7] - 2026-10-05
 
@@ -47,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Issue with start up tasks that might have caused "Failed to fetch session data" errors.
+- Issue with start up tasks that might have caused "Failed to fetch session data" errors
 
 ## [0.48.4] - 2026-09-24
 
@@ -61,7 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Display issues for 720p devices
 - Attempt to fix session data fetch errors
-- Remove volume handing from cast, to avoid a possible "mute softlock" - feature will be added back later.
+- Remove volume handing from cast, to avoid a possible "mute softlock" - feature will be added back later
 
 ## [0.48.2] - 2026-07-11
 
@@ -89,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Trending back (Gaming and Live) for Playlet backend and Invidious - to avoid a blank home screen when not logged in.
+- Trending back (Gaming and Live) for Playlet backend and Invidious - to avoid a blank home screen when not logged in
 
 ### Fixed
 
@@ -198,7 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Always use `signatureTimestamp` in `/player` calls to prevent "reload page" errors. This affects watch history.
+- Always use `signatureTimestamp` in `/player` calls to prevent "reload page" errors. This affects watch history
 - Attempt 2 to fix watch history and watch progress
 
 ## [0.44.7] - 2026-04-23
@@ -249,7 +250,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Small change in post-live dvr detection
 - Issue where recommended videos are all "UPCOMING" paid content
-- Errors related to loading the trending feeds. Trending will be removed from Playlet in a future release.
+- Errors related to loading the trending feeds. Trending will be removed from Playlet in a future release
 
 ## [0.44.0] - 2025-11-09
 
@@ -534,13 +535,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Telemetry to collect anonymous diagnostics data. Can be turned off from the settings.
+- Telemetry to collect anonymous diagnostics data. Can be turned off from the settings
 
 ## [0.40.15] - 2025-08-28
 
 ### Fixed
 
-- Shorts being merged with subscription videos, regardless of "Disable Shorts" preference.
+- Shorts being merged with subscription videos, regardless of "Disable Shorts" preference
 - Gracefully handle STS_MISMATCH errors
 
 ## [0.40.14] - 2025-08-22
@@ -559,17 +560,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Attempt to fix `no valid bitrates` and `Sign in to confirm you're not a bot` errors.
+- Attempt to fix `no valid bitrates` and `Sign in to confirm you're not a bot` errors
   - Introduced a "Playlet support server" to allow handling sig/nsig decoding. These are not possible to do without a Javascript execution environment, so this was necessary.
   - Live videos are not affected by this fix yet, but hopefully it reduce the amount of errors.
 - Videos longer than 5 hours now work [https://github.com/iBicha/playlet/issues/500](https://github.com/iBicha/playlet/issues/500)
-- Age restricted videos should play normally if logged in using a YouTube account.
+- Age restricted videos should play normally if logged in using a YouTube account
 
 ## [0.40.10] - 2025-07-19
 
 ### Added
 
-- An option to export Playlet's state from the web app for easier debugging.
+- An option to export Playlet's state from the web app for easier debugging
   - This is a zip file that contains logs, the app state, and the registry (local storage)
 
 ### Fixed
@@ -618,7 +619,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- [perf] Added a job system to control background tasks.
+- [perf] Added a job system to control background tasks
 
 ### Fixed
 
@@ -640,7 +641,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Added a "hint" in the error message when playing a video and login is required.
+- Added a "hint" in the error message when playing a video and login is required
 - Various performance improvements
 
 ## [0.40.2] - 2025-06-12
@@ -765,7 +766,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- [advanced users]: the Playlet web server's CORS headers are no longer set to `*`, for security reasons.
+- [advanced users]: the Playlet web server's CORS headers are no longer set to `*`, for security reasons
 
 ## [0.36.7] - 2025-05-04
 
@@ -893,7 +894,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- [YouTube.js](https://github.com/LuanRT/YouTube.js) from web app. It is no longer needed, so this reduces app size.
+- [YouTube.js](https://github.com/LuanRT/YouTube.js) from web app. It is no longer needed, so this reduces app size
 
 ## [0.35.0] - 2024-12-24
 
@@ -952,7 +953,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Improved on issue with long videos (10+ hours) showing as 2:30 only. They now show about 5 hours.
+- Improved on issue with long videos (10+ hours) showing as 2:30 only. They now show about 5 hours
 
 ## [0.32.1] - 2024-12-03
 
@@ -975,7 +976,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for Trickplay thumbnails in Playlet backend. Done by parsing storyboards and injecting them into HLS manifest.
+- Support for Trickplay thumbnails in Playlet backend. Done by parsing storyboards and injecting them into HLS manifest
 
 ## [0.30.0] - 2024-11-22
 
@@ -1044,7 +1045,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for casting clips from web app
-- A workaround for video loading errors: uses Playlet Web app and [YouTube.js](https://github.com/LuanRT/YouTube.js) to load streaming data. This workaround is limited, and might not work. It doesn't have closed captions, nor trickplay thumbnails (storyboards).
+- A workaround for video loading errors: uses Playlet Web app and [YouTube.js](https://github.com/LuanRT/YouTube.js) to load streaming data. This workaround is limited, and might not work. It doesn't have closed captions, nor trickplay thumbnails (storyboards)
   - **How To use**: Open the web app, click on a video, and choose "Play on <TV_NAME> (HOT FIX)".
 
 ## [0.25.6] - 2024-09-12
@@ -1231,7 +1232,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Loading Playlet lib as squashfs, with fallback to the zip file. This significantly decreases load times.
+- Loading Playlet lib as squashfs, with fallback to the zip file. This significantly decreases load times
 
 ### Changed
 
@@ -1299,12 +1300,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for multiple profiles. You can now use multiple Invidious accounts.
+- Support for multiple profiles. You can now use multiple Invidious accounts
 - When a video error dialog shows, a timer with 10 seconds starts to play the next video
 
 ### Fixed
 
-- A bug where the loading screen does not disappear if search results are empty.
+- A bug where the loading screen does not disappear if search results are empty
 - Empty invidious instance in preferences when default instance is being used
 
 ## [0.20.2] - 2024-02-26
@@ -1350,12 +1351,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The queue no longer contains playlists. When a playlist is added to the queue, the entire playlist is loaded.
+- The queue no longer contains playlists. When a playlist is added to the queue, the entire playlist is loaded
   - It can take a few seconds to load large playlist before it can be added to the queue
   - This is done to be more compatible more the lounge, which does not contain "Playlists in the queue" concept.
 - The `Web App` tab is now called `Remote`. It can be used to open the web app, or connect using Lounge (cast from YouTube)
 - Removed `fields` from Invidious requests, as per [https://github.com/iv-org/invidious/pull/4276](https://github.com/iv-org/invidious/pull/4276)
-- The `POST /api/queue/` no longer returns the current queue. Instead it returns a 204.
+- The `POST /api/queue/` no longer returns the current queue. Instead it returns a 204
 
 ### Fixed
 
@@ -1389,7 +1390,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A home screen editor allowing to enable/disable feeds, and change their order.
+- A home screen editor allowing to enable/disable feeds, and change their order
   - The editor can be accessed from the Settings screen.
 
 ### Fixed
@@ -1409,7 +1410,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- `Funny` and `News` from the Home screen.
+- `Funny` and `News` from the Home screen
   - These are not standard feeds (like `Trending`), and are just search results for `Funny` and `News`. They were added in earlier Playlet versions to have more content in the Home screen.
   - If you like to add these two feeds to your bookmarks:
     - Search for `Funny` (or `News`)
@@ -1511,7 +1512,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Bookmarks: different items can now be bookmarked, and be found in the `Bookmarks` screen.
+- Bookmarks: different items can now be bookmarked, and be found in the `Bookmarks` screen
   Things that can be bookmarked:
   - A video
   - A channel
@@ -1538,7 +1539,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Layout in channel view so that the upload time and view count of videos is visible
 - A few things in the logger
-- A bug where channels show "0 videos". Channel handle is shown instead.
+- A bug where channels show "0 videos". Channel handle is shown instead
 
 ### Changed
 
@@ -1610,7 +1611,7 @@ This version went through a major refactor, which resulted in a different arcite
 
 ### Added
 
-- The concept of a `Queue`. Videos can now be queued to play one after another.
+- The concept of a `Queue`. Videos can now be queued to play one after another
   - Currently the queue is funcitonal, but no proper UI to support it, such as seeing the queue, clearing it, and so on.
   - UI for the `Queue` will be introduced in a future version.
   - Videos and playlists can be queued from the web app
@@ -1648,7 +1649,7 @@ This version went through a major refactor, which resulted in a different arcite
 - The web server is now decoupled from Playlet specific logic
 - When not logged in, authenticated feed (like user Subscriptions and Playlists) show a "Login to view X" message, with a QR Code that redirects to the login screen
 - [Breaking change] web apis changed a bit (for example the `/api/command` endpoint is removed) refer to the [Open API spec](docs/playlet-web-api.yml)
-- If the Invidious auth token is missing permissions (A token aquired using a previous version of Playlet) you will be auto logged out.
+- If the Invidious auth token is missing permissions (A token aquired using a previous version of Playlet) you will be auto logged out
 
 ### Removed
 
@@ -1660,7 +1661,7 @@ This version went through a major refactor, which resulted in a different arcite
   - Excessive logging without a way to toggle it, or redirect it to a file
 - Some unused parts of the code (Like basic auth in the server, WebSockets, RegistryRouter, Kanji QR Code)
   - These were unused and/or feature flagged features. Things can be restored as needed.
-- The video player loading spinner when the video is minimized: this added too much hacky code with minimum value.
+- The video player loading spinner when the video is minimized: this added too much hacky code with minimum value
 
 ### Fixed
 
@@ -1672,7 +1673,7 @@ This version went through a major refactor, which resulted in a different arcite
 
 ### Added
 
-- Support for saved playlists. By adding a playlist from a youtube channel to your Invidious profile, you can see the playlist on Playlet.
+- Support for saved playlists. By adding a playlist from a youtube channel to your Invidious profile, you can see the playlist on Playlet
 
 ## [0.10.2] - 2023-07-10
 
@@ -1681,7 +1682,7 @@ This version went through a major refactor, which resulted in a different arcite
 - Links to the app info in web app
 - Loading indicator for search page in web app
 - Feedback link through email
-- Scopes and expire fields to the Invidious auth token. This is to detect when a token is close to expiry, or if we have missing permissions.
+- Scopes and expire fields to the Invidious auth token. This is to detect when a token is close to expiry, or if we have missing permissions
 
 ### Fixed
 
@@ -1823,7 +1824,7 @@ This version went through a major refactor, which resulted in a different arcite
 
 ### Fixed
 
-- Bug where playing and exiting a video too quickly would cause the video to play in the background.
+- Bug where playing and exiting a video too quickly would cause the video to play in the background
 - Bug where logging in causes issues if a video is already playing
 - Bug where casting from web app while playing a video from the search
 - Spinner for the video
@@ -1844,7 +1845,7 @@ This version went through a major refactor, which resulted in a different arcite
 
 ### Fixed
 
-- Bug where Settings page and home page are both visible, if settings page is selected, and user logs in.
+- Bug where Settings page and home page are both visible, if settings page is selected, and user logs in
 
 ## [0.3.0] - 2022-11-19
 

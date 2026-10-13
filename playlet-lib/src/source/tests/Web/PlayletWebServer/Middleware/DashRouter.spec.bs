@@ -1,10 +1,21 @@
 import "pkg:/components/Web/PlayletWebServer/Middleware/DashRouter.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/tests/Services/Dash/LiveHeadFakes.bs"
 
 namespace Tests
 
     @suite
     class DashRouterTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
 
         protected override function beforeEach()
             Tests.SetUpLoggingGlobals()
@@ -18,6 +29,10 @@ namespace Tests
                 sceneNodes: { videoQueue: queueNode, invidious: invalid, preferences: invalid }
                 settings: { Port: 8888 }
             })
+        end function
+
+        protected override function afterEach()
+            DeleteFile(LIVE_HEAD_COUNTS_PATH)
         end function
 
         ' What VideoContentJob sets on the player's content for a video load.
@@ -61,7 +76,7 @@ namespace Tests
 
         ' A live load whose head was 2 at 2630 ms (a 0.63s first segment, then 2s: the
         ' load-time average is 1315 ms), with `overrides` on its metadata and head checks
-        ' answering `heads` in order ({ seqnum, timeMs }) and always due.
+        ' answering `heads` in order (Tests.FakeLiveHeadChecks) and always due.
         function LoadLive(heads as object, overrides = {} as object)
             metadata = {
                 videoId: "v"
@@ -77,21 +92,7 @@ namespace Tests
             metadata.Append(overrides)
             m.PushLoad("live1", metadata)
             m.router.GetMetadata("live1")
-            m.router.heads = heads
-            m.router.headChecks = 0
-            m.router.CheckLiveHead = function() as object
-                m.headChecks += 1
-                head = m.heads.Shift()
-                head.response = {
-                    StatusCode: function() as integer
-                        return 403
-                    end function
-                    ErrorMessage: function(_includeBody = true as boolean) as string
-                        return "Reason:Forbidden"
-                    end function
-                }
-                return head
-            end function
+            Tests.FakeLiveHeadChecks(m.router.liveHeadChecks, heads)
         end function
 
         function RefreshDue()
@@ -117,13 +118,13 @@ namespace Tests
             m.LoadLive([{ seqnum: 10, timeMs: 18630 }, { seqnum: 11, timeMs: 20630 }])
             m.router.RefreshLiveHead()
             m.router.RefreshLiveHead()
-            m.assertEqual(m.router.headChecks, 1)
+            m.assertEqual(m.router.liveHeadChecks.counts["checks_sent"], 1)
             m.assertEqual(m.router.liveHeadSeqnum, 10)
         end function
 
         @it("keeps the head on a failed check, reporting the first failure of a video load only")
         function _()
-            m.LoadLive([{ seqnum: -1, timeMs: invalid }, { seqnum: -1, timeMs: invalid }, { seqnum: -1, timeMs: invalid }])
+            m.LoadLive([{ seqnum: -1, timeMs: invalid }, { seqnum: -1, timeMs: invalid }])
             m.global.telemetry.LogEvent = {}
             m.RefreshDue()
             m.assertEqual(m.router.liveHeadSeqnum, 2)
@@ -134,8 +135,52 @@ namespace Tests
             ' a new video load reports again
             m.PushLoad("live2", { videoId: "v", adaptiveFormats: [], liveHeadUrl: "https://example.googlevideo.com/videoplayback?rn=0" })
             m.router.GetMetadata("live2")
+            Tests.FakeLiveHeadChecks(m.router.liveHeadChecks, [{ seqnum: -1, timeMs: invalid }])
             m.RefreshDue()
             m.assertNotEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("takes a check answered after the wait at a later refresh")
+        function _()
+            m.LoadLive([{ seqnum: 10, timeMs: 18630, pending: true }, { seqnum: 11, timeMs: 20630, pending: true }])
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 2)
+            Tests.AnswerLiveHeadChecks(m.router.liveHeadChecks)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 10)
+        end function
+
+        @it("takes the newest head among the checks answered since the last refresh")
+        function _()
+            m.LoadLive([{ seqnum: 12, timeMs: 22630, pending: true }, { seqnum: 10, timeMs: 18630 }])
+            m.RefreshDue()
+            Tests.AnswerLiveHeadChecks(m.router.liveHeadChecks)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 12)
+        end function
+
+        @it("a new video load cancels the checks the previous one left in flight")
+        function _()
+            m.server.routes = { "/live/hung-head": { status: 200, headers: { "X-Head-Seqnum": "10" }, delayMs: 10000 } }
+            m.PushLoad("live1", { videoId: "v", adaptiveFormats: [], liveHeadUrl: Tests.HttpTestServerUrl("/live/hung-head?rn=0") })
+            m.router.GetMetadata("live1")
+            m.RefreshDue()
+            pending = m.router.liveHeadChecks.inFlight[0].pending
+            m.PushMetadata("vod1", "v2")
+            m.router.GetMetadata("vod1")
+            m.assertTrue(pending.Poll().IsCancelled())
+            m.assertInvalid(pending["_fetch"]["_urlTransfer"])
+        end function
+
+        @it("writes the load's head check counts at every refresh")
+        function _()
+            m.LoadLive([{ seqnum: 10, timeMs: 18630 }, { seqnum: -1, timeMs: invalid }])
+            m.RefreshDue()
+            m.RefreshDue()
+            handoff = StringUtils.ParseJsonSafe(ReadAsciiFile(LIVE_HEAD_COUNTS_PATH))
+            m.assertEqual(handoff["video_load_id"], "live1")
+            m.assertEqual(handoff["counts"]["checks_sent"], 2)
+            m.assertEqual(handoff["counts"]["answered_without_head"], 1)
         end function
 
         @it("gives a list behind the head the cadence since load; the load head ended where the list stays ahead")
@@ -285,6 +330,42 @@ namespace Tests
             ' the load head ends at 250 + 8640 x 5000; 1923180 onwards stay contiguous, 300 ms ahead
             m.assertEqual(m.router.liveDurationRuns[1], { fromSeqnum: 1923180, startMs: 250 + 8639 * 5000, durationMs: 5300 })
             m.assertEqual(m.router.liveLeadMs, 300)
+        end function
+
+        @describe("DashRouter.GenerateDashManifestAppendStoryboards")
+
+        function AppendStoryboards(path as string) as object
+            m.content.metadata = { storyboards: [{ interval: 2000, storyboardWidth: 5, storyboardHeight: 5, storyboardCount: 2, width: 160, height: 90, count: 40, templateUrl: "https://i.ytimg.com/sb/v/$M.jpg" }] }
+            response = {
+                SetBodyDataString: function(data as string) as void
+                    m.body = data
+                end function
+                ContentType: function(mimeType as string) as void
+                    m.contentType = mimeType
+                end function
+                Redirect: function(where as string) as void
+                    m.redirect = where
+                end function
+            }
+            m.router.GenerateDashManifestAppendStoryboards({ request: { query: { url: Tests.HttpTestServerUrl(path) } }, response: response })
+            return response
+        end function
+
+        @it("adds the storyboards to the fetched manifest's period")
+        function _()
+            m.server.routes = { "/dash/manifest.mpd": { status: 200, body: "<MPD><Period><AdaptationSet id=""0""/></Period></MPD>" } }
+            response = m.AppendStoryboards("/dash/manifest.mpd")
+            m.assertEqual(response.http_code, 200)
+            m.assertEqual(response.contentType, "application/dash+xml")
+            m.assertTrue(response.body.StartsWith("<MPD><Period><AdaptationSet id=""0""/><AdaptationSet"), response.body)
+            m.assertTrue(response.body.EndsWith("</Period></MPD>"), response.body)
+        end function
+
+        @it("redirects to the manifest it couldn't fetch")
+        function _()
+            response = m.AppendStoryboards("/status/503")
+            m.assertEqual(response.redirect, Tests.HttpTestServerUrl("/status/503"))
+            m.assertInvalid(response.body)
         end function
 
     end class

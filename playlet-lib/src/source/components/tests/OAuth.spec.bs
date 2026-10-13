@@ -22,6 +22,18 @@ namespace Tests
             m.assertFalse(Innertube.IsTerminalRefreshError(invalid))
         end function
 
+        @describe("Innertube.RefreshRetryReason")
+
+        @it("Retries a failed refresh with its error, unless the token endpoint rejected the credential or the client")
+        function _()
+            transient = new HttpClient.Response({ statusCode: 503, text: `{"error":"backend_error"}` })
+            m.assertEqual(Innertube.RefreshRetryReason(transient), transient.ErrorMessage())
+            m.assertNotEqual(transient.ErrorMessage(), "")
+            m.assertEqual(Innertube.RefreshRetryReason(new HttpClient.Response({ statusCode: 400, text: `{"error":"invalid_grant"}` })), "")
+            m.assertEqual(Innertube.RefreshRetryReason(new HttpClient.Response({ statusCode: 401, text: `{"error":"invalid_client"}` })), "")
+            m.assertEqual(Innertube.RefreshRetryReason(new HttpClient.Response({ statusCode: 200, text: `{"access_token":"ya29.abc"}` })), "")
+        end function
+
     end class
 
 end namespace

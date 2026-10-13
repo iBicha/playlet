@@ -1,4 +1,5 @@
 import "pkg:/components/Services/Innertube/NodesParser.bs"
+import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/ObjectUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -44,7 +45,7 @@ namespace Innertube
         return context.feeds
     end function
 
-    function ParseChannelPageResponseData(browseId as string, responseData as object, response as object) as object
+    function ParseChannelPageResponseData(browseId as string, responseData as object, request as HttpClient.Request) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -149,7 +150,7 @@ namespace Innertube
         continuation = invalid
         sortOptions = invalid
         feeds = ParseResponseDataForFeeds(responseData, {
-            response: response
+            request: request
             "currentAuthor": author
             "currentAuthorId": authorId
             browseId: browseId
@@ -187,7 +188,7 @@ namespace Innertube
         return channel
     end function
 
-    function ParsePlaylistPageResponseData(browseId as string, responseData as object, response as object) as object
+    function ParsePlaylistPageResponseData(browseId as string, responseData as object, request as HttpClient.Request) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -285,7 +286,7 @@ namespace Innertube
         end if
 
         feeds = ParseResponseDataForFeeds(responseData, {
-            response: response
+            request: request
             browseId: browseId
         })
         if feeds.Count() > 0
@@ -302,7 +303,7 @@ namespace Innertube
         return playlist
     end function
 
-    function ParseMixPageResponseData(responseData as object, response as object) as object
+    function ParseMixPageResponseData(responseData as object, request as HttpClient.Request) as object
         if responseData = invalid
             return {
                 error: "Invalid response data"
@@ -348,7 +349,7 @@ namespace Innertube
         }
 
         feeds = ParseResponseDataForFeeds(playlist, {
-            response: response
+            request: request
         })
         if feeds.Count() > 0
             result["videos"] = ValidArray(feeds[0].items)
@@ -395,12 +396,12 @@ namespace Innertube
         return error
     end function
 
-    function ParseResponseForCacheControl(response as object) as dynamic
+    function ParseResponseForCacheControl(response as HttpClient.Response) as dynamic
         if not response.IsSuccess()
             return invalid
         end if
 
-        headers = ValidAssociativeArray(response.Headers())
+        headers = response.Headers()
         if headers.DoesExist("cache-control")
             return headers["cache-control"]
         end if

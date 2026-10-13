@@ -1,0 +1,255 @@
+import "pkg:/components/Telemetry/Sentry.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    ' Nothing listens on port 1: a request there fails without an answer.
+    const UNREACHABLE_ENVELOPE_URL = "http://127.0.0.1:1/envelope"
+
+    ' Stands in for HttpClient.CreateUrlTransfer, sending to the urls Serve set in place of the support server's and the fallback's.
+    function SentryUrlTransfer(url as string, headers as object, messagePort as object) as object
+        urls = GetGlobalAA().sentryEnvelopeUrls
+        url = url.Replace(SUPPORT_SERVER_ENVELOPE_URL, urls.supportServer).Replace(SENTRY_FALLBACK_ENVELOPE_URL, urls.fallback)
+        urlTransfer = CreateObject("roUrlTransfer")
+        urlTransfer.RetainBodyOnError(true)
+        urlTransfer.SetUrl(url)
+        urlTransfer.SetHeaders(headers)
+        urlTransfer.SetMessagePort(messagePort)
+        return urlTransfer
+    end function
+
+    @suite
+    class SentrySendEventsTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+            ' BuildEnvelope gives an event without an event_id one from the Telemetry task's m.deviceInfo.
+            GetGlobalAA().deviceInfo = CreateObject("roDeviceInfo")
+        end function
+
+        protected override function tearDown()
+            GetGlobalAA().Delete("deviceInfo")
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.stubCall(HttpClient.CreateUrlTransfer, Tests.SentryUrlTransfer)
+        end function
+
+        protected override function afterEach()
+            GetGlobalAA().Delete("sentryEnvelopeUrls")
+        end function
+
+        ' Points the support server and the fallback at routes of the test server under id; invalid for one nothing answers.
+        function Serve(id as string, supportServerRoute as dynamic, fallbackRoute as dynamic) as void
+            m.supportServerPath = `/support/${id}`
+            m.fallbackPath = `/sentry/${id}/`
+            routes = {}
+            urls = { supportServer: UNREACHABLE_ENVELOPE_URL, fallback: UNREACHABLE_ENVELOPE_URL }
+            if supportServerRoute <> invalid
+                routes[m.supportServerPath] = supportServerRoute
+                urls.supportServer = Tests.HttpTestServerUrl(m.supportServerPath)
+            end if
+            if fallbackRoute <> invalid
+                routes[m.fallbackPath] = fallbackRoute
+                urls.fallback = Tests.HttpTestServerUrl(m.fallbackPath)
+            end if
+            m.server.routes = routes
+            GetGlobalAA().sentryEnvelopeUrls = urls
+        end function
+
+        ' SendEvents' result for one event, and the lines it logged.
+        function Send(message as string) as object
+            result = {
+                events: [{
+                    level: "error"
+                    message: message
+                    release: "1.0.0-test"
+                    tags: { session_id: "session1" }
+                    userId: "user1"
+                }]
+                retryAfter: invalid
+            }
+            result.lines = Tests.LogLines(function(result as object) as void
+                result.retryAfter = Sentry.SendEvents(result.events)
+            end function, result)
+            return result
+        end function
+
+        function SupportServerHits() as integer
+            return Tests.HttpTestServerHits(m.server, m.supportServerPath)
+        end function
+
+        function FallbackHits() as integer
+            return Tests.HttpTestServerHits(m.server, `${m.fallbackPath}?sentry_key=${SENTRY_FALLBACK_KEY}`)
+        end function
+
+        function Messages(lines as string[], level as string) as string[]
+            messages = [] as string[]
+            for each line in lines
+                if line.InStr(`[${level}]`) <> -1
+                    messages.Push(Tests.LogLineMessage(line))
+                end if
+            end for
+            return messages
+        end function
+
+        ' The one error logged.
+        function ErrorLogged(lines as string[]) as string
+            errors = m.Messages(lines, "ERROR")
+            m.assertEqual(errors.Count(), 1, FormatJson(lines))
+            return errors[0]
+        end function
+
+        ' The events' envelope the test server read last: one JSON item per line, ending with a line break.
+        function LastEnvelopeLines() as object
+            request = m.server.lastRequest
+            m.assertEqual(request.method, "POST")
+            m.assertEqual(request.headers["content-type"], "application/x-sentry-envelope")
+            return request.body.Split(`\n`)
+        end function
+
+        @describe("Sentry.SendEvents")
+
+        @it("sends the events to the support server, holding nothing back")
+        function _()
+            m.Serve("sent", { status: 200 }, { status: 200 })
+            result = m.Send("sent event")
+            m.assertEqual(result.retryAfter, 0)
+            m.assertEmpty(m.Messages(result.lines, "ERROR"))
+            m.assertEmpty(m.Messages(result.lines, "WARN"))
+            m.assertEqual(m.SupportServerHits(), 1)
+            m.assertEqual(m.FallbackHits(), 0)
+            lines = m.LastEnvelopeLines()
+            m.assertEqual(lines.Count(), 4)
+            m.assertEqual(ParseJson(lines[0]).sdk.name, "sentry.roku.playlet")
+            m.assertEqual(lines[1], `{"type":"event"}`)
+            event = ParseJson(lines[2])
+            m.assertEqual(event.logentry.formatted, "sent event")
+            m.assertEqual(event.level, "error")
+            m.assertEqual(event.release, "1.0.0-test")
+            m.assertEqual(event.tags, { session_id: "session1" })
+            m.assertEqual(event.user, { id: "user1" })
+            m.assertEqual(event.event_id, result.events[0].event_id)
+            m.assertEqual(lines[3], "")
+        end function
+
+        @it("sends the Sentry fallback, with its key, a warning that the support server is unreachable, the unsent envelope attached")
+        function _()
+            m.Serve("unreachable", invalid, { status: 200 })
+            result = m.Send("unsent event")
+            m.assertEqual(result.retryAfter, 0)
+            m.assertEmpty(m.Messages(result.lines, "ERROR"))
+            m.assertEqual(m.FallbackHits(), 1)
+
+            warningPrefix = "Support server unreachable, sending events to the Sentry fallback: "
+            errorMessage = invalid
+            for each warning in m.Messages(result.lines, "WARN")
+                if warning.StartsWith(warningPrefix)
+                    errorMessage = warning.Mid(warningPrefix.Len())
+                end if
+            end for
+            m.assertNotInvalid(errorMessage, FormatJson(result.lines))
+            m.assertNotEqual(errorMessage.InStr("StatusCode: -"), -1, errorMessage)
+
+            lines = m.LastEnvelopeLines()
+            m.assertEqual(lines[1], `{"type":"event"}`)
+            event = ParseJson(lines[2])
+            m.assertEqual(event.logentry.formatted, `Support server unreachable: ${errorMessage}`)
+            m.assertEqual(event.level, "warning")
+            m.assertEqual(event.fingerprint, ["support server unreachable"])
+            m.assertEqual(event.release, "1.0.0-test")
+            m.assertEqual(event.tags, { session_id: "session1" })
+            m.assertEqual(event.user, { id: "user1" })
+            m.assertInvalid(event.extra)
+
+            attachment = ParseJson(lines[3])
+            m.assertEqual(attachment.type, "attachment")
+            m.assertEqual(attachment.filename, "envelope.txt")
+            m.assertEqual(attachment.content_type, "text/plain")
+            attachedOffset = lines[0].Len() + lines[1].Len() + lines[2].Len() + lines[3].Len() + 4
+            attached = m.server.lastRequest.body.Mid(attachedOffset)
+            m.assertEqual(attachment.length, attached.Len() - 1)
+            attachedLines = attached.Split(`\n`)
+            m.assertEqual(attachedLines[1], `{"type":"event"}`)
+            unsentEvent = ParseJson(attachedLines[2])
+            m.assertEqual(unsentEvent.logentry.formatted, "unsent event")
+            m.assertEqual(unsentEvent.event_id, result.events[0].event_id)
+        end function
+
+        @it("holds the events back for the fallback's Retry-After when it rate-limits them")
+        function _()
+            m.Serve("fallbackratelimited", invalid, { status: 429, headers: { "Retry-After": "45" } })
+            result = m.Send("rate-limited event")
+            m.assertEqual(result.retryAfter, 45)
+            m.assertEqual(m.FallbackHits(), 1)
+            m.assertEqual(m.ErrorLogged(result.lines), `Rate limited by ${SENTRY_FALLBACK_ENVELOPE_URL}?sentry_key=${SENTRY_FALLBACK_KEY} Retry after 45 seconds`)
+        end function
+
+        @it("holds the events back for 60 seconds when the fallback fails too")
+        function _()
+            testCases = [
+                { id: "answered", route: { status: 500 } }
+                { id: "unreachable", route: invalid }
+            ]
+            for each testCase in testCases
+                m.Serve(`fallbackfailed${testCase.id}`, invalid, testCase.route)
+                result = m.Send("failed event")
+                m.assertEqual(result.retryAfter, 60, testCase.id)
+                errorLogged = m.ErrorLogged(result.lines)
+                m.assertTrue(errorLogged.StartsWith(`Failed to send events to ${SENTRY_FALLBACK_ENVELOPE_URL}?sentry_key=${SENTRY_FALLBACK_KEY} `), errorLogged)
+                m.assertTrue(errorLogged.EndsWith(` \nRetry after 60 seconds`), errorLogged)
+            end for
+        end function
+
+        @it("holds the events back for the support server's Retry-After when it rate-limits them, sending the fallback nothing")
+        function _()
+            m.Serve("ratelimited", { status: 429, headers: { "Retry-After": "120" } }, { status: 200 })
+            result = m.Send("rate-limited event")
+            m.assertEqual(result.retryAfter, 120)
+            m.assertEqual(m.SupportServerHits(), 1)
+            m.assertEqual(m.FallbackHits(), 0)
+            m.assertEqual(m.ErrorLogged(result.lines), `Rate limited by ${SUPPORT_SERVER_ENVELOPE_URL} Retry after 120 seconds`)
+        end function
+
+        @it("holds the events back for 60 seconds on a 429 whose Retry-After is absent, zero or a date")
+        function _()
+            testCases = [
+                { id: "absent", headers: {} }
+                { id: "zero", headers: { "Retry-After": "0" } }
+                { id: "date", headers: { "Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT" } }
+            ]
+            for each testCase in testCases
+                m.Serve(`ratelimited${testCase.id}`, { status: 429, headers: testCase.headers }, { status: 200 })
+                result = m.Send("rate-limited event")
+                m.assertEqual(result.retryAfter, 60, testCase.id)
+                m.assertEqual(m.FallbackHits(), 0, testCase.id)
+                m.assertEqual(m.ErrorLogged(result.lines), `Rate limited by ${SUPPORT_SERVER_ENVELOPE_URL} Retry after 60 seconds`, testCase.id)
+            end for
+        end function
+
+        @it("holds the events back for the Retry-After of a failure the support server answers, or 60 seconds, sending the fallback nothing")
+        function _()
+            testCases = [
+                { id: "500", route: { status: 500 }, retryAfter: 60 }
+                { id: "503", route: { status: 503, headers: { "Retry-After": "30" } }, retryAfter: 30 }
+            ]
+            for each testCase in testCases
+                m.Serve(`failed${testCase.id}`, testCase.route, { status: 200 })
+                result = m.Send("failed event")
+                m.assertEqual(result.retryAfter, testCase.retryAfter, testCase.id)
+                m.assertEqual(m.SupportServerHits(), 1, testCase.id)
+                m.assertEqual(m.FallbackHits(), 0, testCase.id)
+                errorLogged = m.ErrorLogged(result.lines)
+                m.assertTrue(errorLogged.StartsWith(`Failed to send events to ${SUPPORT_SERVER_ENVELOPE_URL} `), errorLogged)
+                m.assertNotEqual(errorLogged.InStr(`StatusCode: ${testCase.id}`), -1, errorLogged)
+                m.assertTrue(errorLogged.EndsWith(` \nRetry after ${testCase.retryAfter} seconds`), errorLogged)
+            end for
+        end function
+
+    end class
+
+end namespace

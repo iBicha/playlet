@@ -20,4 +20,23 @@ namespace Tests
         return logLevel
     end function
 
+    ' The lines logged while action(subject) runs.
+    function LogLines(action as function, subject as dynamic) as string[]
+        logPort = CreateObject("roMessagePort")
+        m.global.logger.ObserveFieldScoped("logLine", logPort)
+        action(subject)
+        m.global.logger.UnobserveFieldScoped("logLine")
+        lines = [] as string[]
+        message = logPort.GetMessage()
+        while message <> invalid
+            lines.Push(message.GetData())
+            message = logPort.GetMessage()
+        end while
+        return lines
+    end function
+
+    function LogLineMessage(line as string) as string
+        return line.Mid(line.InStr(" ") + 1).Replace(Chr(27) + "[0m", "")
+    end function
+
 end namespace

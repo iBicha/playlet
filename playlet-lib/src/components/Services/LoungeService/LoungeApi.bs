@@ -38,7 +38,7 @@ class LoungeApi
     private ofs
     private lastProcessedCommandIndex = -1
     private backchannel
-    private outgoingMessagesRequests
+    private pendingOutgoingMessages
 
     function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -52,7 +52,7 @@ class LoungeApi
         m.screenName = deviceName
         m.ofs = 0
         m.backchannel = invalid
-        m.outgoingMessagesRequests = {}
+        m.pendingOutgoingMessages = []
         m.devices = {}
 
         commandHandlers = {}
@@ -144,8 +144,8 @@ class LoungeApi
             return m.loungeToken
         end if
 
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch", "")
-        request.UrlEncodedForm({
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch")
+        request.FormBody({
             "screen_ids": m.screenId
         })
 
@@ -195,9 +195,9 @@ class LoungeApi
         queryParams["loungeIdToken"] = m.loungeToken
         queryParams["zx"] = m.Zx()
 
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind")
         request.QueryParams(queryParams)
-        request.UrlEncodedForm({
+        request.FormBody({
             "count": 0
         })
 
@@ -599,25 +599,20 @@ class LoungeApi
 
         LogDebug("Sending messages:", postData)
 
-        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind", "")
+        request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind")
         request.QueryParams(queryParams)
-        request.UrlEncodedForm(postData)
-
-        request.Send()
-
-        ' we do not need to wait for requests to finish, we check on them later
-        ' to avoid blocking the thread.
-        ' This is specific to sent lounge messages, since we're not waiting for a response.
-        requestId = request.urlTransfer.GetIdentity().ToStr()
-        m.outgoingMessagesRequests[requestId] = request
+        request.FormBody(postData)
+        m.pendingOutgoingMessages.Push(request.Send())
     end function
 
     function ProcessPendingOutgoingMessages() as object
         results = []
-        for each key in m.outgoingMessagesRequests
-            request = m.outgoingMessagesRequests[key]
-            if request.IsCompleted()
-                response = request.Await()
+        stillPending = []
+        for each pending in m.pendingOutgoingMessages
+            response = pending.Poll()
+            if response = invalid
+                stillPending.Push(pending)
+            else
                 status = response.StatusCode()
                 error = response.ErrorMessage()
 
@@ -651,10 +646,9 @@ class LoungeApi
                         })
                     end if
                 end if
-
-                m.outgoingMessagesRequests.Delete(key)
             end if
         end for
+        m.pendingOutgoingMessages = stillPending
 
         return results
     end function

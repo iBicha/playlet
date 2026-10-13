@@ -9,32 +9,32 @@ namespace Sentry
 
     function SendEvents(events as object) as integer
         payload = BuildEnvelope(events, false)
-        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL, payload)
+        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL).TextBody(payload)
         request.Header("Content-Type", "application/x-sentry-envelope")
         response = request.Await()
         ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
         if response.StatusCode() <= 0
             LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", response.ErrorMessage())
-            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL, BuildEnvelope([CreateSupportServerUnreachableEvent(events[0], payload, response.ErrorMessage())], true))
+            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL).TextBody(BuildEnvelope([CreateSupportServerUnreachableEvent(events[0], payload, response.ErrorMessage())], true))
             request.Header("Content-Type", "application/x-sentry-envelope")
             request.QueryParam("sentry_key", SENTRY_FALLBACK_KEY)
             response = request.Await()
         end if
 
         if response.IsSuccess()
-            LogDebug("Sent events to", request.BuildUrl(), "Response:", response.Text())
+            LogDebug("Sent events to", request.GetFullUrl(), "Response:", response.Text())
             return 0
         end if
 
-        retryAfter = ValidString(response.Headers()["Retry-After"]).ToInt()
-        if retryAfter = 0
+        retryAfter = response.RetryAfterSeconds()
+        if retryAfter = invalid or retryAfter = 0
             retryAfter = 60
         end if
 
         if response.StatusCode() = 429
-            LogErrorNoTelemetry("Rate limited by", request.BuildUrl(), "Retry after", retryAfter, "seconds")
+            LogErrorNoTelemetry("Rate limited by", request.GetFullUrl(), "Retry after", retryAfter, "seconds")
         else
-            LogErrorNoTelemetry("Failed to send events to", request.BuildUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
+            LogErrorNoTelemetry("Failed to send events to", request.GetFullUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
         end if
         return retryAfter
     end function

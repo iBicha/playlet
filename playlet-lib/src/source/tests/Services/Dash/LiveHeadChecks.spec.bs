@@ -1,0 +1,228 @@
+import "pkg:/components/Services/Dash/LiveHeadChecks.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/tests/Services/Dash/LiveHeadFakes.bs"
+
+namespace Tests
+
+    @suite
+    class LiveHeadChecksTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+        end function
+
+        function NewChecks(answers as object) as object
+            checks = new LiveHeadChecks("https://example.googlevideo.com/videoplayback?rn=0")
+            Tests.FakeLiveHeadChecks(checks, answers)
+            return checks
+        end function
+
+        function Seqnums(heads as object) as object
+            seqnums = []
+            for each head in heads
+                seqnums.Push(head.seqnum)
+            end for
+            return seqnums
+        end function
+
+        @describe("LiveHeadChecks.Refresh")
+
+        @it("returns a check answered within the wait at once")
+        function _()
+            checks = m.NewChecks([{ seqnum: 10, timeMs: 18630 }])
+            m.assertEqual(m.Seqnums(checks.Refresh()), [10])
+            m.assertEqual(checks.counts["answered_after_wait"], 0)
+        end function
+
+        @it("keeps a check unanswered within the wait in flight, and returns it at the refresh after its answer")
+        function _()
+            checks = m.NewChecks([{ seqnum: 10, timeMs: 18630, pending: true }, { seqnum: 11, timeMs: 20630, pending: true }])
+            m.assertEmpty(checks.Refresh())
+            Tests.AnswerLiveHeadChecks(checks)
+            m.assertEqual(m.Seqnums(checks.Refresh()), [10])
+            m.assertEqual(checks.counts["answered_after_wait"], 1)
+            m.assertEqual(checks.inFlight.Count(), 1)
+        end function
+
+        @it("sends no check while LIVE_HEAD_MAX_CHECKS_IN_FLIGHT are in flight")
+        function _()
+            answers = []
+            for i = 0 to LIVE_HEAD_MAX_CHECKS_IN_FLIGHT
+                answers.Push({ seqnum: 10 + i, timeMs: 18630, pending: true })
+            end for
+            checks = m.NewChecks(answers)
+            for i = 0 to LIVE_HEAD_MAX_CHECKS_IN_FLIGHT
+                checks.Refresh()
+            end for
+            m.assertEqual(checks.counts["checks_sent"], LIVE_HEAD_MAX_CHECKS_IN_FLIGHT)
+        end function
+
+        @it("sends a check at the refresh that collects a check given up")
+        function _()
+            answers = []
+            for i = 1 to LIVE_HEAD_MAX_CHECKS_IN_FLIGHT + 1
+                answers.Push({ seqnum: -1, timeMs: invalid, pending: true })
+            end for
+            checks = m.NewChecks(answers)
+            for i = 1 to LIVE_HEAD_MAX_CHECKS_IN_FLIGHT
+                checks.Refresh()
+            end for
+            oldest = checks.inFlight[0].pending.answer
+            oldest.pending = false
+            oldest.timedOut = true
+            m.assertEqual(m.Seqnums(checks.Refresh()), [-1])
+            m.assertEqual(checks.counts["checks_sent"], LIVE_HEAD_MAX_CHECKS_IN_FLIGHT + 1)
+        end function
+
+        @it("cancels the checks sent before one that answers with a head, and none sent after it")
+        function _()
+            checks = m.NewChecks([
+                { seqnum: 10, timeMs: 18630, pending: true }
+                { seqnum: 11, timeMs: 20630, pending: true }
+                { seqnum: 12, timeMs: 22630, pending: true }
+                { seqnum: 13, timeMs: 24630, pending: true }
+            ])
+            for i = 1 to 3
+                checks.Refresh()
+            end for
+            first = checks.inFlight[0].pending.answer
+            second = checks.inFlight[1].pending.answer
+            third = checks.inFlight[2].pending.answer
+            second.pending = false
+            m.assertEqual(m.Seqnums(checks.Refresh()), [11])
+            m.assertTrue(ValidBool(first.cancelled))
+            m.assertFalse(ValidBool(third.cancelled))
+            m.assertEqual(checks.inFlight.Count(), 2)
+            m.assertEqual(checks.counts["checks_sent"], 4)
+        end function
+
+        @it("cancels the checks in flight when the refresh's own check answers with a head within the wait")
+        function _()
+            checks = m.NewChecks([{ seqnum: 10, timeMs: 18630, pending: true }, { seqnum: 11, timeMs: 20630 }])
+            checks.Refresh()
+            first = checks.inFlight[0].pending.answer
+            m.assertEqual(m.Seqnums(checks.Refresh()), [11])
+            m.assertTrue(ValidBool(first.cancelled))
+            m.assertEmpty(checks.inFlight)
+        end function
+
+        @it("cancels no check for an answer without a head")
+        function _()
+            checks = m.NewChecks([{ seqnum: 10, timeMs: 18630, pending: true }, { seqnum: -1, timeMs: invalid }])
+            checks.Refresh()
+            first = checks.inFlight[0].pending.answer
+            m.assertEqual(m.Seqnums(checks.Refresh()), [-1])
+            m.assertFalse(ValidBool(first.cancelled))
+            m.assertEqual(checks.inFlight.Count(), 1)
+        end function
+
+        @it("counts a check given up as timed out, not as answered")
+        function _()
+            checks = m.NewChecks([{ seqnum: -1, timeMs: invalid, timedOut: true }])
+            m.assertEqual(m.Seqnums(checks.Refresh()), [-1])
+            m.assertEqual(checks.counts["timed_out"], 1)
+            m.assertEqual(checks.counts["answered_without_head"], 0)
+        end function
+
+        @it("counts an answer without a head")
+        function _()
+            checks = m.NewChecks([{ seqnum: -1, timeMs: invalid }])
+            checks.Refresh()
+            m.assertEqual(checks.counts["answered_without_head"], 1)
+        end function
+
+        @it("counts the longest run of refreshes that returned no head newer than the newest seen")
+        function _()
+            checks = m.NewChecks([{ seqnum: 11, timeMs: 20630 }, { seqnum: 10, timeMs: 18630 }, { seqnum: -1, timeMs: invalid }, { seqnum: 12, timeMs: 22630 }, { seqnum: -1, timeMs: invalid }])
+            for i = 1 to 5
+                checks.Refresh()
+            end for
+            m.assertEqual(checks.counts["refreshes_without_newer_head_max_streak"], 2)
+        end function
+
+        @describe("LiveHeadChecks against HttpTestServer")
+
+        ' Head checks against the test server's `path`, which answers X-Head-Seqnum `seqnum` after `delayMs`.
+        function NewServedChecks(path as string, seqnum as integer, delayMs as integer) as object
+            m.ServeHead(path, seqnum, delayMs)
+            return new LiveHeadChecks(Tests.HttpTestServerUrl(`${path}?rn=0`))
+        end function
+
+        function ServeHead(path as string, seqnum as integer, delayMs as integer)
+            routes = {}
+            routes[path] = { status: 200, headers: { "X-Head-Seqnum": seqnum.ToStr(), "X-Head-Time-Millis": (seqnum * 2000).ToStr() }, delayMs: delayMs }
+            m.server.routes = routes
+        end function
+
+        @it("returns a check answered within the wait without waiting it out")
+        function _()
+            checks = m.NewServedChecks("/live/fast-head", 10, 0)
+            timer = CreateObject("roTimespan")
+            m.assertEqual(m.Seqnums(checks.Refresh()), [10])
+            m.assertTrue(timer.TotalMilliseconds() < LIVE_HEAD_WAIT_MS \ 2, `${timer.TotalMilliseconds()} ms`)
+        end function
+
+        @it("waits LIVE_HEAD_WAIT_MS on a slow check, then returns it at the next refresh with that refresh's own check")
+        function _()
+            checks = m.NewServedChecks("/live/slow-head", 10, LIVE_HEAD_WAIT_MS + 1000)
+            timer = CreateObject("roTimespan")
+            m.assertEmpty(checks.Refresh())
+            elapsedMs = timer.TotalMilliseconds()
+            m.assertTrue(elapsedMs >= LIVE_HEAD_WAIT_MS and elapsedMs < LIVE_HEAD_WAIT_MS + 1000, `${elapsedMs} ms`)
+            m.assertEqual(checks.inFlight.Count(), 1)
+
+            m.ServeHead("/live/slow-head", 11, 0)
+            sleep(1500)
+            m.assertEqual(m.Seqnums(checks.Refresh()), [10, 11])
+            m.assertEqual(checks.inFlight.Count(), 0)
+            m.assertEqual(checks.counts["checks_sent"], 2)
+            m.assertEqual(checks.counts["answered_after_wait"], 1)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/live/slow-head?rn=0"), 2)
+        end function
+
+        @it("sends a check answering without X-Head-* once: the next refresh checks again")
+        function _()
+            m.server.routes = { "/live/headless": { status: 200 } }
+            checks = new LiveHeadChecks(Tests.HttpTestServerUrl("/live/headless?rn=0"))
+            m.assertEqual(m.Seqnums(checks.Refresh()), [-1])
+            m.assertEqual(checks.counts["answered_without_head"], 1)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/live/headless?rn=0"), 1)
+        end function
+
+        @it("cancels a slow check, and drops its transfer, once a later one answers with a head")
+        function _()
+            checks = m.NewServedChecks("/live/overtaken-head", 10, 10000)
+            m.assertEmpty(checks.Refresh())
+            slow = checks.inFlight[0].pending
+            m.ServeHead("/live/overtaken-head", 11, 0)
+            m.assertEqual(m.Seqnums(checks.Refresh()), [11])
+            m.assertEmpty(checks.inFlight)
+            m.assertInvalid(slow["_fetch"]["_urlTransfer"])
+            m.assertTrue(slow.Poll().IsCancelled())
+        end function
+
+        @it("Cancel cancels the checks in flight and drops their transfers")
+        function _()
+            checks = m.NewServedChecks("/live/hung-head", 10, 10000)
+            checks.Refresh()
+            pending = checks.inFlight[0].pending
+            m.assertNotInvalid(pending["_fetch"]["_urlTransfer"])
+            checks.Cancel()
+            m.assertEmpty(checks.inFlight)
+            m.assertInvalid(pending["_fetch"]["_urlTransfer"])
+            m.assertTrue(pending.Poll().IsCancelled())
+        end function
+
+    end class
+
+end namespace

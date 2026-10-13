@@ -11,7 +11,7 @@ import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Innertube
 
-    function CreatePlayerRequest(client as Innertube.ClientType, options = invalid as object) as object
+    function CreatePlayerRequest(client as Innertube.ClientType, options = invalid as object) as HttpClient.Request
         videoId = OptionUtils.Get(options, "videoId")
         visitorData = OptionUtils.Get(options, "visitorData")
         accessToken = OptionUtils.Get(options, "accessToken")
@@ -63,7 +63,7 @@ namespace Innertube
             payload["playbackContext"]["contentPlaybackContext"]["isLivingRoomDeeplink"] = true
         end if
 
-        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json", payload)
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/player?prettyPrint=false&alt=json").JsonBody(payload)
         request.Headers(Innertube.CreateHeaders(client))
 
         if not StringUtils.IsNullOrEmpty(visitorData) and not useAccessToken
@@ -86,7 +86,7 @@ namespace Innertube
         return request
     end function
 
-    function ParseInnertubePlayerResponse(playerRequest as dynamic, playerResponse as dynamic, client as Innertube.ClientType, cancellation as object) as object
+    function ParseInnertubePlayerResponse(playerRequest as HttpClient.Request, playerResponse as HttpClient.Response, client as Innertube.ClientType, cancellation as object) as object
         WriteAsciiFile("cachefs:/last_player_response.json", playerResponse.Text())
         parsedResponse = {}
         payload = playerResponse.Json()
@@ -206,7 +206,7 @@ namespace Innertube
         return parsedResponse
     end function
 
-    function ParsePlayerResponseForError(payload as object, playerRequest as object) as string
+    function ParsePlayerResponseForError(payload as object, playerRequest as HttpClient.Request) as string
         if not IsAssociativeArray(payload)
             return "Invalid payload"
         end if
@@ -244,7 +244,7 @@ namespace Innertube
             errorLines.Push("Hint: Log in to the YouTube app on your phone, then cast the video to Playlet.")
 
             hasAccessToken = ValidString(playerRequest.GetHeaders()["Authorization"]).Len() > "Bearer ".Len()
-            hasCtt = ValidString(playerRequest.GetBody()).InStr("credentialTransferTokens") <> -1
+            hasCtt = ValidString(playerRequest.GetTextBody()).InStr("credentialTransferTokens") <> -1
 
             if hasAccessToken or hasCtt
                 LogTelemetryEvent({
@@ -508,7 +508,7 @@ namespace Innertube
 
         request = HttpClient.Get(`${PLAYLET_SUPPORT_SERVER}/v1/sts`)
         request.Cancellation(cancellation)
-        request.TryCount(3)
+        request.RetryCount(2)
         request.NoCache()
         response = request.Await()
         if not response.IsSuccess()
@@ -583,9 +583,8 @@ namespace Innertube
             body["poToken"] = poToken
         end if
 
-        request = HttpClient.PostJson(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`, body)
+        request = HttpClient.Post(`${PLAYLET_SUPPORT_SERVER}/v2/decipher`).JsonBody(body)
         request.Cancellation(cancellation)
-
         request.LogCurlCommand(false)
 
         response = request.Await()

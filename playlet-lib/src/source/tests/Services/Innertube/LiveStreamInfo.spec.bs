@@ -1,9 +1,25 @@
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
 
 namespace Tests
 
     @suite
     class LiveStreamInfoTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
 
         ' availabilityStartTime + the timeline offset place the first segment's start so that the head
         ' segment ends a cushion behind now.
@@ -117,40 +133,62 @@ namespace Tests
             m.AssertAnchored(timeline, 2000000000, 900, 5400)
         end function
 
+        @describe("Innertube.GetLiveStreamInfo")
+
+        @it("reads the timeline from the head check's X-Head-* headers")
+        function _()
+            m.server.routes = { "/live/head": { status: 200, headers: { "X-Head-Seqnum": "100", "X-Head-Time-Millis": "200000" } } }
+            formatUrl = Tests.HttpTestServerUrl("/live/head?itag=1")
+            parsedResponse = {}
+            Innertube.GetLiveStreamInfo(parsedResponse, [{ url: formatUrl, targetDurationSec: 2 }], 0, "cpn1", invalid)
+            m.assertInvalid(parsedResponse.error)
+            m.assertEqual(parsedResponse.liveHeadSeqnum, 100)
+            m.assertEqual(parsedResponse.liveSegmentDurationMs, 2000)
+            m.assertEqual(parsedResponse.liveHeadUrl, Innertube.GetLiveHeadUrl(formatUrl, "cpn1"))
+            m.assertEqual(Tests.HttpTestServerHits(m.server, parsedResponse.liveHeadUrl), 1)
+        end function
+
+        @it("checks the head again when a response lacks X-Head-*, a success included, then fails the load with the cause")
+        function _()
+            m.server.routes = { "/live/headless": { status: 200 } }
+            formatUrl = Tests.HttpTestServerUrl("/live/headless?itag=1")
+            parsedResponse = {}
+            Innertube.GetLiveStreamInfo(parsedResponse, [{ url: formatUrl, targetDurationSec: 2 }], 0, invalid, invalid)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, Innertube.GetLiveHeadUrl(formatUrl, invalid)), 2)
+            m.assertEqual(m.global.telemetry.LogEvent.level, "warning")
+            m.assertEqual(m.global.telemetry.LogEvent.message, "no X-Head-* in the response (HTTP 200)")
+            m.assertEqual(parsedResponse.error, `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP 200)\n`)
+        end function
+
         @describe("Innertube.ReadLiveHeadSeqnum")
 
         @it("reads X-Head-Seqnum")
         function _()
-            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse({ "X-Head-Seqnum": "9059091" })), 9059091)
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.ResponseWithHeaders({ "X-Head-Seqnum": "9059091" })), 9059091)
         end function
 
         @it("returns -1 without the header")
         function _()
-            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse({ "X-Walltime-Ms": "1791305190669" })), -1)
-            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.FakeResponse(invalid)), -1)
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.ResponseWithHeaders({ "X-Walltime-Ms": "1791305190669" })), -1)
+            m.assertEqual(Innertube.ReadLiveHeadSeqnum(m.ResponseWithHeaders({})), -1)
         end function
 
         @describe("Innertube.ReadLiveHeadTimeMs")
 
         @it("reads X-Head-Time-Millis past 32 bits")
         function _()
-            m.assertEqual(Innertube.ReadLiveHeadTimeMs(m.FakeResponse({ "X-Head-Time-Millis": "17900000123", "X-Head-Time-Sec": "17900000" })), 17900000123&)
+            m.assertEqual(Innertube.ReadLiveHeadTimeMs(m.ResponseWithHeaders({ "X-Head-Time-Millis": "17900000123", "X-Head-Time-Sec": "17900000" })), 17900000123&)
         end function
 
         @it("returns invalid without X-Head-Time-Millis, X-Head-Time-Sec or not")
         function _()
-            m.assertInvalid(Innertube.ReadLiveHeadTimeMs(m.FakeResponse({ "X-Head-Time-Sec": "17900000" })))
-            m.assertEqual(Innertube.ReadLiveHeadTimeSecAsMs(m.FakeResponse({ "X-Head-Time-Sec": "17900000" })), 17900000000&)
-            m.assertInvalid(Innertube.ReadLiveHeadTimeSecAsMs(m.FakeResponse({ "X-Head-Time-Millis": "17900000123" })))
+            m.assertInvalid(Innertube.ReadLiveHeadTimeMs(m.ResponseWithHeaders({ "X-Head-Time-Sec": "17900000" })))
+            m.assertEqual(Innertube.ReadLiveHeadTimeSecAsMs(m.ResponseWithHeaders({ "X-Head-Time-Sec": "17900000" })), 17900000000&)
+            m.assertInvalid(Innertube.ReadLiveHeadTimeSecAsMs(m.ResponseWithHeaders({ "X-Head-Time-Millis": "17900000123" })))
         end function
 
-        function FakeResponse(headers as dynamic) as object
-            return {
-                headerData: headers
-                Headers: function() as dynamic
-                    return m.headerData
-                end function
-            }
+        function ResponseWithHeaders(headers as object) as HttpClient.Response
+            return new HttpClient.Response({ headers: headers })
         end function
 
     end class

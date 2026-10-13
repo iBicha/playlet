@@ -23,37 +23,34 @@ namespace InnertubeService
     function GetVideoMetadata(videoId as string, options = invalid as object) as object
         options["videoId"] = videoId
 
+        if not OptionUtils.GetOrDefault(options, "fetchNext", true)
+            return GetPlayerMetadata(videoId, options)
+        end if
+
+        raw = OptionUtils.GetOrDefault(options, "raw", false)
+        nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
+        nextRequest.Cancellation(OptionUtils.Get(options, "cancellation"))
+        if raw
+            nextRequest.LogCurlCommand()
+        end if
+        pendingNext = nextRequest.Send()
+
+        return AwaitAndParseNextResponse(raw, GetPlayerMetadata(videoId, options), nextRequest, pendingNext)
+    end function
+
+    ' The parsed player response (raw: { playerResponse }), or { error }.
+    function GetPlayerMetadata(videoId as string, options as object) as object
         cancellation = OptionUtils.Get(options, "cancellation")
-        fetchNext = OptionUtils.GetOrDefault(options, "fetchNext", true)
         accessToken = OptionUtils.Get(options, "accessToken")
         raw = OptionUtils.GetOrDefault(options, "raw", false)
 
-        nextRequest = invalid
-        if fetchNext
-            nextRequest = Innertube.CreateNextRequest({ "videoId": videoId }, options)
-            nextRequest.Cancellation(cancellation)
-            if raw
-                nextRequest.LogCurlCommand(true)
-            end if
-            nextRequest.Send()
-        end if
-
-        playerResponseJson = invalid
         client = Innertube.ClientType.Tv
-        totalPlayerRequests = 0
         triedReloadRefresh = false
-        while true
-            ' We shouldn't be making more than 3 requests:
-            ' 1. Make request with TV client.
-            ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
-            ' 3. useServerDrivenAbr -> retry with downgraded TV client version to recover format URLs.
-            if totalPlayerRequests >= 3
-                LogError("Too many player requests, aborting.")
-                return {
-                    error: "Too many player requests"
-                }
-            end if
-            totalPlayerRequests += 1
+        ' We shouldn't be making more than 3 requests:
+        ' 1. Make request with TV client.
+        ' 2. Make request, but STS_MISMATCH error -> retry with new STS.
+        ' 3. useServerDrivenAbr -> retry with downgraded TV client version to recover format URLs.
+        for playerRequestCount = 1 to 3
             stsResult = Innertube.GetSignatureTimestamp(cancellation)
             if CancellationUtils.IsCancelled(cancellation)
                 return {
@@ -70,7 +67,7 @@ namespace InnertubeService
             end if
             playerRequest.Cancellation(cancellation)
             if raw
-                playerRequest.LogCurlCommand(true)
+                playerRequest.LogCurlCommand()
             end if
 
             playerResponse = playerRequest.Await()
@@ -82,11 +79,9 @@ namespace InnertubeService
             end if
 
             if not playerResponse.IsSuccess()
-                parsedResponse = {
+                return {
                     error: playerResponse.ErrorMessage()
                 }
-                parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
-                return parsedResponse
             end if
 
             playerResponseJson = playerResponse.Json()
@@ -96,7 +91,7 @@ namespace InnertubeService
             if client = Innertube.ClientType.Tv and IsSabrLocked(playerResponseJson)
                 LogInfo("SABR-locked response, retrying with downgraded TV client...")
                 client = Innertube.ClientType.TvDowngraded
-                continue while
+                continue for
             else if client = Innertube.ClientType.TvDowngraded and not HasUsableAdaptiveUrl(playerResponseJson)
                 LogError("Downgraded TV client did not recover SABR-withheld format URLs")
             end if
@@ -104,18 +99,26 @@ namespace InnertubeService
             parsedResponse = Innertube.ParseInnertubePlayerResponse(playerRequest, playerResponse, client, cancellation)
 
             if parsedResponse.error = invalid
-                exit while
+                if raw
+                    return {
+                        "playerResponse": playerResponseJson
+                    }
+                end if
+                if StringUtils.IsNullOrEmpty(parsedResponse.videoId)
+                    parsedResponse["videoId"] = videoId
+                end if
+                return parsedResponse
             end if
 
             if parsedResponse.errorCode <> invalid
                 if parsedResponse.errorCode = "STS_MISMATCH"
                     LogInfo("STS_MISMATCH error, retrying...")
-                    continue while
+                    continue for
                 else if parsedResponse.errorCode = "RELOAD_PAGE" and not triedReloadRefresh
                     triedReloadRefresh = true
                     LogInfo("RELOAD_PAGE: clearing stale STS cache and retrying...")
                     DeleteFile("tmp:/sts_cache.json")
-                    continue while
+                    continue for
                 else if parsedResponse.errorCode = "MISSING_FORMAT_FIELD"
                     useServerDrivenAbr = `${ObjectUtils.Dig(playerResponseJson, ["playerConfig", "mediaCommonConfig", "useServerDrivenAbr"])}`
                     LogTelemetryEvent({
@@ -135,25 +138,13 @@ namespace InnertubeService
                 end if
             end if
 
-            parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
             return parsedResponse
-        end while
+        end for
 
-        if raw
-            rawResponse = {
-                "playerResponse": playerResponseJson
-            }
-            rawResponse = AwaitAndParseNextResponse(fetchNext, raw, rawResponse, nextRequest)
-            return rawResponse
-        end if
-
-        parsedResponse = AwaitAndParseNextResponse(fetchNext, raw, parsedResponse, nextRequest)
-
-        if StringUtils.IsNullOrEmpty(parsedResponse.videoId)
-            parsedResponse["videoId"] = videoId
-        end if
-
-        return parsedResponse
+        LogError("Too many player requests, aborting.")
+        return {
+            error: "Too many player requests"
+        }
     end function
 
     ' True when the TV client's response is SABR-locked: server-driven ABR signaled with no usable
@@ -186,12 +177,8 @@ namespace InnertubeService
         return false
     end function
 
-    function AwaitAndParseNextResponse(fetchNext as boolean, raw as boolean, parsedResponse as object, nextRequest as object) as object
-        if not fetchNext
-            return parsedResponse
-        end if
-
-        nextResponse = nextRequest.Await()
+    function AwaitAndParseNextResponse(raw as boolean, parsedResponse as object, nextRequest as HttpClient.Request, pendingNext as HttpClient.PendingResponse) as object
+        nextResponse = pendingNext.Await()
 
         if not nextResponse.IsSuccess()
             if nextResponse.IsCancelled()
@@ -213,7 +200,7 @@ namespace InnertubeService
             return parsedResponse
         end if
 
-        return Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse, nextResponse)
+        return Innertube.ParseInnertubeNextResponse(nextResponse.Json(), parsedResponse, nextRequest)
     end function
 
     function GetVideoInfoBatched(videoIds as object, options = invalid as object) as object
@@ -272,7 +259,7 @@ namespace InnertubeService
         end if
 
         feeds = Innertube.ParseResponseDataForFeeds(responseData, {
-            response: response
+            request: request
         })
 
         if videoIds.Count() > 1
@@ -325,8 +312,7 @@ namespace InnertubeService
         request.Cancellation(cancellation)
 
         if raw
-            request.LogCurlCommand(true)
-            request.NoCache()
+            request.LogCurlCommand()
         end if
 
         response = request.Await()
@@ -341,7 +327,7 @@ namespace InnertubeService
         end if
 
         feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
-            response: response
+            request: request
             disableCreatorOnTheRise: true
             disableShorts: disableShorts
             browseId: browseId
@@ -395,7 +381,7 @@ namespace InnertubeService
         end if
 
         feeds = Innertube.ParseResponseDataForFeeds(response.Json(), {
-            response: response
+            request: request
             disableShorts: disableShorts
             browseId: browseId
         })
@@ -551,8 +537,7 @@ namespace InnertubeService
         request = Innertube.CreateBrowseRequest(channelId, Innertube.ClientType.Web, options)
         request.Cancellation(cancellation)
         if raw
-            request.LogCurlCommand(true)
-            request.NoCache()
+            request.LogCurlCommand()
         end if
 
         response = request.Await()
@@ -566,7 +551,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParseChannelPageResponseData(channelId, response.Json(), response)
+        result = Innertube.ParseChannelPageResponseData(channelId, response.Json(), request)
         if result.authorId = invalid and result.error = invalid
             result["authorId"] = channelId
         end if
@@ -693,8 +678,7 @@ namespace InnertubeService
             request.Header("Authorization", "Bearer " + accessToken)
         end if
         if raw
-            request.LogCurlCommand(true)
-            request.NoCache()
+            request.LogCurlCommand()
         end if
 
         response = request.Await()
@@ -708,7 +692,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParsePlaylistPageResponseData(playlistId, response.Json(), response)
+        result = Innertube.ParsePlaylistPageResponseData(playlistId, response.Json(), request)
 
         if result.playlistId = invalid and result.error = invalid
             result["playlistId"] = playlistId
@@ -734,8 +718,7 @@ namespace InnertubeService
         request = Innertube.CreateNextRequest(args)
         request.Cancellation(cancellation)
         if raw
-            request.LogCurlCommand(true)
-            request.NoCache()
+            request.LogCurlCommand()
         end if
 
         response = request.Await()
@@ -749,7 +732,7 @@ namespace InnertubeService
             return response.Json()
         end if
 
-        result = Innertube.ParseMixPageResponseData(response.Json(), response)
+        result = Innertube.ParseMixPageResponseData(response.Json(), request)
 
         cacheControl = Innertube.ParseResponseForCacheControl(response)
         if cacheControl <> invalid

@@ -42,6 +42,26 @@ namespace Tests
             m.assertFalse(StringUtils.IsNullOrEmpty(api.gSessionId), "no gSessionId after rebind")
         end function
 
+        @slow(30000)
+        @it("sends the messages a bind calls for, and reports each one's status once it completes")
+        function _()
+            api = m.CreateLiveApi()
+            api.GetScreenId()
+            api.GetToken()
+            m.assertTrue(api.GetSessionData(), "bind failed")
+
+            results = []
+            timer = CreateObject("roTimespan")
+            while results.Count() = 0 and timer.TotalMilliseconds() < 10000
+                results.Append(api.ProcessPendingOutgoingMessages())
+                sleep(50)
+            end while
+            m.assertNotEmpty(results, "no outgoing message completed")
+            for each result in results
+                m.assertEqual(result.status, 200, result.error)
+            end for
+        end function
+
         private function CreateLiveApi() as object
             loungeServiceNode = CreateObject("roSGNode", "Node")
             loungeServiceNode.addFields({

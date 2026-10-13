@@ -1,0 +1,101 @@
+import "pkg:/components/Services/Innertube/OTFSegmentInfo.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class OTFSegmentInfoTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function Formats(path as string, count as integer) as object
+            formats = []
+            for i = 1 to count
+                formats.Push({ itag: i, url: Tests.HttpTestServerUrl(`${path}?itag=${i}`) })
+            end for
+            return formats
+        end function
+
+        function HitsUnder(prefix as string) as integer
+            hits = 0
+            serverHits = ValidAssociativeArray(m.server.hits)
+            for each path in serverHits
+                if path.StartsWith(prefix)
+                    hits += serverHits[path]
+                end if
+            end for
+            return hits
+        end function
+
+        function AssertContains(text as string, part as string)
+            m.assertTrue(text.InStr(part) <> -1, `"${text}" doesn't contain "${part}"`)
+        end function
+
+        @describe("Innertube.OTFGetSegmentInfo")
+
+        @it("reads every format's segment durations from its init segment, saved to a file")
+        function _()
+            m.server.routes = { "/otf/init": { status: 200, body: `init bytes\r\nSegment-Count: 3\r\nSegment-Durations-Ms: 5333,5334(r=1),\r\n` } }
+            formats = m.Formats("/otf/init", 10)
+            Innertube.OTFGetSegmentInfo(formats, Innertube.ClientType.Tv, invalid, "{}")
+            for each format in formats
+                m.assertEqual(format.otfSegmentDurations, [{ d: 5333 }, { d: 5334, r: 1 }])
+            end for
+            m.assertEqual(m.HitsUnder("/otf/init?"), 10)
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("probes a DRM format whose init segment failed, and reports both")
+        function _()
+            m.server.routes = { "/otf/drm": { status: 404 } }
+            formats = m.Formats("/otf/drm", 1)
+            formats[0].drmFamilies = ["WIDEVINE"]
+            Innertube.OTFGetSegmentInfo(formats, Innertube.ClientType.Tv, invalid, `{"player":1}`)
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.level, "error")
+            m.AssertContains(event.message, "Failed to get segment info for itag 1")
+            m.AssertContains(event.message, "drm probe itag=1 drmFamilies=WIDEVINE")
+            for each variant in ["GET bare", "GET Range header", "GET range param", "GET sq=0", "POST empty range param", "POST {15:0} range param"]
+                m.AssertContains(event.message, `${variant} -> 404`)
+            end for
+            m.assertEqual(event.attachments[0].data, `{"player":1}`)
+            m.assertInvalid(formats[0].otfSegmentDurations)
+        end function
+
+        @it("stops at a cancellation set mid-flight")
+        function _()
+            canceller = CreateObject("roSGNode", "CancelLaterTask")
+            canceller.control = "run"
+            timer = CreateObject("roTimespan")
+            while canceller.cancellationNode = invalid and timer.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            cancellation = CancellationUtils.CreateCancellation(canceller.cancellationNode, "cancel", true)
+            formats = m.Formats("/delay/3000", 10)
+            canceller.cancelAfterMs = 300
+            timer.Mark()
+            Innertube.OTFGetSegmentInfo(formats, Innertube.ClientType.Tv, cancellation, "{}")
+            elapsedMs = timer.TotalMilliseconds()
+            m.assertTrue(elapsedMs >= 250 and elapsedMs < 800, `took ${elapsedMs} ms`)
+            for each format in formats
+                m.assertInvalid(format.otfSegmentDurations)
+            end for
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+    end class
+
+end namespace

@@ -1,4 +1,6 @@
 import "pkg:/components/Services/Dash/DashManifest.bs"
+import "pkg:/components/Services/Dash/LiveHeadChecks.bs"
+import "pkg:/components/Services/Dash/LiveHeadCounts.bs"
 import "pkg:/components/Services/Dash/LiveTimeline.types.bs"
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
@@ -10,8 +12,6 @@ import "pkg:/source/utils/Types.bs"
 
 ' Manifest requests closer together than this (Roku re-fetching after an error) share one live head check.
 const LIVE_HEAD_MIN_INTERVAL_MS = 500
-' The manifest response waits on the head check; past this it lists the last known head.
-const LIVE_HEAD_TIMEOUT_SECONDS = 2
 ' Head time leaping this far past the listed timeline within one head check is a stall.
 const LIVE_STALL_JUMP_MS = 10000
 
@@ -40,6 +40,7 @@ namespace Http
             m.cachedMetadata = invalid
             m.liveHeadUrl = ""
             m.liveHeadTimer = invalid ' since the last head check; invalid = never checked
+            m.liveHeadChecks = invalid
             m.liveHeadSeqnum = 0
             m.liveLoadHeadSeqnum = 0
             m.liveLoadHeadTimeMs = invalid
@@ -175,8 +176,7 @@ namespace Http
                 return true
             end if
 
-            dashRequest = HttpClient.Get(url)
-            dashResponse = dashRequest.Await()
+            dashResponse = HttpClient.Get(url).Await()
 
             if not dashResponse.IsSuccess()
                 LogError("Failed to fetch DASH manifest from URL", dashResponse.ErrorMessage())
@@ -184,7 +184,7 @@ namespace Http
                 return true
             end if
 
-            dashContent = ValidString(dashResponse.Text())
+            dashContent = dashResponse.Text()
             storyboardIndex = dashContent.InStr("</Period>")
             if storyboardIndex = -1
                 response.Redirect(url)
@@ -229,8 +229,8 @@ namespace Http
             return xmlContent
         end function
 
-        ' Raise the live head to the stream's newest segment. On failure the timeline
-        ' keeps its end, and the player holds at it until a later check succeeds.
+        ' Raise the live head to the newest one answered. Until a check answers with a newer head, the
+        ' timeline keeps its end and the player holds at it.
         function RefreshLiveHead() as void
             if StringUtils.IsNullOrEmpty(m.liveHeadUrl)
                 return
@@ -242,28 +242,21 @@ namespace Http
             end if
             m.liveHeadTimer.Mark()
 
-            head = m.CheckLiveHead()
-            if head.seqnum < 0
-                m.ReportLiveHeadFailure(head.response)
-                return
-            end if
-            ' Listed segments can't be withdrawn: the head only moves forward.
-            if head.seqnum > m.liveHeadSeqnum
-                m.AlignLiveTimeline(head)
-                m.liveHeadSeqnum = head.seqnum
-            end if
-        end function
+            newest = invalid
+            for each head in m.liveHeadChecks.Refresh()
+                if head.seqnum < 0
+                    m.ReportLiveHeadFailure(head.response)
+                else if newest = invalid or head.seqnum > newest.seqnum
+                    newest = head
+                end if
+            end for
+            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, FormatJson({ "video_load_id": m.cachedVideoLoadId, "counts": m.liveHeadChecks.counts }))
 
-        ' A no-sq HEAD: googlevideo answers at once with the X-Head-* headers.
-        function CheckLiveHead() as LiveHeadReading
-            request = Innertube.CreateLiveHeadRequest(m.liveHeadUrl)
-            request.TimeoutSeconds(LIVE_HEAD_TIMEOUT_SECONDS)
-            response = request.Await()
-            return {
-                seqnum: Innertube.ReadLiveHeadSeqnum(response)
-                timeMs: Innertube.ReadLiveHeadTimeMs(response)
-                response: response
-            }
+            ' Listed segments can't be withdrawn: the head only moves forward.
+            if newest <> invalid and newest.seqnum > m.liveHeadSeqnum
+                m.AlignLiveTimeline(newest)
+                m.liveHeadSeqnum = newest.seqnum
+            end if
         end function
 
         ' Segments are listed at the duration at load, the stream's lifetime average: off
@@ -353,11 +346,10 @@ namespace Http
             })
         end function
 
-        ' Until a head check succeeds, the listed timeline stops growing and the player
-        ' holds at its end. Telemetry once per video load.
-        function ReportLiveHeadFailure(response as object) as void
+        ' Telemetry once per video load.
+        function ReportLiveHeadFailure(response as HttpClient.Response) as void
             statusText = Str(response.StatusCode()).Trim()
-            LogWarnNoTelemetry("Live head check returned no X-Head-Seqnum (HTTP", statusText, "); head stays at", m.liveHeadSeqnum)
+            LogWarnNoTelemetry("Live head check returned no X-Head-Seqnum (HTTP", statusText, ")")
             if m.reportedLiveHeadFailure
                 return
             end if
@@ -375,7 +367,7 @@ namespace Http
                         `video_load_id: ${ValidString(m.cachedVideoLoadId)}`
                         `head: ${m.liveHeadSeqnum}`
                         `status: ${statusText}`
-                        `error: ${response.ErrorMessage(false)}`
+                        `error: ${response.ErrorMessage()}`
                         `url: ${m.liveHeadUrl}`
                     ].Join(`\n`)
                 }]
@@ -384,6 +376,10 @@ namespace Http
 
         function ResetLiveState(metadata as object) as void
             m.liveHeadUrl = ValidString(metadata.liveHeadUrl)
+            if m.liveHeadChecks <> invalid
+                m.liveHeadChecks.Cancel()
+            end if
+            m.liveHeadChecks = new LiveHeadChecks(m.liveHeadUrl)
             m.liveHeadTimer = invalid
             m.liveHeadSeqnum = ValidInt(metadata.liveHeadSeqnum)
             m.liveLoadHeadSeqnum = m.liveHeadSeqnum

@@ -34,10 +34,12 @@ namespace Innertube
 
         headUrl = GetLiveHeadUrl(adaptiveFormats[0]["url"], cpn)
         request = CreateLiveHeadRequest(headUrl)
-        request.TryCount(2)
-        request.RetryCallback(function(context as object) as boolean
-            response = context.response
-            return Innertube.ReadLiveHeadSeqnum(response) < 0 or (Innertube.ReadLiveHeadTimeMs(response) = invalid and Innertube.ReadLiveHeadTimeSecAsMs(response) = invalid)
+        request.RetryCount(1)
+        request.RetryIf(function(response as HttpClient.Response) as string
+            if Innertube.ReadLiveHeadSeqnum(response) < 0 or (Innertube.ReadLiveHeadTimeMs(response) = invalid and Innertube.ReadLiveHeadTimeSecAsMs(response) = invalid)
+                return `no X-Head-* in the response (HTTP ${response.StatusCode()})`
+            end if
+            return ""
         end function)
         request.Cancellation(cancellation)
         response = request.Await()
@@ -49,7 +51,7 @@ namespace Innertube
             averagedTimeMs = ReadLiveHeadTimeSecAsMs(response)
         end if
         if headSeqnum < 0 or averagedTimeMs = invalid
-            parsedResponse["error"] = `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP ${response.StatusCode()})\n${response.ErrorMessage(false)}`
+            parsedResponse["error"] = `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP ${response.StatusCode()})\n${response.ErrorMessage()}`
             return
         end if
 
@@ -136,7 +138,7 @@ namespace Innertube
         return UrlUtils.SetQueryParams(formatUrl, queryComponents)
     end function
 
-    function CreateLiveHeadRequest(headUrl as string) as object
+    function CreateLiveHeadRequest(headUrl as string) as HttpClient.Request
         request = HttpClient.Head(headUrl)
         request.Headers({
             "origin": "https://www.youtube.com"
@@ -149,9 +151,9 @@ namespace Innertube
     ' X-Head-Seqnum of a live head response, -1 if absent. Not gated on HTTP status: a
     ' head check can come back non-2xx yet still carry the X-Head-* headers
     ' (observed: one stream returns 500, another 200; both include them).
-    function ReadLiveHeadSeqnum(response as object) as integer
+    function ReadLiveHeadSeqnum(response as HttpClient.Response) as integer
         headers = response.Headers()
-        if not IsAssociativeArray(headers) or not headers.DoesExist("X-Head-Seqnum")
+        if not headers.DoesExist("X-Head-Seqnum")
             return -1
         end if
         return ValidString(headers["X-Head-Seqnum"]).ToInt()
@@ -161,19 +163,15 @@ namespace Innertube
     ' long-running stream's (e.g. 207 days = 1.79e10 ms) overflows BrightScript's 32-bit
     ' int: ParseJson keeps it as a LongInteger, which .ToInt() and Cdbl() would truncate
     ' (measured).
-    function ReadLiveHeadTimeMs(response as object) as dynamic
-        headers = response.Headers()
-        if not IsAssociativeArray(headers)
-            return invalid
-        end if
-        return StringUtils.ParseJsonSafe(ValidString(headers["X-Head-Time-Millis"]))
+    function ReadLiveHeadTimeMs(response as HttpClient.Response) as dynamic
+        return StringUtils.ParseJsonSafe(ValidString(response.Headers()["X-Head-Time-Millis"]))
     end function
 
     ' X-Head-Time-Sec in ms, invalid if absent: whole seconds, too coarse to average a
     ' young stream's few segments or to time the head between checks.
-    function ReadLiveHeadTimeSecAsMs(response as object) as dynamic
+    function ReadLiveHeadTimeSecAsMs(response as HttpClient.Response) as dynamic
         headers = response.Headers()
-        if not IsAssociativeArray(headers) or not headers.DoesExist("X-Head-Time-Sec")
+        if not headers.DoesExist("X-Head-Time-Sec")
             return invalid
         end if
         return ValidString(headers["X-Head-Time-Sec"]).ToInt() * 1000&

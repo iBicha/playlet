@@ -1,0 +1,60 @@
+import "pkg:/components/Services/Dash/LiveHeadChecks.bs"
+import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace Tests
+
+    ' Makes `checks` send fake head checks answering `answers` in order: { seqnum, timeMs } (seqnum -1:
+    ' no X-Head-* headers, a 403), `pending: true` to stay unanswered until AnswerLiveHeadChecks,
+    ' `timedOut: true` to be given up.
+    function FakeLiveHeadChecks(checks as object, answers as object)
+        checks.answers = answers
+        checks.Send = function() as object
+            return Tests.FakeLiveHeadPending(m.answers.Shift())
+        end function
+    end function
+
+    function AnswerLiveHeadChecks(checks as object)
+        for each check in checks.inFlight
+            check.pending.answer.pending = false
+        end for
+    end function
+
+    ' A PendingResponse answering `answer` once it isn't pending.
+    function FakeLiveHeadPending(answer as object) as object
+        return {
+            answer: answer
+            Wait: function(_timeoutMs as integer) as dynamic
+                return m.Poll()
+            end function
+            Poll: function() as dynamic
+                if ValidBool(m.answer.pending)
+                    return invalid
+                end if
+                return Tests.FakeLiveHeadResponse(m.answer)
+            end function
+            Cancel: function() as void
+                m.answer.cancelled = true
+            end function
+        }
+    end function
+
+    function FakeLiveHeadResponse(answer as object) as HttpClient.Response
+        if ValidBool(answer.timedOut)
+            return new HttpClient.Response({ timedOut: true })
+        end if
+        headers = {}
+        if answer.seqnum >= 0
+            headers["X-Head-Seqnum"] = answer.seqnum.ToStr()
+        end if
+        if answer.timeMs <> invalid
+            headers["X-Head-Time-Millis"] = FormatJson(answer.timeMs)
+        end if
+        status = 200
+        if answer.seqnum < 0
+            status = 403
+        end if
+        return new HttpClient.Response({ statusCode: status, headers: headers })
+    end function
+
+end namespace

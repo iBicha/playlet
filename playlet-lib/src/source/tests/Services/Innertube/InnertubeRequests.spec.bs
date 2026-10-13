@@ -1,0 +1,61 @@
+import "pkg:/components/Services/Innertube/InnertubeService.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class InnertubeRequestsTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function AssertContains(text as string, part as string)
+            m.assertTrue(text.InStr(part) <> -1, `"${text}" doesn't contain "${part}"`)
+        end function
+
+        @describe("Innertube requests")
+
+        @it("are JSON POSTs carrying the client's context and headers")
+        function _()
+            requests = [
+                Innertube.CreateBrowseRequest("FEwhat_to_watch", Innertube.ClientType.Tv)
+                Innertube.CreateNextRequest({ "videoId": "v" })
+                Innertube.CreateResolveUrlRequest("https://www.youtube.com/@handle")
+                Innertube.CreateSubscribeRequest("UC")
+                Innertube.CreateUnsubscribeRequest("UC")
+                Innertube.CreatePlayerRequest(Innertube.ClientType.Tv, { "videoId": "v" })
+                Innertube.CreateGetDrmLicenceRequest({ "videoId": "v" })
+            ]
+            for each request in requests
+                m.assertEqual(request.GetMethod(), "POST")
+                m.AssertContains(request.GetFullUrl(), "https://www.youtube.com/youtubei/v1/")
+                headers = request.GetHeaders()
+                m.assertEqual(headers["Content-Type"], "application/json")
+                m.assertNotInvalid(headers["x-youtube-client-name"])
+                m.assertTrue(IsAssociativeArray(StringUtils.ParseJsonSafe(request.GetTextBody()).context))
+            end for
+        end function
+
+        @it("report a parser warning with the request's curl command")
+        function _()
+            request = Innertube.CreateBrowseRequest("FEwhat_to_watch", Innertube.ClientType.Tv)
+            Innertube.Warning("Unknown node", { "someRenderer": {} }, { request: request })
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.attachments[1].filename, "request.txt")
+            m.assertEqual(event.attachments[1].data, request.ToCurlCommand())
+            m.AssertContains(event.attachments[1].data, "FEwhat_to_watch")
+        end function
+
+        @it("tell telemetry a LOGIN_REQUIRED response came to a request sent with an access token")
+        function _()
+            request = Innertube.CreatePlayerRequest(Innertube.ClientType.Tv, { "videoId": "v" })
+            request.Header("Authorization", "Bearer token")
+            Innertube.ParsePlayerResponseForError({ "playabilityStatus": { "status": "LOGIN_REQUIRED" } }, request)
+            m.AssertContains(m.global.telemetry.LogEvent.message, "LOGIN_REQUIRED: hasAccessToken=true hasCtt=false")
+        end function
+
+    end class
+
+end namespace

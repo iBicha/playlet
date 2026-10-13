@@ -8,7 +8,7 @@ import "pkg:/source/utils/Types.bs"
 
 namespace Innertube
 
-    function CreateNextRequest(payloadArgs as object, options = invalid as object) as object
+    function CreateNextRequest(payloadArgs as object, options = invalid as object) as HttpClient.Request
         deviceInfo = CreateObject("roDeviceInfo")
 
         context = Innertube.CreateContext(Innertube.ClientType.Web, deviceInfo, options)
@@ -18,7 +18,7 @@ namespace Innertube
         }
         payload.Append(payloadArgs)
 
-        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json", payload)
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false&alt=json").JsonBody(payload)
         request.Headers(Innertube.CreateHeaders(Innertube.ClientType.Web))
 
         return request
@@ -34,7 +34,7 @@ namespace Innertube
         })
     end function
 
-    function ParseInnertubeNextResponse(payload as object, parsedResponse as object, httpResponse as object) as object
+    function ParseInnertubeNextResponse(payload as object, parsedResponse as object, request as HttpClient.Request) as object
         if not IsAssociativeArray(payload)
             LogWarn("Invalid payload", payload)
             return parsedResponse
@@ -49,7 +49,7 @@ namespace Innertube
         endscreen = playerOverlayRenderer["endScreen"]
 
         feeds = Innertube.ParseResponseDataForFeeds(endscreen, {
-            response: httpResponse
+            request: request
             noContainers: true
         })
         if feeds.Count() > 0

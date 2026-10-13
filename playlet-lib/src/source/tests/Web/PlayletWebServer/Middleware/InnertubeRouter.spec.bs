@@ -1,0 +1,82 @@
+import "pkg:/components/Web/PlayletWebServer/Middleware/InnertubeRouter.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class InnertubeRouterTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.router = new Http.InnertubeRouter({ sceneNodes: { innertube: invalid, profilesService: invalid } })
+        end function
+
+        function Proxy(args as object) as object
+            response = {
+                Json: function(value as object) as void
+                    m.json = value
+                end function
+                Default: function(code as integer, _message as string) as void
+                    m.code = code
+                end function
+            }
+            m.router.ProxyRequest({
+                request: {
+                    args: args
+                    BodyJson: function() as object
+                        return m.args
+                    end function
+                }
+                response: response
+            })
+            return response
+        end function
+
+        function UniquePath(prefix as string) as string
+            return prefix + CreateObject("roDeviceInfo").GetRandomUUID()
+        end function
+
+        @describe("Http.InnertubeRouter.ProxyRequest")
+
+        @it("sends the method, headers and body, with our User-Agent when it has none")
+        function _()
+            proxied = m.Proxy({ Method: "POST", Url: Tests.HttpTestServerUrl("/echo"), Headers: { "X-A": "1" }, Body: "body", CacheSeconds: -1 }).json
+            m.assertEqual(proxied.status, 200)
+            echo = StringUtils.ParseJsonSafe(proxied.body)
+            m.assertEqual(echo.method, "POST")
+            m.assertEqual(echo.headers["x-a"], "1")
+            m.assertEqual(echo.headers["user-agent"], VIDEO_PLAYER_USER_AGENT)
+            m.assertEqual(echo.body, "body")
+        end function
+
+        @it("caches a GET for its max-age, unless CacheSeconds is negative")
+        function _()
+            cached = m.UniquePath("/maxage/60/")
+            m.Proxy({ Url: Tests.HttpTestServerUrl(cached), Headers: {} })
+            m.Proxy({ Url: Tests.HttpTestServerUrl(cached), Headers: {} })
+            m.assertEqual(Tests.HttpTestServerHits(m.server, cached), 1)
+
+            uncached = m.UniquePath("/maxage/60/")
+            m.Proxy({ Url: Tests.HttpTestServerUrl(uncached), Headers: {}, CacheSeconds: -1 })
+            m.Proxy({ Url: Tests.HttpTestServerUrl(uncached), Headers: {}, CacheSeconds: -1 })
+            m.assertEqual(Tests.HttpTestServerHits(m.server, uncached), 2)
+        end function
+
+        @it("rejects a key it doesn't take")
+        function _()
+            m.assertEqual(m.Proxy({ Url: Tests.HttpTestServerUrl("/echo"), Headers: {}, Timeout: 1 }).code, 400)
+        end function
+
+    end class
+
+end namespace

@@ -1,4 +1,5 @@
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
 
 namespace Tests
@@ -6,48 +7,1531 @@ namespace Tests
     @suite
     class HttpClientTests extends Rooibos.BaseTestSuite
 
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
         protected override function beforeEach()
             Tests.SetUpLoggingGlobals()
             m.global.telemetry.LogEvent = {}
         end function
 
-        ' Nothing listens on port 1: the connection is refused, a failure that is not a timeout.
-        function RefusedRequest(retryCallback as function) as HttpClient.HttpRequest
-            return HttpClient.Head("http://127.0.0.1:1/").NoCache().TryCount(2).RetryCallback(retryCallback)
+        function ServerUrl(path as string) as string
+            return Tests.HttpTestServerUrl(path)
         end function
 
-        @describe("HttpClient.HttpRequest.Await")
+        function Hits(path as string) as integer
+            return Tests.HttpTestServerHits(m.server, path)
+        end function
 
-        @it("reports a failed attempt the retry callback declines, without retrying")
-        function _()
-            request = m.RefusedRequest(function(context as object) as boolean
-                context.request.declinedError = context.response.ErrorMessage()
-                return false
-            end function)
+        function AssertNotSentOnce(lines as string[], errorMessage as string)
+            errors = [] as string[]
+            for each line in lines
+                m.assertEqual(line.InStr("[WARN]"), -1, line)
+                if line.InStr("[ERROR]") <> -1
+                    errors.Push(line)
+                end if
+            end for
+            m.assertEqual(errors.Count(), 1)
+            m.assertEqual(Tests.LogLineMessage(errors[0]), errorMessage)
+            m.assertEqual(m.global.telemetry.LogError, errors[0])
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        function AssertLogged(lines as string[], part as string) as void
+            for each line in lines
+                if line.InStr(part) <> -1
+                    return
+                end if
+            end for
+            m.fail(`no line logged contains "${part}" in ${FormatJson(lines)}`)
+        end function
+
+        function AssertNotLogged(lines as string[], part as string)
+            for each line in lines
+                m.assertEqual(line.InStr(part), -1, line)
+            end for
+        end function
+
+        ' The message action(subject) throws, invalid if it throws none.
+        function ThrownMessage(action as function, subject as object) as dynamic
+            try
+                action(subject)
+            catch error
+                return error.message
+            end try
+            return invalid
+        end function
+
+        function AssertTook(timer as object, fromMs as integer, toMs as integer)
+            elapsedMs = timer.TotalMilliseconds()
+            m.assertTrue(elapsedMs >= fromMs and elapsedMs < toMs, `took ${elapsedMs} ms, expected ${fromMs}-${toMs}`)
+        end function
+
+        function AssertContains(text as string, part as string)
+            m.assertTrue(text.InStr(part) <> -1, `"${text}" doesn't contain "${part}"`)
+        end function
+
+        function CountOf(text as string, part as string) as integer
+            count = 0
+            index = text.InStr(part)
+            while index <> -1
+                count += 1
+                index = text.InStr(index + part.Len(), part)
+            end while
+            return count
+        end function
+
+        function CreateCancellation() as object
+            node = CreateObject("roSGNode", "Node")
+            node.addField("cancel", "boolean", false)
+            return CancellationUtils.CreateCancellation(node, "cancel", true)
+        end function
+
+        ' A task loop's port, with a node field of its own observed on it.
+        function CreateLoop() as object
+            node = CreateObject("roSGNode", "Node")
+            node.addField("ping", "integer", true)
+            port = CreateObject("roMessagePort")
+            node.ObserveField("ping", port)
+            return { node: node, port: port, pings: 0, pingEveryMessage: false }
+        end function
+
+        ' Waits on the loop's own port the way a task loop does, at most wakeMs at a time, and polls the pending
+        ' response at every wake, until it returns the response or limitMs passed.
+        function RunLoop(loop as object, pending as object, wakeMs as integer, limitMs as integer) as dynamic
             timer = CreateObject("roTimespan")
+            while timer.TotalMilliseconds() < limitMs
+                message = wait(wakeMs, loop.port)
+                if type(message) = "roSGNodeEvent"
+                    loop.pings += 1
+                end if
+                response = pending.Poll()
+                if response <> invalid
+                    return response
+                end if
+                if loop.pingEveryMessage
+                    loop.node.ping = loop.pings + 1
+                end if
+            end while
+            return invalid
+        end function
+
+        function CacheFilePath(request as HttpClient.Request) as string
+            return HttpCache.GetFilePath(request.GetFullUrl(), request.GetHeaders(), request._saveBodyToFilePath)
+        end function
+
+        ' A GET whose cache entry was deleted.
+        function GetWithoutCacheEntry(path as string) as HttpClient.Request
+            request = HttpClient.Get(m.ServerUrl(path))
+            DeleteFile(m.CacheFilePath(request))
+            return request
+        end function
+
+        @describe("HttpClient.Request")
+
+        @it("sends the method, headers, query and path params, and a JSON body")
+        function _()
+            response = HttpClient.Post(m.ServerUrl("/{route}")).PathParam("route", "echo").QueryParam("q", "a b").QueryParams({ n: 2 }).Header("X-One", "1").JsonBody({ key: "value" }).Await()
+            echo = response.Json()
+            m.assertEqual(echo.method, "POST")
+            m.AssertContains(echo.path, "/echo?")
+            m.AssertContains(echo.path, "q=a%20b")
+            m.AssertContains(echo.path, "n=2")
+            m.assertEqual(echo.headers["x-one"], "1")
+            m.assertEqual(echo.headers["content-type"], "application/json")
+            m.assertEqual(StringUtils.ParseJsonSafe(echo.body).key, "value")
+        end function
+
+        @it("sends an array query param as given")
+        function _()
+            echo = HttpClient.Get(m.ServerUrl("/echo")).QueryParamArray("ids", ["a", "b"], UrlUtils.QueryParamArrayType.CommaSeparated).Await().Json()
+            m.assertEqual(echo.path, "/echo?ids=a,b")
+        end function
+
+        @it("sends a form in the order given")
+        function _()
+            echo = HttpClient.Post(m.ServerUrl("/echo")).FormBody([{ key: "z", value: "1" }, { key: "a", value: "x y" }]).Await().Json()
+            m.assertEqual(echo.body, "z=1&a=x%20y")
+            m.assertEqual(echo.headers["content-type"], "application/x-www-form-urlencoded")
+        end function
+
+        @it("sends a body from a file")
+        function _()
+            WriteAsciiFile("tmp:/http-body.txt", "from a file")
+            echo = HttpClient.Put(m.ServerUrl("/echo")).FileBody("tmp:/http-body.txt").Await().Json()
+            m.assertEqual(echo.method, "PUT")
+            m.assertEqual(echo.body, "from a file")
+        end function
+
+        @it("sends DELETE and HEAD")
+        function _()
+            m.assertEqual(HttpClient.Delete(m.ServerUrl("/echo")).Await().Json().method, "DELETE")
+            response = HttpClient.Head(m.ServerUrl("/echo")).Await()
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertEqual(response.Text(), "")
+        end function
+
+        @it("sends a text body as given")
+        function _()
+            echo = HttpClient.Post(m.ServerUrl("/echo")).TextBody("plain text").Await().Json()
+            m.assertEqual(echo.method, "POST")
+            m.assertEqual(echo.body, "plain text")
+        end function
+
+        @it("sends a JSON array body")
+        function _()
+            echo = HttpClient.Post(m.ServerUrl("/echo")).JsonBody([1, 2, 3]).Await().Json()
+            m.assertEqual(echo.body, "[1,2,3]")
+            m.assertEqual(echo.headers["content-type"], "application/json")
+        end function
+
+        @it("sends a form given as an AA")
+        function _()
+            echo = HttpClient.Post(m.ServerUrl("/echo")).FormBody({ a: "x y" }).Await().Json()
+            m.assertEqual(echo.body, "a=x%20y")
+            m.assertEqual(echo.headers["content-type"], "application/x-www-form-urlencoded")
+        end function
+
+        @it("sends headers and path params given as AAs")
+        function _()
+            echo = HttpClient.Get(m.ServerUrl("/{route}")).PathParams({ route: "echo" }).Headers({ "X-One": "1", "X-Two": "2" }).Await().Json()
+            m.assertEqual(echo.path, "/echo")
+            m.assertEqual(echo.headers["x-one"], "1")
+            m.assertEqual(echo.headers["x-two"], "2")
+        end function
+
+        @it("sends an array query param repeated")
+        function _()
+            echo = HttpClient.Get(m.ServerUrl("/echo")).QueryParamArray("ids", [1, 2, 3], UrlUtils.QueryParamArrayType.Repeated).Await().Json()
+            m.assertEqual(echo.path, "/echo?ids=1&ids=2&ids=3")
+        end function
+
+        @it("asks for a compressed response")
+        function _()
+            echo = HttpClient.Get(m.ServerUrl("/echo")).Await().Json()
+            m.AssertContains(ValidString(echo.headers["accept-encoding"]), "gzip")
+        end function
+
+        @it("builds its url again after a param changes, and sends the url built last")
+        function _()
+            request = HttpClient.Get("http://example.com/{id}").PathParam("id", "1")
+            m.assertEqual(request.GetFullUrl(), "http://example.com/1")
+            request.QueryParam("a", "1")
+            m.assertEqual(request.GetFullUrl(), "http://example.com/1?a=1")
+            request.PathParams({ id: "2" })
+            m.assertEqual(request.GetFullUrl(), "http://example.com/2?a=1")
+            request.QueryParams({ a: "2" })
+            m.assertEqual(request.GetFullUrl(), "http://example.com/2?a=2")
+            request.PathParam("id", "3")
+            m.assertEqual(request.GetFullUrl(), "http://example.com/3?a=2")
+
+            sent = HttpClient.Get(m.ServerUrl("/echo")).QueryParam("v", "1")
+            m.assertEqual(sent.Await().Json().path, "/echo?v=1")
+            sent.QueryParam("v", "2")
+            m.assertEqual(sent.Await().Json().path, "/echo?v=2")
+        end function
+
+        @it("writes a curl command for a GET, with its headers")
+        function _()
+            command = HttpClient.Get("http://example.com/a").QueryParam("q", "1").Header("X-Test", "true").ToCurlCommand()
+            expected = `curl "http://example.com/a?q=1" \\
+  --max-time 30 \\
+  --location \\
+  --show-error \\
+  --compressed \\
+  -H 'X-Test: true'`
+            m.assertEqual(command, expected)
+        end function
+
+        @it("writes a curl command for a HEAD")
+        function _()
+            command = HttpClient.Head("http://example.com").AttemptTimeoutMs(1500).ToCurlCommand()
+            expected = `curl "http://example.com" \\
+  --head \\
+  --max-time 1.5 \\
+  --location \\
+  --show-error \\
+  --compressed`
+            m.assertEqual(command, expected)
+        end function
+
+        @it("writes a curl command for a POST, with its text or file body")
+        function _()
+            command = HttpClient.Post("http://example.com").TextBody("body").ToCurlCommand()
+            expected = `curl "http://example.com" \\
+  --request POST \\
+  --max-time 30 \\
+  --location \\
+  --show-error \\
+  --compressed \\
+  -d 'body'`
+            m.assertEqual(command, expected)
+            m.AssertContains(HttpClient.Put("http://example.com").FileBody("tmp:/body.bin").ToCurlCommand(), ` \\\n  --data-binary @tmp:/body.bin`)
+        end function
+
+        @it("reads back its method, headers and text body")
+        function _()
+            request = new HttpClient.Request("patch", "http://x/")
+            request.Header("X-One", "1").JsonBody({ key: "value" })
+            m.assertEqual(request.GetMethod(), "PATCH")
+            m.assertEqual(request.GetHeaders()["x-one"], "1")
+            m.assertEqual(request.GetTextBody(), `{"key":"value"}`)
+            m.assertInvalid(HttpClient.Post("http://x/").GetTextBody())
+            m.assertInvalid(HttpClient.Post("http://x/").TextBody("x").FileBody("tmp:/x").GetTextBody())
+        end function
+
+        @it("logs the curl command of every attempt it sends in DEBUG, unless LogCurlCommand(false)")
+        function _()
+            logPort = CreateObject("roMessagePort")
+            m.global.logger.ObserveFieldScoped("logLine", logPort)
+            HttpClient.Get(m.ServerUrl("/echo")).QueryParam("curl", "default").Await()
+            HttpClient.Get(m.ServerUrl("/echo")).QueryParam("curl", "off").LogCurlCommand(false).Await()
+            cached = m.GetWithoutCacheEntry("/maxage/60/curl")
+            cached.Await()
+            m.assertTrue(cached.Await().IsCached())
+            HttpClient.Get(m.ServerUrl("/seq/curl/503,200")).RetryCount(1).RetryDelayMs(0).NoTelemetry().Await()
+            loggedText = ""
+            message = wait(100, logPort)
+            while message <> invalid
+                loggedText += message.GetData()
+                message = wait(100, logPort)
+            end while
+            m.global.logger.UnobserveFieldScoped("logLine")
+            m.AssertContains(loggedText, `curl "${m.ServerUrl("/echo?curl=default")}"`)
+            m.assertEqual(loggedText.InStr(`curl "${m.ServerUrl("/echo?curl=off")}"`), -1)
+            m.assertEqual(m.CountOf(loggedText, `curl "${m.ServerUrl("/maxage/60/curl")}"`), 1)
+            m.assertEqual(m.CountOf(loggedText, `curl "${m.ServerUrl("/seq/curl/503,200")}"`), 2)
+        end function
+
+        @it("logs every attempt it sends at info, and none on a cache hit")
+        function _()
+            url = m.ServerUrl("/seq/sending/503,200")
+            sendingCount = 0
+            for each line in Tests.LogLines(function(url as string) as void
+                    HttpClient.Get(url).RetryCount(1).RetryDelayMs(0).NoTelemetry().Await()
+                end function, url)
+                if line.InStr(`Sending GET ${url} ID:`) <> -1
+                    m.AssertContains(line, "[INFO]")
+                    sendingCount += 1
+                end if
+            end for
+            m.assertEqual(sendingCount, 2)
+
+            m.GetWithoutCacheEntry("/maxage/60/sending").Await()
+            for each line in Tests.LogLines(function(url as string) as void
+                    HttpClient.Get(url).Await()
+                end function, m.ServerUrl("/maxage/60/sending"))
+                m.assertEqual(line.InStr("Sending "), -1, line)
+            end for
+        end function
+
+        @it("logs each attempt's transfer ID beside its method and url, and none outside a transfer")
+        function _()
+            url = m.ServerUrl("/seq/transferids/503,200")
+            lines = Tests.LogLines(function(url as string) as void
+                HttpClient.Get(url).RetryCount(1).RetryDelayMs(0).NoTelemetry().Await()
+            end function, url)
+            ids = [] as string[]
+            for each line in lines
+                sending = `Sending GET ${url} ID: `
+                if line.InStr(sending) <> -1
+                    ids.Push(Tests.LogLineMessage(line).Mid(Tests.LogLineMessage(line).InStr(sending) + sending.Len()).Trim())
+                end if
+            end for
+            m.assertEqual(ids.Count(), 2)
+            m.assertNotEqual(ids[0], ids[1])
+            m.AssertLogged(lines, `GET ${url} ID: ${ids[0]} attempt 1 ended: `)
+            m.AssertLogged(lines, `Completed GET ${url} ID: ${ids[1]} 200 after `)
+
+            url = m.ServerUrl("/delay/2000")
+            lines = Tests.LogLines(function(url as string) as void
+                HttpClient.Get(url).AttemptTimeoutMs(300).Await()
+            end function, url)
+            m.AssertLogged(lines, `Timeout GET ${url} ID: `)
+            m.AssertLogged(lines, `Completed GET ${url} ID: `)
+
+            cancellation = m.CreateCancellation()
+            cancellation.node.cancel = true
+            url = m.ServerUrl("/seq/transferidcancelled/200")
+            lines = Tests.LogLines(function(request as object) as void
+                request.Await()
+            end function, HttpClient.Get(url).Cancellation(cancellation))
+            m.AssertLogged(lines, `Cancelled GET ${url}`)
+            m.AssertNotLogged(lines, " ID: ")
+            m.AssertLogged(lines, `Completed GET ${url} 0 after `)
+
+            m.GetWithoutCacheEntry("/maxage/60/transferids").Await()
+            url = m.ServerUrl("/maxage/60/transferids")
+            lines = Tests.LogLines(function(url as string) as void
+                HttpClient.Get(url).Await()
+            end function, url)
+            m.AssertLogged(lines, `Cache hit GET ${url}`)
+            m.AssertNotLogged(lines, " ID: ")
+        end function
+
+        @it("completes a request roUrlTransfer can't be created for at once, logging an error, whatever its RetryCount")
+        function _()
+            m.stubCall(HttpClient.CreateUrlTransfer, invalid)
+            result = { url: m.ServerUrl("/seq/uncreated/200"), response: invalid }
+            lines = Tests.LogLines(function(result as object) as void
+                result.response = HttpClient.Get(result.url).RetryCount(2).RetryDelayMs(0).Await()
+            end function, result)
+            m.AssertNotSentOnce(lines, "Failed to create roUrlTransfer")
+            m.assertEqual(result.response.ErrorMessage(), `${Tr(Locale.HttpClient.RequestNotSent)} roUrlTransfer couldn't be created`)
+            m.assertEqual(m.Hits("/seq/uncreated/200"), 0)
+        end function
+
+        @it("completes a request roUrlTransfer refuses at once, logging an error, whatever its RetryCount")
+        function _()
+            ' A transfer already in progress refuses another.
+            busyTransfer = CreateObject("roUrlTransfer")
+            busyTransfer.SetUrl(m.ServerUrl("/delay/2000"))
+            busyTransfer.SetMessagePort(CreateObject("roMessagePort"))
+            busyTransfer.AsyncGetToString()
+            m.stubCall(HttpClient.CreateUrlTransfer, busyTransfer)
+            result = { url: m.ServerUrl("/seq/refused/200"), response: invalid }
+            lines = Tests.LogLines(function(result as object) as void
+                result.response = HttpClient.Get(result.url).RetryCount(2).RetryDelayMs(0).Await()
+            end function, result)
+            busyTransfer.AsyncCancel()
+            m.AssertNotSentOnce(lines, "Failed to send request")
+            m.assertEqual(result.response.ErrorMessage(), `${Tr(Locale.HttpClient.RequestNotSent)} roUrlTransfer refused the request`)
+            m.assertEqual(m.Hits("/seq/refused/200"), 0)
+        end function
+
+        @describe("HttpClient.PendingResponse.Await")
+
+        @it("returns the status, headers and body")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/status/201")).Await()
+            m.assertEqual(response.StatusCode(), 201)
+            m.assertTrue(response.IsSuccess())
+            m.assertEqual(response.Headers()["x-hit"], "1")
+            m.assertEqual(response.Text(), "hit 1")
+            m.assertEqual(response.ErrorMessage(), "")
+        end function
+
+        @it("counts a 3xx it can't follow as a success, retried and cached by no one")
+        function _()
+            request = m.GetWithoutCacheEntry("/seq/unfollowed/300").CacheForSeconds(60).RetryCount(1).RetryDelayMs(0)
             response = request.Await()
-            ' A retry waits at least 1000 ms before its second attempt.
-            m.assertTrue(timer.TotalMilliseconds() < 1000, `took ${timer.TotalMilliseconds()} ms`)
-            m.assertFalse(response.IsSuccess())
-            event = m.global.telemetry.LogEvent
-            m.assertEqual(event.level, "warning")
-            m.assertEqual(event.message, request.declinedError)
-            m.assertEqual(event.attachments[0].filename, "request.txt")
+            m.assertEqual(response.StatusCode(), 300)
+            m.assertTrue(response.IsSuccess())
+            m.assertEqual(response.ErrorMessage(), "")
+            m.assertFalse(request.Await().IsCached())
+            m.assertEqual(m.Hits("/seq/unfollowed/300"), 2)
         end function
 
-        @it("reports a failed attempt before retrying it")
+        @it("succeeds on a 2xx, a 204 with no body")
+        @params(200, "Hello, world!")
+        @params(201, "Hello, world!")
+        @params(202, "Hello, world!")
+        @params(203, "Hello, world!")
+        @params(204, "")
+        function _(statusCode as integer, expectedBody as string)
+            path = `/succeeded/${statusCode}`
+            routes = {}
+            routes[path] = { status: statusCode, body: "Hello, world!" }
+            m.server.routes = routes
+            response = HttpClient.Get(m.ServerUrl(path)).Await()
+            m.assertTrue(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), statusCode)
+            m.assertEqual(response.Text(), expectedBody)
+            m.assertEqual(response.ErrorMessage(), "")
+        end function
+
+        @it("fails with roUrlTransfer's reason for the status, the status, the transfer ID and the body")
+        @params(400, "Bad request")
+        @params(401, "Not authorized")
+        @params(403, "Forbidden")
+        @params(404, "Not found")
+        @params(409, "Conflict")
+        @params(429, "HTTP 429 error")
+        @params(500, "Internal server error")
+        @params(501, "Not implemented")
+        @params(502, "Bad gateway")
+        @params(503, "Service unavailable")
+        function _(statusCode as integer, reason as string)
+            path = `/failed/${statusCode}`
+            routes = {}
+            routes[path] = { status: statusCode, body: "failed" }
+            m.server.routes = routes
+            response = HttpClient.Get(m.ServerUrl(path)).Await()
+            message = response.ErrorMessage()
+            m.assertFalse(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), statusCode)
+            m.assertEqual(response.Text(), "failed")
+            m.assertTrue(message.StartsWith(`${Tr(Locale.HttpClient.Reason)}:${reason}`), message)
+            m.AssertContains(message, `\nStatusCode: ${statusCode}\nRequestId: `)
+            m.assertTrue(message.EndsWith(`\nBody: failed`), message)
+        end function
+
+        @it("follows a redirect; a 3xx it can't follow is a success, its body read")
         function _()
-            request = m.RefusedRequest(function(context as object) as boolean
-                context.request.retriedError = context.response.ErrorMessage()
-                return true
-            end function)
+            m.server.routes = {
+                "/moved": { status: 302, headers: { "Location": "/landed" } }
+                "/landed": { status: 200, body: "landed" }
+                "/nowhere": { status: 302, body: "no Location" }
+            }
+            response = HttpClient.Get(m.ServerUrl("/moved")).Await()
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertEqual(response.Text(), "landed")
+            m.assertEqual(m.Hits("/landed"), 1)
+
+            response = HttpClient.Get(m.ServerUrl("/nowhere")).Await()
+            m.assertEqual(response.StatusCode(), 302)
+            m.assertTrue(response.IsSuccess())
+            m.assertEqual(response.Text(), "no Location")
+        end function
+
+        @it("fails after too many redirects")
+        function _()
+            m.server.routes = { "/loop": { status: 302, headers: { "Location": "/loop" } } }
+            response = HttpClient.Get(m.ServerUrl("/loop")).Await()
+            m.assertFalse(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), HttpClient.CurlErrors.CURLE_TOO_MANY_REDIRECTS)
+            m.AssertContains(response.ErrorMessage(), `StatusCode: ${HttpClient.CurlErrors.CURLE_TOO_MANY_REDIRECTS}`)
+        end function
+
+        @it("fails on a connection the server closes without an answer")
+        function _()
+            m.server.routes = { "/dropped": { drop: true } }
+            response = HttpClient.Get(m.ServerUrl("/dropped")).Await()
+            m.assertFalse(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), HttpClient.CurlErrors.CURLE_GOT_NOTHING)
+            m.assertEqual(response.Text(), "")
+            m.AssertContains(response.ErrorMessage(), "Empty reply from server")
+        end function
+
+        @it("fails on a host that doesn't resolve")
+        function _()
+            response = HttpClient.Get("http://playlet-test.invalid/").Await()
+            m.assertFalse(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), HttpClient.CurlErrors.CURLE_COULDNT_RESOLVE_HOST)
+            m.AssertContains(response.ErrorMessage(), `StatusCode: ${HttpClient.CurlErrors.CURLE_COULDNT_RESOLVE_HOST}`)
+        end function
+
+        @it("makes one attempt by default, even on a 503")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/seq/once/503,200")).Await()
+            m.assertEqual(response.StatusCode(), 503)
+            m.assertEqual(m.Hits("/seq/once/503,200"), 1)
+        end function
+
+        @it("retries a first failure, a 4xx included, then a 5xx until one succeeds")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/seq/failures/404,503,502,200")).RetryCount(3).RetryDelayMs(0).Await()
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertEqual(m.Hits("/seq/failures/404,503,502,200"), 4)
+        end function
+
+        @it("takes a 4xx answer to a retry as final")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/seq/final4xx/503,404,200")).RetryCount(3).RetryDelayMs(0).Await()
+            m.assertEqual(response.StatusCode(), 404)
+            m.assertEqual(m.Hits("/seq/final4xx/503,404,200"), 2)
+        end function
+
+        @it("never retries a timed-out attempt, first or later")
+        function _()
+            first = HttpClient.Get(m.ServerUrl("/seq/firsttimeout/200@2000,200")).AttemptTimeoutMs(300).RetryCount(2).RetryDelayMs(0).Await()
+            m.assertTrue(first.IsTimedOut())
+            m.assertEqual(m.Hits("/seq/firsttimeout/200@2000,200"), 1)
+            later = HttpClient.Get(m.ServerUrl("/seq/latertimeout/503,200@2000,200")).AttemptTimeoutMs(300).RetryCount(2).RetryDelayMs(0).Await()
+            m.assertTrue(later.IsTimedOut())
+            m.assertEqual(m.Hits("/seq/latertimeout/503,200@2000,200"), 2)
+        end function
+
+        @it("retries a refused connection")
+        function _()
             timer = CreateObject("roTimespan")
-            request.Await()
-            m.assertTrue(timer.TotalMilliseconds() >= 1000, `took ${timer.TotalMilliseconds()} ms`)
+            response = HttpClient.Get("http://127.0.0.1:1/").RetryCount(1).RetryDelayMs(300).Await()
+            m.assertTrue(response.StatusCode() < 0)
+            m.AssertTook(timer, 300, 750)
+        end function
+
+        @it("returns the last attempt once the retries are spent")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/seq/spent/503")).RetryCount(2).RetryDelayMs(0).Await()
+            m.assertEqual(response.StatusCode(), 503)
+            m.assertEqual(m.Hits("/seq/spent/503"), 3)
+        end function
+
+        @it("reports a retried attempt to telemetry, unless NoTelemetry")
+        function _()
+            HttpClient.Get(m.ServerUrl("/seq/reported/503,200")).RetryCount(1).RetryDelayMs(0).Await()
             event = m.global.telemetry.LogEvent
             m.assertEqual(event.level, "warning")
-            m.assertEqual(event.message, request.retriedError)
-            m.assertEqual(event.attachments[0].filename, "request.txt")
+            m.AssertContains(event.message, "503")
+            m.AssertContains(event.attachments[0].data, "/seq/reported/503,200")
+
+            m.global.telemetry.LogEvent = {}
+            HttpClient.Get(m.ServerUrl("/seq/unreported/503,200")).RetryCount(1).RetryDelayMs(0).NoTelemetry().Await()
+            m.assertEqual(m.Hits("/seq/unreported/503,200"), 2)
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("retries on the reason RetryIf gives, a success included, and reports that reason")
+        function _()
+            lines = Tests.LogLines(function(url as string) as void
+                response = HttpClient.Get(url).RetryCount(1).RetryDelayMs(0).RetryIf(function(response as HttpClient.Response) as dynamic
+                    if response.Headers()["x-hit"] = "1"
+                        return "the first hit"
+                    end if
+                    return ""
+                end function).Await()
+                GetGlobalAA().retriedResponse = response
+            end function, m.ServerUrl("/seq/retryif/200,200"))
+            m.assertEqual(GetGlobalAA().retriedResponse.Headers()["x-hit"], "2")
+            warnings = [] as string[]
+            for each line in lines
+                if line.InStr("[WARN]") <> -1
+                    warnings.Push(line)
+                end if
+            end for
+            m.assertEqual(warnings.Count(), 1)
+            m.AssertContains(warnings[0], "attempt 1 ended: the first hit")
+            m.assertEqual(m.global.telemetry.LogEvent.message, "the first hit")
+        end function
+
+        @it("doesn't retry when RetryIf gives an empty reason or invalid")
+        function _()
+            empty = HttpClient.Get(m.ServerUrl("/seq/retryifempty/503,200")).RetryCount(1).RetryDelayMs(0).RetryIf(function(_response as HttpClient.Response) as dynamic
+                return ""
+            end function).Await()
+            m.assertEqual(empty.StatusCode(), 503)
+            m.assertEqual(m.Hits("/seq/retryifempty/503,200"), 1)
+            none = HttpClient.Get(m.ServerUrl("/seq/retryifinvalid/503,200")).RetryCount(1).RetryDelayMs(0).RetryIf(function(_response as HttpClient.Response) as dynamic
+                return invalid
+            end function).Await()
+            m.assertEqual(none.StatusCode(), 503)
+            m.assertEqual(m.Hits("/seq/retryifinvalid/503,200"), 1)
+        end function
+
+        @it("reports a failure RetryIf declines to retry, unless NoTelemetry, and not a success or a last attempt")
+        function _()
+            decline = function(_response as HttpClient.Response) as dynamic
+                return ""
+            end function
+            lines = Tests.LogLines(function(request as object) as void
+                request.Await()
+            end function, HttpClient.Get(m.ServerUrl("/seq/declined/503,200")).RetryCount(1).RetryDelayMs(0).RetryIf(decline))
+            warnings = [] as string[]
+            for each line in lines
+                if line.InStr("[WARN]") <> -1
+                    warnings.Push(line)
+                end if
+            end for
+            m.assertEqual(warnings.Count(), 1)
+            m.AssertContains(warnings[0], "attempt 1 ended: ")
+            m.AssertContains(warnings[0], "StatusCode: 503")
+            m.AssertContains(warnings[0], `\nNot retrying: the retry callback declined`)
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.level, "warning")
+            m.AssertContains(event.message, "StatusCode: 503")
+            m.AssertContains(event.attachments[0].data, "/seq/declined/503,200")
+
+            m.global.telemetry.LogEvent = {}
+            HttpClient.Get(m.ServerUrl("/seq/declinedquiet/503,200")).RetryCount(1).RetryDelayMs(0).RetryIf(decline).NoTelemetry().Await()
+            HttpClient.Get(m.ServerUrl("/seq/declinedsuccess/200")).RetryCount(1).RetryDelayMs(0).RetryIf(decline).Await()
+            HttpClient.Get(m.ServerUrl("/seq/declinedlast/503")).RetryIf(decline).Await()
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("asks RetryIf only about the attempts RetryCount allows to retry")
+        function _()
+            ' RetryIf calls it through a local: its m is the global AA.
+            GetGlobalAA().retryIfCalls = 0
+            alwaysRetry = function(_response as HttpClient.Response) as dynamic
+                GetGlobalAA().retryIfCalls += 1
+                return "always"
+            end function
+            timedOut = HttpClient.Get(m.ServerUrl("/seq/retryiftimeout/200@2000,200")).AttemptTimeoutMs(300).RetryCount(1).RetryDelayMs(0).RetryIf(alwaysRetry).Await()
+            m.assertTrue(timedOut.IsTimedOut())
+            m.assertEqual(GetGlobalAA().retryIfCalls, 0)
+            final4xx = HttpClient.Get(m.ServerUrl("/seq/retryiflater/503,404,200")).RetryCount(3).RetryDelayMs(0).RetryIf(alwaysRetry).Await()
+            m.assertEqual(final4xx.StatusCode(), 404)
+            m.assertEqual(GetGlobalAA().retryIfCalls, 1)
+        end function
+
+        @it("rethrows what RetryIf throws, in DEBUG")
+        function _()
+            message = m.ThrownMessage(function(url as object) as void
+                HttpClient.Get(url).RetryCount(1).RetryDelayMs(0).RetryIf(function(_response as object) as dynamic
+                    throw "RetryIf threw"
+                end function).Await()
+            end function, m.ServerUrl("/seq/retryifthrows/503,200"))
+            m.assertEqual(message, "RetryIf threw")
+            m.assertEqual(m.Hits("/seq/retryifthrows/503,200"), 1)
+        end function
+
+        @it("sends a retry RetryDelayMs to 2 × RetryDelayMs after the failed attempt")
+        function _()
+            timer = CreateObject("roTimespan")
+            response = HttpClient.Get(m.ServerUrl("/seq/delayed/503,200")).RetryCount(1).RetryDelayMs(300).Await()
+            m.assertEqual(response.StatusCode(), 200)
+            m.AssertTook(timer, 300, 750)
+        end function
+
+        @it("times out an attempt AttemptTimeoutMs after it was sent")
+        function _()
+            timer = CreateObject("roTimespan")
+            response = HttpClient.Get(m.ServerUrl("/delay/2000")).AttemptTimeoutMs(300).Await()
+            m.AssertTook(timer, 300, 450)
+            m.assertTrue(response.IsTimedOut())
+            m.assertFalse(response.IsSuccess())
+            m.assertEqual(response.StatusCode(), 0)
+            m.assertEqual(response.ErrorMessage(), Tr(Locale.HttpClient.RequestTimedOut))
+        end function
+
+        @it("reports a refused connection with its curl code")
+        function _()
+            response = HttpClient.Get("http://127.0.0.1:1/").Await()
+            m.assertTrue(response.StatusCode() < 0)
+            m.AssertContains(response.ErrorMessage(), `StatusCode: ${response.StatusCode()}`)
+        end function
+
+        @it("reports a failure with its status and body")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/status/404")).Await()
+            message = response.ErrorMessage()
+            m.AssertContains(message, "StatusCode: 404")
+            m.AssertContains(message, "Body: hit 1")
+        end function
+
+        @it("reports a failure without a body with an empty Body line")
+        function _()
+            message = HttpClient.Head(m.ServerUrl("/status/404")).Await().ErrorMessage()
+            m.AssertContains(message, "StatusCode: 404")
+            m.assertTrue(message.EndsWith(`\nBody: `), `"${message}" doesn't end with an empty Body line`)
+        end function
+
+        @it("reports a failure whose body went to a file without a Body line")
+        function _()
+            DeleteFile("tmp:/http-failed-body.txt")
+            message = HttpClient.Get(m.ServerUrl("/status/404")).SaveBodyToFile("tmp:/http-failed-body.txt").Await().ErrorMessage()
+            m.AssertContains(message, "StatusCode: 404")
+            m.assertEqual(message.InStr("Body:"), -1, message)
+            DeleteFile("tmp:/http-failed-body.txt")
+        end function
+
+        @it("returns the same response to every later Await, Wait and Poll")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/status/200")).Send()
+            pending.Await().Headers()["x-marker"] = "same"
+            m.assertEqual(pending.Await().Headers()["x-marker"], "same")
+            m.assertEqual(pending.Poll().Headers()["x-marker"], "same")
+            m.assertEqual(pending.Wait(100).Headers()["x-marker"], "same")
+            m.assertEqual(m.Hits("/status/200"), 1)
+        end function
+
+        @it("runs several fetches at once")
+        function _()
+            timer = CreateObject("roTimespan")
+            slow = HttpClient.Get(m.ServerUrl("/delay/600")).Send()
+            fast = HttpClient.Get(m.ServerUrl("/delay/100")).Send()
+            m.assertEqual(slow.Await().StatusCode(), 200)
+            m.assertEqual(fast.Await().StatusCode(), 200)
+            m.AssertTook(timer, 600, 900)
+        end function
+
+        @it("keeps a response readable once its fetch is gone")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/seq/collected/200")).Await()
+            RunGarbageCollector()
+            m.assertEqual(response.Text(), "hit 1")
+            m.assertEqual(response.Headers()["x-hit"], "1")
+        end function
+
+        @it("leaves no reference cycle behind, on any path")
+        function _()
+            HttpClient.Get(m.ServerUrl("/seq/cycleretry/503,200")).RetryCount(1).RetryDelayMs(0).Await()
+            HttpClient.Get(m.ServerUrl("/delay/2000")).AttemptTimeoutMs(100).Await()
+            cached = m.GetWithoutCacheEntry("/maxage/60/cycle")
+            cached.Await()
+            cached.Await()
+            HttpClient.Get(m.ServerUrl("/delay/2000")).Send().Cancel()
+            cancellation = m.CreateCancellation()
+            pending = HttpClient.Get(m.ServerUrl("/delay/2000")).Cancellation(cancellation).Send()
+            cancellation.node.cancel = true
+            pending.Await()
+            HttpClient.Get(m.ServerUrl("/status/200")).Cancellation(cancellation).Await()
+            m.assertEqual(RunGarbageCollector().orphaned, 0)
+        end function
+
+        @describe("HttpClient.PendingResponse.Wait and Poll")
+
+        @it("Wait returns invalid at waitMs, then the response as soon as it is in")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/800")).Send()
+            timer = CreateObject("roTimespan")
+            m.assertInvalid(pending.Wait(200))
+            m.AssertTook(timer, 200, 300)
+            response = pending.Wait(3000)
+            m.assertEqual(response.StatusCode(), 200)
+            m.AssertTook(timer, 800, 1000)
+        end function
+
+        @it("Poll never blocks")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/500")).Send()
+            timer = CreateObject("roTimespan")
+            m.assertInvalid(pending.Poll())
+            m.AssertTook(timer, 0, 30)
+            m.assertEqual(pending.Await().StatusCode(), 200)
+        end function
+
+        @it("Poll runs the retries, without blocking on the delay")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/seq/polled/503,200")).RetryCount(1).RetryDelayMs(300).Send()
+            response = invalid
+            polls = 0
+            while response = invalid and polls < 400
+                timer = CreateObject("roTimespan")
+                response = pending.Poll()
+                m.AssertTook(timer, 0, 50)
+                polls += 1
+                sleep(10)
+            end while
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertEqual(m.Hits("/seq/polled/503,200"), 2)
+        end function
+
+        @it("Wait runs the retries within its bound")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/seq/waited/503,200")).RetryCount(1).RetryDelayMs(300).Send()
+            timer = CreateObject("roTimespan")
+            response = pending.Wait(3000)
+            m.assertEqual(response.StatusCode(), 200)
+            m.AssertTook(timer, 300, 750)
+        end function
+
+        @it("a late Poll takes an answer already on the port, even past the deadline")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/100")).AttemptTimeoutMs(500).Send()
+            sleep(1000)
+            response = pending.Poll()
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertFalse(response.IsTimedOut())
+        end function
+
+        @it("a late Poll takes an answer that arrived after the deadline")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/seq/arrivedlate/201@600")).AttemptTimeoutMs(300).Send()
+            sleep(1500)
+            response = pending.Poll()
+            m.assertEqual(response.StatusCode(), 201)
+            m.assertEqual(response.Text(), "hit 1")
+            m.assertFalse(response.IsTimedOut())
+            m.assertEqual(m.Hits("/seq/arrivedlate/201@600"), 1)
+        end function
+
+        @it("a late Poll reports a timeout that passed")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/2000")).AttemptTimeoutMs(300).Send()
+            sleep(600)
+            m.assertTrue(pending.Poll().IsTimedOut())
+        end function
+
+        @it("a task loop takes the response at the first Poll after it is in, its own messages left to it")
+        function _()
+            loop = m.CreateLoop()
+            timer = CreateObject("roTimespan")
+            pending = HttpClient.Get(m.ServerUrl("/delay/200")).Send()
+            loop.node.ping = 1
+            response = m.RunLoop(loop, pending, 100, 3000)
+            m.assertEqual(response.StatusCode(), 200)
+            m.AssertTook(timer, 200, 400)
+            m.assertEqual(loop.pings, 1)
+        end function
+
+        @it("a task loop takes the timeout at the first Poll past the deadline, its port busy with its own messages")
+        function _()
+            loop = m.CreateLoop()
+            loop.pingEveryMessage = true
+            timer = CreateObject("roTimespan")
+            pending = HttpClient.Get(m.ServerUrl("/delay/2000")).AttemptTimeoutMs(300).Send()
+            loop.node.ping = 1
+            response = m.RunLoop(loop, pending, 500, 3000)
+            m.AssertTook(timer, 300, 450)
+            m.assertTrue(response.IsTimedOut())
+            m.assertTrue(loop.pings > 1)
+        end function
+
+        @describe("HttpClient cancellation")
+
+        @it("sends nothing when cancelled before Send")
+        function _()
+            cancellation = m.CreateCancellation()
+            cancellation.node.cancel = true
+            response = HttpClient.Get(m.ServerUrl("/seq/precancelled/200")).Cancellation(cancellation).Await()
+            m.assertTrue(response.IsCancelled())
+            m.assertEqual(response.ErrorMessage(), Tr(Locale.HttpClient.RequestCancelled))
+            m.assertEqual(m.Hits("/seq/precancelled/200"), 0)
+        end function
+
+        @it("wakes a blocked Await when another thread cancels")
+        function _()
+            canceller = CreateObject("roSGNode", "CancelLaterTask")
+            canceller.control = "run"
+            timer = CreateObject("roTimespan")
+            while canceller.cancellationNode = invalid and timer.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            cancellation = CancellationUtils.CreateCancellation(canceller.cancellationNode, "cancel", true)
+            pending = HttpClient.Get(m.ServerUrl("/delay/3000")).Cancellation(cancellation).Send()
+            canceller.cancelAfterMs = 300
+            timer = CreateObject("roTimespan")
+            m.assertTrue(pending.Await().IsCancelled())
+            m.AssertTook(timer, 250, 600)
+        end function
+
+        @it("wakes an Await blocked in a task when another thread cancels")
+        function _()
+            task = CreateObject("roSGNode", "AwaitInTask")
+            task.url = m.ServerUrl("/delay/3000")
+            task.cancellationNode = m.CreateCancellation().node
+            task.control = "run"
+            timer = CreateObject("roTimespan")
+            while task.sending <> true and timer.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            sleep(200)
+            timer.Mark()
+            task.cancellationNode.cancel = true
+            while task.state <> "stop" and timer.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            m.assertTrue(task.cancelled)
+            m.AssertTook(timer, 0, 300)
+        end function
+
+        @it("is cancelled at a Poll in a task that never waits, when another thread cancels")
+        function _()
+            task = CreateObject("roSGNode", "PollInTask")
+            task.url = m.ServerUrl("/delay/3000")
+            task.cancellationNode = m.CreateCancellation().node
+            task.control = "run"
+            timer = CreateObject("roTimespan")
+            while task.sending <> true and timer.TotalMilliseconds() < 3000
+                sleep(10)
+            end while
+            sleep(200)
+            timer.Mark()
+            task.cancellationNode.cancel = true
+            while task.state <> "stop" and timer.TotalMilliseconds() < 5000
+                sleep(10)
+            end while
+            m.assertTrue(task.cancelled)
+            m.AssertTook(timer, 0, 1000)
+        end function
+
+        @it("is cancelled at the next Poll after its cancellation is set")
+        function _()
+            cancellation = m.CreateCancellation()
+            pending = HttpClient.Get(m.ServerUrl("/delay/3000")).Cancellation(cancellation).Send()
+            m.assertInvalid(pending.Poll())
+            cancellation.node.cancel = true
+            m.assertTrue(pending.Poll().IsCancelled())
+        end function
+
+        @it("isn't cancelled by its cancellation field set to another value")
+        function _()
+            node = CreateObject("roSGNode", "Node")
+            node.addField("state", "string", false)
+            cancellation = CancellationUtils.CreateCancellation(node, "state", "cancel")
+            node.state = "done"
+            before = HttpClient.Get(m.ServerUrl("/seq/othervaluebefore/200")).Cancellation(cancellation).Await()
+            m.assertEqual(before.StatusCode(), 200)
+            m.assertFalse(before.IsCancelled())
+
+            pending = HttpClient.Get(m.ServerUrl("/delay/300")).Cancellation(cancellation).Send()
+            m.assertInvalid(pending.Poll())
+            node.state = "running"
+            during = pending.Await()
+            m.assertEqual(during.StatusCode(), 200)
+            m.assertFalse(during.IsCancelled())
+        end function
+
+        @it("reads as cancelled once its cancellation is set, though the answer came before")
+        function _()
+            cancellation = m.CreateCancellation()
+            response = HttpClient.Get(m.ServerUrl("/seq/cancelledafter/200")).Cancellation(cancellation).Await()
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertFalse(response.IsCancelled())
+            cancellation.node.cancel = true
+            m.assertTrue(response.IsCancelled())
+        end function
+
+        @it("never reads as cancelled while its cancellation isn't set")
+        function _()
+            m.assertFalse(HttpClient.Get(m.ServerUrl("/seq/nocancellation/200")).Await().IsCancelled())
+            node = CreateObject("roSGNode", "Node")
+            node.addField("state", "string", false)
+            cancellation = CancellationUtils.CreateCancellation(node, "state", "cancel")
+            response = HttpClient.Get(m.ServerUrl("/seq/unsetcancellation/200")).Cancellation(cancellation).Await()
+            m.assertFalse(response.IsCancelled())
+            node.state = "done"
+            m.assertFalse(response.IsCancelled())
+        end function
+
+        @it("reads as cancelled when its fetch was cancelled")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/3000")).Send()
+            pending.Cancel()
+            m.assertTrue(pending.Await().IsCancelled())
+            cancellation = m.CreateCancellation()
+            cancellation.node.cancel = true
+            m.assertTrue(HttpClient.Get(m.ServerUrl("/seq/cancelledfetch/200")).Cancellation(cancellation).Await().IsCancelled())
+            m.assertEqual(m.Hits("/seq/cancelledfetch/200"), 0)
+        end function
+
+        @it("stays cancelled once read as cancelled, though its cancellation is reset")
+        function _()
+            cancellation = m.CreateCancellation()
+            response = HttpClient.Get(m.ServerUrl("/seq/cancelledreset/200")).Cancellation(cancellation).Await()
+            cancellation.node.cancel = true
+            m.assertTrue(response.IsCancelled())
+            cancellation.node.cancel = false
+            m.assertTrue(response.IsCancelled())
+        end function
+
+        @it("reports a failure as cancelled once its cancellation is set, though the answer came before")
+        function _()
+            cancellation = m.CreateCancellation()
+            response = HttpClient.Get(m.ServerUrl("/seq/failedcancelledafter/404")).Cancellation(cancellation).Await()
+            m.AssertContains(response.ErrorMessage(), "StatusCode: 404")
+            cancellation.node.cancel = true
+            m.assertEqual(response.ErrorMessage(), Tr(Locale.HttpClient.RequestCancelled))
+        end function
+
+        @it("ends the delay before a retry when cancelled")
+        function _()
+            cancellation = m.CreateCancellation()
+            pending = HttpClient.Get(m.ServerUrl("/seq/cancelretry/503,200")).RetryCount(1).RetryDelayMs(3000).Cancellation(cancellation).Send()
+            m.assertInvalid(pending.Wait(300))
+            cancellation.node.cancel = true
+            timer = CreateObject("roTimespan")
+            m.assertTrue(pending.Await().IsCancelled())
+            m.AssertTook(timer, 0, 50)
+            m.assertEqual(m.Hits("/seq/cancelretry/503,200"), 1)
+        end function
+
+        @it("neither retries nor reports a failed attempt whose cancellation was set before its answer was read")
+        function _()
+            ' RetryIf calls it through a local: its m is the global AA.
+            GetGlobalAA().retryIfCalls = 0
+            alwaysRetry = function(_response as HttpClient.Response) as dynamic
+                GetGlobalAA().retryIfCalls += 1
+                return "always"
+            end function
+            requests = [
+                HttpClient.Get(m.ServerUrl("/seq/cancelunread/503,200"))
+                HttpClient.Get(m.ServerUrl("/seq/cancelunreadretryif/503,200")).RetryIf(alwaysRetry)
+            ]
+            for each request in requests
+                request.RetryCount(1).RetryDelayMs(0).Cancellation(m.CreateCancellation())
+            end for
+            lines = Tests.LogLines(function(requests as object) as void
+                responses = []
+                for each request in requests
+                    pending = request.Send()
+                    ' The 503 reaches the port before the cancellation's event.
+                    sleep(300)
+                    request._cancellation.node.cancel = true
+                    responses.Push(pending.Await())
+                end for
+                GetGlobalAA().unreadResponses = responses
+            end function, requests)
+            for each response in GetGlobalAA().unreadResponses
+                m.assertTrue(response.IsCancelled())
+                m.assertEqual(response.StatusCode(), 503)
+            end for
+            m.assertEqual(m.Hits("/seq/cancelunread/503,200"), 1)
+            m.assertEqual(m.Hits("/seq/cancelunreadretryif/503,200"), 1)
+            m.assertEqual(GetGlobalAA().retryIfCalls, 0)
+            m.AssertNotLogged(lines, "[WARN]")
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("sends no retry once its cancellation is set, though the cancellation's event never comes")
+        function _()
+            cancellation = m.CreateCancellation()
+            pending = HttpClient.Get(m.ServerUrl("/seq/cancelretrylost/503,200")).RetryCount(1).RetryDelayMs(500).Cancellation(cancellation).Send()
+            m.assertInvalid(pending.Wait(300))
+            pending._cancellationObserver.UnobserveField("changed")
+            cancellation.node.cancel = true
+            m.assertTrue(pending.Await().IsCancelled())
+            m.assertEqual(m.Hits("/seq/cancelretrylost/503,200"), 1)
+        end function
+
+        @it("Cancel completes it as cancelled")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/delay/3000")).Send()
+            pending.Cancel()
+            timer = CreateObject("roTimespan")
+            m.assertTrue(pending.Await().IsCancelled())
+            m.AssertTook(timer, 0, 50)
+        end function
+
+        @it("leaves the caller's own observer of the cancellation in place")
+        function _()
+            cancellation = m.CreateCancellation()
+            callerPort = CreateObject("roMessagePort")
+            cancellation.node.ObserveFieldScoped("cancel", callerPort)
+            m.assertEqual(HttpClient.Get(m.ServerUrl("/status/200")).Cancellation(cancellation).Await().StatusCode(), 200)
+            cancellation.node.cancel = true
+            m.assertEqual(type(callerPort.GetMessage()), "roSGNodeEvent")
+        end function
+
+        @it("stops observing its cancellation once the response is taken, or on Cancel")
+        function _()
+            cancellation = m.CreateCancellation()
+            taken = HttpClient.Get(m.ServerUrl("/status/200")).Cancellation(cancellation).Send()
+            takenObserver = taken["_cancellationObserver"]
+            m.assertFalse(takenObserver.nodeDestroy)
+            taken.Await()
+            m.assertTrue(takenObserver.nodeDestroy)
+
+            cancelled = HttpClient.Get(m.ServerUrl("/delay/3000")).Cancellation(cancellation).Send()
+            cancelledObserver = cancelled["_cancellationObserver"]
+            cancelled.Cancel()
+            m.assertTrue(cancelledObserver.nodeDestroy)
+
+            cancellation.node.cancel = true
+            precancelled = HttpClient.Get(m.ServerUrl("/status/200")).Cancellation(cancellation).Send()
+            precancelledObserver = precancelled["_cancellationObserver"]
+            m.assertTrue(precancelled.Poll().IsCancelled())
+            m.assertTrue(precancelledObserver.nodeDestroy)
+        end function
+
+        @it("cancels every fetch sharing a cancellation")
+        function _()
+            cancellation = m.CreateCancellation()
+            first = HttpClient.Get(m.ServerUrl("/delay/3000")).Cancellation(cancellation).Send()
+            finished = HttpClient.Get(m.ServerUrl("/status/200")).Cancellation(cancellation).Await()
+            second = HttpClient.Get(m.ServerUrl("/delay/3000")).Cancellation(cancellation).Send()
+            m.assertEqual(finished.StatusCode(), 200)
+            cancellation.node.cancel = true
+            m.assertTrue(first.Await().IsCancelled())
+            m.assertTrue(second.Await().IsCancelled())
+        end function
+
+        @describe("HttpClient cache")
+
+        @it("serves a GET from the cache for its Cache-Control max-age, by default")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/60/served")
+            m.assertFalse(request.Await().IsCached())
+            response = request.Await()
+            m.assertTrue(response.IsCached())
+            m.assertEqual(response.StatusCode(), 200)
+            m.assertEqual(response.Text(), "hit 1")
+            m.assertEqual(response.Headers()["X-Hit"], "1")
+            m.assertEqual(m.Hits("/maxage/60/served"), 1)
+        end function
+
+        @it("returns a cached response at the first Poll")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/60/polled")
+            request.Await()
+            m.assertTrue(request.Send().Poll().IsCached())
+        end function
+
+        @it("keeps an entry in a request_v3_ file, one per url, headers and file the body is saved to")
+        function _()
+            path = HttpCache.GetFilePath("http://x/", {}, invalid)
+            m.assertTrue(path.StartsWith("cachefs:/request_v3_"), path)
+            m.assertNotEqual(HttpCache.GetFilePath("http://y/", {}, invalid), path)
+            m.assertNotEqual(HttpCache.GetFilePath("http://x/", { "X-A": "1" }, invalid), path)
+            m.assertNotEqual(HttpCache.GetFilePath("http://x/", {}, "tmp:/body.txt"), path)
+            request = m.GetWithoutCacheEntry("/maxage/60/filename")
+            request.Await()
+            m.assertTrue(CreateObject("roFileSystem").Exists(m.CacheFilePath(request)))
+        end function
+
+        @it("reads no entry that isn't there, quietly")
+        function _()
+            path = "cachefs:/request_v3_missing.json"
+            DeleteFile(path)
+            lines = Tests.LogLines(function(path as string) as void
+                GetGlobalAA().missingEntry = HttpCache.Read(path, invalid)
+            end function, path)
+            m.assertInvalid(GetGlobalAA().missingEntry)
+            m.assertEmpty(lines)
+        end function
+
+        @it("warns of an empty entry and deletes it")
+        function _()
+            entryPath = "cachefs:/request_v3_empty.json"
+            WriteAsciiFile(entryPath, "")
+            m.assertTrue(CreateObject("roFileSystem").Exists(entryPath))
+            m.global.telemetry.LogWarn = ""
+            warnings = [] as string[]
+            for each line in Tests.LogLines(function(entryPath as string) as void
+                    GetGlobalAA().emptyEntry = HttpCache.Read(entryPath, invalid)
+                end function, entryPath)
+                if line.InStr("[WARN]") <> -1
+                    warnings.Push(line)
+                end if
+            end for
+            m.assertInvalid(GetGlobalAA().emptyEntry)
+            m.assertEqual(warnings.Count(), 1)
+            m.assertEqual(Tests.LogLineMessage(warnings[0]), "Failed to parse cache.")
+            m.assertEqual(m.global.telemetry.LogWarn, warnings[0])
+            m.assertFalse(CreateObject("roFileSystem").Exists(entryPath))
+        end function
+
+        @it("warns of a corrupt entry and deletes it, though its body file is gone")
+        function _()
+            entryPath = "cachefs:/request_v3_corruptgone.json"
+            WriteAsciiFile(entryPath, "not a cache entry")
+            DeleteFile("tmp:/http-corruptgone.txt")
+            warnings = [] as string[]
+            for each line in Tests.LogLines(function(entryPath as string) as void
+                    GetGlobalAA().goneEntry = HttpCache.Read(entryPath, "tmp:/http-corruptgone.txt")
+                end function, entryPath)
+                if line.InStr("[WARN]") <> -1
+                    warnings.Push(Tests.LogLineMessage(line))
+                end if
+            end for
+            m.assertInvalid(GetGlobalAA().goneEntry)
+            m.assertEqual(warnings, ["Failed to parse cache."])
+            m.assertFalse(CreateObject("roFileSystem").Exists(entryPath))
+        end function
+
+        @it("deletes an expired entry whose body file is gone")
+        function _()
+            entryPath = "cachefs:/request_v3_expiredgone.json"
+            WriteAsciiFile(entryPath, `{"expiresAt":1,"statusCode":200,"headers":{}}\n`)
+            DeleteFile("tmp:/http-expiredgone.txt")
+            m.assertInvalid(HttpCache.Read(entryPath, "tmp:/http-expiredgone.txt"))
+            m.assertFalse(CreateObject("roFileSystem").Exists(entryPath))
+        end function
+
+        @it("deletes a valid entry whose body file is gone, so the request is sent again")
+        function _()
+            path = "tmp:/http-validgone.txt"
+            request = HttpClient.Get(m.ServerUrl("/maxage/60/validgone")).SaveBodyToFile(path)
+            DeleteFile(m.CacheFilePath(request))
+            request.Await()
+            m.assertTrue(request.Await().IsCached())
+            DeleteFile(path)
+            m.assertInvalid(HttpCache.Read(m.CacheFilePath(request), path))
+            m.assertFalse(CreateObject("roFileSystem").Exists(m.CacheFilePath(request)))
+            response = request.Await()
+            m.assertFalse(response.IsCached())
+            m.assertEqual(ReadAsciiFile(path), "hit 2")
+            m.assertEqual(m.Hits("/maxage/60/validgone"), 2)
+            DeleteFile(path)
+        end function
+
+        @it("doesn't cache what Cache-Control's no-store or no-cache forbid, unless CacheForSeconds")
+        function _()
+            m.server.routes = {
+                "/nostore": { status: 200, headers: { "Cache-Control": "no-store" }, body: "no-store" }
+                "/nocache": { status: 200, headers: { "Cache-Control": "max-age=60, no-cache" }, body: "no-cache" }
+            }
+            for each path in ["/nostore", "/nocache"]
+                request = m.GetWithoutCacheEntry(path)
+                m.assertEqual(request.Await().StatusCode(), 200)
+                m.assertFalse(CreateObject("roFileSystem").Exists(m.CacheFilePath(request)), path)
+                m.assertFalse(request.Await().IsCached(), path)
+            end for
+            forSeconds = m.GetWithoutCacheEntry("/nostore").CacheForSeconds(60)
+            forSeconds.Await()
+            response = forSeconds.Await()
+            m.assertTrue(response.IsCached())
+            m.assertEqual(response.Text(), "no-store")
+            m.assertEqual(m.Hits("/nostore"), 3)
+        end function
+
+        @it("reads Cache-Control in any case, and a cached response's headers in any case")
+        function _()
+            m.server.routes = { "/mixedcase": { status: 200, headers: { "cAcHe-CoNtRoL": "max-age=60", "X-Echo-Test": "true" }, body: "cached" } }
+            request = m.GetWithoutCacheEntry("/mixedcase")
+            first = request.Await()
+            m.assertFalse(first.IsCached())
+            m.assertEqual(first.Headers()["X-Echo-Test"], "true")
+            m.assertEqual(first.Headers()["x-echo-test"], "true")
+            cached = request.Await()
+            m.assertTrue(cached.IsCached())
+            m.assertEqual(cached.Text(), "cached")
+            m.assertEqual(cached.Headers()["X-Echo-Test"], "true")
+            m.assertEqual(cached.Headers()["x-echo-test"], "true")
+            m.assertEqual(cached.Headers()["CACHE-CONTROL"], "max-age=60")
+            m.assertEqual(m.Hits("/mixedcase"), 1)
+        end function
+
+        @it("caches for CacheForSeconds whatever the response says")
+        function _()
+            request = m.GetWithoutCacheEntry("/seq/forseconds/200").CacheForSeconds(60)
+            request.Await()
+            m.assertTrue(request.Await().IsCached())
+        end function
+
+        @it("doesn't cache without max-age, with max-age=0, or a failure")
+        function _()
+            noMaxAge = m.GetWithoutCacheEntry("/seq/nomaxage/200")
+            noMaxAge.Await()
+            m.assertFalse(noMaxAge.Await().IsCached())
+            failed = m.GetWithoutCacheEntry("/seq/cachedfailure/503").CacheForSeconds(60)
+            failed.Await()
+            m.assertFalse(failed.Await().IsCached())
+            maxAgeZero = m.GetWithoutCacheEntry("/maxage/0/uncached")
+            maxAgeZero.Await()
+            m.assertFalse(maxAgeZero.Await().IsCached())
+        end function
+
+        @it("caches only a GET")
+        function _()
+            head = HttpClient.Head(m.ServerUrl("/maxage/60/head"))
+            head.Await()
+            m.assertFalse(head.Await().IsCached())
+            post = HttpClient.Post(m.ServerUrl("/maxage/60/post"))
+            post.Await()
+            m.assertFalse(post.Await().IsCached())
+            m.assertEqual(m.Hits("/maxage/60/head"), 2)
+            m.assertEqual(m.Hits("/maxage/60/post"), 2)
+        end function
+
+        @it("NoCache neither reads nor writes the cache, CacheForSeconds included")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/60/nocache")
+            request.Await()
+            m.assertFalse(HttpClient.Get(m.ServerUrl("/maxage/60/nocache")).NoCache().Await().IsCached())
+            DeleteFile(m.CacheFilePath(request))
+            HttpClient.Get(m.ServerUrl("/maxage/60/nocache")).CacheForSeconds(60).NoCache().Await()
+            m.assertFalse(request.Await().IsCached())
+            m.assertEqual(m.Hits("/maxage/60/nocache"), 4)
+        end function
+
+        @it("warns of a corrupt entry with what failed to parse, then replaces it")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/60/corrupt")
+            corruptEntries = [
+                { text: "not a cache entry", warning: "Failed to parse cache." }
+                { text: `{"expiresAt":\nhit 0`, warning: "Failed to parse metadata from cache." }
+                { text: `{"expiresAt":2000000000,"statusCode":200,"headers":"none"}\nhit 0`, warning: "Failed to parse headers from cache." }
+            ]
+            for each corrupt in corruptEntries
+                WriteAsciiFile(m.CacheFilePath(request), corrupt.text)
+                GetGlobalAA().corruptResponse = invalid
+                lines = Tests.LogLines(function(request as object) as void
+                    GetGlobalAA().corruptResponse = request.Await()
+                end function, request)
+                response = GetGlobalAA().corruptResponse
+                m.assertFalse(response.IsCached())
+                m.assertEqual(response.StatusCode(), 200)
+                warnings = [] as string[]
+                for each line in lines
+                    if line.InStr("[WARN]") <> -1
+                        warnings.Push(line)
+                    end if
+                end for
+                m.assertEqual(warnings.Count(), 1)
+                m.assertEqual(Tests.LogLineMessage(warnings[0]), corrupt.warning)
+                m.assertEqual(m.global.telemetry.LogWarn, warnings[0])
+                m.assertTrue(request.Await().IsCached())
+            end for
+        end function
+
+        @it("expires an entry")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/1/expires")
+            request.Await()
+            sleep(2100)
+            m.assertFalse(request.Await().IsCached())
+        end function
+
+        @it("keeps an entry for the time it was written with, whatever the request reading it sets")
+        function _()
+            request = m.GetWithoutCacheEntry("/maxage/1/writtenexpiry")
+            request.Await()
+            longer = HttpClient.Get(m.ServerUrl("/maxage/1/writtenexpiry")).CacheForSeconds(60)
+            m.assertTrue(longer.Await().IsCached())
+            sleep(2100)
+            m.assertFalse(longer.Await().IsCached())
+
+            m.GetWithoutCacheEntry("/seq/writtenforseconds/200").CacheForSeconds(60).Await()
+            m.assertTrue(HttpClient.Get(m.ServerUrl("/seq/writtenforseconds/200")).Await().IsCached())
+            m.assertEqual(m.Hits("/seq/writtenforseconds/200"), 1)
+        end function
+
+        @it("keeps an answer taken before its cancellation was set")
+        function _()
+            cancellation = m.CreateCancellation()
+            request = m.GetWithoutCacheEntry("/maxage/60/cancelledafter")
+            response = request.Cancellation(cancellation).Await()
+            cancellation.node.cancel = true
+            m.assertTrue(response.IsCancelled())
+            m.assertTrue(request.Cancellation(invalid).Await().IsCached())
+            m.assertEqual(m.Hits("/maxage/60/cancelledafter"), 1)
+        end function
+
+        @it("doesn't cache an empty body, unless it went to a file")
+        function _()
+            m.server.routes = { "/emptybody": { status: 200, headers: { "Cache-Control": "max-age=60" }, body: "" } }
+            request = m.GetWithoutCacheEntry("/emptybody")
+            m.assertEqual(request.Await().Text(), "")
+            m.assertFalse(request.Await().IsCached())
+            m.assertEqual(m.Hits("/emptybody"), 2)
+
+            path = "tmp:/http-empty-download.txt"
+            DeleteFile(path)
+            toFile = HttpClient.Get(m.ServerUrl("/emptybody")).SaveBodyToFile(path)
+            DeleteFile(m.CacheFilePath(toFile))
+            m.assertEqual(toFile.Await().StatusCode(), 200)
+            m.assertTrue(toFile.Await().IsCached())
+            DeleteFile(path)
+        end function
+
+        @it("caches a body saved to a file while the file exists")
+        function _()
+            path = "tmp:/http-download.txt"
+            request = HttpClient.Get(m.ServerUrl("/maxage/60/download")).SaveBodyToFile(path)
+            DeleteFile(m.CacheFilePath(request))
+            DeleteFile(path)
+            m.assertEqual(request.Await().StatusCode(), 200)
+            m.assertEqual(ReadAsciiFile(path), "hit 1")
+            m.assertTrue(request.Await().IsCached())
+            DeleteFile(path)
+            m.assertFalse(request.Await().IsCached())
+            m.assertEqual(ReadAsciiFile(path), "hit 2")
+        end function
+
+        @describe("HttpClient.Response")
+
+        @it("builds from statusCode, headers and text")
+        function _()
+            response = new HttpClient.Response({ statusCode: 404, headers: { "X-A": "b" }, text: `{"a":1}` })
+            m.assertEqual(response.StatusCode(), 404)
+            m.assertEqual(response.Headers()["x-a"], "b")
+            m.assertEqual(response.Json().a, 1)
+            m.assertEqual(response.ErrorMessage(), `StatusCode: 404\nBody: {"a":1}`)
+            m.assertEqual((new HttpClient.Response({ statusCode: 500 })).ErrorMessage(), `StatusCode: 500\nBody: `)
+        end function
+
+        @it("reads Retry-After in seconds")
+        function _()
+            retryAfterSeconds = function(retryAfter as dynamic) as dynamic
+                response = new HttpClient.Response({ headers: { "Retry-After": retryAfter } })
+                return response.RetryAfterSeconds()
+            end function
+            m.assertEqual(retryAfterSeconds(" 120 "), 120)
+            m.assertEqual(retryAfterSeconds("0"), 0)
+            m.assertInvalid(retryAfterSeconds("Wed, 21 Oct 2026 07:28:00 GMT"))
+            m.assertInvalid(retryAfterSeconds(invalid))
+        end function
+
+        @it("reads Retry-After off a 429")
+        function _()
+            m.server.routes = { "/busy": { status: 429, headers: { "Retry-After": "120" }, body: "busy" } }
+            response = HttpClient.Get(m.ServerUrl("/busy")).Await()
+            m.assertEqual(response.StatusCode(), 429)
+            m.assertEqual(response.RetryAfterSeconds(), 120)
+            m.AssertContains(response.ErrorMessage(), "HTTP 429 error")
+        end function
+
+        @it("parses invalid JSON as invalid")
+        function _()
+            m.assertInvalid(HttpClient.Get(m.ServerUrl("/status/200")).Await().Json())
+        end function
+
+        @describe("HttpClient misuse, asserted in DEBUG")
+
+        @it("a body on GET or HEAD")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.TextBody("x")
+            end function, HttpClient.Get("http://x/")), "TextBody on a GET request")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.JsonBody({})
+            end function, HttpClient.Head("http://x/")), "JsonBody on a HEAD request")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.FormBody({})
+            end function, HttpClient.Get("http://x/")), "FormBody on a GET request")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.FileBody("tmp:/x")
+            end function, HttpClient.Get("http://x/")), "FileBody on a GET request")
+        end function
+
+        @it("caching or saving the body to a file on anything but GET")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.CacheForSeconds(60)
+            end function, HttpClient.Put("http://x/")), "CacheForSeconds on a PUT request")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.SaveBodyToFile("tmp:/x")
+            end function, HttpClient.Head("http://x/")), "SaveBodyToFile on a HEAD request")
+        end function
+
+        @it("out of range numbers")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.AttemptTimeoutMs(0)
+            end function, HttpClient.Get("http://x/")), "AttemptTimeoutMs(0)")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.RetryCount(-1)
+            end function, HttpClient.Get("http://x/")), "RetryCount(-1)")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.RetryDelayMs(-1)
+            end function, HttpClient.Get("http://x/")), "RetryDelayMs(-1)")
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.CacheForSeconds(0)
+            end function, HttpClient.Get("http://x/")), "CacheForSeconds(0)")
+        end function
+
+        @it("an invalid query param value")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.QueryParam("q", invalid)
+            end function, HttpClient.Get("http://x/")), `QueryParam("q", invalid)`)
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.QueryParamArray("ids", invalid, UrlUtils.QueryParamArrayType.CommaSeparated)
+            end function, HttpClient.Get("http://x/")), `QueryParamArray("ids", invalid)`)
+        end function
+
+        @it("a RetryIf that returns no reason")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(url as object) as void
+                HttpClient.Get(url).RetryCount(1).RetryDelayMs(0).RetryIf(function(_response as object) as dynamic
+                    return true
+                end function).Await()
+            end function, m.ServerUrl("/seq/retryifboolean/503,200")), "RetryIf returned a Boolean")
+        end function
+
+        @it("a cancellation that isn't one")
+        function _()
+            m.AssertContains(m.ThrownMessage(function(request as object) as void
+                request.Cancellation({ node: invalid })
+            end function, HttpClient.Get("http://x/")), "Cancellation takes")
+        end function
+
+        @it("Wait(0): wait(0) blocks forever on Roku")
+        function _()
+            pending = HttpClient.Get(m.ServerUrl("/status/200")).Send()
+            m.AssertContains(m.ThrownMessage(function(pending as object) as void
+                pending.Wait(0)
+            end function, pending), "Wait(0)")
+            pending.Await()
+        end function
+
+        @it("Text or Json on a response whose body was saved to a file")
+        function _()
+            response = HttpClient.Get(m.ServerUrl("/status/200")).SaveBodyToFile("tmp:/http-misuse.txt").Await()
+            m.AssertContains(m.ThrownMessage(function(response as object) as void
+                response.Text()
+            end function, response), "Text and Json on a SaveBodyToFile response")
+            m.AssertContains(m.ThrownMessage(function(response as object) as void
+                response.Json()
+            end function, response), "Text and Json on a SaveBodyToFile response")
         end function
 
     end class

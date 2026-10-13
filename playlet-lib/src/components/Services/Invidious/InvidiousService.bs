@@ -106,7 +106,7 @@ namespace Invidious
             end if
 
             url = `${auth.serverUrl}${Invidious.HISTORY_ENDPOINT}/${videoId}`
-            request = HttpClient.Post(url, "")
+            request = HttpClient.Post(url)
             request.Headers(m.GetAuthenticationHeaders(auth.token))
             request.Cancellation(cancellation)
             response = request.Await()
@@ -120,7 +120,7 @@ namespace Invidious
             request = HttpClient.Get(url)
             request.QueryParam("region", m.GetUserCountryCode())
             request.QueryParam("q", q)
-            request.CacheSeconds(60 * 60 * 24)
+            request.CacheForSeconds(60 * 60 * 24)
 
             request.Cancellation(cancellation)
 
@@ -136,31 +136,23 @@ namespace Invidious
 
         function GetVideoMetadata(videoId as string, options = invalid as object) as object
             cancellation = OptionUtils.Get(options, "cancellation")
-            tryCount = OptionUtils.GetOrDefault(options, "tryCount", 2)
+            retryCount = OptionUtils.GetOrDefault(options, "retryCount", 1)
 
             instance = m.GetInstance()
             url = `${instance}${Invidious.VIDEOS_ENDPOINT}/${videoId}`
 
             request = HttpClient.Get(url)
-
             request.Cancellation(cancellation)
-
-            if tryCount > 1
-                request.TryCount(tryCount)
-                request.RetryCallback(function(context as object) as boolean
-                    response = context.response
-                    ' In some cases, video info requests return "HTTP/0.9 when not allowed" errors.
-                    ' Retrying should usually fix the issue.
-                    if response.StatusCode() = HttpClient.CurlErrors.CURLE_UNSUPPORTED_PROTOCOL
-                        errorMessage = response.ErrorMessage()
-                        if errorMessage.InStr("HTTP/0.9") <> -1
-                            return true
-                        end if
-                    end if
-
-                    return false
-                end function)
-            end if
+            request.RetryCount(retryCount)
+            ' In some cases, video info requests return "HTTP/0.9 when not allowed" errors.
+            ' Retrying should usually fix the issue.
+            request.RetryIf(function(response as HttpClient.Response) as string
+                errorMessage = response.ErrorMessage()
+                if response.StatusCode() = HttpClient.CurlErrors.CURLE_UNSUPPORTED_PROTOCOL and errorMessage.InStr("HTTP/0.9") <> -1
+                    return errorMessage
+                end if
+                return ""
+            end function)
 
             response = request.Await()
             if not response.IsSuccess()
@@ -227,8 +219,8 @@ namespace Invidious
 
             request = HttpClient.Get(url)
             request.Cancellation(cancellation)
-            request.CacheSeconds(60 * 60 * 24)' 24 hours
-            request.TryCount(3)
+            request.CacheForSeconds(60 * 60 * 24)' 24 hours
+            request.RetryCount(2)
 
             return request.Await()
         end function
@@ -297,10 +289,6 @@ namespace Invidious
                 }
             end if
 
-            instance = m.GetInstance()
-
-            request = HttpClient.Get(instance + endpoint.url)
-
             profile = invalid
 
             if endpoint.authenticated = true
@@ -315,11 +303,13 @@ namespace Invidious
                         error: ERROR_NOT_AUTHENTICATED
                     }
                 end if
-                request.Url(auth.serverUrl + endpoint.url)
+                request = HttpClient.Get(auth.serverUrl + endpoint.url)
                 request.Headers(m.GetAuthenticationHeaders(auth.token))
                 if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
                     request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
                 end if
+            else
+                request = HttpClient.Get(m.GetInstance() + endpoint.url)
             end if
 
             if endpoint.queryParams <> invalid
@@ -342,15 +332,15 @@ namespace Invidious
             end if
 
             if feedSource.cacheSeconds <> invalid
-                request.CacheSeconds(feedSource.cacheSeconds)
+                request.CacheForSeconds(feedSource.cacheSeconds)
             else if endpoint.cacheSeconds <> invalid
-                request.CacheSeconds(endpoint.cacheSeconds)
+                request.CacheForSeconds(endpoint.cacheSeconds)
             end if
 
             if feedSource.tryCount <> invalid
-                request.TryCount(feedSource.tryCount)
+                request.RetryCount(feedSource.tryCount - 1)
             else if endpoint.tryCount <> invalid
-                request.TryCount(endpoint.tryCount)
+                request.RetryCount(endpoint.tryCount - 1)
             end if
 
             if feedSource.queryParams <> invalid
@@ -382,7 +372,7 @@ namespace Invidious
                 profile: profile
             })
 
-            if response.IsSuccess() and result <> invalid
+            if result <> invalid
                 return {
                     success: true
                     result: result
@@ -396,32 +386,28 @@ namespace Invidious
             end if
         end function
 
-        function SendRequest(request as HttpClient.HttpRequest, httpServer as dynamic) as dynamic
+        function SendRequest(request as HttpClient.Request, httpServer as dynamic) as HttpClient.Response
             if httpServer = invalid
                 return request.Await()
             end if
 
-            url = request.BuildUrl()
+            url = request.GetFullUrl()
             isUrlToLocalServer = url.StartsWith("http://127.0.0.1:8888") or url.StartsWith(m.invidiousNode.webServer@.GetServerAddress())
             if not isUrlToLocalServer
                 return request.Await()
             end if
 
             parsedUrl = UrlUtils.ParseUrl(url)
-            method = request.GetMethod()
-            uri = parsedUrl.path
-            headers = request.GetHeaders()
-            body = ValidString(request.GetBody())
-            responseObj = httpServer.ProcessRequestLocal(method, uri, headers, body)
-            response = new HttpClient.HttpResponse(request, invalid)
-            response.OverrideStatusCode(responseObj.http_code)
-            response.OverrideHeaders(responseObj.headers)
+            responseObj = httpServer.ProcessRequestLocal(request.GetMethod(), parsedUrl.path, request.GetHeaders(), ValidString(request.GetTextBody()))
             body = ""
             if responseObj.body <> invalid
                 body = responseObj.body.ToAsciiString()
             end if
-            response.OverrideText(body)
-            return response
+            return new HttpClient.Response({
+                statusCode: responseObj.http_code
+                headers: responseObj.headers
+                text: body
+            })
         end function
 
         function DefaultHandler(context as object) as object
@@ -450,7 +436,6 @@ namespace Invidious
             if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted playlist.
-                response.OverrideStatusCode(200)
                 return {
                     isLastPage: true
                     items: [{
@@ -481,7 +466,6 @@ namespace Invidious
             if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted channel.
-                response.OverrideStatusCode(200)
                 return {
                     isLastPage: true
                     items: [{
@@ -534,7 +518,6 @@ namespace Invidious
                 ' with just a video id, which will allow us to show a valid thumbnail if possible.
                 ' This is to makes it possible to load a bookmarked video and delete it even if
                 ' it is no longer valid.
-                response.OverrideStatusCode(200)
                 return {
                     items: [{
                         "type": "video"
@@ -561,7 +544,6 @@ namespace Invidious
             if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted playlist.
-                response.OverrideStatusCode(200)
                 return {
                     items: [{
                         "type": "playlist"
@@ -590,7 +572,6 @@ namespace Invidious
             if not response.IsSuccess()
                 ' Similar to VideoInfoHandler, we can return a valid response
                 ' in case of a deleted channel.
-                response.OverrideStatusCode(200)
                 return {
                     items: [{
                         "type": "channel"
@@ -701,12 +682,12 @@ namespace Invidious
             return json
         end function
 
-        function MarkNeedsReauthIfCredentialsRejected(response as object, profile as object) as void
+        function MarkNeedsReauthIfCredentialsRejected(response as HttpClient.Response, profile as object) as void
             if response.StatusCode() <> 403
                 return
             end if
 
-            body = ValidString(response.Text())
+            body = response.Text()
             LogWarn(`Invidious instance responded with 403: ${body}`)
             if profile = invalid or profile.type <> "invidious"
                 return
@@ -743,7 +724,7 @@ namespace Invidious
         function UnregisterToken(instance as string, token as string) as object
             url = `${instance}${Invidious.AUTH_TOKENS_UNREGISTER}`
 
-            request = HttpClient.Post(url, token)
+            request = HttpClient.Post(url).TextBody(token)
             request.Headers(m.GetAuthenticationHeaders(token))
             request.Header("Content-Type", "application/json")
 
@@ -787,7 +768,7 @@ namespace Invidious
 
         function Subscribe(auth as ProfileContentAuthTokenUtils.AccessTokenResult, channelId as string, cancellation = invalid as object) as object
             url = `${auth.serverUrl}${Invidious.AUTH_SUBSCRIPTIONS}/${channelId}`
-            request = HttpClient.Post(url, "")
+            request = HttpClient.Post(url)
             if not StringUtils.IsNullOrEmpty(auth.activeIdentifyToken)
                 request.QueryParam("activeIdentifyToken", auth.activeIdentifyToken)
             end if

@@ -32,13 +32,12 @@ namespace Innertube
             end if
         end if
 
-        request = HttpClient.PostJson("https://www.youtube.com/youtubei/v1/search?prettyPrint=false&alt=json", payload)
+        request = HttpClient.Post("https://www.youtube.com/youtubei/v1/search?prettyPrint=false&alt=json").JsonBody(payload)
         request.Headers(Innertube.CreateHeaders(ClientType.Web))
 
         request.Cancellation(cancellation)
         if raw
-            request.NoCache()
-            request.LogCurlCommand(true)
+            request.LogCurlCommand()
         end if
 
         response = request.Await()
@@ -53,7 +52,7 @@ namespace Innertube
         end if
 
         feeds = ParseResponseDataForFeeds(response.Json(), {
-            response: response
+            request: request
             disableShorts: disableShorts
         })
 

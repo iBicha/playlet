@@ -128,8 +128,23 @@ namespace Http
                 requestHeaders["User-Agent"] = VIDEO_PLAYER_USER_AGENT
             end if
 
-            httpReq = HttpClient.FromObject(requestArgs)
-            httpRes = httpReq.Await()
+            method = "GET"
+            if requestArgs.Method <> invalid
+                method = requestArgs.Method
+            end if
+            proxyRequest = new HttpClient.Request(method, requestArgs.Url)
+            proxyRequest.Headers(requestHeaders)
+            if requestArgs.Body <> invalid
+                proxyRequest.TextBody(requestArgs.Body)
+            end if
+            if requestArgs.CacheSeconds <> invalid
+                if requestArgs.CacheSeconds > 0
+                    proxyRequest.CacheForSeconds(requestArgs.CacheSeconds)
+                else
+                    proxyRequest.NoCache()
+                end if
+            end if
+            httpRes = proxyRequest.Await()
 
             result = {
                 "status": httpRes.StatusCode()

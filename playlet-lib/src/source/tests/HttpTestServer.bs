@@ -1,0 +1,36 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace Tests
+
+    const HTTP_TEST_SERVER_PORT = 54125
+
+    function StartHttpTestServer() as object
+        server = CreateObject("roSGNode", "HttpTestServer")
+        server.port = HTTP_TEST_SERVER_PORT
+        server.control = "run"
+        timer = CreateObject("roTimespan")
+        while server.isRunning <> true and timer.TotalMilliseconds() < 3000
+            sleep(10)
+        end while
+        return server
+    end function
+
+    function StopHttpTestServer(server as object) as void
+        server.shouldQuit = true
+        timer = CreateObject("roTimespan")
+        while server.isRunning = true and timer.TotalMilliseconds() < 3000
+            sleep(10)
+        end while
+    end function
+
+    function HttpTestServerUrl(path as string) as string
+        return `http://127.0.0.1:${HTTP_TEST_SERVER_PORT}${path}`
+    end function
+
+    ' How many requests the server answered for a path or url, its query included.
+    function HttpTestServerHits(server as object, pathOrUrl as string) as integer
+        path = pathOrUrl.Replace(HttpTestServerUrl(""), "")
+        return ValidInt(ValidAssociativeArray(server.hits)[path])
+    end function
+
+end namespace
