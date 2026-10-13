@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Small security fixes
 - SponsorBlock skip looping back to the start of a segment on some devices, and overlapping segments
 - Live streams buffering on slow networks
+- Playback errors with a preferred quality set, on some devices
 
 ### Changed
 

@@ -52,42 +52,28 @@ namespace Tests
 
         @describe("playback error decision")
 
-        @it("retries the next stream url on an http error before playing")
+        @it("retries the next stream url before the first play")
         function _()
             content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
-            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, false)
+            d = ErrorDialogController.DecideVideoError(content, false)
             m.assertEqual(d.action, ErrorDialogController.Action.Retry)
             m.assertEqual(d.nextUrl, "b")
             m.assertEqual(content.url, "b")
         end function
 
-        @it("retries on a mediaerror category")
-        function _()
-            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
-            d = ErrorDialogController.DecideVideoError(content, { category: "mediaerror" }, false)
-            m.assertEqual(d.action, ErrorDialogController.Action.Retry)
-            m.assertEqual(d.nextUrl, "b")
-        end function
-
         @it("shows a dialog when no next url exists")
         function _()
             content = { videoId: "v", playletStreamUrls: ["a"], playletStreamUrlIndex: 0, url: "a" }
-            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, false)
+            d = ErrorDialogController.DecideVideoError(content, false)
             m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
         end function
 
         @it("shows a dialog once the stream has already played (no stream-swap)")
         function _()
             content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
-            d = ErrorDialogController.DecideVideoError(content, { category: "http" }, true)
+            d = ErrorDialogController.DecideVideoError(content, true)
             m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
-        end function
-
-        @it("shows a dialog for a non-stream error category")
-        function _()
-            content = { videoId: "v", playletStreamUrls: ["a", "b"], playletStreamUrlIndex: 0, url: "a" }
-            d = ErrorDialogController.DecideVideoError(content, { category: "drm" }, false)
-            m.assertEqual(d.action, ErrorDialogController.Action.Dialog)
+            m.assertEqual(content.url, "a")
         end function
 
     end class

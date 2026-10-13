@@ -30,20 +30,19 @@ namespace ErrorDialogController
         }
     end function
 
-    ' A Video state=error. Retry the next stream URL only before the first successful play, only for a
-    ' stream/format error (http / mediaerror), and only if a next URL exists; otherwise a dialog. On retry the
-    ' coordinator re-applies the initial seek (SeekToInitialPosition).
-    function DecideVideoError(content as object, errorInfo as object, videoPlayedSuccessfully as boolean) as object
-        if not videoPlayedSuccessfully and content <> invalid and IsAssociativeArray(errorInfo)
-            category = ValidString(errorInfo.category)
-            if category = "http" or category = "mediaerror"
-                nextUrl = ErrorDialogController.NextStreamUrl(content)
-                if nextUrl <> invalid
-                    return {
-                        action: ErrorDialogController.Action.Retry
-                        nextUrl: nextUrl
-                    }
-                end if
+    ' A Video state=error. Before the first successful play, whatever the error, retry the next stream URL if one
+    ' exists; otherwise a dialog. The URLs are variants of one source (quality-filtered first, then unfiltered,
+    ' then proxied), and a filtered manifest the device can't play fails under more than one category
+    ' (telemetry: mediaplayer and mediaerror). On retry the coordinator re-applies the initial seek
+    ' (SeekToInitialPosition).
+    function DecideVideoError(content as object, videoPlayedSuccessfully as boolean) as object
+        if not videoPlayedSuccessfully and content <> invalid
+            nextUrl = ErrorDialogController.NextStreamUrl(content)
+            if nextUrl <> invalid
+                return {
+                    action: ErrorDialogController.Action.Retry
+                    nextUrl: nextUrl
+                }
             end if
         end if
 
