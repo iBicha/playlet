@@ -1,4 +1,4 @@
-import "pkg:/source/utils/Types.bs"
+import "pkg:/components/Services/ApplicationInfo/LibManifestUtils.bs"
 
 const LIB_CANARY_ZIP_URL = "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.zip"
 const LIB_CANARY_SQUASHFS_URL = "https://github.com/iBicha/playlet/releases/download/canary/playlet-lib.squashfs.pkg"
@@ -9,7 +9,7 @@ end function
 
 ' TODO:P2: refactor and move to appropriate place, reuse with web app
 function GetAppVersion() as string
-    version = "v" + GetLibVersion()
+    version = "v" + LibManifestUtils.GetLibVersion()
 
     roAppInfo = CreateObject("roAppInfo")
     appId = roAppInfo.GetID()
@@ -28,56 +28,4 @@ function GetAppVersion() as string
     end if
 
     return version
-end function
-
-function GetLibVersion() as string
-    values = GetLibManifestValues()
-    if values = invalid
-        return "0.0.0"
-    end if
-
-    major = 0
-    minor = 0
-    build = 0
-
-    if values.DoesExist("major_version")
-        value = values["major_version"]
-        if IsString(value)
-            major = value.toInt()
-        end if
-    end if
-
-    if values.DoesExist("minor_version")
-        value = values["minor_version"]
-        if IsString(value)
-            minor = value.toInt()
-        end if
-    end if
-
-    if values.DoesExist("build_version")
-        value = values["build_version"]
-        if IsString(value)
-            build = value.toInt()
-        end if
-    end if
-
-    return `${major}.${minor}.${build}`
-end function
-
-function GetLibManifestValues() as object
-    libManifest = ReadAsciiFile("libpkg:/manifest")
-    lines = libManifest.Tokenize(`\n`)
-    values = {}
-    for each line in lines
-        if line.left(1) = "#"
-            continue for
-        end if
-        keyValuePair = line.Tokenize("=")
-        if keyValuePair.Count() <> 2
-            continue for
-        end if
-
-        values[keyValuePair[0]] = keyValuePair[1]
-    end for
-    return values
 end function

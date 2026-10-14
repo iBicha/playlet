@@ -1,0 +1,40 @@
+import "pkg:/source/utils/Types.bs"
+
+namespace LibManifestUtils
+
+    function GetLibVersion() as string
+        values = GetValues()
+        major = ValidString(values["major_version"]).ToInt()
+        minor = ValidString(values["minor_version"]).ToInt()
+        build = ValidString(values["build_version"]).ToInt()
+        return `${major}.${minor}.${build}`
+    end function
+
+    function GetLibGitCommitHash() as string
+        return ValidString(GetValues()["git_commit_sha"])
+    end function
+
+    function GetValues() as roAssociativeArray
+        if m.libManifestValues = invalid
+            m.libManifestValues = Parse(ReadAsciiFile("libpkg:/manifest"))
+        end if
+        return m.libManifestValues
+    end function
+
+    function Parse(manifest as string) as roAssociativeArray
+        values = {}
+        for each line in manifest.Tokenize(`\r\n`)
+            if line.left(1) = "#"
+                continue for
+            end if
+            keyValuePair = line.Tokenize("=")
+            if keyValuePair.Count() <> 2
+                continue for
+            end if
+
+            values[keyValuePair[0]] = keyValuePair[1]
+        end for
+        return values
+    end function
+
+end namespace

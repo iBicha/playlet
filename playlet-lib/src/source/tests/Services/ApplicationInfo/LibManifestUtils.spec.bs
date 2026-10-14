@@ -1,0 +1,55 @@
+import "pkg:/components/Services/ApplicationInfo/LibManifestUtils.bs"
+
+namespace Tests
+
+    @suite
+    class LibManifestUtilsTests extends Rooibos.BaseTestSuite
+
+        @describe("LibManifestUtils")
+
+        @it("Reads lib version")
+        function _()
+            version = LibManifestUtils.GetLibVersion()
+            regex = /^\d+\.\d+\.\d+$/
+            m.assertTrue(regex.IsMatch(version))
+        end function
+
+        @it("Reads git commit hash")
+        function _()
+            gitHash = LibManifestUtils.GetLibGitCommitHash()
+            m.assertNotEmpty(gitHash)
+        end function
+
+        @it("Reads values from manifest")
+        function _()
+            values = LibManifestUtils.GetValues()
+            m.assertNotEmpty(values["major_version"])
+            m.assertNotEmpty(values["minor_version"])
+            m.assertNotEmpty(values["build_version"])
+            m.assertNotEmpty(values["git_commit_sha"])
+            m.assertEqual(values["title"], "PlayletLib")
+            m.assertEqual(values["ui_resolutions"], "hd")
+            m.assertEqual(values["uri_resolution_autosub"], "$$RES$$,480p,720p,1080p")
+        end function
+
+        @it("Parses the same values whatever the line endings")
+        @params("LF")
+        @params("CRLF")
+        @params("CR")
+        function _(lineEnding as string)
+            eol = { "LF": `\n`, "CRLF": `\r\n`, "CR": `\r` }[lineEnding]
+            manifest = ["git_commit_sha=8da6289", ""].Join(eol)
+            values = LibManifestUtils.Parse(manifest)
+            m.assertEqual(values, { "git_commit_sha": "8da6289" })
+        end function
+
+        @it("Skips comments and lines that are not a key=value pair")
+        function _()
+            manifest = `# git_commit_sha=commented\r\ntitle\r\nsplash_min_time=\r\ngit_commit_sha=8da6289\r\n`
+            values = LibManifestUtils.Parse(manifest)
+            m.assertEqual(values, { "git_commit_sha": "8da6289" })
+        end function
+
+    end class
+
+end namespace
