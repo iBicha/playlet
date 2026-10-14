@@ -44,7 +44,7 @@ function OnPlay() as void
             return
         end if
 
-        m.top.closePlayer = true
+        RemovePlayer()
     end if
 
     player = CreateVideoPlayer()
@@ -70,7 +70,7 @@ function OnPrevious() as void
         return
     end if
 
-    m.top.closePlayer = true
+    RemovePlayer()
     m.top.index -= 1
     m.top.play = true
 end function
@@ -80,16 +80,24 @@ function OnNext() as void
         return
     end if
 
-    m.top.closePlayer = true
+    RemovePlayer()
     m.top.index += 1
     m.top.play = true
 end function
 
 function OnClosePlayer() as void
+    if RemovePlayer()
+        m.top.loungeService.outgoingMessages = [LoungeMessages.NowPlaying(invalid), LoungeMessages.OnStateChange(invalid)]
+    end if
+end function
+
+' Returns whether a player was open. A replacement calls this, not the closePlayer field: the field tells a
+' lounge sender that nothing plays, which between two videos shows an empty nowPlaying.
+function RemovePlayer() as boolean
     m.top.nowPlaying = invalid
     player = m.top.player
     if player = invalid
-        return
+        return false
     end if
 
     player.close = true
@@ -97,6 +105,7 @@ function OnClosePlayer() as void
     m.previousPlayer = player
 
     m.top.appController@.FocusTopScreen()
+    return true
 end function
 
 function OnPlayVideo() as void
@@ -123,7 +132,7 @@ function OnPlayVideo() as void
     end if
     m.top.index = index
 
-    m.top.closePlayer = true
+    RemovePlayer()
     m.top.play = true
 end function
 
@@ -201,7 +210,7 @@ function OnPlaylistLoadStateChange() as void
         existingIndex = FindPlaylistVideosInQueue(videoNodes)
         if existingIndex >= 0
             m.top.index = existingIndex + playlistIndex
-            m.top.closePlayer = true
+            RemovePlayer()
             m.top.play = true
             return
         end if
@@ -217,7 +226,7 @@ function OnPlaylistLoadStateChange() as void
 
         m.top.index = index + playlistIndex
 
-        m.top.closePlayer = true
+        RemovePlayer()
         m.top.play = true
     else if playlistOp = "queue"
         m.content.appendChildren(videoNodes)

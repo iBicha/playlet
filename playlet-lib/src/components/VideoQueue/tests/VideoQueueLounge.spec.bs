@@ -1,0 +1,109 @@
+import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
+
+namespace Tests
+
+    @SGNode("VideoQueue")
+    @suite
+    class VideoQueueLoungeTests extends Rooibos.BaseTestSuite
+
+        @describe("VideoQueue lounge reports")
+
+        ' Annotated: Rooibos instruments CreateVideoPlayer only for a stubCall in a test or an annotated hook.
+        @beforeEach
+        function SetUpQueue()
+            m.node.loungeMessages = []
+            loungeService = CreateObject("roSGNode", "Node")
+            loungeService.addField("outgoingMessages", "array", true)
+            loungeService.observeFieldScoped("outgoingMessages", FuncName(Tests.RecordLoungeMessages))
+            m.top.loungeService = loungeService
+            m.top.appController = CreateObject("roSGNode", "Node")
+
+            m.top.content.removeChildrenIndex(m.top.content.getChildCount(), 0)
+            m.top.content.appendChildren([m.CreateVideo("AAA"), m.CreateVideo("BBB")])
+            m.top.index = 0
+            m.top.player = m.CreatePlayer("AAA")
+            m.stubCall(CreateVideoPlayer, m.CreatePlayer(""))
+            m.node.loungeMessages.Clear()
+        end function
+
+        function CreateVideo(videoId as string) as object
+            video = CreateObject("roSGNode", "ContentNode")
+            video.addFields({ videoId: videoId })
+            return video
+        end function
+
+        function CreatePlayer(videoId as string) as object
+            player = CreateObject("roSGNode", "Node")
+            player.addFields({ close: false, content: m.CreateVideo(videoId) })
+            return player
+        end function
+
+        function SentCommands(commandType as string) as object
+            commands = []
+            for each message in m.node.loungeMessages
+                if message.commandType = commandType
+                    commands.Push(message)
+                end if
+            end for
+            return commands
+        end function
+
+        @it("tells the lounge nothing plays when the player is closed")
+        function closeReportsNothingPlays()
+            player = m.top.player
+
+            m.top.closePlayer = true
+
+            expectedState = {}
+            expectedState[FIELD_STATE] = PlayerState.UNSTARTED
+            expectedState[FIELD_CURRENT_TIME] = 0
+            expectedState[FIELD_DURATION] = 0
+            expectedState[FIELD_LOADED_TIME] = 0
+            expectedState[FIELD_SEEKABLE_START_TIME] = 0
+            expectedState[FIELD_SEEKABLE_END_TIME] = 0
+            m.assertEqual(m.node.loungeMessages, [{ commandType: COMMAND_NOW_PLAYING }, { commandType: COMMAND_ON_STATE_CHANGE, commandArgs: expectedState }])
+            m.assertTrue(player.close)
+            m.assertInvalid(m.top.player)
+        end function
+
+        @it("tells the lounge nothing when closed with no player open")
+        function closeWithNoPlayerSaysNothing()
+            m.top.closePlayer = true
+            m.node.loungeMessages.Clear()
+
+            m.top.closePlayer = true
+
+            m.assertEmpty(m.node.loungeMessages)
+        end function
+
+        @it("sends no empty nowPlaying when next replaces the player")
+        function nextSendsNoEmptyNowPlaying()
+            player = m.top.player
+
+            m.top.next = true
+
+            m.assertEmpty(m.SentCommands(COMMAND_NOW_PLAYING))
+            m.assertEmpty(m.SentCommands(COMMAND_ON_STATE_CHANGE))
+            m.assertTrue(player.close)
+            m.assertEqual(m.top.nowPlaying.videoId, "BBB")
+        end function
+
+        @it("sends no empty nowPlaying when another video replaces the player")
+        function playVideoSendsNoEmptyNowPlaying()
+            player = m.top.player
+
+            m.top.playVideo = m.CreateVideo("CCC")
+
+            m.assertEmpty(m.SentCommands(COMMAND_NOW_PLAYING))
+            m.assertEmpty(m.SentCommands(COMMAND_ON_STATE_CHANGE))
+            m.assertTrue(player.close)
+            m.assertEqual(m.top.nowPlaying.videoId, "CCC")
+        end function
+
+    end class
+
+    function RecordLoungeMessages(event as object)
+        m.loungeMessages.Append(event.getData())
+    end function
+
+end namespace

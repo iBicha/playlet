@@ -1,0 +1,40 @@
+import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeMessagesTests extends Rooibos.BaseTestSuite
+
+        @describe("LoungeMessages with no player")
+
+        @it("reports an unstarted player with zeroed times")
+        function onStateChangeNoPlayer()
+            message = LoungeMessages.OnStateChange(invalid)
+
+            expected = {}
+            expected[FIELD_STATE] = PlayerState.UNSTARTED
+            expected[FIELD_CURRENT_TIME] = 0
+            expected[FIELD_DURATION] = 0
+            expected[FIELD_LOADED_TIME] = 0
+            expected[FIELD_SEEKABLE_START_TIME] = 0
+            expected[FIELD_SEEKABLE_END_TIME] = 0
+            m.assertEqual(message.commandType, COMMAND_ON_STATE_CHANGE)
+            m.assertEqual(message.commandArgs, expected)
+        end function
+
+        @it("reports an empty nowPlaying")
+        function nowPlayingNoPlayer()
+            m.assertEqual(LoungeMessages.NowPlaying(invalid), { commandType: COMMAND_NOW_PLAYING })
+        end function
+
+        @describe("LoungeMessages.GetPlayerState")
+
+        @it("reports a stopping or stopped player as unstarted")
+        function stoppedIsUnstarted()
+            m.assertEqual(LoungeMessages.GetPlayerState({ state: "stopping" }), PlayerState.UNSTARTED)
+            m.assertEqual(LoungeMessages.GetPlayerState({ state: "stopped" }), PlayerState.UNSTARTED)
+        end function
+
+    end class
+
+end namespace

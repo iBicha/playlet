@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Live streams buffering on slow networks
 - Playback errors with a preferred quality set, on some devices
 - Lounge (cast from phone) fix a sync issue after reconnecting
+- Lounge (cast from phone): closing a video on the TV now updates the phone state
 
 ### Changed
 
