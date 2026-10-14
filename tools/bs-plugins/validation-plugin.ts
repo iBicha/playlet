@@ -4,6 +4,7 @@
 import {
     BscFile,
     CompilerPlugin,
+    DiagnosticSeverity,
     OnFileValidateEvent,
     Program,
     Range,
@@ -65,12 +66,13 @@ export class ValidationPlugin implements CompilerPlugin {
                     continue;
                 }
 
-                file.diagnostics.push({
+                file.addDiagnostics([{
                     code: validation.code,
                     message: validation.message,
                     file: file,
-                    range: Range.create(line, column, line, column + match[0].length)
-                });
+                    range: Range.create(line, column, line, column + match[0].length),
+                    severity: DiagnosticSeverity.Error
+                }]);
             }
         });
     }

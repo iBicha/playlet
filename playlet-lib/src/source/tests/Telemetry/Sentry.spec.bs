@@ -1,6 +1,7 @@
 import "pkg:/components/Telemetry/Sentry.bs"
 import "pkg:/source/tests/HttpTestServer.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/utils/StringUtils.bs"
 
 namespace Tests
 
@@ -133,9 +134,9 @@ namespace Tests
             m.assertEqual(m.FallbackHits(), 0)
             lines = m.LastEnvelopeLines()
             m.assertEqual(lines.Count(), 4)
-            m.assertEqual(ParseJson(lines[0]).sdk.name, "sentry.roku.playlet")
+            m.assertEqual(StringUtils.ParseJsonSafe(lines[0]).sdk.name, "sentry.roku.playlet")
             m.assertEqual(lines[1], `{"type":"event"}`)
-            event = ParseJson(lines[2])
+            event = StringUtils.ParseJsonSafe(lines[2])
             m.assertEqual(event.logentry.formatted, "sent event")
             m.assertEqual(event.level, "error")
             m.assertEqual(event.release, "1.0.0-test")
@@ -165,7 +166,7 @@ namespace Tests
 
             lines = m.LastEnvelopeLines()
             m.assertEqual(lines[1], `{"type":"event"}`)
-            event = ParseJson(lines[2])
+            event = StringUtils.ParseJsonSafe(lines[2])
             m.assertEqual(event.logentry.formatted, `Support server unreachable: ${errorMessage}`)
             m.assertEqual(event.level, "warning")
             m.assertEqual(event.fingerprint, ["support server unreachable"])
@@ -174,7 +175,7 @@ namespace Tests
             m.assertEqual(event.user, { id: "user1" })
             m.assertInvalid(event.extra)
 
-            attachment = ParseJson(lines[3])
+            attachment = StringUtils.ParseJsonSafe(lines[3])
             m.assertEqual(attachment.type, "attachment")
             m.assertEqual(attachment.filename, "envelope.txt")
             m.assertEqual(attachment.content_type, "text/plain")
@@ -183,7 +184,7 @@ namespace Tests
             m.assertEqual(attachment.length, attached.Len() - 1)
             attachedLines = attached.Split(`\n`)
             m.assertEqual(attachedLines[1], `{"type":"event"}`)
-            unsentEvent = ParseJson(attachedLines[2])
+            unsentEvent = StringUtils.ParseJsonSafe(attachedLines[2])
             m.assertEqual(unsentEvent.logentry.formatted, "unsent event")
             m.assertEqual(unsentEvent.event_id, result.events[0].event_id)
         end function
