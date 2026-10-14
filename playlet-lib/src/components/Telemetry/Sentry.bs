@@ -2,42 +2,63 @@ import "pkg:/source/services/HttpClient.bs"
 
 const SUPPORT_SERVER_ENVELOPE_URL = "https://playlet-v8556.ondigitalocean.app/envelope"
 ' A fallback is needed to investigate https://github.com/iBicha/playlet/issues/906
-const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4512194184544256/envelope/"
-const SENTRY_FALLBACK_KEY = "a16c510299b23ccc63bdc84f751c9950"
+const SENTRY_FALLBACK_ENVELOPE_URL = "https://o4509923566288896.ingest.us.sentry.io/api/4512194184544256/envelope/?sentry_key=a16c510299b23ccc63bdc84f751c9950"
 
 namespace Sentry
 
-    function SendEvents(events as object) as integer
-        payload = BuildEnvelope(events, false)
-        request = HttpClient.Post(SUPPORT_SERVER_ENVELOPE_URL).TextBody(payload)
-        request.Header("Content-Type", "application/x-sentry-envelope")
-        response = request.Await()
-        ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
-        if response.StatusCode() <= 0
-            LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", response.ErrorMessage())
-            request = HttpClient.Post(SENTRY_FALLBACK_ENVELOPE_URL).TextBody(BuildEnvelope([CreateSupportServerUnreachableEvent(events[0], payload, response.ErrorMessage())], true))
-            request.Header("Content-Type", "application/x-sentry-envelope")
-            request.QueryParam("sentry_key", SENTRY_FALLBACK_KEY)
-            response = request.Await()
-        end if
+    class Delivery
+        private events as object
+        private payload as string
+        private request as HttpClient.Request
+        private pending as HttpClient.PendingResponse
+        private sentToFallback as boolean = false
 
-        if response.IsSuccess()
-            LogDebug("Sent events to", request.GetFullUrl(), "Response:", response.Text())
-            return 0
-        end if
+        function new(events as object)
+            m.events = events
+            m.payload = BuildEnvelope(events, false)
+            m.Send(SUPPORT_SERVER_ENVELOPE_URL, m.payload)
+        end function
 
-        retryAfter = response.RetryAfterSeconds()
-        if retryAfter = invalid or retryAfter = 0
-            retryAfter = 60
-        end if
+        ' invalid while it is being sent; then how long to hold events back, in seconds: 0 once delivered.
+        function Poll() as dynamic
+            response = m.pending.Poll()
+            if response = invalid
+                return invalid
+            end if
 
-        if response.StatusCode() = 429
-            LogErrorNoTelemetry("Rate limited by", request.GetFullUrl(), "Retry after", retryAfter, "seconds")
-        else
-            LogErrorNoTelemetry("Failed to send events to", request.GetFullUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
-        end if
-        return retryAfter
-    end function
+            ' Only when the server never answered: its own failures hit every device at once and would exhaust the fallback's quota
+            if not m.sentToFallback and response.StatusCode() <= 0
+                errorMessage = response.ErrorMessage()
+                LogWarnNoTelemetry("Support server unreachable, sending events to the Sentry fallback:", errorMessage)
+                m.sentToFallback = true
+                unreachableEvent = CreateSupportServerUnreachableEvent(m.events[0], m.payload, errorMessage)
+                m.Send(SENTRY_FALLBACK_ENVELOPE_URL, BuildEnvelope([unreachableEvent], true))
+                return invalid
+            end if
+
+            if response.IsSuccess()
+                LogDebug("Sent events to", m.request.GetFullUrl(), "Response:", response.Text())
+                return 0
+            end if
+
+            retryAfter = response.RetryAfterSeconds()
+            if retryAfter = invalid or retryAfter = 0
+                retryAfter = 60
+            end if
+
+            if response.StatusCode() = 429
+                LogErrorNoTelemetry("Rate limited by", m.request.GetFullUrl(), "Retry after", retryAfter, "seconds")
+            else
+                LogErrorNoTelemetry("Failed to send events to", m.request.GetFullUrl(), response.ErrorMessage(), `\nRetry after`, retryAfter, "seconds")
+            end if
+            return retryAfter
+        end function
+
+        private function Send(url as string, envelope as string) as void
+            m.request = HttpClient.Post(url).TextBody(envelope).Header("Content-Type", "application/x-sentry-envelope")
+            m.pending = m.request.Send()
+        end function
+    end class
 
     function CreateSupportServerUnreachableEvent(originalEvent as object, payload as string, errorMessage as string) as object
         return {

@@ -1,9 +1,13 @@
-#const SUPPORTS_BATCHING = true
-
 import "pkg:/components/Telemetry/LastExitCrash.bs"
 import "pkg:/components/Telemetry/Sentry.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/Types.bs"
+
+const DELIVERY_POLL_MS = 500
+const MAX_EVENTS_PER_DELIVERY = 20
+' A batch is sent once it holds MAX_EVENTS_PER_DELIVERY events, once no event came for BATCH_IDLE_MS, or BATCH_MAX_AGE_MS after the inbox was last empty.
+const BATCH_IDLE_MS = 2000
+const BATCH_MAX_AGE_MS = 5000
 
 function Init() as void
     if m.global.telemetry <> invalid
@@ -53,18 +57,9 @@ function TelemetryLoop() as void
     m.top.observeField("LogError", msgPort)
     m.top.observeField("LogEvent", msgPort)
 
-    #if SUPPORTS_BATCHING
-        debouceMs = 2000
-        debounceCountLimit = 20
-        debounceTimeLimit = 5000
-        debounceTimer = CreateObject("roTimeSpan")
-    #end if
-
+    retryAfter = 0
     retryAfterTimer = CreateObject("roTimeSpan")
-    retryAfter = Sentry.SendEvents(CreateLaunchEvents())
-    if retryAfter > 0
-        retryAfterTimer.Mark()
-    end if
+    delivery = new Sentry.Delivery(CreateLaunchEvents())
 
     levelMap = {
         "LogInfo": "info"
@@ -73,51 +68,66 @@ function TelemetryLoop() as void
     }
 
     receivedAt = CreateObject("roDateTime")
+    lastEventTimer = CreateObject("roTimeSpan")
+    batchTimer = CreateObject("roTimeSpan")
     inbox = []
-    events = []
 
     while true
-        msg = wait(0, msgPort)
+        waitMs = 0
+        if delivery <> invalid
+            waitMs = DELIVERY_POLL_MS
+        else if inbox.Count() > 0
+            waitMs = BATCH_IDLE_MS - lastEventTimer.TotalMilliseconds()
+            batchAgeLeftMs = BATCH_MAX_AGE_MS - batchTimer.TotalMilliseconds()
+            if batchAgeLeftMs < waitMs
+                waitMs = batchAgeLeftMs
+            end if
+            ' wait(0) would block until the next event.
+            if waitMs < 1
+                waitMs = 1
+            end if
+        end if
+        msg = wait(waitMs, msgPort)
 
-        if retryAfter > 0
-            if retryAfterTimer.TotalMilliseconds() < retryAfter * 1000
-                continue while
-            else
-                retryAfter = 0
+        if delivery <> invalid
+            deliveryRetryAfter = delivery.Poll()
+            if deliveryRetryAfter <> invalid
+                delivery = invalid
+                retryAfter = deliveryRetryAfter
+                if retryAfter > 0
+                    retryAfterTimer.Mark()
+                    inbox.Clear()
+                end if
             end if
         end if
 
-        receivedAt.Mark()
-        inbox.Push({ msg: msg, timestamp: receivedAt.ToISOString() })
+        if retryAfter > 0 and retryAfterTimer.TotalMilliseconds() < retryAfter * 1000
+            continue while
+        end if
 
-        #if SUPPORTS_BATCHING
-            debounceTimer.Mark()
-            while true
-                LogDebug("Waiting for more messages...")
-                msg = wait(debouceMs, msgPort)
-                if msg = invalid
-                    LogDebug("No more messages")
-                    exit while
-                end if
-                receivedAt.Mark()
-                inbox.Push({ msg: msg, timestamp: receivedAt.ToISOString() })
-                if inbox.Count() >= debounceCountLimit
-                    LogDebug("Reached debounce count limit")
-                    exit while
-                end if
-                if debounceTimer.TotalMilliseconds() >= debounceTimeLimit
-                    LogDebug("Reached debounce time limit")
-                    exit while
-                end if
-            end while
-        #end if
+        if msg <> invalid
+            receivedAt.Mark()
+            inbox.Push({ msg: msg, timestamp: receivedAt.ToISOString() })
+            lastEventTimer.Mark()
+            if inbox.Count() = 1
+                batchTimer.Mark()
+            end if
+        end if
 
-        events.Clear()
-        for each item in inbox
+        if delivery <> invalid or inbox.Count() = 0
+            continue while
+        end if
+        if inbox.Count() < MAX_EVENTS_PER_DELIVERY and lastEventTimer.TotalMilliseconds() < BATCH_IDLE_MS and batchTimer.TotalMilliseconds() < BATCH_MAX_AGE_MS
+            continue while
+        end if
+
+        events = []
+        while events.Count() < MAX_EVENTS_PER_DELIVERY and inbox.Count() > 0
+            item = inbox.Shift()
             msg = item.msg
             msgType = type(msg)
             if msgType <> "roSGNodeEvent"
-                continue for
+                continue while
             end if
 
             field = msg.getField()
@@ -146,17 +156,13 @@ function TelemetryLoop() as void
                     attachments: data.attachments
                 })
             end if
-        end for
-        inbox.Clear()
+        end while
 
         if events.Count() = 0
             continue while
         end if
 
-        retryAfter = Sentry.SendEvents(events)
-        if retryAfter > 0
-            retryAfterTimer.Mark()
-        end if
+        delivery = new Sentry.Delivery(events)
     end while
 end function
 

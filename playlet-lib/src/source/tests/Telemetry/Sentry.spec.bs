@@ -10,7 +10,7 @@ namespace Tests
     ' Stands in for HttpClient.CreateUrlTransfer, sending to the urls Serve set in place of the support server's and the fallback's.
     function SentryUrlTransfer(url as string, headers as object, messagePort as object) as object
         urls = GetGlobalAA().sentryEnvelopeUrls
-        url = url.Replace(SUPPORT_SERVER_ENVELOPE_URL, urls.supportServer).Replace(SENTRY_FALLBACK_ENVELOPE_URL, urls.fallback)
+        url = url.Replace(SUPPORT_SERVER_ENVELOPE_URL, urls.supportServer).Replace(SENTRY_FALLBACK_ENVELOPE_URL.Split("?")[0], urls.fallback)
         urlTransfer = CreateObject("roUrlTransfer")
         urlTransfer.RetainBodyOnError(true)
         urlTransfer.SetUrl(url)
@@ -20,7 +20,7 @@ namespace Tests
     end function
 
     @suite
-    class SentrySendEventsTests extends Rooibos.BaseTestSuite
+    class SentryDeliveryTests extends Rooibos.BaseTestSuite
 
         protected override function setup()
             m.server = Tests.StartHttpTestServer()
@@ -32,11 +32,6 @@ namespace Tests
             GetGlobalAA().Delete("deviceInfo")
             Tests.StopHttpTestServer(m.server)
             m.server = invalid
-        end function
-
-        protected override function beforeEach()
-            Tests.SetUpLoggingGlobals()
-            m.stubCall(HttpClient.CreateUrlTransfer, Tests.SentryUrlTransfer)
         end function
 
         protected override function afterEach()
@@ -61,7 +56,7 @@ namespace Tests
             GetGlobalAA().sentryEnvelopeUrls = urls
         end function
 
-        ' SendEvents' result for one event, and the lines it logged.
+        ' The delivery's result for one event, and the lines it logged.
         function Send(message as string) as object
             result = {
                 events: [{
@@ -74,7 +69,12 @@ namespace Tests
                 retryAfter: invalid
             }
             result.lines = Tests.LogLines(function(result as object) as void
-                result.retryAfter = Sentry.SendEvents(result.events)
+                delivery = new Sentry.Delivery(result.events)
+                result.retryAfter = delivery.Poll()
+                while result.retryAfter = invalid
+                    sleep(10)
+                    result.retryAfter = delivery.Poll()
+                end while
             end function, result)
             return result
         end function
@@ -84,7 +84,7 @@ namespace Tests
         end function
 
         function FallbackHits() as integer
-            return Tests.HttpTestServerHits(m.server, `${m.fallbackPath}?sentry_key=${SENTRY_FALLBACK_KEY}`)
+            return Tests.HttpTestServerHits(m.server, `${m.fallbackPath}?sentry_key=a16c510299b23ccc63bdc84f751c9950`)
         end function
 
         function Messages(lines as string[], level as string) as string[]
@@ -112,7 +112,15 @@ namespace Tests
             return request.body.Split(`\n`)
         end function
 
-        @describe("Sentry.SendEvents")
+        @describe("Sentry.Delivery")
+
+        ' Annotated rather than an override: Rooibos instruments a global function only for a stubCall it finds in a test
+        ' or an annotated hook, and an uninstrumented HttpClient.CreateUrlTransfer sends to the real support server.
+        @beforeEach
+        function StubEnvelopeUrls()
+            Tests.SetUpLoggingGlobals()
+            m.stubCall(HttpClient.CreateUrlTransfer, Tests.SentryUrlTransfer)
+        end function
 
         @it("sends the events to the support server, holding nothing back")
         function _()
@@ -186,7 +194,7 @@ namespace Tests
             result = m.Send("rate-limited event")
             m.assertEqual(result.retryAfter, 45)
             m.assertEqual(m.FallbackHits(), 1)
-            m.assertEqual(m.ErrorLogged(result.lines), `Rate limited by ${SENTRY_FALLBACK_ENVELOPE_URL}?sentry_key=${SENTRY_FALLBACK_KEY} Retry after 45 seconds`)
+            m.assertEqual(m.ErrorLogged(result.lines), `Rate limited by ${SENTRY_FALLBACK_ENVELOPE_URL} Retry after 45 seconds`)
         end function
 
         @it("holds the events back for 60 seconds when the fallback fails too")
@@ -200,7 +208,7 @@ namespace Tests
                 result = m.Send("failed event")
                 m.assertEqual(result.retryAfter, 60, testCase.id)
                 errorLogged = m.ErrorLogged(result.lines)
-                m.assertTrue(errorLogged.StartsWith(`Failed to send events to ${SENTRY_FALLBACK_ENVELOPE_URL}?sentry_key=${SENTRY_FALLBACK_KEY} `), errorLogged)
+                m.assertTrue(errorLogged.StartsWith(`Failed to send events to ${SENTRY_FALLBACK_ENVELOPE_URL} `), errorLogged)
                 m.assertTrue(errorLogged.EndsWith(` \nRetry after 60 seconds`), errorLogged)
             end for
         end function
