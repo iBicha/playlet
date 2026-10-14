@@ -34,11 +34,15 @@ class LoungeApi
     public sessionId
     public gSessionId
     public devices
+    ' Set by a send's failure, until the next bind.
+    public sessionGone = false
+    public tokenExpired = false
 
     private ofs
     private lastProcessedCommandIndex = -1
     private backchannel
     private pendingOutgoingMessages
+    private lastLoungeDisconnect
 
     function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
         m.loungeServiceNode = loungeServiceNode
@@ -216,8 +220,11 @@ class LoungeApi
         body.FromAsciiString(response.Text())
 
         ' A new session restarts command indices from 0; clear the high-water mark so its commands
-        ' aren't skipped as duplicates.
+        ' aren't skipped as duplicates. Its outbound offset restarts from 0 too.
         m.lastProcessedCommandIndex = -1
+        m.ofs = 0
+        m.sessionGone = false
+        m.tokenExpired = false
         messagesToSend = []
         result = LoungeFraming.Extract(body, 0)
         for each frame in result.frames
@@ -285,6 +292,31 @@ class LoungeApi
     function RefreshToken() as dynamic
         m.loungeToken = invalid
         return m.GetToken()
+    end function
+
+    function Bind() as boolean
+        if not m.GetSessionData()
+            return false
+        end if
+        m.SaveCurrentLoungeData()
+        return true
+    end function
+
+    function Rebind(withNewToken as boolean) as boolean
+        for each pending in m.pendingOutgoingMessages
+            pending.Cancel()
+        end for
+        m.pendingOutgoingMessages = []
+
+        if withNewToken
+            LogWarnNoTelemetry("Lounge token expired, refreshing")
+            if StringUtils.IsNullOrEmpty(m.RefreshToken())
+                return false
+            end if
+        end if
+
+        LogWarnNoTelemetry("Rebinding lounge session")
+        return m.Bind()
     end function
 
     function ProcessFrame(frame as string, messagesToSend as object) as void
@@ -545,11 +577,14 @@ class LoungeApi
         messagesToSend.Push(message)
     end function
 
-    function SendMessages(messages as object, loungeData = invalid as object) as void
+    function SendMessages(messages as object) as void
         if messages.Count() = 0
             return
         end if
+        m.pendingOutgoingMessages.Push(m.SendMessagesTo(m, messages))
+    end function
 
+    private function SendMessagesTo(loungeData as object, messages as object) as HttpClient.PendingResponse
         queryParams = {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
@@ -561,10 +596,6 @@ class LoungeApi
             "app": "lb-v4"
             "RID": "1337"
         }
-
-        if loungeData = invalid
-            loungeData = m
-        end if
 
         queryParams["name"] = loungeData.screenName
         queryParams["id"] = loungeData.deviceId
@@ -602,7 +633,11 @@ class LoungeApi
         request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind")
         request.QueryParams(queryParams)
         request.FormBody(postData)
-        m.pendingOutgoingMessages.Push(request.Send())
+        return request.Send()
+    end function
+
+    function HasPendingOutgoingMessages() as boolean
+        return m.pendingOutgoingMessages.Count() > 0
     end function
 
     function ProcessPendingOutgoingMessages() as object
@@ -626,6 +661,11 @@ class LoungeApi
                     unknownSid = response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
                     expiredToken = response.StatusCode() = 401 and response.ErrorMessage().InStr("Expired lounge id token") <> -1
                     isKnownError = isGone or unknownSid or expiredToken
+                    if isGone or unknownSid
+                        m.sessionGone = true
+                    else if expiredToken
+                        m.tokenExpired = true
+                    end if
 
                     if isKnownError
                         ' NoTelemetry: the body carries a volatile token; logging it would fragment these.
@@ -709,7 +749,8 @@ class LoungeApi
         ' we didn't keep track of the ofs, so we'll just set it to a large number.
         ' This is the last message we'll be sending to this lounge.
         loungeData.ofs = 99999999
-        m.SendMessages(messages, loungeData)
+        ' Held: dropping it releases its transfer, which aborts the send.
+        m.lastLoungeDisconnect = m.SendMessagesTo(loungeData, messages)
     end function
 
 end class

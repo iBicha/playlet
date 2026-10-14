@@ -1,5 +1,6 @@
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
 
 namespace Tests
@@ -10,10 +11,17 @@ namespace Tests
 
         protected override function setup()
             m.logLevel = Tests.MuteLogger()
+            ' Rebind saves the test lounge as the last one, which the next app launch disconnects from.
+            m.lastLoungeData = RegistryUtils.Read(RegistryUtils.LAST_LOUNGE_DATA)
         end function
 
         protected override function tearDown()
             m.global.logger.logLevel = m.logLevel
+            if m.lastLoungeData = invalid
+                RegistryUtils.Delete(RegistryUtils.LAST_LOUNGE_DATA)
+            else
+                RegistryUtils.Write(RegistryUtils.LAST_LOUNGE_DATA, m.lastLoungeData)
+            end if
         end function
 
         @describe("Lounge token-refresh recovery (live)")
@@ -57,6 +65,37 @@ namespace Tests
                 sleep(50)
             end while
             m.assertNotEmpty(results, "no outgoing message completed")
+            for each result in results
+                m.assertEqual(result.status, 200, result.error)
+            end for
+        end function
+
+        @slow(30000)
+        @it("Rebind cancels the replaced session's sends, and the new session's sends complete")
+        function _()
+            api = m.CreateLiveApi()
+            api.GetScreenId()
+            api.GetToken()
+            m.assertTrue(api.GetSessionData(), "bind failed")
+            m.assertTrue(api.HasPendingOutgoingMessages(), "the bind sent no messages")
+            replacedSends = []
+            replacedSends.Append(api.pendingOutgoingMessages)
+
+            m.assertTrue(api.Rebind(true), "rebind failed")
+
+            m.assertNotEmpty(replacedSends)
+            for each pending in replacedSends
+                m.assertTrue(pending.Poll().IsCancelled(), "a send of the replaced session was not cancelled")
+            end for
+
+            results = []
+            timer = CreateObject("roTimespan")
+            while api.HasPendingOutgoingMessages() and timer.TotalMilliseconds() < 10000
+                results.Append(api.ProcessPendingOutgoingMessages())
+                sleep(50)
+            end while
+            m.assertFalse(api.HasPendingOutgoingMessages(), "the new session's sends did not complete")
+            m.assertNotEmpty(results, "the rebind sent no messages")
             for each result in results
                 m.assertEqual(result.status, 200, result.error)
             end for

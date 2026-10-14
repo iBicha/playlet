@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SponsorBlock skip looping back to the start of a segment on some devices, and overlapping segments
 - Live streams buffering on slow networks
 - Playback errors with a preferred quality set, on some devices
+- Lounge (cast from phone) fix a sync issue after reconnecting
 
 ### Changed
 

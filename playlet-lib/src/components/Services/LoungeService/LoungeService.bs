@@ -1,6 +1,9 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
 
+const IDLE_WAIT_MS = 60000
+const SENDS_IN_FLIGHT_WAIT_MS = 500
+
 function Init()
     m.top.functionName = "LoungeServiceLoop"
 
@@ -63,12 +66,11 @@ function LoungeServiceLoop() as void
 
     m.top.observeField("outgoingMessages", messagePort)
 
-    if not api.GetSessionData()
-        Shutdown("Failed to get session data")
+    if not api.Bind()
+        Shutdown("Failed to bind")
         return
     end if
 
-    api.SaveCurrentLoungeData()
     api.FetchCommandsRpc(messagePort)
 
     m.top.shouldQuit = false
@@ -83,7 +85,12 @@ function LoungeServiceLoop() as void
             exit while
         end if
 
-        message = wait(60000, messagePort)
+        ' Sends answer on ports of their own, read only when the loop wakes.
+        waitMs = IDLE_WAIT_MS
+        if api.HasPendingOutgoingMessages()
+            waitMs = SENDS_IN_FLIGHT_WAIT_MS
+        end if
+        message = wait(waitMs, messagePort)
         portMessages.Clear()
         portMessages.Push(message)
 
@@ -117,20 +124,13 @@ function LoungeServiceLoop() as void
         isOpen = api.Poll(socketMessages, outgoingLoungeMessages)
 
         api.SendMessages(outgoingLoungeMessages)
-        outgoingLoungeMessagesResults = api.ProcessPendingOutgoingMessages()
+        api.ProcessPendingOutgoingMessages()
 
+        ' A send's failure is acted on once the backchannel closes, which a dead session's does too.
         if not isOpen
             closeInfo = api.GetCloseInfo()
-            needsRebind = closeInfo.statusCode = 410 or closeInfo.statusCode = 400
-            needsTokenRefresh = closeInfo.statusCode = 401
-
-            for each result in outgoingLoungeMessagesResults
-                if result.status = 410 or (result.status = 400 and result.error.InStr("Unknown SID") <> -1)
-                    needsRebind = true
-                else if result.status = 401 and result.error.InStr("Expired lounge id token") <> -1
-                    needsTokenRefresh = true
-                end if
-            end for
+            needsRebind = closeInfo.statusCode = 410 or closeInfo.statusCode = 400 or api.sessionGone
+            needsTokenRefresh = closeInfo.statusCode = 401 or api.tokenExpired
 
             LogDebug("Backchannel closed:", closeInfo.reason)
             if IsActionableCloseFailure(closeInfo.reason, needsRebind, needsTokenRefresh)
@@ -148,19 +148,12 @@ function LoungeServiceLoop() as void
             sleep(ComputeReconnectBackoffMs(reconnectAttempts))
             reconnectAttempts += 1
 
-            if needsTokenRefresh
-                LogWarnNoTelemetry("Lounge token expired, refreshing")
-                api.RefreshToken()
-                needsRebind = true
-            end if
-
-            if needsRebind
-                LogWarnNoTelemetry("Rejoining lounge session")
-                if not api.GetSessionData()
-                    Shutdown("Failed to rejoin session data")
+            if needsRebind or needsTokenRefresh
+                if not api.Rebind(needsTokenRefresh)
+                    Shutdown("Failed to rebind")
                     return
                 end if
-                api.SaveCurrentLoungeData()
+                m.top.loungeToken = api.loungeToken
             end if
 
             api.FetchCommandsRpc(messagePort)
