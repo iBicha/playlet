@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Nothing worth mentioning yet
+### Fixed
+
+- Error message when account requires age verification
 
 ## [0.48.9] - 2026-10-14
 

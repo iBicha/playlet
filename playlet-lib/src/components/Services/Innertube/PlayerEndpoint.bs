@@ -235,7 +235,13 @@ namespace Innertube
             errorLines.Push(subreason)
         end if
 
+        playerErrorCommand = ObjectUtils.Dig(playabilityStatus, ["errorScreen", "playerErrorCommandRenderer"])
+        if IsAssociativeArray(playerErrorCommand)
+            errorLines.Append(ParsePlayerErrorCommandRenderer(playerErrorCommand))
+        end if
+
         if errorLines.Count() = 0
+            Warning(`Unparsed playability status: ${status}`, playabilityStatus, { request: playerRequest })
             errorLines.Push("Video not available (Unknown)")
         end if
 
@@ -256,6 +262,47 @@ namespace Innertube
         end if
 
         return errorLines.Join(`\n`)
+    end function
+
+    function ParsePlayerErrorCommandRenderer(renderer as object) as object
+        lines = []
+        errorMessage = ParseText(renderer["errorMessage"])
+        if errorMessage <> ""
+            lines.Push(errorMessage)
+        end if
+        lines.Append(ParseOpenPopupAction(ObjectUtils.Dig(renderer, ["command", "openPopupAction"])))
+        return lines
+    end function
+
+    function ParseOpenPopupAction(openPopupAction as object) as object
+        lines = []
+        panel = ObjectUtils.Dig(openPopupAction, ["popup", "overlaySectionRenderer", "overlay", "overlayTwoPanelRenderer", "actionPanel", "overlayPanelRenderer"])
+        if not IsAssociativeArray(panel)
+            return lines
+        end if
+
+        header = ObjectUtils.Dig(panel, ["header", "overlayPanelHeaderRenderer"])
+        title = ParseText(ObjectUtils.Dig(header, ["title"]))
+        if title <> ""
+            lines.Push(title)
+        end if
+        subtitle = ParseText(ObjectUtils.Dig(header, ["subtitle"]))
+        if subtitle <> ""
+            lines.Push(subtitle)
+        end if
+
+        items = ObjectUtils.Dig(panel, ["content", "overlayPanelItemListRenderer", "items"])
+        if not IsArray(items)
+            return lines
+        end if
+        for each item in items
+            url = ParseText(ObjectUtils.Dig(item, ["secondScreenActionRenderer", "url"]))
+            if url <> ""
+                lines.Push(url)
+            end if
+            lines.Append(ParseOpenPopupAction(ObjectUtils.Dig(item, ["compactLinkRenderer", "serviceEndpoint", "openPopupAction"])))
+        end for
+        return lines
     end function
 
     function PlayerResponseRequiresPageReload(payload as object) as boolean
