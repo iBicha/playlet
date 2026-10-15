@@ -13,7 +13,6 @@ import "pkg:/components/VideoPlayerDev/VideoNode.bs"
 import "pkg:/components/VideoQueue/VideoQueueUtils.bs"
 import "pkg:/source/utils/Locale.bs"
 import "pkg:/source/utils/Logging.bs"
-import "pkg:/source/utils/MathUtils.bs"
 import "pkg:/source/utils/RemoteKeys.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -55,7 +54,6 @@ function Initialize()
     m.watchTimeMarker = -1
     m.reportWatchTime = false
     m.onCloseCalled = false
-    m.seekToPercent = invalid
     ' a setSeek that arrived while the content loads (ms, -1 = none): the content-load seek goes there instead.
     m.loadingSetSeekMs = -1
 
@@ -869,11 +867,12 @@ function OnVideoError() as void
         LogInfo("error retry -> next stream url=", decision.nextUrl)
         m.playbackTelemetry.ReportVideoError(errorData, errorInfo, failedUrl, failedUrlIndex, false)
         ' the controller already advanced content.url/index; replay it from the initial position (live edge /
-        ' timestamp / percent watched). Swallow the next finished edge.
+        ' timestamp / percent watched), seeked before play so it is the start position. Swallow the next
+        ' finished edge.
         m.ignoreNextFinished = true
         m.repauseAfterSeek = false ' the retry plays fresh; drop any pending re-pause
-        m.top.control = VideoControl.Play
         SeekToInitialPosition(content)
+        m.top.control = VideoControl.Play
         return
     end if
 
@@ -931,8 +930,6 @@ function OnDuration(event as object) as void
         PushLiveEdge()
     end if
     ApplyTransport()
-    ' a percent-of-duration initial seek waits on a known duration.
-    SeekToPercentOfDuration()
 end function
 
 ' Current wall-clock epoch seconds, off the cached roDateTime.
@@ -1078,7 +1075,6 @@ function OnSetSeek(event as object) as void
         m.loadingSetSeekMs = seekMs
         return
     end if
-    m.seekToPercent = invalid
     wasTransport = (m.transport.transportMode <> TransportController.Mode.Idle)
     m.transport.ForceIdleSeek(seekMs, not wasTransport)
     ApplyTransport()
@@ -1302,31 +1298,22 @@ function SeekToInitialPosition(content as object) as void
         return
     end if
     percentDurationWatched = ValidFloat(content.percentDurationWatched)
-    if percentDurationWatched > 0
-        m.seekToPercent = percentDurationWatched
-        SeekToPercentOfDuration()
-    end if
-end function
-
-function SeekToPercentOfDuration() as void
-    seekToPercent = m.seekToPercent
-    if seekToPercent = invalid
+    if percentDurationWatched <= 0
         return
     end if
-    duration = m.top.duration
-    if duration = 0
-        return ' OnDuration re-calls this when duration arrives
-    end if
-    if duration < 30
-        m.seekToPercent = invalid
+    ' the metadata's length, not the Video's duration (known only once playing): a seek into a started DRM play
+    ' errors on some Roku TVs.
+    lengthSeconds = ValidInt(ValidAssociativeArray(content.metadata).lengthSeconds)
+    if lengthSeconds <= 0
+        LogWarn("no lengthSeconds to resume the percent watched from; starting from the beginning. videoId:", content.videoId)
         return
     end if
-    m.seekToPercent = invalid
-    seek = (MathUtils.Clamp(seekToPercent, 0, 100) / 100.0) * duration
-    if seek > 0
-        LogDebug("seeking to percent watched ->", seek)
-        ApplySeek(Int(seek * 1000))
+    if lengthSeconds < 30
+        return
     end if
+    seekMs = Int(percentDurationWatched / 100.0 * lengthSeconds * 1000)
+    LogDebug("seeking to percent watched ->", seekMs)
+    ApplySeek(seekMs)
 end function
 
 function PlayAfterPreviousPlayerHasStopped() as void

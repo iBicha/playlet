@@ -312,17 +312,6 @@ namespace Tests
             m.assertEqual(Int(m.top.seek * 1000), 42000)
         end function
 
-        @it("setSeek before the duration is known cancels the pending percent-watched seek")
-        function _()
-            m.ArmSeekState("first load")
-            content = CreateObject("roSGNode", "ContentNode")
-            content.AddFields({ percentDurationWatched: 50.0 })
-            m.top.callFunc("TestSeekToInitialPosition", content)
-            m.top.setSeek = 30.5
-            m.top.duration = 600.0
-            m.assertEqual(Int(m.top.seek * 1000), 30500, "the percent seek did not override the setSeek")
-        end function
-
         @it("setSeek while the content loads becomes the content-load seek, over the resume timestamp")
         function _()
             m.top.callFunc("TestSetContentLoading", true)
@@ -357,14 +346,48 @@ namespace Tests
             m.assertEqual(Int(m.top.seek * 1000), 42000)
         end function
 
-        @it("the content-load seek goes to the percent watched once the duration is known")
+        @it("the content-load seek goes to the percent watched of the video's length")
         function _()
             content = CreateObject("roSGNode", "ContentNode")
-            content.AddFields({ percentDurationWatched: 25.0 })
+            content.AddFields({ percentDurationWatched: 25.0, metadata: { lengthSeconds: 600 } })
             m.top.callFunc("TestSeekToInitialPosition", content)
-            m.assertEqual(m.top.seek, 0.0, "no seek before the duration is known")
-            m.top.duration = 600.0
             m.assertEqual(Int(m.top.seek * 1000), 150000)
+        end function
+
+        @it("the content-load seek skips the percent watched when the video's length is unknown")
+        function _()
+            for each metadata in [{}, { lengthSeconds: 0 }]
+                m.top.seek = -1
+                content = CreateObject("roSGNode", "ContentNode")
+                content.AddFields({ percentDurationWatched: 25.0, metadata: metadata })
+                m.top.callFunc("TestSeekToInitialPosition", content)
+                m.top.duration = 600.0
+                m.assertEqual(m.top.seek, -1.0, FormatJson(metadata))
+            end for
+        end function
+
+        @it("the content-load seek skips the percent watched on a video shorter than 30 seconds")
+        function _()
+            m.top.seek = -1
+            content = CreateObject("roSGNode", "ContentNode")
+            content.AddFields({ percentDurationWatched: 50.0, metadata: { lengthSeconds: 29 } })
+            m.top.callFunc("TestSeekToInitialPosition", content)
+            m.assertEqual(m.top.seek, -1.0)
+        end function
+
+        @it("an error retry seeks to the percent watched before it plays")
+        function _()
+            content = CreateObject("roSGNode", "ContentNode")
+            content.AddFields({
+                videoId: "vid1"
+                playletStreamUrls: ["http://a", "http://b"]
+                playletStreamUrlIndex: 0
+                percentDurationWatched: 25.0
+                metadata: { lengthSeconds: 600 }
+            })
+            content.url = "http://a"
+            m.assertEqual(m.top.callFunc("TestErrorRetry", content), 150.0)
+            m.assertEqual(content.url, "http://b", "retried the next stream url")
         end function
 
         @it("the error dialog displays every captured error field, not just the category")
@@ -1072,7 +1095,7 @@ namespace Tests
                 classified[name] = "axis"
             end for
             ' flags / scratch — one-shot latches and counters with a single consuming path.
-            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "seekToPercent", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive"]
+            for each name in ["onCloseCalled", "ignoreNextFinished", "videoPlayedSuccessfully", "firstFrameSeen", "showFullScreenHint", "repauseAfterSeek", "loadingSetSeekMs", "watchTimeMarker", "reportWatchTime", "errorDialogNode", "lastCommitSeq", "lastFinishSeq", "liveAstSeconds", "liveFallbackEdgeMs", "liveFallbackAtSeconds", "liveBadgeHoldActive"]
                 classified[name] = "flag"
             end for
             ' NOT coordinator state — node-scope + test-environment entries, pinned EXPLICITLY (no hidden

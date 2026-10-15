@@ -89,6 +89,10 @@ function TestSetup() as void
 
     OnNodeReady()
 
+    ' after OnNodeReady (the loop above drops it per TestSetup, along with the coordinator's control observer).
+    m.top.seekAtPlay = -1
+    m.top.ObserveField("control", FuncName(OnTestControl))
+
     ' the children survive across tests too: clear what a previous test's transport or live content left.
     m.transportTimer.control = "none"
     m.trickPlayBar.isLive = false
@@ -96,6 +100,13 @@ end function
 
 function OnTestNudge() as void
     m.top.nudgeCount += 1
+end function
+
+' a seek written before control=play is the play's start position; one written after is a seek into the started play.
+function OnTestControl() as void
+    if m.top.control = VideoControl.Play
+        m.top.seekAtPlay = m.top.seek
+    end if
 end function
 
 function OnTestJobRequest(event as object) as void
@@ -142,6 +153,16 @@ end function
 ' content job.
 function TestSeekToInitialPosition(content as object) as void
     SeekToInitialPosition(content)
+end function
+
+' TestErrorRetry — a stream error before the first frame, with a next stream url to retry: runs the REAL
+' OnVideoError and returns the seek the device held when the retry wrote control=play.
+function TestErrorRetry(content as object) as float
+    m.videoPlayedSuccessfully = false ' the seam spec's first-frame setup marked the stream played
+    m.top.content = content
+    m.top.errorInfo = { category: "http", source: "buffer:reader", ignored: false }
+    OnVideoError()
+    return m.top.seekAtPlay
 end function
 
 ' TestSetContentLoading — a VideoContentJob in flight (or not), minus the job.
