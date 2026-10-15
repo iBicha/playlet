@@ -841,18 +841,6 @@
         <translation>No se pudieron cargar las instancias públicas de Invidious</translation>
     </message>
     <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>No se pudo obtener el ID de tu pantalla. Por favor reinicia Playlet para usar la función de transmitir.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>La ID de pantalla no es válida: %1</translation>
-    </message>
-    <message>
-        <source>Invalid response: %1</source>
-        <translation>Respuesta inválida: %1</translation>
-    </message>
-    <message>
         <source>Invidious public instances</source>
         <translation>Instancias públicas de Invidious</translation>
     </message>
@@ -945,14 +933,6 @@
         <translation>Más reciente (por defecto)</translation>
     </message>
     <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>No se ha podido obtener el token de Lounge. Por favor reinicia Playlet para usar la función de transmión.</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>No se han podido obtener los datos de sesión. Por favor reinicia Playlet para usar la función de transmisión.</translation>
-    </message>
-    <message>
         <source>Invidious custom instance</source>
         <translation>Instancia personalizada de Invidious</translation>
     </message>
@@ -1019,10 +999,6 @@
     <message>
         <source>Invalid caption data from %1 (response is not a valid vtt file)</source>
         <translation>Datos de subtítulos inválidos de %1 (la respuesta no es un archivo vtt válido)</translation>
-    </message>
-    <message>
-        <source>Lounge service setup error</source>
-        <translation>Error de configuración del servicio Lounge</translation>
     </message>
     <message>
         <source>signup</source>

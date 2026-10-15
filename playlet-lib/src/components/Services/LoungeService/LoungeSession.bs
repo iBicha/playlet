@@ -1,0 +1,26 @@
+import "pkg:/components/Services/LoungeService/LoungeService.types.bs"
+
+namespace LoungeSession
+
+    const GIVE_UP_MS = 300000
+
+    function StepAfterPoll(closeReason as LoungeCloseReason, statusCode as integer, stalledPolls as integer, sessionGone as boolean, tokenExpired as boolean, msSinceDelivered as integer) as LoungeSessionStep
+        ' A new session doesn't answer the frames a stalled one keeps answering.
+        needsRebind = statusCode = 400 or statusCode = 410 or sessionGone or stalledPolls > 1
+        needsNewToken = statusCode = 401 or tokenExpired
+        if closeReason = LoungeCloseReason.Complete and not needsRebind and not needsNewToken
+            return LoungeSessionStep.Poll
+        end if
+        if msSinceDelivered >= LoungeSession.GIVE_UP_MS
+            return LoungeSessionStep.Drop
+        end if
+        if needsNewToken
+            return LoungeSessionStep.RebindWithNewToken
+        end if
+        if needsRebind
+            return LoungeSessionStep.Rebind
+        end if
+        return LoungeSessionStep.Retry
+    end function
+
+end namespace

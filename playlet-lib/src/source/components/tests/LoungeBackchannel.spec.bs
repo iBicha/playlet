@@ -1,0 +1,209 @@
+import "pkg:/components/Services/LoungeService/LoungeBackchannel.bs"
+import "pkg:/components/Services/LoungeService/LoungeService.types.bs"
+import "pkg:/source/tests/HttpTestServer.bs"
+import "pkg:/source/tests/LoggingGlobals.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeBackchannelTests extends Rooibos.BaseTestSuite
+
+        protected override function setup()
+            m.server = Tests.StartHttpTestServer()
+        end function
+
+        protected override function tearDown()
+            Tests.StopHttpTestServer(m.server)
+            m.server = invalid
+        end function
+
+        protected override function beforeEach()
+            Tests.SetUpLoggingGlobals()
+            m.global.telemetry.LogEvent = {}
+        end function
+
+        function PollOnce(backchannel as LoungeBackchannel, path as string, route as dynamic) as object
+            if route <> invalid
+                routes = {}
+                routes[path] = route
+                m.server.routes = routes
+            end if
+            port = CreateObject("roMessagePort")
+            backchannel.Open(HttpClient.Get(Tests.HttpTestServerUrl(path)), port)
+            commands = []
+            timer = CreateObject("roTimespan")
+            while backchannel.IsPolling() and timer.TotalMilliseconds() < 5000
+                commands.Append(backchannel.Handle(wait(backchannel.MaxWaitMs(), port)))
+            end while
+            return commands
+        end function
+
+        function Frame(json as string) as string
+            body = CreateObject("roByteArray")
+            body.FromAsciiString(json)
+            return `${body.Count()}\n${json}`
+        end function
+
+        @describe("LoungeBackchannel")
+
+        @it("returns the commands of a 2xx answer, complete, and acknowledges the last one in the next poll")
+        function _()
+            backchannel = new LoungeBackchannel()
+            body = m.Frame(`[[7,["noop"]]]\n`) + m.Frame(`[[8,["seekTo",{"newTime":"12"}]]]\n`) + `\n`
+            commands = m.PollOnce(backchannel, "/lounge/frames", { status: 200, body: body })
+            m.assertEqual(commands.Count(), 2)
+            m.assertEqual(commands[0].index, 7)
+            m.assertEqual(commands[0].type, "noop")
+            m.assertInvalid(commands[0].args)
+            m.assertEqual(commands[1].index, 8)
+            m.assertEqual(commands[1].type, "seekTo")
+            m.assertEqual(commands[1].args, { newTime: "12" })
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
+            m.assertEqual(backchannel.statusCode, 200)
+            m.assertEqual(backchannel.ackedCommandIndex, 8)
+            m.assertFalse(backchannel.IsPolling())
+            m.assertEmpty(m.global.telemetry.LogEvent)
+
+            m.PollOnce(backchannel, "/lounge/next", { status: 200, body: m.Frame(`[[9,["noop"]]]`) })
+            m.assertEqual(Tests.HttpTestServerHits(m.server, "/lounge/next?AID=8"), 1)
+        end function
+
+        @it("ends a 2xx answer without frames as empty")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/empty", { status: 200, body: "" }))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Empty)
+        end function
+
+        @it("returns the commands of the whole frames of an answer that ends mid-frame, and reports what is left")
+        function _()
+            backchannel = new LoungeBackchannel()
+            commands = m.PollOnce(backchannel, "/lounge/partial", { status: 200, body: m.Frame(`[[7,["noop"]]]`) + `40\n[[8,` })
+            m.assertEqual(commands.Count(), 1)
+            m.assertEqual(commands[0].index, 7)
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
+            event = m.global.telemetry.LogEvent
+            m.assertEqual(event.fingerprint, "lounge-partial-frame")
+            m.assertTrue(event.message.InStr("7 bytes left") <> -1, event.message)
+        end function
+
+        @it("skips the commands it already received")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.PollOnce(backchannel, "/lounge/first", { status: 200, body: m.Frame(`[[7,["noop"]]]`) })
+            commands = m.PollOnce(backchannel, "/lounge/resent", { status: 200, body: m.Frame(`[[7,["noop"]],[8,["play"]]]`) })
+            m.assertEqual(commands.Count(), 1)
+            m.assertEqual(commands[0].index, 8)
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
+        end function
+
+        @it("acknowledges a malformed command it can read the index of, and reports it")
+        function _()
+            backchannel = new LoungeBackchannel()
+            commands = m.PollOnce(backchannel, "/lounge/malformed", { status: 200, body: m.Frame(`[[7],[8,{"not":"an array"}]]`) })
+            m.assertEmpty(commands)
+            m.assertEqual(backchannel.ackedCommandIndex, 8)
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
+            m.assertEqual(m.global.telemetry.LogEvent.fingerprint, "lounge-malformed-command")
+        end function
+
+        @it("ends a 2xx answer that acknowledges nothing as stalled")
+        function _()
+            backchannel = new LoungeBackchannel()
+            body = m.Frame(`[[7,["noop"]]]`)
+            m.PollOnce(backchannel, "/lounge/stalled", { status: 200, body: body })
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/stalled", invalid))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Stalled)
+            m.assertEqual(backchannel.stalledPolls, 1)
+            m.assertEqual(backchannel.ackedCommandIndex, 7)
+
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/unparseable", { status: 200, body: m.Frame(`[[8,["noop"]`) }))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Stalled)
+            m.assertEqual(backchannel.stalledPolls, 2)
+            m.assertEqual(m.global.telemetry.LogEvent.fingerprint, "lounge-unparseable-frame")
+
+            m.PollOnce(backchannel, "/lounge/unstalled", { status: 200, body: m.Frame(`[[8,["noop"]]]`) })
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
+            m.assertEqual(backchannel.stalledPolls, 0)
+        end function
+
+        @it("restarts the acknowledged index for the session a bind starts")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.PollOnce(backchannel, "/lounge/old-session", { status: 200, body: m.Frame(`[[7,["noop"]]]`) })
+            m.PollOnce(backchannel, "/lounge/old-session", invalid)
+            commands = backchannel.StartSession(m.Frame(`[[0,["c","SID"]],[1,["S","GSID"]]]`))
+            m.assertEqual(commands.Count(), 2)
+            m.assertEqual(commands[0].type, "c")
+            m.assertEqual(commands[0].args, "SID")
+            m.assertEqual(backchannel.ackedCommandIndex, 1)
+            m.assertEqual(backchannel.stalledPolls, 0)
+        end function
+
+        @it("ends a non-2xx answer with its status")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/unknownsid", { status: 400, body: "Unknown SID" }))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Http)
+            m.assertEqual(backchannel.CloseLabel(), "http_400")
+            m.assertEqual(backchannel.statusCode, 400)
+        end function
+
+        @it("ends a poll the server drops with its curl code")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/dropped", { drop: true }))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Curl)
+            m.assertEqual(backchannel.CloseLabel(), "curl_52")
+            m.assertEqual(backchannel.statusCode, HttpClient.CurlErrors.CURLE_GOT_NOTHING)
+        end function
+
+        @it("ends a poll the server holds past the poll timeout as timeout")
+        function _()
+            backchannel = new LoungeBackchannel()
+            backchannel.pollTimeoutMs = 300
+            m.assertEmpty(m.PollOnce(backchannel, "/delay/3000", invalid))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Timeout)
+            m.assertEqual(backchannel.statusCode, 0)
+        end function
+
+        @it("ends a poll that can't be sent as not_sent")
+        function _()
+            backchannel = new LoungeBackchannel()
+            ' A transfer already in progress refuses another.
+            busyTransfer = CreateObject("roUrlTransfer")
+            busyTransfer.SetUrl(Tests.HttpTestServerUrl("/delay/2000"))
+            busyTransfer.SetMessagePort(CreateObject("roMessagePort"))
+            busyTransfer.AsyncGetToString()
+            m.stubCall(HttpClient.CreateUrlTransfer, busyTransfer)
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/not-sent", invalid))
+            busyTransfer.AsyncCancel()
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.NotSent)
+            m.assertEqual(backchannel.statusCode, 0)
+        end function
+
+        @it("cancels the poll in flight when closed")
+        function _()
+            backchannel = new LoungeBackchannel()
+            port = CreateObject("roMessagePort")
+            backchannel.Open(HttpClient.Get(Tests.HttpTestServerUrl("/delay/3000")), port)
+            backchannel.Close()
+            m.assertFalse(backchannel.IsPolling())
+            m.assertEmpty(backchannel.Handle(wait(500, port)))
+            m.assertInvalid(backchannel.closeReason)
+        end function
+
+        @it("resets the status and reason of the previous poll when it opens the next")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.PollOnce(backchannel, "/lounge/gone", { status: 410, body: "" })
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Http)
+            backchannel.Open(HttpClient.Get(Tests.HttpTestServerUrl("/delay/3000")), CreateObject("roMessagePort"))
+            m.assertTrue(backchannel.IsPolling())
+            m.assertInvalid(backchannel.closeReason)
+            m.assertEqual(backchannel.statusCode, 0)
+        end function
+
+    end class
+
+end namespace

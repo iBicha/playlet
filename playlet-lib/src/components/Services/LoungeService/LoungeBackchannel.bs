@@ -1,242 +1,166 @@
-import "pkg:/components/Services/LoungeService/HttpChunkedDecoder.bs"
-import "pkg:/components/Services/LoungeService/LoungeBytes.bs"
 import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
+import "pkg:/components/Services/LoungeService/LoungeService.types.bs"
+import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/Logging.bs"
-import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
 
-' Server sends periodic noop keepalives, so no data for this long means a dead connection.
-const LOUNGE_BACKCHANNEL_TIMEOUT_MS = 60000
-const LOUNGE_BACKCHANNEL_BODY_COMPACT = 32768
-const LOUNGE_BACKCHANNEL_MAX_REDIRECTS = 10
+' The server answers a poll with a noop after at most ~30 s idle, and drops a session that goes 55-60 s without a poll.
+' Giving up on a dead connection by 40 s lets the next poll, after the first backoff, land before the session is gone.
+const LOUNGE_POLL_TIMEOUT_MS = 40000
 
-' Raw socket on plain HTTP: roUrlTransfer can't read a streaming body incrementally, and
-' roStreamSocket has no TLS.
 class LoungeBackchannel
 
     public statusCode = 0
-    public closeReason = ""
-    public redirectTarget = ""
+    public closeReason as LoungeCloseReason
+    public ackedCommandIndex = -1
+    public stalledPolls = 0
+    public pollTimeoutMs = LOUNGE_POLL_TIMEOUT_MS
 
-    private socket
-    private decoder
-    private body
-    private bodyCursor = 0
-    private timer
-    private url = ""
-    private messagePort
-    private redirectCount = 0
+    private pending = invalid
+    private polledCommandIndex = -1
 
-    function new()
-        m.timer = CreateObject("roTimespan")
+    ' A new session restarts command indices from 0.
+    function StartSession(bindResponseText as string) as LoungeCommand[]
+        m.ackedCommandIndex = -1
+        m.stalledPolls = 0
+        return m.Receive(m.ExtractFrames(bindResponseText))
     end function
 
-    function Open(url as string, messagePort as object) as boolean
-        m.messagePort = messagePort
-        m.redirectCount = 0
-        m.redirectTarget = ""
-        return m.Connect(url)
-    end function
-
-    private function Connect(url as string) as boolean
-        ' A redirect or reconnect reuses Connect; close the previous socket so it doesn't leak.
-        if m.socket <> invalid
-            m.socket.NotifyReadable(false)
-            m.socket.Close()
-            m.socket = invalid
-        end if
-
-        m.url = url
+    function Open(request as HttpClient.Request, messagePort as object) as void
         m.statusCode = 0
-        m.closeReason = ""
-
-        urlObject = UrlUtils.ParseUrl(url)
-        if urlObject.protocol <> "http"
-            m.closeReason = "invalid_protocol"
-            LogError("Lounge backchannel needs http, got:", urlObject.protocol)
-            return false
-        end if
-
-        portValue = urlObject.port
-        if portValue = invalid or portValue = ""
-            portValue = "80"
-        end if
-
-        address = CreateObject("roSocketAddress")
-        address.SetAddress(urlObject.host + ":" + portValue)
-
-        socket = CreateObject("roStreamSocket")
-        socket.SetSendToAddress(address)
-        if not socket.Connect()
-            m.closeReason = "connect_failed"
-            LogWarnNoTelemetry("Lounge backchannel connect failed:", urlObject.host)
-            return false
-        end if
-
-        CRLF = Chr(13) + Chr(10)
-        request = "GET " + urlObject.path + " HTTP/1.1" + CRLF
-        request += "Host: " + urlObject.host + CRLF
-        request += "Connection: keep-alive" + CRLF
-        request += CRLF
-        socket.SendStr(request)
-
-        socket.NotifyReadable(true)
-        socket.SetMessagePort(m.messagePort)
-
-        m.socket = socket
-        m.decoder = new HttpChunkedDecoder()
-        m.body = CreateObject("roByteArray")
-        m.bodyCursor = 0
-        m.timer.Mark()
-
-        LogInfo("Lounge backchannel open, socket", socket.GetID())
-        return true
-    end function
-
-    function IsOpen() as boolean
-        return m.socket <> invalid and m.closeReason = ""
-    end function
-
-    function Poll(socketEvents as object) as object
-        frames = []
-        if m.socket = invalid
-            return frames
-        end if
-
-        if not m.socket.IsConnected()
-            m.CloseWith("disconnected")
-            return frames
-        end if
-
-        if m.timer.TotalMilliseconds() > LOUNGE_BACKCHANNEL_TIMEOUT_MS
-            m.CloseWith("timeout")
-            return frames
-        end if
-
-        if not m.HasReadableEvent(socketEvents)
-            return frames
-        end if
-
-        received = m.decoder.Pump(m.socket, m.body)
-        if received = 0
-            m.CloseWith("eof")
-            return frames
-        else if received < 0
-            if not m.socket.eOK()
-                m.CloseWith("receive_error")
-            end if
-            return frames
-        end if
-
-        m.timer.Mark()
-
-        if m.decoder.IsRedirect()
-            return m.FollowRedirect()
-        end if
-
-        result = LoungeFraming.Extract(m.body, m.bodyCursor)
-        m.bodyCursor = result.nextPos
-        for each frame in result.frames
-            frames.Push(frame)
-        end for
-        m.CompactBody()
-
-        if m.decoder.IsError()
-            m.statusCode = m.decoder.statusCode
-            if m.decoder.errorReason <> HttpDecoderError.None
-                m.CloseWith(m.decoder.errorReason)
-            else
-                m.CloseWith("http_" + StrI(m.statusCode).Trim())
-            end if
-        else if m.decoder.IsDone()
-            m.CloseWith("complete")
-        end if
-
-        return frames
+        m.closeReason = invalid
+        m.polledCommandIndex = m.ackedCommandIndex
+        m.pending = request.QueryParam("AID", m.ackedCommandIndex).NoCache().RetryCount(0).AttemptTimeoutMs(m.pollTimeoutMs).SendOn(messagePort)
     end function
 
     function Close() as void
-        m.CloseWith("closed")
-    end function
-
-    private function HasReadableEvent(socketEvents as object) as boolean
-        id = m.socket.GetID()
-        for each event in socketEvents
-            if event.GetSocketID() = id
-                return true
-            end if
-        end for
-        return false
-    end function
-
-    private function CloseWith(reason as string) as void
-        if m.socket <> invalid
-            m.socket.NotifyReadable(false)
-            m.socket.Close()
-            m.socket = invalid
-        end if
-        if m.closeReason = ""
-            m.closeReason = reason
+        if m.pending <> invalid
+            m.pending.Cancel()
+            m.pending = invalid
         end if
     end function
 
-    private function CompactBody() as void
-        if m.bodyCursor = 0
-            return
+    function IsPolling() as boolean
+        return m.pending <> invalid
+    end function
+
+    function MaxWaitMs() as integer
+        if m.pending = invalid
+            return 0
         end if
-        if m.bodyCursor >= m.body.Count()
-            m.body.Clear()
-        else if m.bodyCursor >= LOUNGE_BACKCHANNEL_BODY_COMPACT
-            m.body = LoungeBytes.Tail(m.body, m.bodyCursor)
+        return m.pending.MaxWaitMs()
+    end function
+
+    function Handle(message as dynamic) as LoungeCommand[]
+        if m.pending = invalid
+            return []
+        end if
+        response = m.pending.Handle(message)
+        if response = invalid
+            return []
+        end if
+        m.pending = invalid
+        m.statusCode = response.StatusCode()
+
+        if response.IsTimedOut()
+            m.closeReason = LoungeCloseReason.Timeout
+            return []
+        end if
+        if m.statusCode = 0
+            m.closeReason = LoungeCloseReason.NotSent
+            return []
+        end if
+        if m.statusCode < 0
+            m.closeReason = LoungeCloseReason.Curl
+            return []
+        end if
+        if m.statusCode < 200 or m.statusCode >= 300
+            m.closeReason = LoungeCloseReason.Http
+            return []
+        end if
+
+        frames = m.ExtractFrames(response.Text())
+        if frames.Count() = 0
+            m.closeReason = LoungeCloseReason.Empty
+            return []
+        end if
+        commands = m.Receive(frames)
+        ' Nothing acknowledged: the next poll is answered with the same frames.
+        if m.ackedCommandIndex = m.polledCommandIndex
+            m.closeReason = LoungeCloseReason.Stalled
+            m.stalledPolls += 1
         else
-            return
+            m.closeReason = LoungeCloseReason.Complete
+            m.stalledPolls = 0
         end if
-        m.bodyCursor = 0
+        return commands
     end function
 
-    private function FollowRedirect() as object
-        frames = []
-
-        location = m.decoder.Location()
-        if not IsString(location) or location = ""
-            m.CloseWith("redirect_no_location")
-            return frames
+    function CloseLabel() as string
+        if m.closeReason = LoungeCloseReason.Curl or m.closeReason = LoungeCloseReason.Http
+            return `${m.closeReason}_${Abs(m.statusCode)}`
         end if
+        return m.closeReason
+    end function
 
-        nextUrl = LoungeRedirect.Resolve(m.url, location)
-        m.redirectTarget = nextUrl
-
-        m.redirectCount += 1
-        if m.redirectCount > LOUNGE_BACKCHANNEL_MAX_REDIRECTS
-            m.CloseWith("redirect_limit")
-            return frames
+    private function ExtractFrames(text as string) as object
+        body = CreateObject("roByteArray")
+        body.FromAsciiString(text)
+        result = LoungeFraming.Extract(body, 0)
+        if result.nextPos < body.Count()
+            LogTelemetryEvent({
+                level: "warning"
+                message: `Lounge answer ended mid-frame, ${body.Count() - result.nextPos} bytes left: ${text}`
+                fingerprint: "lounge-partial-frame"
+            })
         end if
+        return result.frames
+    end function
 
-        LogInfo("Lounge backchannel following redirect to", m.redirectTarget)
-        m.Connect(nextUrl)
-        return frames
+    private function Receive(frames as object) as LoungeCommand[]
+        commands = []
+        for each frame in frames
+            entries = StringUtils.ParseJsonSafe(frame)
+            if not IsArray(entries)
+                LogTelemetryEvent({
+                    level: "error"
+                    message: "Lounge frame did not parse to a command array: " + frame.Left(256)
+                    fingerprint: "lounge-unparseable-frame"
+                })
+                continue for
+            end if
+
+            for each entry in entries
+                if not IsArray(entry) or entry.Count() = 0 or not IsInt(entry[0])
+                    m.LogMalformedCommand(entry)
+                    continue for
+                end if
+                index = entry[0]
+                if index <= m.ackedCommandIndex
+                    LogDebug("Skipping command already received:", entry)
+                    continue for
+                end if
+                ' Acknowledged before validation: the server answers an unacknowledged command again, at once.
+                m.ackedCommandIndex = index
+
+                data = entry[1]
+                if not IsArray(data) or data.Count() = 0 or not IsString(data[0])
+                    m.LogMalformedCommand(entry)
+                    continue for
+                end if
+                commands.Push({ index: index, type: data[0], args: data[1] })
+            end for
+        end for
+        return commands
+    end function
+
+    private function LogMalformedCommand(entry as dynamic) as void
+        LogTelemetryEvent({
+            level: "error"
+            message: "Malformed lounge command: " + FormatJson(entry).Left(256)
+            fingerprint: "lounge-malformed-command"
+        })
     end function
 
 end class
-
-namespace LoungeRedirect
-
-    ' Force the target to plain HTTP - a raw socket has no TLS, so an https redirect is followed over http.
-    function Resolve(currentUrl as string, location as string) as string
-        if location.StartsWith("http://") or location.StartsWith("https://")
-            parts = UrlUtils.ParseUrl(location)
-        else
-            parts = UrlUtils.ParseUrl(currentUrl)
-            if not location.StartsWith("/")
-                location = "/" + location
-            end if
-            parts.path = location
-        end if
-
-        parts.protocol = "http"
-        if parts.port = "80" or parts.port = "443"
-            parts.port = invalid
-        end if
-        return UrlUtils.BuildUrlFromParts(parts)
-    end function
-
-end namespace

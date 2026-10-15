@@ -1,8 +1,6 @@
-import "pkg:/components/Dialog/DialogUtils.bs"
 import "pkg:/components/Services/Invidious/InvidiousToContentNode.bs"
 import "pkg:/components/Services/LoungeService/LoungeBackchannel.bs"
 import "pkg:/components/Services/LoungeService/LoungeConstants.bs"
-import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
 import "pkg:/components/Services/LoungeService/LoungeMessages.bs"
 import "pkg:/components/Services/LoungeService/LoungeVideoQueue.bs"
 import "pkg:/components/Services/LoungeService/Notifications/DeviceConnectedNotificationUtils.bs"
@@ -10,7 +8,7 @@ import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/RegistryUtils.bs"
 import "pkg:/source/utils/StringUtils.bs"
-import "pkg:/source/utils/UrlUtils.bs"
+import "pkg:/source/utils/Types.bs"
 
 const COMMAND_HANDLER_PREFIX = "_Handle_"
 
@@ -37,14 +35,14 @@ class LoungeApi
     ' Set by a send's failure, until the next bind.
     public sessionGone = false
     public tokenExpired = false
+    public backchannel as LoungeBackchannel
 
     private ofs
-    private lastProcessedCommandIndex = -1
-    private backchannel
+    private messagePort
     private pendingOutgoingMessages
     private lastLoungeDisconnect
 
-    function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object)
+    function new(loungeServiceNode as object, videoQueueNode as object, notificationsNode as object, invidiousNode as object, messagePort as object)
         m.loungeServiceNode = loungeServiceNode
         m.videoQueueNode = videoQueueNode
         m.notificationsNode = notificationsNode
@@ -55,7 +53,8 @@ class LoungeApi
         m.deviceName = deviceName
         m.screenName = deviceName
         m.ofs = 0
-        m.backchannel = invalid
+        m.messagePort = messagePort
+        m.backchannel = new LoungeBackchannel()
         m.pendingOutgoingMessages = []
         m.devices = {}
 
@@ -119,23 +118,13 @@ class LoungeApi
 
         response = request.Await()
         if not response.IsSuccess()
-            error = Tr(Locale.Dialogs.LoungeFailedToGetScreenId) + `\n${response.ErrorMessage()}`
-            LogError(error)
-            DialogUtils.ShowDialogEx({
-                message: error
-                title: Tr(Locale.Dialogs.LoungeServiceSetupError)
-            })
+            LogError(`Failed to get lounge screen ID\n${response.ErrorMessage()}`)
             return invalid
         end if
 
         id = response.Text()
-        if not IsString(id)
-            error = Tr(Locale.Dialogs.LoungeFailedToGetScreenId) + `\n` = Tr(Locale.Dialogs.LoungeNotAValidScreenId).Replace("%1", `${id}`)
-            LogError(error)
-            DialogUtils.ShowDialogEx({
-                message: error
-                title: Tr(Locale.Dialogs.LoungeServiceSetupError)
-            })
+        if StringUtils.IsNullOrEmpty(id)
+            LogError("Failed to get lounge screen ID: empty response")
             return invalid
         end if
 
@@ -155,24 +144,14 @@ class LoungeApi
 
         response = request.Await()
         if not response.IsSuccess()
-            error = Tr(Locale.Dialogs.LoungeFailedToGetLoungeToken) + `\n${response.ErrorMessage()}`
-            LogError(error)
-            DialogUtils.ShowDialogEx({
-                message: error
-                title: Tr(Locale.Dialogs.LoungeServiceSetupError)
-            })
+            LogError(`Failed to get lounge token\n${response.ErrorMessage()}`)
             return invalid
         end if
 
         json = response.Json()
-        screens = json.screens
+        screens = ValidAssociativeArray(json).screens
         if not IsArray(screens) or screens.Count() <> 1
-            error = Tr(Locale.Dialogs.LoungeFailedToGetLoungeToken) + `\n` + Tr(Locale.Dialogs.LoungeInvalidResponse).Replace("%1", `${json}`)
-            LogError(error)
-            DialogUtils.ShowDialogEx({
-                message: error
-                title: Tr(Locale.Dialogs.LoungeServiceSetupError)
-            })
+            LogError(`Failed to get lounge token: invalid response\nBody: ${response.Text()}`)
             return invalid
         end if
 
@@ -181,8 +160,8 @@ class LoungeApi
         return m.loungeToken
     end function
 
-    function GetSessionData() as boolean
-        queryParams = {
+    private function BindQueryParams(loungeData as object) as object
+        return {
             "device": "LOUNGE_SCREEN"
             "theme": "cl"
             "capabilities": "vsp"
@@ -191,13 +170,16 @@ class LoungeApi
             "v": "2"
             "t": "1"
             "app": "lb-v4"
-            "RID": "1337"
+            "name": loungeData.screenName
+            "id": loungeData.deviceId
+            "loungeIdToken": loungeData.loungeToken
+            "zx": m.Zx()
         }
+    end function
 
-        queryParams["name"] = m.screenName
-        queryParams["id"] = m.deviceId
-        queryParams["loungeIdToken"] = m.loungeToken
-        queryParams["zx"] = m.Zx()
+    function GetSessionData() as boolean
+        queryParams = m.BindQueryParams(m)
+        queryParams["RID"] = "1337"
 
         request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind")
         request.QueryParams(queryParams)
@@ -207,28 +189,16 @@ class LoungeApi
 
         response = request.Await()
         if not response.IsSuccess()
-            error = Tr(Locale.Dialogs.LoungeFailedToGetSessionData) + `\n${response.ErrorMessage()}`
-            LogError(error)
-            DialogUtils.ShowDialogEx({
-                message: error
-                title: Tr(Locale.Dialogs.LoungeServiceSetupError)
-            })
+            LogError(`Failed to get lounge session data\n${response.ErrorMessage()}`)
             return false
         end if
 
-        body = CreateObject("roByteArray")
-        body.FromAsciiString(response.Text())
-
-        ' A new session restarts command indices from 0; clear the high-water mark so its commands
-        ' aren't skipped as duplicates. Its outbound offset restarts from 0 too.
-        m.lastProcessedCommandIndex = -1
         m.ofs = 0
         m.sessionGone = false
         m.tokenExpired = false
         messagesToSend = []
-        result = LoungeFraming.Extract(body, 0)
-        for each frame in result.frames
-            m.ProcessFrame(frame, messagesToSend)
+        for each command in m.backchannel.StartSession(response.Text())
+            m.ProcessCommand(command, messagesToSend)
         end for
         if StringUtils.IsNullOrEmpty(m.sessionId) or StringUtils.IsNullOrEmpty(m.gSessionId)
             LogTelemetryEvent({
@@ -241,52 +211,35 @@ class LoungeApi
         return true
     end function
 
-    function FetchCommandsRpc(messagePort as object) as void
-        ' Plain HTTP: LoungeBackchannel streams this response over a raw socket, which has no TLS
-        baseUrl = "http://www.youtube.com/api/lounge/bc/bind"
-        queryParams = {
-            "device": "LOUNGE_SCREEN"
-            "theme": "cl"
-            "capabilities": "vsp"
-            "mdxVersion": "2"
-            "VER": "8"
-            "v": "2"
-            "t": "1"
-            "app": "lb-v4"
-            "RID": "rpc"
-            "CI": "0"
-        }
-
-        queryParams["name"] = m.screenName
-        queryParams["id"] = m.deviceId
-        queryParams["loungeIdToken"] = m.loungeToken
+    function StartPoll() as void
+        queryParams = m.BindQueryParams(m)
+        queryParams["RID"] = "rpc"
         queryParams["SID"] = m.sessionId
         queryParams["gsessionid"] = m.gSessionId
-        queryParams["zx"] = m.Zx()
+        queryParams["CI"] = "1"
+        queryParams["TYPE"] = "xmlhttp"
 
-        url = UrlUtils.BuildUrl(baseUrl, invalid, queryParams)
-
-        if m.backchannel = invalid
-            m.backchannel = new LoungeBackchannel()
-        end if
-
-        m.backchannel.Open(url, messagePort)
+        request = HttpClient.Get("https://www.youtube.com/api/lounge/bc/bind")
+        request.QueryParams(queryParams)
+        m.backchannel.Open(request, m.messagePort)
     end function
 
-    function Poll(socketMessages as object, messagesToSend as object) as boolean
-        frames = m.backchannel.Poll(socketMessages)
-        for each frame in frames
-            m.ProcessFrame(frame, messagesToSend)
+    function HandleMessage(message as dynamic, messagesToSend as object) as void
+        for each command in m.backchannel.Handle(message)
+            m.ProcessCommand(command, messagesToSend)
         end for
-
-        return m.backchannel.IsOpen()
+        m.HandleSends(message)
     end function
 
-    function GetCloseInfo() as object
-        if m.backchannel = invalid
-            return { statusCode: 0, reason: "", target: "" }
-        end if
-        return { statusCode: m.backchannel.statusCode, reason: m.backchannel.closeReason, target: m.backchannel.redirectTarget }
+    function MaxWaitMs() as integer
+        waitMs = m.backchannel.MaxWaitMs()
+        for each pending in m.pendingOutgoingMessages
+            pendingWaitMs = pending.MaxWaitMs()
+            if waitMs = 0 or pendingWaitMs < waitMs
+                waitMs = pendingWaitMs
+            end if
+        end for
+        return waitMs
     end function
 
     function RefreshToken() as dynamic
@@ -303,10 +256,7 @@ class LoungeApi
     end function
 
     function Rebind(withNewToken as boolean) as boolean
-        for each pending in m.pendingOutgoingMessages
-            pending.Cancel()
-        end for
-        m.pendingOutgoingMessages = []
+        m.CancelSends()
 
         if withNewToken
             LogWarnNoTelemetry("Lounge token expired, refreshing")
@@ -319,58 +269,38 @@ class LoungeApi
         return m.Bind()
     end function
 
-    function ProcessFrame(frame as string, messagesToSend as object) as void
-        commands = StringUtils.ParseJsonSafe(frame)
-        if not IsArray(commands)
-            LogTelemetryEvent({
-                level: "error"
-                message: "Lounge frame did not parse to a command array: " + frame.Left(256)
-                fingerprint: "lounge-unparseable-frame"
-            })
-            return
-        end if
-        m.ProcessCommands(commands, messagesToSend)
+    function EndSession() as void
+        m.backchannel.Close()
+        m.CancelSends()
+        m.loungeToken = invalid
     end function
 
-    function ProcessCommands(commands as object, messagesToSend as object) as void
-        for each command in commands
-            if not IsArray(command) or command.Count() <> 2
-                continue for
-            end if
-
-            commandIndex = command[0]
-            commandData = command[1]
-            commandType = commandData[0]
-
-            if commandIndex <= m.lastProcessedCommandIndex and commandType <> COMMAND_TYPE_G_SESSION_ID and commandType <> COMMAND_TYPE_SESSION_ID
-                LogDebug("Skipping command already processed:", command)
-                continue for
-            end if
-            m.lastProcessedCommandIndex = commandIndex
-
-            commandArgs = invalid
-            if commandData.Count() > 1
-                commandArgs = commandData[1]
-            end if
-
-            handler = COMMAND_HANDLER_PREFIX + commandType
-            if m.DoesExist(handler)
-                LogInfo(commandIndex, commandType)
-                m[handler](commandIndex, commandType, commandArgs, messagesToSend)
-            else
-                fingerprint = "Unknown command type:" + ToString(commandType)
-                message = fingerprint + " command:" + ToString(command)
-                LogWarnNoTelemetry(message)
-                LogTelemetryEvent({
-                    level: "warning"
-                    message: message
-                    fingerprint: fingerprint
-                })
-                #if DEBUG
-                    throw message
-                #end if
-            end if
+    private function CancelSends() as void
+        for each pending in m.pendingOutgoingMessages
+            pending.Cancel()
         end for
+        m.pendingOutgoingMessages = []
+    end function
+
+    function ProcessCommand(command as LoungeCommand, messagesToSend as object) as void
+        handler = COMMAND_HANDLER_PREFIX + command.type
+        if m.DoesExist(handler)
+            LogInfo(command.index, command.type)
+            m[handler](command.index, command.type, command.args, messagesToSend)
+            return
+        end if
+
+        fingerprint = "Unknown command type:" + command.type
+        message = fingerprint + " command:" + ToString(command)
+        LogWarnNoTelemetry(message)
+        LogTelemetryEvent({
+            level: "warning"
+            message: message
+            fingerprint: fingerprint
+        })
+        #if DEBUG
+            throw message
+        #end if
     end function
 
     function HandleIgnoreCommand(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object)
@@ -387,20 +317,11 @@ class LoungeApi
         LogInfo("gSessionId:", m.gSessionId)
     end function
 
-    function HandleGetPlayingNow(commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
+    function HandleGetPlayingNow(_commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
         player = m.videoQueueNode.player
-
-        message = LoungeMessages.OnHasPreviousNextChanged(m.videoQueueNode.hasPrevious, m.videoQueueNode.hasNext)
-        message["commandId"] = commandId
-        messagesToSend.Push(message)
-
-        message = LoungeMessages.NowPlaying(player)
-        message["commandId"] = commandId
-        messagesToSend.Push(message)
-
-        message = LoungeMessages.OnStateChange(player)
-        message["commandId"] = commandId
-        messagesToSend.Push(message)
+        messagesToSend.Push(LoungeMessages.OnHasPreviousNextChanged(m.videoQueueNode.hasPrevious, m.videoQueueNode.hasNext))
+        messagesToSend.Push(LoungeMessages.NowPlaying(player))
+        messagesToSend.Push(LoungeMessages.OnStateChange(player))
     end function
 
     function HandleLoungeStatus(_commandId as integer, commandType as string, commandArgs as object, _messagesToSend as object) as void
@@ -556,7 +477,7 @@ class LoungeApi
         messagesToSend.Push(LoungeMessages.OnPlaybackSpeedChanged(speed, true))
     end function
 
-    function HandleGetPlaybackSpeed(commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
+    function HandleGetPlaybackSpeed(_commandId as integer, _commandType as string, _commandArgs as object, messagesToSend as object) as void
         player = m.videoQueueNode.player
         if player = invalid
             return
@@ -572,39 +493,23 @@ class LoungeApi
             speed = 1.0
         end if
 
-        message = LoungeMessages.OnPlaybackSpeedChanged(speed)
-        message["commandId"] = commandId
-        messagesToSend.Push(message)
+        messagesToSend.Push(LoungeMessages.OnPlaybackSpeedChanged(speed))
     end function
 
     function SendMessages(messages as object) as void
         if messages.Count() = 0
             return
         end if
-        m.pendingOutgoingMessages.Push(m.SendMessagesTo(m, messages))
+        m.pendingOutgoingMessages.Push(m.SendRequest(m, messages, m.backchannel.ackedCommandIndex).SendOn(m.messagePort))
     end function
 
-    private function SendMessagesTo(loungeData as object, messages as object) as HttpClient.PendingResponse
-        queryParams = {
-            "device": "LOUNGE_SCREEN"
-            "theme": "cl"
-            "capabilities": "vsp"
-            "mdxVersion": "2"
-            "VER": "8"
-            "v": "2"
-            "t": "1"
-            "app": "lb-v4"
-            "RID": "1337"
-        }
-
-        queryParams["name"] = loungeData.screenName
-        queryParams["id"] = loungeData.deviceId
-        queryParams["loungeIdToken"] = loungeData.loungeToken
+    private function SendRequest(loungeData as object, messages as object, ackedCommandIndex as integer) as HttpClient.Request
+        queryParams = m.BindQueryParams(loungeData)
+        queryParams["RID"] = "1337"
         queryParams["SID"] = loungeData.sessionId
         queryParams["gsessionid"] = loungeData.gSessionId
-        queryParams["zx"] = m.Zx()
-        if messages[0].commandId <> invalid
-            queryParams["AID"] = messages[0].commandId
+        if ackedCommandIndex >= 0
+            queryParams["AID"] = ackedCommandIndex
         end if
 
         postData = [
@@ -633,64 +538,51 @@ class LoungeApi
         request = HttpClient.Post("https://www.youtube.com/api/lounge/bc/bind")
         request.QueryParams(queryParams)
         request.FormBody(postData)
-        return request.Send()
+        return request
     end function
 
-    function HasPendingOutgoingMessages() as boolean
-        return m.pendingOutgoingMessages.Count() > 0
-    end function
-
-    function ProcessPendingOutgoingMessages() as object
-        results = []
-        stillPending = []
-        for each pending in m.pendingOutgoingMessages
-            response = pending.Poll()
-            if response = invalid
-                stillPending.Push(pending)
-            else
-                status = response.StatusCode()
-                error = response.ErrorMessage()
-
-                results.Push({
-                    "status": status
-                    "error": error
-                })
-
+    private function HandleSends(message as dynamic) as void
+        for i = m.pendingOutgoingMessages.Count() - 1 to 0 step -1
+            response = m.pendingOutgoingMessages[i].Handle(message)
+            if response <> invalid
+                m.pendingOutgoingMessages.Delete(i)
                 if not response.IsSuccess()
-                    isGone = response.StatusCode() = 410
-                    unknownSid = response.StatusCode() = 400 and response.ErrorMessage().InStr("Unknown SID") <> -1
-                    expiredToken = response.StatusCode() = 401 and response.ErrorMessage().InStr("Expired lounge id token") <> -1
-                    isKnownError = isGone or unknownSid or expiredToken
-                    if isGone or unknownSid
-                        m.sessionGone = true
-                    else if expiredToken
-                        m.tokenExpired = true
-                    end if
-
-                    if isKnownError
-                        ' NoTelemetry: the body carries a volatile token; logging it would fragment these.
-                        LogErrorNoTelemetry(response.ErrorMessage())
-                        if expiredToken
-                            LogTelemetryEvent({
-                                level: "warning"
-                                message: "Lounge id token expired"
-                                fingerprint: "lounge-expired-token"
-                            })
-                        end if
-                    else
-                        LogErrorNoTelemetry(error)
-                        LogTelemetryEvent({
-                            level: "error"
-                            message: error
-                            fingerprint: ["lounge-send-failure", status]
-                        })
-                    end if
+                    m.OnSendFailed(response)
                 end if
             end if
         end for
-        m.pendingOutgoingMessages = stillPending
+    end function
 
-        return results
+    private function OnSendFailed(response as HttpClient.Response) as void
+        status = response.StatusCode()
+        error = response.ErrorMessage()
+        isGone = status = 410
+        unknownSid = status = 400 and error.InStr("Unknown SID") <> -1
+        expiredToken = status = 401 and error.InStr("Expired lounge id token") <> -1
+        if isGone or unknownSid
+            m.sessionGone = true
+        else if expiredToken
+            m.tokenExpired = true
+        end if
+
+        if isGone or unknownSid or expiredToken
+            ' NoTelemetry: the body carries a volatile token; logging it would fragment these.
+            LogErrorNoTelemetry(error)
+            if expiredToken
+                LogTelemetryEvent({
+                    level: "warning"
+                    message: "Lounge id token expired"
+                    fingerprint: "lounge-expired-token"
+                })
+            end if
+        else
+            LogErrorNoTelemetry(error)
+            LogTelemetryEvent({
+                level: "error"
+                message: error
+                fingerprint: ["lounge-send-failure", status]
+            })
+        end if
     end function
 
     function SaveCurrentLoungeData() as void
@@ -750,7 +642,7 @@ class LoungeApi
         ' This is the last message we'll be sending to this lounge.
         loungeData.ofs = 99999999
         ' Held: dropping it releases its transfer, which aborts the send.
-        m.lastLoungeDisconnect = m.SendMessagesTo(loungeData, messages)
+        m.lastLoungeDisconnect = m.SendRequest(loungeData, messages, -1).Send()
     end function
 
 end class

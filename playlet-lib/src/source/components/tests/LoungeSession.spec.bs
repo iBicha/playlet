@@ -1,0 +1,63 @@
+import "pkg:/components/Services/LoungeService/LoungeSession.bs"
+
+namespace Tests
+
+    @suite
+    class LoungeSessionTests extends Rooibos.BaseTestSuite
+
+        @describe("LoungeSession.StepAfterPoll")
+
+        @it("polls again after a complete poll")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Complete, 200, 0, false, false, 0), LoungeSessionStep.Poll)
+        end function
+
+        @it("retries a failed poll")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, 1000), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Timeout, 0, 0, false, false, 40000), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 503, 0, false, false, 1000), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Empty, 200, 0, false, false, 1000), LoungeSessionStep.Retry)
+        end function
+
+        @it("retries the first stall, and rebinds on the second in a row")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Stalled, 200, 1, false, false, 1000), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Stalled, 200, 2, false, false, 2000), LoungeSessionStep.Rebind)
+        end function
+
+        @it("rebinds a session the server no longer has")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 400, 0, false, false, 1000), LoungeSessionStep.Rebind)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 410, 0, false, false, 1000), LoungeSessionStep.Rebind)
+            m.assertEqual(m.Step(LoungeCloseReason.Complete, 200, 0, true, false, 0), LoungeSessionStep.Rebind)
+        end function
+
+        @it("rebinds with a new token when the token expired")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 401, 0, false, false, 1000), LoungeSessionStep.RebindWithNewToken)
+            m.assertEqual(m.Step(LoungeCloseReason.Complete, 200, 0, false, true, 0), LoungeSessionStep.RebindWithNewToken)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 400, 0, false, true, 1000), LoungeSessionStep.RebindWithNewToken)
+        end function
+
+        @it("drops a session that delivered no poll for the give-up time, whatever the failure")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 400, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, 401, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
+            m.assertEqual(m.Step(LoungeCloseReason.Stalled, 200, 3, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
+            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, LoungeSession.GIVE_UP_MS - 1), LoungeSessionStep.Retry)
+        end function
+
+        @it("never drops a session whose poll just delivered")
+        function _()
+            m.assertEqual(m.Step(LoungeCloseReason.Complete, 200, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Poll)
+        end function
+
+        function step(closeReason as LoungeCloseReason, statusCode as integer, stalledPolls as integer, sessionGone as boolean, tokenExpired as boolean, msSinceDelivered as integer) as LoungeSessionStep
+            return LoungeSession.StepAfterPoll(closeReason, statusCode, stalledPolls, sessionGone, tokenExpired, msSinceDelivered)
+        end function
+
+    end class
+
+end namespace

@@ -249,30 +249,6 @@
         <translation>Backend changed to Playlet, because no Invidious instance is set.</translation>
     </message>
     <message>
-        <source>Lounge service setup error</source>
-        <translation>Lounge service setup error</translation>
-    </message>
-    <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>Failed to get screen ID. Please restart Playlet to use the cast function.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>Not a valid screen id: %1</translation>
-    </message>
-    <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>Failed to get lounge token. Please restart Playlet to use the cast function.</translation>
-    </message>
-    <message>
-        <source>Invalid response: %1</source>
-        <translation>Invalid response: %1</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>Failed to get session data. Please restart Playlet to use the cast function.</translation>
-    </message>
-    <message>
         <source>Select a service to login</source>
         <translation>Select a service to login</translation>
     </message>

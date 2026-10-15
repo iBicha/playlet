@@ -51,23 +51,39 @@ namespace Tests
         end function
 
         @slow(30000)
-        @it("sends the messages a bind calls for, and reports each one's status once it completes")
+        @it("sends the messages a bind calls for, each completing on the service loop's port")
+        function _()
+            api = m.CreateLiveApi()
+            api.GetScreenId()
+            api.GetToken()
+            m.assertTrue(api.GetSessionData(), "bind failed")
+            sends = []
+            sends.Append(api.pendingOutgoingMessages)
+            m.assertNotEmpty(sends, "the bind sent no messages")
+
+            m.RunLoop(api, 10000, function(api as object) as boolean
+                return api.pendingOutgoingMessages.Count() = 0
+            end function)
+            m.AssertSendsSucceeded(sends)
+        end function
+
+        @slow(60000)
+        @it("polls the backchannel over HTTPS: the server holds the poll, then answers with a frame")
         function _()
             api = m.CreateLiveApi()
             api.GetScreenId()
             api.GetToken()
             m.assertTrue(api.GetSessionData(), "bind failed")
 
-            results = []
+            api.StartPoll()
+            m.assertTrue(api.backchannel.IsPolling())
             timer = CreateObject("roTimespan")
-            while results.Count() = 0 and timer.TotalMilliseconds() < 10000
-                results.Append(api.ProcessPendingOutgoingMessages())
-                sleep(50)
-            end while
-            m.assertNotEmpty(results, "no outgoing message completed")
-            for each result in results
-                m.assertEqual(result.status, 200, result.error)
-            end for
+            m.RunLoop(api, 50000, function(api as object) as boolean
+                return not api.backchannel.IsPolling()
+            end function)
+            m.assertEqual(api.backchannel.closeReason, LoungeCloseReason.Complete, `status ${api.backchannel.statusCode}`)
+            m.assertEqual(api.backchannel.statusCode, 200)
+            m.assertTrue(timer.TotalMilliseconds() > 5000, `answered after ${timer.TotalMilliseconds()} ms: AID didn't acknowledge the bind's commands`)
         end function
 
         @slow(30000)
@@ -77,27 +93,37 @@ namespace Tests
             api.GetScreenId()
             api.GetToken()
             m.assertTrue(api.GetSessionData(), "bind failed")
-            m.assertTrue(api.HasPendingOutgoingMessages(), "the bind sent no messages")
             replacedSends = []
             replacedSends.Append(api.pendingOutgoingMessages)
+            m.assertNotEmpty(replacedSends, "the bind sent no messages")
 
             m.assertTrue(api.Rebind(true), "rebind failed")
 
-            m.assertNotEmpty(replacedSends)
             for each pending in replacedSends
-                m.assertTrue(pending.Poll().IsCancelled(), "a send of the replaced session was not cancelled")
+                m.assertTrue(pending.Handle(invalid).IsCancelled(), "a send of the replaced session was not cancelled")
             end for
 
-            results = []
+            sends = []
+            sends.Append(api.pendingOutgoingMessages)
+            m.assertNotEmpty(sends, "the rebind sent no messages")
+            m.RunLoop(api, 10000, function(api as object) as boolean
+                return api.pendingOutgoingMessages.Count() = 0
+            end function)
+            m.AssertSendsSucceeded(sends)
+        end function
+
+        private function RunLoop(api as object, limitMs as integer, done as function) as void
             timer = CreateObject("roTimespan")
-            while api.HasPendingOutgoingMessages() and timer.TotalMilliseconds() < 10000
-                results.Append(api.ProcessPendingOutgoingMessages())
-                sleep(50)
+            while not done(api) and timer.TotalMilliseconds() < limitMs
+                api.HandleMessage(wait(api.MaxWaitMs(), m.messagePort), [])
             end while
-            m.assertFalse(api.HasPendingOutgoingMessages(), "the new session's sends did not complete")
-            m.assertNotEmpty(results, "the rebind sent no messages")
-            for each result in results
-                m.assertEqual(result.status, 200, result.error)
+        end function
+
+        private function AssertSendsSucceeded(sends as object) as void
+            for each pending in sends
+                response = pending.Handle(invalid)
+                m.assertNotInvalid(response, "a send did not complete")
+                m.assertEqual(response.StatusCode(), 200, response.ErrorMessage())
             end for
         end function
 
@@ -111,7 +137,8 @@ namespace Tests
             queueStub = CreateObject("roSGNode", "Node")
             queueStub.addFields({ hasPrevious: false, hasNext: false })
             notifyStub = CreateObject("roSGNode", "Node")
-            return new LoungeApi(loungeServiceNode, queueStub, notifyStub, invalid)
+            m.messagePort = CreateObject("roMessagePort")
+            return new LoungeApi(loungeServiceNode, queueStub, notifyStub, invalid, m.messagePort)
         end function
 
     end class

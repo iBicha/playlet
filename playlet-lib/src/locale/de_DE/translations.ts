@@ -69,14 +69,6 @@
         <translation>Premiere in 1 Minute</translation>
     </message>
     <message>
-        <source>Lounge service setup error</source>
-        <translation>Fehler beim Setup des Lounge-Services</translation>
-    </message>
-    <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>Lounge Token konnte nicht geladen werden. Bitte starten Sie Playlet erneut, um die Cast-Funktion nutzen zu können.</translation>
-    </message>
-    <message>
         <source>name</source>
         <translation>Name</translation>
     </message>
@@ -423,22 +415,6 @@
     <message>
         <source>Failed to load feed</source>
         <translation>Feed konnte nicht geladen werden</translation>
-    </message>
-    <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>Bildschirm ID konnte nicht gefunden werden. Bitte starten sie Playlet neu, um die Cast-Funktion nutzen zu können.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>Ungültige Bildschirm-ID: %1</translation>
-    </message>
-    <message>
-        <source>Invalid response: %1</source>
-        <translation>Ungültige Antwort: %1</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>Session-Daten konnten nicht geladen werden. Bitte starten Sie Playlet neu, um die Cast-Funktion nutzen zu können.</translation>
     </message>
     <message>
         <source>Invidious custom instance</source>

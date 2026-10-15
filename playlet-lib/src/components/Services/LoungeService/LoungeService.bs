@@ -1,8 +1,7 @@
 import "pkg:/components/parts/AutoBind/OnNodeReadyNoOp.bs"
 import "pkg:/components/Services/LoungeService/LoungeApi.bs"
-
-const IDLE_WAIT_MS = 60000
-const SENDS_IN_FLIGHT_WAIT_MS = 500
+import "pkg:/components/Services/LoungeService/LoungeService.types.bs"
+import "pkg:/components/Services/LoungeService/LoungeSession.bs"
 
 function Init()
     m.top.functionName = "LoungeServiceLoop"
@@ -21,6 +20,7 @@ function StartService(_unused as dynamic) as boolean
         return true
     end if
 
+    m.top.isRunning = true
     m.top.control = "run"
     return true
 end function
@@ -34,65 +34,83 @@ function StopService(_unused as dynamic) as void
 end function
 
 function LoungeServiceLoop() as void
-    api = new LoungeApi(m.top, m.top.videoQueue, m.top.notifications, m.top.invidious)
+    messagePort = CreateObject("roMessagePort")
+    m.top.observeField("shouldQuit", messagePort)
+    api = new LoungeApi(m.top, m.top.videoQueue, m.top.notifications, m.top.invidious, messagePort)
     ' Mobile app can remain connected to devices even after restarts.
     ' Since we create a new lounge every time, we signal to the last lounge
     ' that we're no longer there, and we're not coming back.
     api.DisconnectFromLastLounge()
 
-    messagePort = CreateObject("roMessagePort")
-
     ' We do not join a lounge until something asks us to like
     ' - A remote connects through DIAL
     ' - Generating a TV link code
+    ' Both join only while loungeToken is empty: a session that ends clears it.
+    while WaitForJoin(messagePort)
+        quitRequested = RunSession(api, messagePort)
+        api.EndSession()
+        m.top.unobserveField("outgoingMessages")
+        m.top.loungeToken = ""
+        if quitRequested
+            exit while
+        end if
+    end while
+
+    LogInfo("Lounge service stopped")
+    m.top.unobserveField("shouldQuit")
+    m.top.isRunning = false
+end function
+
+function WaitForJoin(messagePort as object) as boolean
     m.top.observeField("join", messagePort)
-    wait(0, messagePort)
+    joinRequested = false
+    while true
+        message = wait(0, messagePort)
+        if IsQuitRequested([message])
+            exit while
+        end if
+        if type(message) = "roSGNodeEvent" and message.GetField() = "join"
+            joinRequested = true
+            exit while
+        end if
+    end while
     m.top.unobserveField("join")
+    return joinRequested
+end function
 
-
+function RunSession(api as LoungeApi, messagePort as object) as boolean
     screenId = api.GetScreenId()
     if StringUtils.IsNullOrEmpty(screenId)
-        Shutdown("No screen ID found")
-        return
+        LogInfo("Lounge session ended: no screen ID")
+        return false
     end if
     m.top.screenId = screenId
 
     loungeToken = api.GetToken()
     if StringUtils.IsNullOrEmpty(loungeToken)
-        Shutdown("No lounge token found")
-        return
+        LogInfo("Lounge session ended: no lounge token")
+        return false
     end if
     m.top.loungeToken = loungeToken
 
     m.top.observeField("outgoingMessages", messagePort)
 
     if not api.Bind()
-        Shutdown("Failed to bind")
-        return
+        LogInfo("Lounge session ended: bind failed")
+        return false
     end if
 
-    api.FetchCommandsRpc(messagePort)
+    api.StartPoll()
 
-    m.top.shouldQuit = false
-    isOpen = false
+    backchannel = api.backchannel
     reconnectAttempts = 0
+    sinceDelivered = CreateObject("roTimespan")
     outgoingLoungeMessages = []
     portMessages = []
-    socketMessages = []
 
     while true
-        if m.top.shouldQuit = true
-            exit while
-        end if
-
-        ' Sends answer on ports of their own, read only when the loop wakes.
-        waitMs = IDLE_WAIT_MS
-        if api.HasPendingOutgoingMessages()
-            waitMs = SENDS_IN_FLIGHT_WAIT_MS
-        end if
-        message = wait(waitMs, messagePort)
         portMessages.Clear()
-        portMessages.Push(message)
+        portMessages.Push(wait(api.MaxWaitMs(), messagePort))
 
         ' There's a chance messages were piling up while we were sending messages to the lounge
         ' This could happen if we were sending things to the lounge and the player state
@@ -100,75 +118,81 @@ function LoungeServiceLoop() as void
         while messagePort.PeekMessage() <> invalid
             portMessages.Push(messagePort.GetMessage())
         end while
+        if IsQuitRequested(portMessages)
+            return true
+        end if
 
         ' At this point:
         ' - We check if we need to send messages to the lounge based on player state
         ' - We check the lounge for new commands, which might need responding to
         ' - Finally, we send the outgoing messages to the lounge in one go
         outgoingLoungeMessages.Clear()
-        socketMessages.Clear()
-
         for each portMessage in portMessages
-            messageType = type(portMessage)
-            if messageType = "roSocketEvent"
-                socketMessages.Push(portMessage)
-            else if messageType = "roSGNodeEvent"
-                field = portMessage.GetField()
-                if field = "outgoingMessages"
-                    messages = portMessage.GetData()
-                    outgoingLoungeMessages.Append(messages)
-                end if
+            if type(portMessage) = "roSGNodeEvent" and portMessage.GetField() = "outgoingMessages"
+                outgoingLoungeMessages.Append(portMessage.GetData())
             end if
+            api.HandleMessage(portMessage, outgoingLoungeMessages)
         end for
 
-        isOpen = api.Poll(socketMessages, outgoingLoungeMessages)
-
         api.SendMessages(outgoingLoungeMessages)
-        api.ProcessPendingOutgoingMessages()
 
-        ' A send's failure is acted on once the backchannel closes, which a dead session's does too.
-        if not isOpen
-            closeInfo = api.GetCloseInfo()
-            needsRebind = closeInfo.statusCode = 410 or closeInfo.statusCode = 400 or api.sessionGone
-            needsTokenRefresh = closeInfo.statusCode = 401 or api.tokenExpired
-
-            LogDebug("Backchannel closed:", closeInfo.reason)
-            if IsActionableCloseFailure(closeInfo.reason, needsRebind, needsTokenRefresh)
-                message = "Lounge backchannel failure: " + closeInfo.reason
-                if not StringUtils.IsNullOrEmpty(closeInfo.target)
-                    message += " -> " + closeInfo.target
-                end if
-                LogTelemetryEvent({
-                    level: "warning"
-                    message: message
-                    fingerprint: "lounge-backchannel-" + closeInfo.reason
-                })
-            end if
-
-            sleep(ComputeReconnectBackoffMs(reconnectAttempts))
-            reconnectAttempts += 1
-
-            if needsRebind or needsTokenRefresh
-                if not api.Rebind(needsTokenRefresh)
-                    Shutdown("Failed to rebind")
-                    return
-                end if
-                m.top.loungeToken = api.loungeToken
-            end if
-
-            api.FetchCommandsRpc(messagePort)
-        else
-            reconnectAttempts = 0
+        if backchannel.IsPolling()
+            continue while
         end if
+
+        if backchannel.closeReason = LoungeCloseReason.Complete
+            sinceDelivered.Mark()
+        end if
+        ' A send's failure is acted on once the poll ends, which a dead session's does too.
+        nextStep = LoungeSession.StepAfterPoll(backchannel.closeReason, backchannel.statusCode, backchannel.stalledPolls, api.sessionGone, api.tokenExpired, sinceDelivered.TotalMilliseconds())
+        if nextStep = LoungeSessionStep.Poll
+            reconnectAttempts = 0
+            api.StartPoll()
+            continue while
+        end if
+
+        closeLabel = backchannel.CloseLabel()
+        LogDebug("Backchannel closed:", closeLabel, "next:", nextStep)
+        if nextStep = LoungeSessionStep.Drop
+            LogTelemetryEvent({
+                level: "error"
+                message: `Lounge session dropped: no poll delivered for ${sinceDelivered.TotalSeconds()} s, last close: ${closeLabel}`
+                fingerprint: ["lounge-session-dropped", closeLabel]
+            })
+            return false
+        end if
+        if nextStep = LoungeSessionStep.Retry and backchannel.closeReason <> LoungeCloseReason.Timeout
+            LogTelemetryEvent({
+                level: "warning"
+                message: "Lounge backchannel failure: " + closeLabel
+                fingerprint: "lounge-backchannel-" + closeLabel
+            })
+        end if
+
+        sleep(ComputeReconnectBackoffMs(reconnectAttempts))
+        reconnectAttempts += 1
+
+        if nextStep <> LoungeSessionStep.Retry
+            if not api.Rebind(nextStep = LoungeSessionStep.RebindWithNewToken)
+                LogInfo("Lounge session ended: rebind failed")
+                return false
+            end if
+            m.top.loungeToken = api.loungeToken
+        end if
+
+        api.StartPoll()
     end while
 
-    Shutdown("Service stopped")
+    return false
 end function
 
-function Shutdown(reason as string)
-    LogInfo("Shutting down:", reason)
-    m.top.unobserveField("outgoingMessages")
-    m.top.isRunning = false
+function IsQuitRequested(portMessages as object) as boolean
+    for each portMessage in portMessages
+        if type(portMessage) = "roSGNodeEvent" and portMessage.GetField() = "shouldQuit" and portMessage.GetData() = true
+            return true
+        end if
+    end for
+    return false
 end function
 
 ' Full jitter (random in [0, window)) avoids a fleet-wide thundering-herd reconnect.
@@ -182,14 +206,4 @@ function ComputeReconnectBackoffMs(attempts as integer) as integer
         windowMs = 30000
     end if
     return 500 + Int(Rnd(0) * windowMs)
-end function
-
-function IsActionableCloseFailure(reason as string, needsRebind as boolean, needsTokenRefresh as boolean) as boolean
-    if needsRebind or needsTokenRefresh
-        return false
-    end if
-    if reason = "complete" or reason = "eof" or reason = "closed" or reason = "timeout" or reason = "disconnected" or reason = ""
-        return false
-    end if
-    return true
 end function

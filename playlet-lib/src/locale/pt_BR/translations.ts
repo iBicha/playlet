@@ -129,10 +129,6 @@
         <translation>Falha ao carregar o canal %1</translation>
     </message>
     <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>Não conseguiu obter token lounge. Por favor, reinicie Playlet para usar a função de transmitir.</translation>
-    </message>
-    <message>
         <source>Subscriptions</source>
         <translation>Inscrições</translation>
     </message>
@@ -215,18 +211,6 @@
     <message>
         <source>Failed to load feed</source>
         <translation>Erro ao carregar o feed</translation>
-    </message>
-    <message>
-        <source>Lounge service setup error</source>
-        <translation>Erro ao configurar o serviço de lounge</translation>
-    </message>
-    <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>Falha ao obter o ID da tela. Por favor, reinicie Playlet para usar a função de transmitir.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>Não é um id de tela válido: %1</translation>
     </message>
     <message>
         <source>Invidious instance to use. Example: https://example.com. Find more instances at %INVIDIOUS_PUBLIC_INSTANCES%</source>
@@ -505,10 +489,6 @@
         <translation>Isso vai reiniciar o Playlet.</translation>
     </message>
     <message>
-        <source>Invalid response: %1</source>
-        <translation>Resposta inválida: %1</translation>
-    </message>
-    <message>
         <source>Test</source>
         <translation>Teste</translation>
     </message>
@@ -711,10 +691,6 @@
     <message>
         <source>Queue Playlist</source>
         <translation>Lista dereprodução em fila</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>Não conseguimos obter dados da sessão. Por favor, reinicie Playlet para usar a função transmitir.</translation>
     </message>
     <message>
         <source>Invalid JSON from %1 (couldn&apos;t read %2)</source>

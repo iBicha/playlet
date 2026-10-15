@@ -209,30 +209,6 @@
         <translation>Échec du chargement du flux</translation>
     </message>
     <message>
-        <source>Lounge service setup error</source>
-        <translation>Erreur de configuration du service Lounge</translation>
-    </message>
-    <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>Impossible d&apos;obtenir l&apos;identifiant de l&apos;écran. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>Identifiant d&apos;écran non valide : %1</translation>
-    </message>
-    <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>Échec de l&apos;obtention du jeton Lounge. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
-    </message>
-    <message>
-        <source>Invalid response: %1</source>
-        <translation>Réponse non valide : %1</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>Échec de l&apos;obtention des données de session. Veuillez redémarrer Playlet pour utiliser la fonction de diffusion.</translation>
-    </message>
-    <message>
         <source>Invidious custom instance</source>
         <translation>Instance personnalisée d&apos;Invidious</translation>
     </message>

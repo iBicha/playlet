@@ -23,18 +23,21 @@ import "pkg:/source/utils/UrlUtils.bs"
 '   response = pending.Wait(2000)                         ' the response, or invalid after 2s; the fetch goes on
 '   response = pending.Poll()                             ' the response, or invalid; never blocks
 '
-'   pending = HttpClient.Post(url).Send()                 ' in a task loop, which blocks only on its own port
+'   pending = HttpClient.Post(url).SendOn(port)           ' in a task loop: a Fetch on the loop's own port
 '   while true
-'       message = wait(500, port)
-'       response = pending.Poll()                         ' at each wake: the response once it is in, up to 500ms late
+'       message = wait(pending.MaxWaitMs(), port)         ' wakes for the answer, the attempt's deadline or a retry
+'       response = pending.Handle(message)                ' the response once it is in; the loop's messages are ignored
 '       ...                                               ' the loop's own messages
+'       if response <> invalid then exit while
 '
-' Retries run inside the fetch, on the thread that started it, while Await, Wait or Poll runs.
+' Retries run inside the fetch, on the thread that started it, while Await, Wait, Poll or Handle runs.
 namespace HttpClient
 
     const COMPRESSION_ENABLED = true
     const DEFAULT_ATTEMPT_TIMEOUT_MS = 30000
     const DEFAULT_RETRY_DELAY_MS = 1000
+    ' The id of every cancellation observer, which tells its events from the other node events on a shared port.
+    const CANCELLATION_OBSERVER_ID = "HttpClient.CancellationObserver"
 
     ' https://developer.roku.com/en-ca/docs/references/brightscript/events/rourlevent.md#getresponsecode-as-integer
     ' Seem to mirror the curl error codes https://curl.se/libcurl/c/libcurl-errors.html
@@ -385,11 +388,21 @@ namespace HttpClient
         ' Starts a fetch on a port of its own, which Await, Wait or Poll runs: a request never waited on or polled may
         ' be dropped when its task ends, and its retries never run.
         function Send() as PendingResponse
-            messagePort = CreateObject("roMessagePort")
+            return m.StartFetch(CreateObject("roMessagePort"), true)
+        end function
+
+        ' Starts a fetch on a task loop's port: the loop caps each wait with MaxWaitMs and hands Handle every message
+        ' it takes, so it wakes as soon as the answer is in, and the fetch's deadline and retries run on time.
+        function SendOn(messagePort as object) as PendingResponse
+            return m.StartFetch(messagePort, false)
+        end function
+
+        private function StartFetch(messagePort as object, ownsPort as boolean) as PendingResponse
             ' Observed before the fetch starts, so a cancellation set between its check and the observation isn't missed.
             cancellationObserver = invalid
             if m._cancellation <> invalid
                 cancellationObserver = CreateObject("roSGNode", "NodeObserver")
+                cancellationObserver.id = CANCELLATION_OBSERVER_ID
                 ' Observed before the target is set: the NodeObserver's callback on the render-thread cancellation moves the
                 ' NodeObserver to the render thread, after which each access to it is a rendezvous.
                 cancellationObserver.ObserveField("changed", messagePort)
@@ -397,13 +410,13 @@ namespace HttpClient
             end if
             startedFetch = new Fetch(m, messagePort)
             startedFetch.Start()
-            return new PendingResponse(startedFetch, messagePort, m._cancellation, cancellationObserver)
+            return new PendingResponse(startedFetch, messagePort, ownsPort, m._cancellation, cancellationObserver)
         end function
     end class
 
-    ' A request being sent: its attempts, timeouts, retries and cache, run by the PendingResponse that Send returns.
-    ' It reads the request as it goes, so the request isn't changed after it is sent. Its port is its own: it gets
-    ' only the attempts' answers and the cancellation's events.
+    ' A request being sent: its attempts, timeouts, retries and cache, run by the PendingResponse that Send or SendOn
+    ' returns. It reads the request as it goes, so the request isn't changed after it is sent. Of the messages it is
+    ' handed, it takes only its current attempt's answer.
     class Fetch
         function new(request as Request, messagePort as object)
             m._request = request
@@ -446,10 +459,14 @@ namespace HttpClient
             m.StartAttempt()
         end function
 
-        ' How long a wait on the port may last before the next HandleMessage, while the response isn't in: until the
-        ' attempt's deadline while it is sent, until the retry is due between attempts. At least 1, as wait(0) has no
+        ' How long a wait on the port may last before the next HandleMessage: until the attempt's deadline while it is
+        ' sent, until the retry is due between attempts, 1 once complete, as a cache hit, a request not sent and a
+        ' cancellation before the first attempt complete with no message on the port. At least 1, as wait(0) has no
         ' time limit.
         function MaxWaitMs() as integer
+            if m._response <> invalid
+                return 1
+            end if
             if m._urlTransfer <> invalid
                 waitMs = m._attemptDeadlineMs - m._clock.TotalMilliseconds()
             else
@@ -689,12 +706,14 @@ namespace HttpClient
         end function
     end class
 
-    ' A fetch on a port of its own, which Await, Wait and Poll wait on. They return the same response once it is in.
-    ' Whoever sends the request takes its response or calls Cancel(): either ends the observation of its cancellation.
+    ' A fetch on a port of its own (Send), which Await, Wait and Poll wait on, or on a task loop's port (SendOn), whose
+    ' messages the loop hands to Handle. Each returns the same response once it is in. Whoever sends the request takes
+    ' its response or calls Cancel(): either ends the observation of its cancellation.
     class PendingResponse
-        function new(startedFetch as Fetch, messagePort as object, cancellation as dynamic, cancellationObserver as dynamic)
+        function new(startedFetch as Fetch, messagePort as object, ownsPort as boolean, cancellation as dynamic, cancellationObserver as dynamic)
             m._fetch = startedFetch
             m._messagePort = messagePort
+            m._ownsPort = ownsPort
             m._cancellation = cancellation
             m._cancellationObserver = cancellationObserver
             m._clock = CreateObject("roTimespan")
@@ -716,6 +735,27 @@ namespace HttpClient
             return m.WaitForResponse(0)
         end function
 
+        ' message: what the loop took from the port, invalid when its wait timed out. Returns the response once it is
+        ' in, invalid until then.
+        function Handle(message as dynamic) as dynamic
+            if m._response <> invalid
+                return m._response
+            end if
+            if type(message) = "roSGNodeEvent" and message.GetNode() = CANCELLATION_OBSERVER_ID and CancellationUtils.IsCancelled(m._cancellation)
+                m._fetch.Cancel()
+            end if
+            m._response = m._fetch.HandleMessage(message)
+            if m._response <> invalid
+                m.StopObservingCancellation()
+            end if
+            return m._response
+        end function
+
+        ' How long the loop may wait on the port before the next Handle; 1 once the response is in.
+        function MaxWaitMs() as integer
+            return m._fetch.MaxWaitMs()
+        end function
+
         function Cancel() as void
             m._fetch.Cancel()
             m.StopObservingCancellation()
@@ -723,34 +763,30 @@ namespace HttpClient
 
         ' timeoutMs: -1 for as long as it takes, 0 to take only what is already on the port.
         private function WaitForResponse(timeoutMs as integer) as dynamic
+            #if DEBUG
+                Assert.IsTrue(m._ownsPort, "Await, Wait or Poll on a SendOn fetch: they would take the loop's messages; hand them to Handle")
+            #end if
             m._clock.Mark()
             ' Messages already on the port go first: an answer there is taken even past the deadline.
-            message = m._messagePort.GetMessage()
-            while m._response = invalid
-                ' The port's only node events are the cancellation observer's.
-                if type(message) = "roSGNodeEvent" and CancellationUtils.IsCancelled(m._cancellation)
-                    m._fetch.Cancel()
-                end if
-                m._response = m._fetch.HandleMessage(message)
-                if m._response = invalid
-                    message = m._messagePort.GetMessage()
-                    if message = invalid
-                        waitMs = m._fetch.MaxWaitMs()
-                        if timeoutMs >= 0
-                            remainingMs = timeoutMs - m._clock.TotalMilliseconds()
-                            if remainingMs <= 0
-                                return invalid
-                            end if
-                            if remainingMs < waitMs
-                                waitMs = remainingMs
-                            end if
+            response = m.Handle(m._messagePort.GetMessage())
+            while response = invalid
+                message = m._messagePort.GetMessage()
+                if message = invalid
+                    waitMs = m.MaxWaitMs()
+                    if timeoutMs >= 0
+                        remainingMs = timeoutMs - m._clock.TotalMilliseconds()
+                        if remainingMs <= 0
+                            return invalid
                         end if
-                        message = wait(waitMs, m._messagePort)
+                        if remainingMs < waitMs
+                            waitMs = remainingMs
+                        end if
                     end if
+                    message = wait(waitMs, m._messagePort)
                 end if
+                response = m.Handle(message)
             end while
-            m.StopObservingCancellation()
-            return m._response
+            return response
         end function
 
         private function StopObservingCancellation() as void

@@ -209,30 +209,6 @@
         <translation>Fallo al cargar el feed</translation>
     </message>
     <message>
-        <source>Lounge service setup error</source>
-        <translation>Error de configuración del servicio Lounge</translation>
-    </message>
-    <message>
-        <source>Failed to get screen ID. Please restart Playlet to use the cast function.</source>
-        <translation>No se pudo obtener el ID de tu pantalla. Por favor reinicia Playlet para usar la función de transmitir.</translation>
-    </message>
-    <message>
-        <source>Not a valid screen id: %1</source>
-        <translation>Id de pantalla no válida: %1</translation>
-    </message>
-    <message>
-        <source>Failed to get lounge token. Please restart Playlet to use the cast function.</source>
-        <translation>No se ha podido obtener el token dela sala. Por favor, reinicia Playlet para utilizar la función de la transmisión.</translation>
-    </message>
-    <message>
-        <source>Failed to get session data. Please restart Playlet to use the cast function.</source>
-        <translation>No se han podido obtener los datos de la sesión. Por favor, reinicia Playlet para utilizar la función de transmisión.</translation>
-    </message>
-    <message>
-        <source>Invalid response: %1</source>
-        <translation>Respuesta no válida: %1</translation>
-    </message>
-    <message>
         <source>Invidious custom instance</source>
         <translation>Instancia personalizada de Invidious</translation>
     </message>
