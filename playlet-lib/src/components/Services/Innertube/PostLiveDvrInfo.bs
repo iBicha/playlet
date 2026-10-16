@@ -1,11 +1,11 @@
-import "pkg:/components/Services/Innertube/Context.bs"
+import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/source/services/HttpClient.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Innertube
 
-    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as void
+    function GetPostLiveDvrInfo(parsedResponse as object, adaptiveFormats as object, cpn as dynamic, cancellation as object) as void
         if adaptiveFormats.Count() = 0
             LogWarn("GetPostLiveDvrInfo: No adaptive formats available")
             return
@@ -19,25 +19,16 @@ namespace Innertube
 
         ' Query the live edge (no sq): that response is Cache-Control: no-cache, always
         ' served fresh, so it carries X-Head-*. A finished stream's head is its final
-        ' segment, so X-Head-Seqnum is the total count and X-Head-Time-Millis the duration.
-        primary = FetchPostLiveDvrHead(formatUrl, invalid, cpn, client, cancellation)
-        headers = invalid
+        ' segment, so X-Head-Seqnum is the total count and X-Head-Time-* the duration.
+        headUrl = GetLiveHeadUrl(formatUrl, cpn)
+        response = FetchLiveHead(headUrl, cancellation)
 
-        if HasPostLiveDvrHead(primary)
-            headers = primary.headers
-        else
-            ' sq=0 is cacheable, so an edge can return it missing X-Head-* (#359); fall
-            ' back to it only when the live-edge query misses.
-            fallback = FetchPostLiveDvrHead(formatUrl, "0", cpn, client, cancellation)
-            diagnostics = PostLiveDvrDiagnostics(parsedResponse["videoId"], primary, fallback)
-            if HasPostLiveDvrHead(fallback)
-                headers = fallback.headers
-                LogTelemetryEvent({
-                    level: "warning"
-                    message: `GetPostLiveDvrInfo: no-sq missing head, sq=0 fallback recovered\n${diagnostics}`
-                    fingerprint: ["GetPostLiveDvrInfo: sq=0 fallback recovered"]
-                })
-            else
+        if not HasLiveHead(response)
+            ' sq=0 is cacheable, so an edge can return it missing X-Head-*; fall back to it
+            ' only when the live-edge query misses.
+            fallback = FetchLiveHead(UrlUtils.AppendQueryParams(headUrl, { "sq": "0" }), cancellation)
+            diagnostics = PostLiveDvrDiagnostics(parsedResponse["videoId"], headUrl, response, fallback)
+            if not HasLiveHead(fallback)
                 ' Warning, not error: a known transport-failure tail where playback fails regardless.
                 LogTelemetryEvent({
                     level: "warning"
@@ -46,10 +37,16 @@ namespace Innertube
                 })
                 return
             end if
+            LogTelemetryEvent({
+                level: "warning"
+                message: `GetPostLiveDvrInfo: no-sq missing head, sq=0 fallback recovered\n${diagnostics}`
+                fingerprint: ["GetPostLiveDvrInfo: sq=0 fallback recovered"]
+            })
+            response = fallback
         end if
 
-        durationMs = ValidString(headers["X-Head-Time-Millis"]).ToInt()
-        segmentCount = ValidString(headers["X-Head-Seqnum"]).ToInt()
+        durationMs = ReadLiveHeadAnyTimeMs(response)
+        segmentCount = ReadLiveHeadSeqnum(response)
 
         if durationMs > 0
             parsedResponse["postLiveDvrDurationMs"] = durationMs
@@ -59,40 +56,8 @@ namespace Innertube
         end if
     end function
 
-    function FetchPostLiveDvrHead(formatUrl as string, sq as dynamic, cpn as dynamic, client as Innertube.ClientType, cancellation as object) as object
-        queryComponents = UrlUtils.ParseQueryComponents(formatUrl)
-        queryComponents["rn"] = "0"
-        if sq <> invalid
-            queryComponents["sq"] = sq
-        end if
-        if not StringUtils.IsNullOrEmpty(cpn)
-            queryComponents["cpn"] = cpn
-        end if
-        url = UrlUtils.SetQueryParams(formatUrl, queryComponents)
-
-        request = HttpClient.Head(url)
-        requestHeaders = Innertube.CreateHeaders(client)
-        requestHeaders["origin"] = "https://www.youtube.com"
-        requestHeaders["referer"] = "https://www.youtube.com"
-        requestHeaders["DNT"] = "?1"
-        request.Headers(requestHeaders)
-        request.RetryCount(1)
-        request.Cancellation(cancellation)
-        response = request.Await()
-
-        return {
-            url: url
-            statusCode: response.StatusCode()
-            headers: response.Headers()
-        }
-    end function
-
-    function HasPostLiveDvrHead(result as object) as boolean
-        return IsAssociativeArray(result) and IsAssociativeArray(result.headers) and result.headers.DoesExist("X-Head-Time-Millis") and result.headers.DoesExist("X-Head-Seqnum")
-    end function
-
-    function PostLiveDvrDiagnostics(videoId as dynamic, primary as object, fallback as object) as string
-        return `VideoID: ${ValidString(videoId)}` + Chr(10) + `URL (no-sq; sq=0 appends &sq=0): ${primary.url}` + Chr(10) + `no-sq HEAD status: ${primary.statusCode.ToStr()} headers: ${FormatJson(primary.headers)}` + Chr(10) + `sq=0 HEAD status: ${fallback.statusCode.ToStr()} headers: ${FormatJson(fallback.headers)}`
+    function PostLiveDvrDiagnostics(videoId as dynamic, headUrl as string, primary as HttpClient.Response, fallback as HttpClient.Response) as string
+        return `VideoID: ${ValidString(videoId)}` + Chr(10) + `URL (no-sq; sq=0 appends &sq=0): ${headUrl}` + Chr(10) + `no-sq HEAD status: ${primary.StatusCode().ToStr()} headers: ${FormatJson(primary.Headers())}` + Chr(10) + `sq=0 HEAD status: ${fallback.StatusCode().ToStr()} headers: ${FormatJson(fallback.Headers())}`
     end function
 
 end namespace

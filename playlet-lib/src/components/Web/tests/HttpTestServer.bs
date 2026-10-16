@@ -7,7 +7,8 @@ import "pkg:/source/utils/Types.bs"
 '   /delay/<ms>                   200 after <ms>
 '   /echo                         200 with the request's { method, path, headers, body } as JSON
 '   /maxage/<seconds>/<id>        200 with Cache-Control: max-age=<seconds>
-' A path in routes (its query aside) responds as its route says instead: { status, headers, body, delayMs }.
+' A path in routes responds as its route says instead: { status, headers, body, delayMs }. A route keyed
+' with a query answers that query only, ahead of the route keyed with the bare path.
 ' A route { drop: true } closes the connection without a response.
 ' Every response carries X-Hit, the request's count for its path. Connections are read and responded to
 ' without blocking each other, so a slow or abandoned one holds up nothing.
@@ -162,7 +163,11 @@ function BuildResponse(item as object) as object
     m.top.lastRequest = request
 
     delayMs = MIN_RESPONSE_DELAY_MS
-    route = ValidAssociativeArray(m.top.routes)[path.Split("?")[0]]
+    routes = ValidAssociativeArray(m.top.routes)
+    route = routes[path]
+    if route = invalid
+        route = routes[path.Split("?")[0]]
+    end if
     if route <> invalid
         if ValidInt(route.delayMs) > delayMs
             delayMs = route.delayMs

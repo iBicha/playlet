@@ -140,6 +140,24 @@ namespace Tests
             m.assertEqual(manifest.FormatDuration(999), "PT0.999S")
             m.assertEqual(manifest.FormatDuration(1500), "PT1.500S")
             m.assertEqual(manifest.FormatDuration(10000), "PT10.000S")
+            m.assertEqual(manifest.FormatDuration(17900000123&), "PT17900000.123S")
+        end function
+
+        @describe("DashManifest.GetDurationMs")
+
+        @it("returns a post-live DVR duration past 32 bits")
+        function _()
+            manifest = new DashManifest("")
+            m.assertEqual(manifest.GetDurationMs({ isPostLiveDvr: true, postLiveDvrDurationMs: 17900000123& }), 17900000123&)
+        end function
+
+        @it("falls back to the first format's approxDurationMs, then to lengthSeconds")
+        function _()
+            manifest = new DashManifest("")
+            m.assertEqual(manifest.GetDurationMs({ adaptiveFormats: [{ approxDurationMs: "17900000123" }], lengthSeconds: 60 }), 17900000123&)
+            m.assertEqual(manifest.GetDurationMs({ adaptiveFormats: [{ approxDurationMs: "0" }], lengthSeconds: 60 }), 60000&)
+            m.assertEqual(manifest.GetDurationMs({ adaptiveFormats: [{}], lengthSeconds: 60 }), 60000&)
+            m.assertEqual(manifest.GetDurationMs({ isPostLiveDvr: true, adaptiveFormats: [], lengthSeconds: 60 }), 60000&)
         end function
 
     end class

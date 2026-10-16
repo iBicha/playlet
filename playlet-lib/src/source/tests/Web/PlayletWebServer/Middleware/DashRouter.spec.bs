@@ -32,7 +32,7 @@ namespace Tests
         end function
 
         protected override function afterEach()
-            DeleteFile(LIVE_HEAD_COUNTS_PATH)
+            DeleteFile(LIVE_LOAD_COUNTS_PATH)
         end function
 
         ' What VideoContentJob sets on the player's content for a video load.
@@ -172,15 +172,18 @@ namespace Tests
             m.assertInvalid(pending["_fetch"]["_urlTransfer"])
         end function
 
-        @it("writes the load's head check counts at every refresh")
+        @it("writes the load's head check and timeline counts at every refresh, after its correction")
         function _()
             m.LoadLive([{ seqnum: 10, timeMs: 18630 }, { seqnum: -1, timeMs: invalid }])
             m.RefreshDue()
+            handoff = StringUtils.ParseJsonSafe(ReadAsciiFile(LIVE_LOAD_COUNTS_PATH))
+            m.assertEqual(handoff["live_timeline"]["corrections"], 1)
             m.RefreshDue()
-            handoff = StringUtils.ParseJsonSafe(ReadAsciiFile(LIVE_HEAD_COUNTS_PATH))
+            handoff = StringUtils.ParseJsonSafe(ReadAsciiFile(LIVE_LOAD_COUNTS_PATH))
             m.assertEqual(handoff["video_load_id"], "live1")
-            m.assertEqual(handoff["counts"]["checks_sent"], 2)
-            m.assertEqual(handoff["counts"]["answered_without_head"], 1)
+            m.assertEqual(handoff["live_head"]["checks_sent"], 2)
+            m.assertEqual(handoff["live_head"]["answered_without_head"], 1)
+            m.assertEqual(handoff["live_timeline"], m.router.liveTimelineCounts)
         end function
 
         @it("gives a list behind the head the cadence since load; the load head ended where the list stays ahead")
@@ -220,6 +223,16 @@ namespace Tests
             ' head 5: 600 ms behind, within half a segment
             m.RefreshDue()
             m.assertEqual(m.router.liveDurationRuns.Count(), 1)
+            m.assertEqual(m.router.liveTimelineCounts, {
+                "timed_checks": 1
+                "corrections": 0
+                "stall_corrections": 0
+                "drift_ms_min": -600
+                "drift_ms_max": 0
+                "step_ms_min": -600
+                "step_ms_max": 0
+                "duration_runs_max": 1
+            })
             ' head 15 ends at 6000 + 28600 = 34600, listed at 32000: 5 onwards (4 is the last
             ' listed) take 2200 ms, placed to end 15 there: from 10400, past 4's end (10000)
             m.global.telemetry.LogEvent = {}
@@ -233,6 +246,17 @@ namespace Tests
             m.RefreshDue()
             m.assertEqual(m.router.liveDurationRuns, [{ fromSeqnum: 5, startMs: 10400, durationMs: 2200 }, { fromSeqnum: 15, startMs: 91600 - 26 * 2253, durationMs: 2253 }])
             m.assertEmpty(m.global.telemetry.LogEvent)
+            ' drift -600, -2600, then -2000 off the realigned list
+            m.assertEqual(m.router.liveTimelineCounts, {
+                "timed_checks": 3
+                "corrections": 2
+                "stall_corrections": 0
+                "drift_ms_min": -2600
+                "drift_ms_max": 0
+                "step_ms_min": -2000
+                "step_ms_max": 0
+                "duration_runs_max": 2
+            })
         end function
 
         @it("takes a stall as a gap: the cadence stays, and the list stays on the head after it")
@@ -256,6 +280,9 @@ namespace Tests
             end for
             m.assertEqual(m.router.liveDurationRuns.Count(), 2)
             m.assertEqual(m.router.liveLeadMs, 0)
+            m.assertEqual(m.router.liveTimelineCounts["corrections"], 1)
+            m.assertEqual(m.router.liveTimelineCounts["stall_corrections"], 1)
+            m.assertEqual(m.router.liveTimelineCounts["step_ms_min"], -90000)
         end function
 
         @it("takes a list ahead by more than the stall bound as cadence: a stall before load heals at once")
@@ -264,6 +291,9 @@ namespace Tests
             m.LoadLive([{ seqnum: 10, timeMs: 40000 }, { seqnum: 15, timeMs: 50000 }], { liveHeadSeqnum: 5, liveHeadTimeMs: 30000, liveSegmentDurationMs: 6000 })
             m.RefreshDue()
             m.assertEqual(m.router.liveDurationRuns[1].durationMs, 2000)
+            ' head 10 ends at 36000 + 10000, listed to end at 11 x 6000
+            m.assertEqual(m.router.liveTimelineCounts["drift_ms_max"], 20000)
+            m.assertEqual(m.router.liveTimelineCounts["step_ms_max"], 20000)
             m.RefreshDue()
             m.assertEqual(m.router.liveDurationRuns.Count(), 2)
         end function
@@ -318,8 +348,25 @@ namespace Tests
             m.RefreshDue()
             m.assertEqual(m.router.liveHeadSeqnum, 7)
             m.assertEqual(m.router.liveDurationRuns.Count(), 1)
+            m.assertEqual(m.router.liveTimelineCounts["timed_checks"], 0)
             m.RefreshDue()
             m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+            m.assertEqual(m.router.liveTimelineCounts["timed_checks"], 1)
+        end function
+
+        @it("skips a head check whose time went back, unmeasured, and corrects at a later one")
+        function _()
+            ' the load head (2) is at 2630 ms; head 7 claims 2000
+            m.LoadLive([{ seqnum: 7, timeMs: 2000 }, { seqnum: 12, timeMs: 22630 }])
+            m.RefreshDue()
+            m.assertEqual(m.router.liveHeadSeqnum, 7)
+            m.assertEqual(m.router.liveDurationRuns.Count(), 1)
+            m.assertEqual(m.router.liveDriftMs, 0)
+            m.assertEqual(m.router.liveTimelineCounts["timed_checks"], 0)
+            m.assertEqual(m.router.liveTimelineCounts["drift_ms_max"], 0)
+            m.RefreshDue()
+            m.assertEqual(m.router.liveDurationRuns.Count(), 2)
+            m.assertEqual(m.router.liveTimelineCounts["timed_checks"], 1)
         end function
 
         @it("times the head of a stream live for 111 days (head time past 32 bits)")

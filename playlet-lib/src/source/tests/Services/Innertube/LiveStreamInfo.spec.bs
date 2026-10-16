@@ -160,6 +160,22 @@ namespace Tests
             m.assertEqual(parsedResponse.error, `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP 200)\n`)
         end function
 
+        @describe("Innertube.FetchLiveHead")
+
+        @it("sends the check once more when the answer lacks the head, whatever its status")
+        function _()
+            m.server.routes = {
+                "/live/failing": { status: 503 }
+                "/live/failingwithhead": { status: 503, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } }
+            }
+            failing = Tests.HttpTestServerUrl("/live/failing?itag=1")
+            m.assertFalse(Innertube.HasLiveHead(Innertube.FetchLiveHead(failing, invalid)))
+            m.assertEqual(Tests.HttpTestServerHits(m.server, failing), 2)
+            failingWithHead = Tests.HttpTestServerUrl("/live/failingwithhead?itag=1")
+            m.assertTrue(Innertube.HasLiveHead(Innertube.FetchLiveHead(failingWithHead, invalid)))
+            m.assertEqual(Tests.HttpTestServerHits(m.server, failingWithHead), 1)
+        end function
+
         @describe("Innertube.ReadLiveHeadSeqnum")
 
         @it("reads X-Head-Seqnum")
@@ -185,6 +201,15 @@ namespace Tests
             m.assertInvalid(Innertube.ReadLiveHeadTimeMs(m.ResponseWithHeaders({ "X-Head-Time-Sec": "17900000" })))
             m.assertEqual(Innertube.ReadLiveHeadTimeSecAsMs(m.ResponseWithHeaders({ "X-Head-Time-Sec": "17900000" })), 17900000000&)
             m.assertInvalid(Innertube.ReadLiveHeadTimeSecAsMs(m.ResponseWithHeaders({ "X-Head-Time-Millis": "17900000123" })))
+        end function
+
+        @describe("Innertube.ReadLiveHeadAnyTimeMs")
+
+        @it("reads X-Head-Time-Millis, else X-Head-Time-Sec")
+        function _()
+            m.assertEqual(Innertube.ReadLiveHeadAnyTimeMs(m.ResponseWithHeaders({ "X-Head-Time-Millis": "17900000123", "X-Head-Time-Sec": "17900000" })), 17900000123&)
+            m.assertEqual(Innertube.ReadLiveHeadAnyTimeMs(m.ResponseWithHeaders({ "X-Head-Time-Sec": "17900000" })), 17900000000&)
+            m.assertInvalid(Innertube.ReadLiveHeadAnyTimeMs(m.ResponseWithHeaders({ "X-Head-Seqnum": "40" })))
         end function
 
         function ResponseWithHeaders(headers as object) as HttpClient.Response

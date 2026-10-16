@@ -33,33 +33,17 @@ namespace Innertube
         end if
 
         headUrl = GetLiveHeadUrl(adaptiveFormats[0]["url"], cpn)
-        request = CreateLiveHeadRequest(headUrl)
-        request.RetryCount(1)
-        request.RetryIf(function(response as HttpClient.Response) as string
-            if Innertube.ReadLiveHeadSeqnum(response) < 0 or (Innertube.ReadLiveHeadTimeMs(response) = invalid and Innertube.ReadLiveHeadTimeSecAsMs(response) = invalid)
-                return `no X-Head-* in the response (HTTP ${response.StatusCode()})`
-            end if
-            return ""
-        end function)
-        request.Cancellation(cancellation)
-        response = request.Await()
-
-        headSeqnum = ReadLiveHeadSeqnum(response)
-        headTimeMs = ReadLiveHeadTimeMs(response)
-        averagedTimeMs = headTimeMs
-        if averagedTimeMs = invalid
-            averagedTimeMs = ReadLiveHeadTimeSecAsMs(response)
-        end if
-        if headSeqnum < 0 or averagedTimeMs = invalid
+        response = FetchLiveHead(headUrl, cancellation)
+        if not HasLiveHead(response)
             parsedResponse["error"] = `Live stream head check returned no X-Head-Seqnum / X-Head-Time (HTTP ${response.StatusCode()})\n${response.ErrorMessage()}`
             return
         end if
 
         now = CreateObject("roDateTime")
-        timeline = GetLiveTimeline(headSeqnum, averagedTimeMs, ValidInt(adaptiveFormats[0]["targetDurationSec"]), ValidInt(adaptiveFormats[0]["maxDvrDurationSec"]), chunkReadahead, now.AsSeconds(), now.GetMilliseconds())
+        timeline = GetLiveTimeline(ReadLiveHeadSeqnum(response), ReadLiveHeadAnyTimeMs(response), ValidInt(adaptiveFormats[0]["targetDurationSec"]), ValidInt(adaptiveFormats[0]["maxDvrDurationSec"]), chunkReadahead, now.AsSeconds(), now.GetMilliseconds())
         parsedResponse.Append(timeline)
         parsedResponse["liveHeadUrl"] = headUrl
-        parsedResponse["liveHeadTimeMs"] = headTimeMs
+        parsedResponse["liveHeadTimeMs"] = ReadLiveHeadTimeMs(response)
     end function
 
     ' The live timeline fields for a stream whose head (newest segment) is
@@ -148,6 +132,25 @@ namespace Innertube
         return request
     end function
 
+    ' The head check's answer, sent once more when it lacks the head (HasLiveHead), whatever its HTTP status.
+    function FetchLiveHead(headUrl as string, cancellation as object) as HttpClient.Response
+        request = CreateLiveHeadRequest(headUrl)
+        request.RetryCount(1)
+        request.RetryIf(function(response as HttpClient.Response) as string
+            if not Innertube.HasLiveHead(response)
+                return `no X-Head-* in the response (HTTP ${response.StatusCode()})`
+            end if
+            return ""
+        end function)
+        request.Cancellation(cancellation)
+        return request.Await()
+    end function
+
+    ' Whether a head check's answer carries the head's seqnum and time.
+    function HasLiveHead(response as HttpClient.Response) as boolean
+        return ReadLiveHeadSeqnum(response) >= 0 and ReadLiveHeadAnyTimeMs(response) <> invalid
+    end function
+
     ' X-Head-Seqnum of a live head response, -1 if absent. Not gated on HTTP status: a
     ' head check can come back non-2xx yet still carry the X-Head-* headers
     ' (observed: one stream returns 500, another 200; both include them).
@@ -165,6 +168,15 @@ namespace Innertube
     ' (measured).
     function ReadLiveHeadTimeMs(response as HttpClient.Response) as dynamic
         return StringUtils.ParseJsonSafe(ValidString(response.Headers()["X-Head-Time-Millis"]))
+    end function
+
+    ' X-Head-Time-Millis, else X-Head-Time-Sec in ms, invalid if neither.
+    function ReadLiveHeadAnyTimeMs(response as HttpClient.Response) as dynamic
+        timeMs = ReadLiveHeadTimeMs(response)
+        if timeMs = invalid
+            timeMs = ReadLiveHeadTimeSecAsMs(response)
+        end if
+        return timeMs
     end function
 
     ' X-Head-Time-Sec in ms, invalid if absent: whole seconds, too coarse to average a

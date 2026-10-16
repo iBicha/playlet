@@ -1,6 +1,6 @@
 import "pkg:/components/Services/Dash/DashManifest.bs"
 import "pkg:/components/Services/Dash/LiveHeadChecks.bs"
-import "pkg:/components/Services/Dash/LiveHeadCounts.bs"
+import "pkg:/components/Services/Dash/LiveLoadCounts.bs"
 import "pkg:/components/Services/Dash/LiveTimeline.types.bs"
 import "pkg:/components/Services/Innertube/LiveStreamInfo.bs"
 import "pkg:/components/Services/Invidious/InvidiousService.bs"
@@ -52,6 +52,7 @@ namespace Http
             m.liveLeadMs = 0
             m.liveDriftMs = 0
             m.liveLastCheckJumped = false
+            m.liveTimelineCounts = invalid
             m.reportedLiveCorrection = false
             m.liveManifestTemplate = ""
             m.liveManifestTemplateKey = invalid
@@ -250,13 +251,13 @@ namespace Http
                     newest = head
                 end if
             end for
-            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, FormatJson({ "video_load_id": m.cachedVideoLoadId, "counts": m.liveHeadChecks.counts }))
 
             ' Listed segments can't be withdrawn: the head only moves forward.
             if newest <> invalid and newest.seqnum > m.liveHeadSeqnum
                 m.AlignLiveTimeline(newest)
                 m.liveHeadSeqnum = newest.seqnum
             end if
+            WriteAsciiFile(LIVE_LOAD_COUNTS_PATH, FormatJson({ "video_load_id": m.cachedVideoLoadId, "live_head": m.liveHeadChecks.counts, "live_timeline": m.liveTimelineCounts }))
         end function
 
         ' Segments are listed at the duration at load, the stream's lifetime average: off
@@ -272,11 +273,23 @@ namespace Http
             if head.timeMs = invalid or m.liveBaseTimeMs = invalid
                 return
             end if
+            ' The cadence since the base.
+            sinceBaseDurationMs = Cint((head.timeMs - m.liveBaseTimeMs) / (head.seqnum - m.liveBaseSeqnum))
+            if sinceBaseDurationMs <= 0
+                LogWarnNoTelemetry("Live head time went back:", head.timeMs, "ms at", head.seqnum, "after", m.liveBaseTimeMs, "ms at", m.liveBaseSeqnum)
+                return
+            end if
             durationRuns = m.liveDurationRuns
             headEndMs = m.liveBaseEndMs + Cint(head.timeMs - m.liveBaseTimeMs)
             driftMs = m.dashManifest.LiveSegmentStartMs(durationRuns, head.seqnum + 1) - headEndMs - m.liveLeadMs
             stepMs = driftMs - m.liveDriftMs
             m.liveDriftMs = driftMs
+            counts = m.liveTimelineCounts
+            counts["timed_checks"] += 1
+            counts["drift_ms_min"] = MathUtils.Min(counts["drift_ms_min"], driftMs)
+            counts["drift_ms_max"] = MathUtils.Max(counts["drift_ms_max"], driftMs)
+            counts["step_ms_min"] = MathUtils.Min(counts["step_ms_min"], stepMs)
+            counts["step_ms_max"] = MathUtils.Max(counts["step_ms_max"], stepMs)
             lastCheckJumped = m.liveLastCheckJumped
             m.liveLastCheckJumped = false
             listedDurationMs = durationRuns[durationRuns.Count() - 1].durationMs
@@ -288,14 +301,9 @@ namespace Http
             ' large cadence error can leap too (a young stream between sparse checks): the
             ' next check measures it.
             isStall = stepMs < -LIVE_STALL_JUMP_MS and not lastCheckJumped
+            durationMs = sinceBaseDurationMs
             if isStall
                 durationMs = listedDurationMs
-            else
-                durationMs = Cint((head.timeMs - m.liveBaseTimeMs) / (head.seqnum - m.liveBaseSeqnum))
-                if durationMs <= 0
-                    LogWarnNoTelemetry("Live head time went back:", head.timeMs, "ms at", head.seqnum, "after", m.liveBaseTimeMs, "ms at", m.liveBaseSeqnum)
-                    return
-                end if
             end if
 
             fromSeqnum = m.dashManifest.LiveLastListedSeqnum(durationRuns, m.liveHeadSeqnum) + 1
@@ -316,6 +324,11 @@ namespace Http
                 durationRuns.Shift()
             end while
             durationRuns.Push({ fromSeqnum: fromSeqnum, startMs: startMs, durationMs: durationMs })
+            counts["corrections"] += 1
+            if isStall
+                counts["stall_corrections"] += 1
+            end if
+            counts["duration_runs_max"] = MathUtils.Max(counts["duration_runs_max"], durationRuns.Count())
 
             m.ReportLiveCorrection(head, durationMs, driftMs, stepMs, isStall)
         end function
@@ -393,6 +406,16 @@ namespace Http
             m.liveLeadMs = 0
             m.liveDriftMs = 0
             m.liveLastCheckJumped = false
+            m.liveTimelineCounts = {
+                "timed_checks": 0
+                "corrections": 0
+                "stall_corrections": 0
+                "drift_ms_min": 0
+                "drift_ms_max": 0
+                "step_ms_min": 0
+                "step_ms_max": 0
+                "duration_runs_max": m.liveDurationRuns.Count()
+            }
             m.reportedLiveCorrection = false
             m.liveManifestTemplate = ""
             m.liveManifestTemplateKey = invalid

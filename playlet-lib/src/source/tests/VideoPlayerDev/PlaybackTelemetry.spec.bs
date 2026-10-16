@@ -388,34 +388,45 @@ namespace Tests
             m.assertFalse(summary.DoesExist("stream_source"))
         end function
 
-        @it("the live head check counts of the video load, without defaults, read once")
+        @it("the live head check and timeline counts of the video load, without defaults, read once")
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, FormatJson({ "video_load_id": "live1", "counts": { "checks_sent": 6, "answered_after_wait": 1, "timed_out": 0 } }))
+            WriteAsciiFile(LIVE_LOAD_COUNTS_PATH, FormatJson({
+                "video_load_id": "live1"
+                "live_head": { "checks_sent": 6, "answered_after_wait": 1, "timed_out": 0 }
+                "live_timeline": { "timed_checks": 3, "corrections": 1, "stall_corrections": 0, "drift_ms_min": -3425, "drift_ms_max": 0, "duration_runs_max": 2 }
+            }))
             summary = m.SendAt(1000)
             m.assertEqual(summary.live_head, { "checks_sent": 6, "answered_after_wait": 1 })
-            m.assertFalse(CreateObject("roFileSystem").Exists(LIVE_HEAD_COUNTS_PATH), "read once")
-            m.assertFalse(m.SendAt(2000).DoesExist("live_head"))
+            m.assertEqual(summary.live_timeline, { "timed_checks": 3, "corrections": 1, "drift_ms_min": -3425, "duration_runs_max": 2 })
+            m.assertFalse(CreateObject("roFileSystem").Exists(LIVE_LOAD_COUNTS_PATH), "read once")
+            summary = m.SendAt(2000)
+            m.assertFalse(summary.DoesExist("live_head"))
+            m.assertFalse(summary.DoesExist("live_timeline"))
         end function
 
-        @it("a live play without live head check counts has none")
+        @it("a live play without live load counts has none")
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            DeleteFile(LIVE_HEAD_COUNTS_PATH)
-            m.assertFalse(m.SendAt(1000).DoesExist("live_head"))
+            DeleteFile(LIVE_LOAD_COUNTS_PATH)
+            summary = m.SendAt(1000)
+            m.assertFalse(summary.DoesExist("live_head"))
+            m.assertFalse(summary.DoesExist("live_timeline"))
         end function
 
-        @it("leaves the live head check counts of another video load")
+        @it("leaves the live load counts of another video load")
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            handoff = FormatJson({ "video_load_id": "live2", "counts": { "checks_sent": 6 } })
-            WriteAsciiFile(LIVE_HEAD_COUNTS_PATH, handoff)
-            m.assertFalse(m.SendAt(1000).DoesExist("live_head"))
-            m.assertEqual(ReadAsciiFile(LIVE_HEAD_COUNTS_PATH), handoff)
-            DeleteFile(LIVE_HEAD_COUNTS_PATH)
+            handoff = FormatJson({ "video_load_id": "live2", "live_head": { "checks_sent": 6 }, "live_timeline": { "corrections": 1 } })
+            WriteAsciiFile(LIVE_LOAD_COUNTS_PATH, handoff)
+            summary = m.SendAt(1000)
+            m.assertFalse(summary.DoesExist("live_head"))
+            m.assertFalse(summary.DoesExist("live_timeline"))
+            m.assertEqual(ReadAsciiFile(LIVE_LOAD_COUNTS_PATH), handoff)
+            DeleteFile(LIVE_LOAD_COUNTS_PATH)
         end function
 
         @it("a live play: the first video segment's bitrate and the network's at the first playing")

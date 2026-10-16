@@ -54,7 +54,6 @@ class DashManifest
             adaptiveFormats = m.ProxyFormatsThroughInvidious(adaptiveFormats)
         end if
 
-        duration = m.GetDuration(metadata)
         isLive = ValidBool(metadata.liveNow)
 
         groupings = m.CreateFormatGroupings(adaptiveFormats, metadata.isPostLiveDvr, isLive)
@@ -119,7 +118,7 @@ class DashManifest
         else
             mpdAttributes["profiles"] = "urn:mpeg:dash:profile:full:2011"
             mpdAttributes["type"] = "static"
-            mpdAttributes["mediaPresentationDuration"] = `PT${duration}S`
+            mpdAttributes["mediaPresentationDuration"] = m.FormatDuration(m.GetDurationMs(metadata))
         end if
 
         ' Live needs an explicit Period start to anchor the timeline against availabilityStartTime.
@@ -169,17 +168,17 @@ class DashManifest
         return proxied
     end function
 
-    function GetDuration(metadata as object) as dynamic
-        if metadata["isPostLiveDvr"] = true and IsInt(metadata["postLiveDvrDurationMs"])
-            return metadata["postLiveDvrDurationMs"] / 1000.0
+    function GetDurationMs(metadata as object) as longinteger
+        if metadata["isPostLiveDvr"] = true and metadata["postLiveDvrDurationMs"] <> invalid
+            return metadata["postLiveDvrDurationMs"]
         end if
 
-        approxDurationMs = ValidString(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "approxDurationMs"])).ToInt()
-        if approxDurationMs > 0
-            return approxDurationMs / 1000.0
+        approxDurationMs = StringUtils.ParseJsonSafe(ObjectUtils.Dig(metadata, ["adaptiveFormats", 0, "approxDurationMs"]))
+        if IsNumber(approxDurationMs) and approxDurationMs > 0
+            return approxDurationMs
         end if
 
-        return ValidInt(metadata["lengthSeconds"])
+        return ValidInt(metadata["lengthSeconds"]) * 1000&
     end function
 
     ' `durationRuns` ascending.
@@ -246,7 +245,7 @@ class DashManifest
         return seqnum
     end function
 
-    function FormatDuration(ms as integer) as string
+    function FormatDuration(ms as longinteger) as string
         return `PT${ms \ 1000}.${Right("00" + (ms mod 1000).ToStr(), 3)}S`
     end function
 
@@ -638,8 +637,7 @@ class DashManifest
             if not IsInt(postLiveDvrSegmentCount)
                 xml.Comment(`[ERROR] Post-Live DVR metadata missing postLiveDvrSegmentCount for itag: ${stream.itag}`)
                 ' We're going to guess segment count from targetDurationSec and total duration
-                totalDurationMs = m.GetDuration(metadata) * 1000.0
-                postLiveDvrSegmentCount = MathUtils.Max(Fix(totalDurationMs / (stream.targetDurationSec * 1000)), 1)
+                postLiveDvrSegmentCount = MathUtils.Max(Fix(m.GetDurationMs(metadata) / (stream.targetDurationSec * 1000)), 1)
                 xml.Comment(`[INFO] Guessing postLiveDvrSegmentCount as ${postLiveDvrSegmentCount} for itag: ${stream.itag}`)
             end if
 

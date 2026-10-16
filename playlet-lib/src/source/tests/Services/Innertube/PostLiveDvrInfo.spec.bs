@@ -1,6 +1,7 @@
 import "pkg:/components/Services/Innertube/PostLiveDvrInfo.bs"
 import "pkg:/source/tests/HttpTestServer.bs"
 import "pkg:/source/tests/LoggingGlobals.bs"
+import "pkg:/source/utils/UrlUtils.bs"
 
 namespace Tests
 
@@ -21,35 +22,50 @@ namespace Tests
             m.global.telemetry.LogEvent = {}
         end function
 
-        @describe("Innertube.FetchPostLiveDvrHead")
-
-        @it("reads a HEAD's status and headers")
-        function _()
-            m.server.routes = { "/dvr/head": { status: 200, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } } }
-            result = Innertube.FetchPostLiveDvrHead(Tests.HttpTestServerUrl("/dvr/head?itag=1"), invalid, "cpn1", Innertube.ClientType.Tv, invalid)
-            m.assertEqual(result.statusCode, 200)
-            m.assertTrue(Innertube.HasPostLiveDvrHead(result))
-            m.assertEqual(Tests.HttpTestServerHits(m.server, result.url), 1)
-        end function
-
-        @it("sends a failed HEAD once more")
-        function _()
-            m.server.routes = { "/dvr/failing": { status: 503 } }
-            result = Innertube.FetchPostLiveDvrHead(Tests.HttpTestServerUrl("/dvr/failing?itag=1"), "0", invalid, Innertube.ClientType.Tv, invalid)
-            m.assertEqual(result.statusCode, 503)
-            m.assertFalse(Innertube.HasPostLiveDvrHead(result))
-            m.assertEqual(Tests.HttpTestServerHits(m.server, result.url), 2)
-        end function
-
         @describe("Innertube.GetPostLiveDvrInfo")
 
         @it("reads the duration and segment count from the live edge's head")
         function _()
             m.server.routes = { "/dvr/ended": { status: 200, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } } }
             parsedResponse = {}
-            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: Tests.HttpTestServerUrl("/dvr/ended?itag=1") }], invalid, Innertube.ClientType.Tv, invalid)
+            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: Tests.HttpTestServerUrl("/dvr/ended?itag=1") }], invalid, invalid)
             m.assertEqual(parsedResponse.postLiveDvrDurationMs, 80000)
             m.assertEqual(parsedResponse.postLiveDvrSegmentCount, 40)
+        end function
+
+        @it("reads a duration past 32 bits")
+        function _()
+            m.server.routes = { "/dvr/long": { status: 200, headers: { "X-Head-Seqnum": "3580000", "X-Head-Time-Millis": "17900000123" } } }
+            parsedResponse = {}
+            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: Tests.HttpTestServerUrl("/dvr/long?itag=1") }], invalid, invalid)
+            m.assertEqual(parsedResponse.postLiveDvrDurationMs, 17900000123&)
+            m.assertEqual(parsedResponse.postLiveDvrSegmentCount, 3580000)
+        end function
+
+        @it("reads the head from sq=0 when the live edge has none")
+        function _()
+            formatUrl = Tests.HttpTestServerUrl("/dvr/cached?itag=1")
+            fallbackUrl = UrlUtils.AppendQueryParams(Innertube.GetLiveHeadUrl(formatUrl, "cpn1"), { "sq": "0" })
+            routes = { "/dvr/cached": { status: 200 } }
+            routes[fallbackUrl.Replace(Tests.HttpTestServerUrl(""), "")] = { status: 200, headers: { "X-Head-Seqnum": "40", "X-Head-Time-Millis": "80000" } }
+            m.server.routes = routes
+            parsedResponse = {}
+            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: formatUrl }], "cpn1", invalid)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, Innertube.GetLiveHeadUrl(formatUrl, "cpn1")), 2)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, fallbackUrl), 1)
+            m.assertEqual(parsedResponse.postLiveDvrDurationMs, 80000)
+            m.assertEqual(parsedResponse.postLiveDvrSegmentCount, 40)
+        end function
+
+        @it("sets nothing when neither the live edge nor sq=0 has a head")
+        function _()
+            m.server.routes = { "/dvr/nohead": { status: 200 } }
+            formatUrl = Tests.HttpTestServerUrl("/dvr/nohead?itag=1")
+            parsedResponse = {}
+            Innertube.GetPostLiveDvrInfo(parsedResponse, [{ url: formatUrl }], "cpn1", invalid)
+            m.assertEqual(Tests.HttpTestServerHits(m.server, UrlUtils.AppendQueryParams(Innertube.GetLiveHeadUrl(formatUrl, "cpn1"), { "sq": "0" })), 2)
+            m.assertFalse(parsedResponse.DoesExist("postLiveDvrDurationMs"))
+            m.assertFalse(parsedResponse.DoesExist("postLiveDvrSegmentCount"))
         end function
 
     end class
