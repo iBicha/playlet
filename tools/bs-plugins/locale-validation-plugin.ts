@@ -67,6 +67,11 @@ export class LocaleValidationPlugin implements CompilerPlugin {
             return;
         }
 
+        // Rooibos generates its test-runner components in test builds
+        if (file.pkgPath.replace(/\\/g, '/').startsWith('components/rooibos/')) {
+            return;
+        }
+
         if (this.enums.length === 0 || this.localeValues.length === 0) {
             return;
         }
