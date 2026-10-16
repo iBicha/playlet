@@ -850,7 +850,7 @@
     </message>
     <message>
         <source>No thumbnails found in JSON from %1</source>
-        <translation>Keine Vorschaubilder im JSON von 1% gefunden</translation>
+        <translation>Keine Vorschaubilder im JSON von %1 gefunden</translation>
     </message>
     <message>
         <source>%1 is not reachable</source>
