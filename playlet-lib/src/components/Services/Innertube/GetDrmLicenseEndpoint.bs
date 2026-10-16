@@ -1,3 +1,5 @@
+import "pkg:/components/Services/Innertube/GetDrmLicenseEndpoint.types.bs"
+
 namespace Innertube
 
     function CreateGetDrmLicenceRequest(options as object) as HttpClient.Request
@@ -39,7 +41,7 @@ namespace Innertube
         return request
     end function
 
-    function ParseGetDrmLicenseResponse(payload as object) as dynamic
+    function ParseGetDrmLicenseResponse(payload as object) as Innertube.DrmLicenseResponse
         if not IsAssociativeArray(payload)
             return {
                 "error": "Invalid JSON response"
@@ -50,6 +52,7 @@ namespace Innertube
         if status <> "LICENSE_STATUS_OK"
             return {
                 "error": "DRM license request failed with status: " + status
+                "payload": payload
             }
         end if
 
@@ -57,12 +60,24 @@ namespace Innertube
         if StringUtils.IsNullOrEmpty(license)
             return {
                 "error": "DRM license is missing in the response"
+                "payload": payload
             }
         end if
 
         buffer = createObject("roByteArray")
         buffer.FromBase64String(license.Replace("-", "+").Replace("_", "/"))
-        return buffer
+        if buffer.Count() = 0
+            return {
+                "error": "DRM license decodes to no bytes"
+                "payload": payload
+            }
+        end if
+
+        payload.Delete("license")
+        return {
+            "license": buffer
+            "payload": payload
+        }
     end function
 
     function GenerateDrmSessionId() as string

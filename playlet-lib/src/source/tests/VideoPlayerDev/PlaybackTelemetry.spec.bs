@@ -38,6 +38,11 @@ namespace Tests
             m.recorder = new PlaybackTelemetry.Recorder({ playerTimer: m.playerClock, transport: m.fakeTransport, top: m.fakeTop })
         end function
 
+        protected override function afterEach()
+            DeleteFile(LIVE_LOAD_COUNTS_PATH)
+            DeleteFile(DRM_LICENSE_REQUESTS_PATH)
+        end function
+
         function At(ms as integer) as void
             m.playerClock.ms = ms
         end function
@@ -292,6 +297,27 @@ namespace Tests
             m.assertEqual(summary.stream_url_index, 1)
         end function
 
+        @it("DRM content: the video load's license requests, read once")
+        function _()
+            m.fakeTop.content = { videoId: "vid1", videoLoadId: "load1", backend: "playlet", playletStreamSource: "adaptiveFormats", drmParams: { keySystem: "Widevine" } }
+            requests = { "sent": 2, "responses": [{ "error": "timeout" }, { "payload": { "status": "LICENSE_STATUS_OK", "authorizedFormats": [{ "trackType": "DRM_TRACK_TYPE_SD", "keyId": "a" }] } }] }
+            VideoLoadHandoff.Write(DRM_LICENSE_REQUESTS_PATH, "load1", requests)
+            summary = m.SendAt(1000)
+            m.assertEqual(summary.drm_license_requests, requests)
+            m.assertEqual(summary.widevine_security_level, CreateObject("roDeviceInfo").GetDrmInfoEx().Widevine.securityLevel)
+            m.assertFalse(m.SendAt(2000).DoesExist("drm_license_requests"), "read once")
+        end function
+
+        @it("content without DRM sends no DRM fields")
+        function _()
+            m.fakeTop.content.videoLoadId = "load1"
+            VideoLoadHandoff.Write(DRM_LICENSE_REQUESTS_PATH, "load1", { "sent": 1, "responses": [] })
+            summary = m.SendAt(1000)
+            for each field in ["drm", "drm_license_requests", "widevine_security_level", "hdcp_version"]
+                m.assertFalse(summary.DoesExist(field), field)
+            end for
+        end function
+
         @it("content that never loaded sends no stream fields")
         function _()
             m.fakeTop.content = { videoId: "vid1", backend: "playlet" }
@@ -392,25 +418,22 @@ namespace Tests
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            WriteAsciiFile(LIVE_LOAD_COUNTS_PATH, FormatJson({
-                "video_load_id": "live1"
+            VideoLoadHandoff.Write(LIVE_LOAD_COUNTS_PATH, "live1", {
                 "live_head": { "checks_sent": 6, "answered_after_wait": 1, "timed_out": 0 }
                 "live_timeline": { "timed_checks": 3, "corrections": 1, "stall_corrections": 0, "drift_ms_min": -3425, "drift_ms_max": 0, "duration_runs_max": 2 }
-            }))
+            })
             summary = m.SendAt(1000)
             m.assertEqual(summary.live_head, { "checks_sent": 6, "answered_after_wait": 1 })
             m.assertEqual(summary.live_timeline, { "timed_checks": 3, "corrections": 1, "drift_ms_min": -3425, "duration_runs_max": 2 })
-            m.assertFalse(CreateObject("roFileSystem").Exists(LIVE_LOAD_COUNTS_PATH), "read once")
             summary = m.SendAt(2000)
-            m.assertFalse(summary.DoesExist("live_head"))
-            m.assertFalse(summary.DoesExist("live_timeline"))
+            m.assertFalse(summary.DoesExist("live_head"), "read once")
+            m.assertFalse(summary.DoesExist("live_timeline"), "read once")
         end function
 
         @it("a live play without live load counts has none")
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            DeleteFile(LIVE_LOAD_COUNTS_PATH)
             summary = m.SendAt(1000)
             m.assertFalse(summary.DoesExist("live_head"))
             m.assertFalse(summary.DoesExist("live_timeline"))
@@ -420,13 +443,12 @@ namespace Tests
         function _()
             m.fakeTransport.isLive = true
             m.fakeTop.content.videoLoadId = "live1"
-            handoff = FormatJson({ "video_load_id": "live2", "live_head": { "checks_sent": 6 }, "live_timeline": { "corrections": 1 } })
-            WriteAsciiFile(LIVE_LOAD_COUNTS_PATH, handoff)
+            counts = { "live_head": { "checks_sent": 6 }, "live_timeline": { "corrections": 1 } }
+            VideoLoadHandoff.Write(LIVE_LOAD_COUNTS_PATH, "live2", counts)
             summary = m.SendAt(1000)
             m.assertFalse(summary.DoesExist("live_head"))
             m.assertFalse(summary.DoesExist("live_timeline"))
-            m.assertEqual(ReadAsciiFile(LIVE_LOAD_COUNTS_PATH), handoff)
-            DeleteFile(LIVE_LOAD_COUNTS_PATH)
+            m.assertEqual(VideoLoadHandoff.Read(LIVE_LOAD_COUNTS_PATH, "live2"), counts)
         end function
 
         @it("a live play: the first video segment's bitrate and the network's at the first playing")

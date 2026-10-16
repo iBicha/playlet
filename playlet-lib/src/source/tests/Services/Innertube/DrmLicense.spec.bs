@@ -1,0 +1,89 @@
+import "pkg:/components/Services/Innertube/DrmLicenseRequests.bs"
+import "pkg:/components/Services/Innertube/GetDrmLicenseEndpoint.bs"
+
+namespace Tests
+
+    @suite
+    class DrmLicenseTests extends Rooibos.BaseTestSuite
+
+        protected override function afterEach()
+            DeleteFile(DRM_LICENSE_REQUESTS_PATH)
+        end function
+
+        function Requests(videoLoadId as string) as object
+            return VideoLoadHandoff.Read(DRM_LICENSE_REQUESTS_PATH, videoLoadId)
+        end function
+
+        @describe("Innertube.ParseGetDrmLicenseResponse")
+
+        @it("decodes the web-safe base64 license and keeps the rest of the response")
+        function _()
+            authorizedFormats = [{ "trackType": "DRM_TRACK_TYPE_HD", "keyId": "a" }]
+            responseContext = { "serviceTrackingParams": [{ "service": "GFEEDBACK", "params": [{ "key": "logged_in", "value": "1" }] }] }
+            parsed = Innertube.ParseGetDrmLicenseResponse({
+                "responseContext": responseContext
+                "status": "LICENSE_STATUS_OK"
+                "license": "AQID-_8="
+                "authorizedFormats": authorizedFormats
+                "canRenew": false
+            })
+            m.assertEqual(parsed.license.ToHexString(), "010203FBFF")
+            m.assertEqual(parsed.payload, { "responseContext": responseContext, "status": "LICENSE_STATUS_OK", "authorizedFormats": authorizedFormats, "canRenew": false })
+        end function
+
+        @it("a license that decodes to no bytes is an error, with the response as sent")
+        function _()
+            ' Roku decodes a length that isn't a multiple of 4 to nothing.
+            parsed = Innertube.ParseGetDrmLicenseResponse({ "status": "LICENSE_STATUS_OK", "license": "AQI" })
+            m.assertEqual(parsed.error, "DRM license decodes to no bytes")
+            m.assertEqual(parsed.payload, { "status": "LICENSE_STATUS_OK", "license": "AQI" })
+        end function
+
+        @it("a status other than OK is an error, with the response as sent")
+        function _()
+            parsed = Innertube.ParseGetDrmLicenseResponse({ "status": "LICENSE_STATUS_DENIED", "license": "AQID", "reason": "r" })
+            m.assertEqual(parsed.error, "DRM license request failed with status: LICENSE_STATUS_DENIED")
+            m.assertEqual(parsed.payload, { "status": "LICENSE_STATUS_DENIED", "license": "AQID", "reason": "r" })
+        end function
+
+        @describe("DrmLicenseRequests")
+
+        @it("counts the video load's requests and keeps each response in order")
+        function _()
+            DrmLicenseRequests.RecordSent("load1")
+            DrmLicenseRequests.RecordResponse("load1", { payload: { "status": "LICENSE_STATUS_OK" } })
+            DrmLicenseRequests.RecordSent("load1")
+            DrmLicenseRequests.RecordResponse("load1", { error: "timeout" })
+            DrmLicenseRequests.RecordSent("load1")
+            m.assertEqual(m.Requests("load1"), {
+                "sent": 3
+                "responses": [
+                    { "payload": { "status": "LICENSE_STATUS_OK" } }
+                    { "error": "timeout" }
+                ]
+            })
+        end function
+
+        @it("keeps the first responses, counting every request")
+        function _()
+            for i = 1 to DRM_LICENSE_RESPONSE_SAMPLE_CAP + 2
+                DrmLicenseRequests.RecordSent("load1")
+                DrmLicenseRequests.RecordResponse("load1", { error: `e${i}` })
+            end for
+            requests = m.Requests("load1")
+            m.assertEqual(requests["sent"], DRM_LICENSE_RESPONSE_SAMPLE_CAP + 2)
+            m.assertEqual(requests["responses"].Count(), DRM_LICENSE_RESPONSE_SAMPLE_CAP)
+            m.assertEqual(requests["responses"][0], { "error": "e1" })
+        end function
+
+        @it("a new video load starts over")
+        function _()
+            DrmLicenseRequests.RecordSent("load1")
+            DrmLicenseRequests.RecordSent("load2")
+            m.assertInvalid(m.Requests("load1"))
+            m.assertEqual(m.Requests("load2"), { "sent": 1, "responses": [] })
+        end function
+
+    end class
+
+end namespace

@@ -1,5 +1,6 @@
 import "pkg:/components/ContentNode/ProfileContentAuthTokenUtils.bs"
 import "pkg:/components/Services/Innertube/Constants.bs"
+import "pkg:/components/Services/Innertube/DrmLicenseRequests.bs"
 import "pkg:/components/Services/Innertube/InnertubeService.bs"
 import "pkg:/components/Services/Innertube/PoTokens.bs"
 import "pkg:/components/Web/WebServer/Http/HttpRouter.bs"
@@ -161,7 +162,7 @@ namespace Http
             request = context.request
             response = context.response
 
-            drmStringQueryParams = ["videoId", "drmParams", "drmSessionId", "cpn"]
+            drmStringQueryParams = ["videoId", "videoLoadId", "drmParams", "drmSessionId", "cpn"]
             for each paramName in drmStringQueryParams
                 if StringUtils.IsNullOrEmpty(request.query[paramName])
                     response.Default(400, "Missing " + paramName)
@@ -194,29 +195,25 @@ namespace Http
                 options["visitorData"] = m.innertube.sessionData.visitorData
             end if
 
-            drmResponse = InnertubeService.GetDrmLicense(options)
+            DrmLicenseRequests.RecordSent(request.query.videoLoadId)
+            licenseResponse = InnertubeService.GetDrmLicense(options)
+            DrmLicenseRequests.RecordResponse(request.query.videoLoadId, licenseResponse)
 
-            if IsByteArray(drmResponse)
-                response.http_code = 200
-                response.SetBodyDataBuffer(drmResponse)
-                response.ContentType("text/html; charset=utf-8")
-                response.headers["Cache-Control"] = "no-cache"
-            else if IsAssociativeArray(drmResponse)
+            license = licenseResponse.license
+            if not IsByteArray(license) or license.Count() = 0
                 LogTelemetryEvent({
                     level: "error"
-                    message: `DRM license request failed: ${ValidString(drmResponse.error)}\nvideoId: ${request.query.videoId}`
+                    message: `DRM license request failed: ${ValidString(licenseResponse.error)}\nvideoId: ${request.query.videoId}\nvideo_load_id: ${request.query.videoLoadId}`
                     fingerprint: ["DRM license request failed"]
                 })
-                response.Default(500, FormatJson(drmResponse))
-            else
-                LogTelemetryEvent({
-                    level: "error"
-                    message: `DRM license request returned an unexpected response type\nvideoId: ${request.query.videoId}`
-                    fingerprint: ["DRM license request failed"]
-                })
-                response.Default(500, "Invalid DRM license response")
+                response.Default(500, FormatJson(licenseResponse))
+                return true
             end if
 
+            response.http_code = 200
+            response.SetBodyDataBuffer(license)
+            response.ContentType("text/html; charset=utf-8")
+            response.headers["Cache-Control"] = "no-cache"
             return true
         end function
 

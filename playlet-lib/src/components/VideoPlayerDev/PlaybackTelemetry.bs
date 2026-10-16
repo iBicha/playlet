@@ -1,4 +1,6 @@
 import "pkg:/components/Services/Dash/LiveLoadCounts.bs"
+import "pkg:/components/Services/Innertube/DrmLicenseRequests.bs"
+import "pkg:/components/Telemetry/VideoLoadHandoff.bs"
 import "pkg:/components/VideoPlayerDev/VideoNode.bs"
 import "pkg:/source/utils/ErrorUtils.bs"
 import "pkg:/source/utils/Locale.bs"
@@ -345,12 +347,9 @@ namespace PlaybackTelemetry
                 "tail_resolve_samples": m.tailResolveSamples
             }
             if m.transport.isLive
-                liveLoadCounts = StringUtils.ParseJsonSafe(ReadAsciiFile(LIVE_LOAD_COUNTS_PATH))
-                if liveLoadCounts <> invalid and liveLoadCounts["video_load_id"] = summary["video_load_id"]
-                    summary["live_head"] = liveLoadCounts["live_head"]
-                    summary["live_timeline"] = liveLoadCounts["live_timeline"]
-                    DeleteFile(LIVE_LOAD_COUNTS_PATH)
-                end if
+                liveLoadCounts = ValidAssociativeArray(VideoLoadHandoff.ReadAndDelete(LIVE_LOAD_COUNTS_PATH, summary["video_load_id"]))
+                summary["live_head"] = liveLoadCounts["live_head"]
+                summary["live_timeline"] = liveLoadCounts["live_timeline"]
                 summary["start_segment_bitrate_bps"] = m.startSegmentBitrateBps
                 summary["start_measured_bitrate_bps"] = m.startMeasuredBitrateBps
             end if
@@ -359,6 +358,14 @@ namespace PlaybackTelemetry
                 summary["stream_source"] = content.playletStreamSource
                 summary["drm"] = not StringUtils.IsNullOrEmpty(ValidAssociativeArray(content.drmParams).keySystem)
                 summary["stream_url_index"] = content.playletStreamUrlIndex
+                if summary["drm"]
+                    summary["drm_license_requests"] = VideoLoadHandoff.ReadAndDelete(DRM_LICENSE_REQUESTS_PATH, summary["video_load_id"])
+                    summary["widevine_security_level"] = ValidAssociativeArray(CreateObject("roDeviceInfo").GetDrmInfoEx().Widevine).securityLevel
+                    hdmiStatus = CreateObject("roHdmiStatus")
+                    if hdmiStatus <> invalid
+                        summary["hdcp_version"] = hdmiStatus.GetHdcpVersion()
+                    end if
+                end if
             end if
             LogTelemetryEvent({
                 level: "info"

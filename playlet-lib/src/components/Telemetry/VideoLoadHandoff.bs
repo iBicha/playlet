@@ -1,0 +1,26 @@
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+
+namespace VideoLoadHandoff
+
+    function Read(path as string, videoLoadId as string) as dynamic
+        handoff = StringUtils.ParseJsonSafe(ReadAsciiFile(path))
+        if not IsAssociativeArray(handoff) or handoff["video_load_id"] <> videoLoadId
+            return invalid
+        end if
+        return handoff["value"]
+    end function
+
+    function Write(path as string, videoLoadId as string, value as dynamic) as void
+        WriteAsciiFile(path, FormatJson({ "video_load_id": videoLoadId, "value": value }))
+    end function
+
+    function ReadAndDelete(path as string, videoLoadId as string) as dynamic
+        value = VideoLoadHandoff.Read(path, videoLoadId)
+        if value <> invalid
+            DeleteFile(path)
+        end if
+        return value
+    end function
+
+end namespace

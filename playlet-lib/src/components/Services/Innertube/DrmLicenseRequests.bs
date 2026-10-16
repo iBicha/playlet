@@ -1,0 +1,37 @@
+import "pkg:/components/Services/Innertube/GetDrmLicenseEndpoint.types.bs"
+import "pkg:/components/Telemetry/VideoLoadHandoff.bs"
+
+const DRM_LICENSE_REQUESTS_PATH = "tmp:/drm_license_requests.json"
+const DRM_LICENSE_RESPONSE_SAMPLE_CAP = 10
+
+namespace DrmLicenseRequests
+
+    function RecordSent(videoLoadId as string) as void
+        requests = DrmLicenseRequests.Load(videoLoadId)
+        requests["sent"] += 1
+        VideoLoadHandoff.Write(DRM_LICENSE_REQUESTS_PATH, videoLoadId, requests)
+    end function
+
+    function RecordResponse(videoLoadId as string, response as Innertube.DrmLicenseResponse) as void
+        requests = DrmLicenseRequests.Load(videoLoadId)
+        responses = requests["responses"]
+        if responses.Count() >= DRM_LICENSE_RESPONSE_SAMPLE_CAP
+            return
+        end if
+        if response.payload <> invalid
+            responses.Push({ "payload": response.payload })
+        else
+            responses.Push({ "error": response.error })
+        end if
+        VideoLoadHandoff.Write(DRM_LICENSE_REQUESTS_PATH, videoLoadId, requests)
+    end function
+
+    function Load(videoLoadId as string) as object
+        requests = VideoLoadHandoff.Read(DRM_LICENSE_REQUESTS_PATH, videoLoadId)
+        if not IsAssociativeArray(requests)
+            return { "sent": 0, "responses": [] }
+        end if
+        return requests
+    end function
+
+end namespace
