@@ -1,0 +1,121 @@
+import "pkg:/source/utils/Logging.bs"
+import "pkg:/source/utils/StringUtils.bs"
+import "pkg:/source/utils/Types.bs"
+import "TransportEvents.types.bs"
+
+function Init()
+    m.appManager = CreateObject("roAppManager")
+    m.videoQueue = m.top.getScene().findNode("VideoQueue")
+
+    ' TODO:P2 ok, forward, rewind, replay, next and skip need support in the player or the queue. Until then they
+    ' have no entry here, and answer unhandled.
+    m.commandHandlers = {}
+    m.commandHandlers[TransportCommand.Play] = PlayCommand
+    m.commandHandlers[TransportCommand.Pause] = PauseCommand
+    m.commandHandlers[TransportCommand.Stop] = PauseCommand
+    m.commandHandlers[TransportCommand.Seek] = SeekCommand
+    m.commandHandlers[TransportCommand.StartOver] = StartOverCommand
+    m.commandHandlers[TransportCommand.NowPlaying] = NowPlayingCommand
+    m.commandHandlers[TransportCommand.Like] = NotSupportedCommand
+    m.commandHandlers[TransportCommand.Dislike] = NotSupportedCommand
+    m.commandHandlers[TransportCommand.Shuffle] = NotSupportedCommand
+    m.commandHandlers[TransportCommand.Loop] = NotSupportedCommand
+end function
+
+function HandleTransportEvent(event as object) as string
+    status = RouteTransportEvent(event)
+    LogInfo("transport event", event, "->", status)
+    return status
+end function
+
+function RouteTransportEvent(event as object) as string
+    commandHandler = m.commandHandlers[ValidString(event.command)]
+    if commandHandler = invalid
+        return TransportStatus.Unhandled
+    end if
+    return commandHandler(event)
+end function
+
+function PlayCommand(_event as object) as string
+    player = m.videoQueue.player
+    if player = invalid
+        return TransportStatus.Unhandled
+    end if
+
+    if player.state = "paused"
+        m.videoQueue.play = true
+    end if
+    return TransportStatus.Success
+end function
+
+function PauseCommand(_event as object) as string
+    player = m.videoQueue.player
+    if player = invalid
+        return TransportStatus.Unhandled
+    end if
+
+    if player.state = "paused"
+        return TransportStatus.ErrorRedundant
+    end if
+    m.videoQueue.pause = true
+    return TransportStatus.Success
+end function
+
+function SeekCommand(event as object) as string
+    player = m.videoQueue.player
+    if player = invalid
+        return TransportStatus.Unhandled
+    end if
+
+    deltaSeconds = ValidString(event.duration).ToInt()
+    if deltaSeconds <= 0
+        return TransportStatus.Error
+    end if
+    if event.direction = TransportSeekDirection.Backward
+        deltaSeconds = -deltaSeconds
+    end if
+
+    targetSeconds = player.position + deltaSeconds
+    status = TransportStatus.Success
+    if targetSeconds < 0
+        targetSeconds = 0
+        status = TransportStatus.SuccessSeekStart
+    else if player.duration > 0 and targetSeconds > player.duration
+        targetSeconds = player.duration
+        status = TransportStatus.SuccessSeekEnd
+    end if
+
+    player.setSeek = targetSeconds
+    return status
+end function
+
+function StartOverCommand(_event as object) as string
+    player = m.videoQueue.player
+    if player = invalid
+        return TransportStatus.Unhandled
+    end if
+
+    player.setSeek = 0
+    return TransportStatus.Success
+end function
+
+function NowPlayingCommand(_event as object) as string
+    player = m.videoQueue.player
+    if player = invalid
+        m.appManager.SetNowPlayingContentMetaData(invalid)
+        return TransportStatus.Success
+    end if
+
+    content = player.content
+    if content = invalid or StringUtils.IsNullOrEmpty(content.title)
+        m.appManager.SetNowPlayingContentMetaData(invalid)
+        return TransportStatus.ErrorGeneric
+    end if
+
+    m.appManager.SetNowPlayingContentMetaData({ title: content.title, contentType: "movie" })
+    return TransportStatus.Success
+end function
+
+function NotSupportedCommand(_event as object) as string
+    return TransportStatus.ErrorChannel
+end function

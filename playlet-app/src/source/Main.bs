@@ -27,6 +27,7 @@ function Main(args as object) as void
 
     scene = screen.CreateScene("BootstrapScene")
     screen.show()
+    scene.ObserveField("libSceneCreated", port)
 
     AppManager.CaptureLastExitInfo(scene)
 
@@ -49,6 +50,8 @@ function Main(args as object) as void
 
     input = CreateObject("roInput")
     input.setMessagePort(port)
+    input.EnableTransportEvents()
+    transportEventsHandler = invalid
 
     systemLog = CreateObject("roSystemLog")
     systemLog.SetMessagePort(port)
@@ -83,8 +86,21 @@ function Main(args as object) as void
             if field = "enableSystemLogType"
                 systemLog.EnableType(data)
             end if
+            if field = "libSceneCreated"
+                scene.unobserveField("libSceneCreated")
+                transportEventsHandler = scene@.CreateInputTransportEventsHandler()
+            end if
         else if msgType = "roInputEvent"
-            scene.inputArgs = msg.getInfo()
+            info = msg.getInfo()
+            if info.type = "transport"
+                status = "unhandled"
+                if transportEventsHandler <> invalid
+                    status = transportEventsHandler@.HandleTransportEvent(info)
+                end if
+                input.EventResponse({ id: info.id, status: status })
+            else
+                scene.inputArgs = info
+            end if
         end if
     end while
 
