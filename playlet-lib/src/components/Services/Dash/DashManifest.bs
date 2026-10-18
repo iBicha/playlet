@@ -267,6 +267,10 @@ class DashManifest
                 continue for
             end if
 
+            if m.HasOnlyUnsupportedDrm(format)
+                continue for
+            end if
+
             if (format.width = invalid or format.height = invalid) and not StringUtils.IsNullOrEmpty(format.size)
                 if format.size.instr("x") > 0
                     parts = format.size.Tokenize("x")
@@ -323,7 +327,12 @@ class DashManifest
                 audioTrackId = format.audioTrack.id
             end if
 
-            groupId = `${mimeType}-${justCodec}-${colorInfo}-${audioTrackId}${m.GetAudioVariantSuffix(format)}`
+            drmFamilies = ""
+            if IsArray(format.drmFamilies)
+                drmFamilies = format.drmFamilies.Join("+")
+            end if
+
+            groupId = `${mimeType}-${justCodec}-${colorInfo}-${audioTrackId}${m.GetAudioVariantSuffix(format)}-${drmFamilies}`
 
             if groupInfo[groupId] = invalid
                 groupInfo[groupId] = []
@@ -473,14 +482,7 @@ class DashManifest
             end if
 
             if xml.Node("AdaptationSet", adaptationSetAttributes)
-                if IsArray(firstFormat.drmFamilies)
-                    for each drmFamily in firstFormat.drmFamilies
-                        systemId = m.GetDrmSystemId(drmFamily)
-                        if IsString(systemId)
-                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
-                        end if
-                    end for
-                end if
+                m.AddContentProtection(xml, firstFormat)
 
                 if IsAssociativeArray(firstFormat.audioTrack) or firstFormat.isDrc = true or firstFormat.isVoiceBoost = true
                     ' Roles
@@ -574,14 +576,7 @@ class DashManifest
             end if
 
             if xml.Node("AdaptationSet", adaptationSetAttributes)
-                if IsArray(firstFormat.drmFamilies)
-                    for each drmFamily in firstFormat.drmFamilies
-                        systemId = m.GetDrmSystemId(drmFamily)
-                        if IsString(systemId)
-                            xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
-                        end if
-                    end for
-                end if
+                m.AddContentProtection(xml, firstFormat)
 
                 m.AddColorInfo(firstFormat, xml)
 
@@ -1013,6 +1008,32 @@ class DashManifest
             "id": id
             "languageCode": lang.Tokenize("-")[0]
         }
+    end function
+
+    ' DRM movies have formats whose only DRM family is FAIRPLAY, which no ContentProtection Roku supports can declare.
+    function HasOnlyUnsupportedDrm(format as object) as boolean
+        if not IsArray(format.drmFamilies) or format.drmFamilies.Count() = 0
+            return false
+        end if
+        for each drmFamily in format.drmFamilies
+            if IsString(m.GetDrmSystemId(drmFamily))
+                return false
+            end if
+        end for
+        return true
+    end function
+
+    ' A set's formats share their drmFamilies: CreateFormatGroupings keys groups on them.
+    function AddContentProtection(xml as object, format as object) as void
+        if not IsArray(format.drmFamilies)
+            return
+        end if
+        for each drmFamily in format.drmFamilies
+            systemId = m.GetDrmSystemId(drmFamily)
+            if IsString(systemId)
+                xml.EmptyNode("ContentProtection", { "schemeIdUri": `urn:uuid:${systemId}` })
+            end if
+        end for
     end function
 
     function GetDrmSystemId(drmFamily as dynamic) as dynamic

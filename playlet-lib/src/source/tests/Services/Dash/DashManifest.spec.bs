@@ -34,6 +34,87 @@ namespace Tests
             m.assertInvalid(proxied[0].url)
         end function
 
+        @describe("DashManifest.FromVideoMetadata DRM")
+
+        function DrmFormat(itag as string, mimeType as string, drmFamilies as dynamic) as object
+            format = {
+                itag: itag
+                url: `https://rr1.googlevideo.com/videoplayback?itag=${itag}`
+                type: mimeType
+                bitrate: 1000000
+                init: "0-700"
+                index: "701-900"
+            }
+            if mimeType.startsWith("video")
+                format.width = 1920
+                format.height = 1080
+            end if
+            if drmFamilies <> invalid
+                format.drmFamilies = drmFamilies
+            end if
+            return format
+        end function
+
+        ' Each audio/video AdaptationSet as { reps: its Representation ids, drm: its ContentProtection schemeIdUris }.
+        function DrmAdaptationSets(formats as object) as object
+            manifest = new DashManifest("")
+            xml = CreateObject("roXMLElement")
+            xml.Parse(manifest.FromVideoMetadata({ videoId: "v", lengthSeconds: 100, isPostLiveDvr: false, adaptiveFormats: formats, storyboards: [] }, {}, false))
+            sets = []
+            for each adaptationSet in xml.GetNamedElements("Period").GetNamedElements("AdaptationSet")
+                contentType = adaptationSet@contentType
+                if contentType <> "audio" and contentType <> "video"
+                    continue for
+                end if
+                reps = []
+                for each representation in adaptationSet.GetNamedElements("Representation")
+                    reps.Push(representation@id)
+                end for
+                drm = []
+                for each contentProtection in adaptationSet.GetNamedElements("ContentProtection")
+                    drm.Push(contentProtection@schemeIdUri)
+                end for
+                sets.Push({ reps: reps, drm: drm })
+            end for
+            return sets
+        end function
+
+        @it("leaves out formats whose only DRM is FairPlay, and keeps the formats without DRM")
+        function _()
+            sets = m.DrmAdaptationSets([
+                m.DrmFormat("137", `video/mp4; codecs="avc1.640028"`, ["WIDEVINE", "PLAYREADY"])
+                m.DrmFormat("399", `video/mp4; codecs="vp09.00.40.08.00.01.01.01.00"`, ["FAIRPLAY"])
+                m.DrmFormat("140", `audio/mp4; codecs="mp4a.40.2"`, ["WIDEVINE", "PLAYREADY"])
+                m.DrmFormat("141", `audio/mp4; codecs="mp4a.40.2"`, ["FAIRPLAY"])
+                m.DrmFormat("136", `video/mp4; codecs="avc1.4D401F"`, invalid)
+            ])
+            reps = []
+            for each adaptationSet in sets
+                reps.Append(adaptationSet.reps)
+            end for
+            reps.Sort()
+            m.assertEqual(reps, ["136", "137", "140"])
+        end function
+
+        @it("marks each set with the DRM systems its formats carry")
+        function _()
+            widevine = "urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed"
+            playready = "urn:uuid:9a04f079-9840-4286-ab92-e65be0885f95"
+            sets = m.DrmAdaptationSets([
+                m.DrmFormat("140", `audio/mp4; codecs="mp4a.40.2"`, ["WIDEVINE", "PLAYREADY"])
+                m.DrmFormat("139", `audio/mp4; codecs="mp4a.40.5"`, ["WIDEVINE"])
+                m.DrmFormat("136", `video/mp4; codecs="avc1.4D401F"`, invalid)
+            ])
+            drmByRep = {}
+            for each adaptationSet in sets
+                m.assertEqual(adaptationSet.reps.Count(), 1)
+                drmByRep[adaptationSet.reps[0]] = adaptationSet.drm
+            end for
+            m.assertEqual(drmByRep["140"], [widevine, playready])
+            m.assertEqual(drmByRep["139"], [widevine])
+            m.assertEqual(drmByRep["136"], [])
+        end function
+
         @describe("DashManifest.FillLiveManifest")
 
         ' The filled startNumber, <S> entries ({ t, d, r }) and now.
