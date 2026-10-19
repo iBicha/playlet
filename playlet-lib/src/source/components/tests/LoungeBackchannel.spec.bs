@@ -75,7 +75,7 @@ namespace Tests
             m.assertEqual(backchannel.closeReason, LoungeCloseReason.Empty)
         end function
 
-        @it("returns the commands of the whole frames of an answer that ends mid-frame, and reports what is left")
+        @it("returns the commands of the whole frames of an answer that ends mid-frame, and reports where")
         function _()
             backchannel = new LoungeBackchannel()
             commands = m.PollOnce(backchannel, "/lounge/partial", { status: 200, body: m.Frame(`[[7,["noop"]]]`) + `40\n[[8,` })
@@ -84,7 +84,49 @@ namespace Tests
             m.assertEqual(backchannel.closeReason, LoungeCloseReason.Complete)
             event = m.global.telemetry.LogEvent
             m.assertEqual(event.fingerprint, "lounge-partial-frame")
-            m.assertTrue(event.message.InStr("7 bytes left") <> -1, event.message)
+            m.assertTrue(event.message.InStr("at byte 17 of 24") <> -1, event.message)
+        end function
+
+        @it("counts a frame's length in bytes, so a multi-byte character does not shift the next frame")
+        function _()
+            backchannel = new LoungeBackchannel()
+            titleBytes = CreateObject("roByteArray")
+            titleBytes.FromHexString("636166C3A9")
+            title = titleBytes.ToAsciiString()
+            commands = backchannel.StartSession(m.Frame(`[[0,["setTitle","${title}"]]]`) + m.Frame(`[[1,["noop"]]]`))
+            m.assertEqual(commands.Count(), 2)
+            m.assertEqual(commands[0].args, title)
+            m.assertEqual(commands[1].type, "noop")
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("reads a length line that ends in CR LF")
+        function _()
+            backchannel = new LoungeBackchannel()
+            commands = backchannel.StartSession(`\r\n14\r\n[[0,["noop"]]]`)
+            m.assertEqual(commands.Count(), 1)
+            m.assertEqual(commands[0].type, "noop")
+            m.assertEmpty(m.global.telemetry.LogEvent)
+        end function
+
+        @it("stops at a frame without a valid length, keeps the frames before it, and reports it")
+        function _()
+            for each badFrame in [`0\n`, `x\n[[1,["noop"]]]`, `14 [[1,["noop"]]]`, `99999999999999999999\n[[1,["noop"]]]`]
+                m.global.telemetry.LogEvent = {}
+                backchannel = new LoungeBackchannel()
+                commands = backchannel.StartSession(m.Frame(`[[0,["noop"]]]`) + badFrame + m.Frame(`[[2,["noop"]]]`))
+                m.assertEqual(commands.Count(), 1, badFrame)
+                m.assertEqual(commands[0].index, 0, badFrame)
+                m.assertEqual(m.global.telemetry.LogEvent.fingerprint, "lounge-partial-frame", badFrame)
+            end for
+        end function
+
+        @it("ends a 2xx answer that is not framed as empty, and reports it")
+        function _()
+            backchannel = new LoungeBackchannel()
+            m.assertEmpty(m.PollOnce(backchannel, "/lounge/unframed", { status: 200, body: "<html></html>" }))
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Empty)
+            m.assertEqual(m.global.telemetry.LogEvent.fingerprint, "lounge-partial-frame")
         end function
 
         @it("skips the commands it already received")
@@ -145,16 +187,14 @@ namespace Tests
             backchannel = new LoungeBackchannel()
             m.assertEmpty(m.PollOnce(backchannel, "/lounge/unknownsid", { status: 400, body: "Unknown SID" }))
             m.assertEqual(backchannel.closeReason, LoungeCloseReason.Http)
-            m.assertEqual(backchannel.CloseLabel(), "http_400")
             m.assertEqual(backchannel.statusCode, 400)
         end function
 
-        @it("ends a poll the server drops with its curl code")
+        @it("ends a poll the server drops with the status the OS returns")
         function _()
             backchannel = new LoungeBackchannel()
             m.assertEmpty(m.PollOnce(backchannel, "/lounge/dropped", { drop: true }))
-            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Curl)
-            m.assertEqual(backchannel.CloseLabel(), "curl_52")
+            m.assertEqual(backchannel.closeReason, LoungeCloseReason.Http)
             m.assertEqual(backchannel.statusCode, HttpClient.CurlErrors.CURLE_GOT_NOTHING)
         end function
 

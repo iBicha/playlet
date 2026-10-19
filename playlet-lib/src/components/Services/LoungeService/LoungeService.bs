@@ -151,21 +151,20 @@ function RunSession(api as LoungeApi, messagePort as object) as boolean
             continue while
         end if
 
-        closeLabel = backchannel.CloseLabel()
-        LogDebug("Backchannel closed:", closeLabel, "next:", nextStep)
+        LogDebug("Backchannel closed:", backchannel.closeReason, backchannel.statusCode, "next:", nextStep)
         if nextStep = LoungeSessionStep.Drop
             LogTelemetryEvent({
                 level: "error"
-                message: `Lounge session dropped: no poll delivered for ${sinceDelivered.TotalSeconds()} s, last close: ${closeLabel}`
-                fingerprint: ["lounge-session-dropped", closeLabel]
+                message: `Lounge session dropped: no poll delivered for ${sinceDelivered.TotalSeconds()} s, last close: ${backchannel.closeReason} ${backchannel.statusCode}`
+                fingerprint: ["lounge-session-dropped", backchannel.closeReason, backchannel.statusCode]
             })
             return false
         end if
         if nextStep = LoungeSessionStep.Retry and backchannel.closeReason <> LoungeCloseReason.Timeout
             LogTelemetryEvent({
                 level: "warning"
-                message: "Lounge backchannel failure: " + closeLabel
-                fingerprint: "lounge-backchannel-" + closeLabel
+                message: `Lounge backchannel failure: ${backchannel.closeReason} ${backchannel.statusCode}`
+                fingerprint: ["lounge-backchannel", backchannel.closeReason, backchannel.statusCode]
             })
         end if
 

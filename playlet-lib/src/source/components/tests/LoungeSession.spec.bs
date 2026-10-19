@@ -14,7 +14,7 @@ namespace Tests
 
         @it("retries a failed poll")
         function _()
-            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, 1000), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, -7, 0, false, false, 1000), LoungeSessionStep.Retry)
             m.assertEqual(m.Step(LoungeCloseReason.Timeout, 0, 0, false, false, 40000), LoungeSessionStep.Retry)
             m.assertEqual(m.Step(LoungeCloseReason.Http, 503, 0, false, false, 1000), LoungeSessionStep.Retry)
             m.assertEqual(m.Step(LoungeCloseReason.Empty, 200, 0, false, false, 1000), LoungeSessionStep.Retry)
@@ -42,11 +42,11 @@ namespace Tests
 
         @it("drops a session that delivered no poll for the give-up time, whatever the failure")
         function _()
-            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, -7, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
             m.assertEqual(m.Step(LoungeCloseReason.Http, 400, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
             m.assertEqual(m.Step(LoungeCloseReason.Http, 401, 0, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
             m.assertEqual(m.Step(LoungeCloseReason.Stalled, 200, 3, false, false, LoungeSession.GIVE_UP_MS), LoungeSessionStep.Drop)
-            m.assertEqual(m.Step(LoungeCloseReason.Curl, -7, 0, false, false, LoungeSession.GIVE_UP_MS - 1), LoungeSessionStep.Retry)
+            m.assertEqual(m.Step(LoungeCloseReason.Http, -7, 0, false, false, LoungeSession.GIVE_UP_MS - 1), LoungeSessionStep.Retry)
         end function
 
         @it("never drops a session whose poll just delivered")

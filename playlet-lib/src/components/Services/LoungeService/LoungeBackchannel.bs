@@ -1,6 +1,6 @@
-import "pkg:/components/Services/LoungeService/LoungeFraming.bs"
 import "pkg:/components/Services/LoungeService/LoungeService.types.bs"
 import "pkg:/source/services/HttpClient.bs"
+import "pkg:/source/utils/ByteArrayUtils.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
@@ -71,10 +71,6 @@ class LoungeBackchannel
             m.closeReason = LoungeCloseReason.NotSent
             return []
         end if
-        if m.statusCode < 0
-            m.closeReason = LoungeCloseReason.Curl
-            return []
-        end if
         if m.statusCode < 200 or m.statusCode >= 300
             m.closeReason = LoungeCloseReason.Http
             return []
@@ -97,25 +93,42 @@ class LoungeBackchannel
         return commands
     end function
 
-    function CloseLabel() as string
-        if m.closeReason = LoungeCloseReason.Curl or m.closeReason = LoungeCloseReason.Http
-            return `${m.closeReason}_${Abs(m.statusCode)}`
-        end if
-        return m.closeReason
-    end function
-
+    ' Frame = `<byteLength>\n<json>`, the length counted in BYTES. The answer is complete, so a malformed or cut-off
+    ' frame ends the extraction: no later read can complete it.
     private function ExtractFrames(text as string) as object
         body = CreateObject("roByteArray")
         body.FromAsciiString(text)
-        result = LoungeFraming.Extract(body, 0)
-        if result.nextPos < body.Count()
-            LogTelemetryEvent({
-                level: "warning"
-                message: `Lounge answer ended mid-frame, ${body.Count() - result.nextPos} bytes left: ${text}`
-                fingerprint: "lounge-partial-frame"
-            })
-        end if
-        return result.frames
+        frames = []
+        count = body.Count()
+        cursor = 0
+        while cursor < count
+            if body[cursor] = 10 or body[cursor] = 13
+                cursor += 1
+                continue while
+            end if
+            frameStart = cursor
+            frameLength = 0
+            ' Stops once the length exceeds the body: a frame that long can't be whole, and the integer can't overflow.
+            while cursor < count and body[cursor] >= 48 and body[cursor] <= 57 and frameLength <= count
+                frameLength = frameLength * 10 + body[cursor] - 48
+                cursor += 1
+            end while
+            if cursor < count and body[cursor] = 13
+                cursor += 1
+            end if
+            if cursor >= count or body[cursor] <> 10 or frameLength = 0 or count - cursor - 1 < frameLength
+                LogTelemetryEvent({
+                    level: "warning"
+                    message: `Lounge answer has a malformed or cut-off frame at byte ${frameStart} of ${count}: ${text}`
+                    fingerprint: "lounge-partial-frame"
+                })
+                exit while
+            end if
+            dataStart = cursor + 1
+            frames.Push(ByteArrayUtils.Slice(body, dataStart, dataStart + frameLength).ToAsciiString())
+            cursor = dataStart + frameLength
+        end while
+        return frames
     end function
 
     private function Receive(frames as object) as LoungeCommand[]
