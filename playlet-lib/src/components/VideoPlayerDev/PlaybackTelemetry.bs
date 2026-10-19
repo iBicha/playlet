@@ -233,9 +233,8 @@ namespace PlaybackTelemetry
 
         function ReportVideoError(errorData as object, errorInfo as object, url as dynamic, urlIndex as dynamic, shownInDialog as boolean) as void
             m.errorCount += 1
-            ' malformed data: the last generated DASH/HLS manifest and player response diagnose it from the report.
             attachments = invalid
-            if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1
+            if errorData.body.Instr("malformed data") <> -1 or errorData.body.Instr("invalid pathname") <> -1 or ((errorInfo = invalid or errorInfo.category <> "http") and errorData.body.Instr("last_err:") = -1)
                 attachments = [{
                     filename: "last_generated_dash.xml"
                     content_type: "plain/text"
