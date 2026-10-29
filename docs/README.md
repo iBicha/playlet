@@ -12,6 +12,7 @@ This document contains various kinds of information related to Playlet developme
   - [BrighterScript](#brighterscript)
   - [BrighterScript Linter/Formatter](#brighterscript-linterformatter)
   - [BrighterScript Plugins](#brighterscript-plugins)
+  - [CJK font bundler](#cjk-font-bundler)
 - [Playlet App](#playlet-app)
   - [Why separate between Playlet and Playlet Lib?](#why-separate-between-playlet-and-playlet-lib)
 - [Playlet Lib](#playlet-lib)
@@ -117,6 +118,32 @@ npm run lint:fix
 ### BrighterScript Plugins
 
 See [Playlet Brighterscript Plugins](./plugins.md)
+
+### CJK font bundler
+
+On Roku devices whose system fonts lack CJK glyphs, Chinese/Japanese/Korean
+video titles render as empty boxes (`□□□`), because Playlet uses the system
+fonts and does not bundle any font of its own (the official YouTube app is
+unaffected since it ships its own font).
+
+`tools/patch_cjk.py` builds a sideloadable Playlet package with bundled CJK
+fonts (Noto Sans SC, OFL). It rewrites every system-font reference in the
+component library (XML font attributes, `<Font>` nodes, `fontUri` attributes
+and the two BrightScript call sites that assign fonts in code), embeds the
+patched library in the channel, and makes the channel load it first, so the
+result is self-contained.
+
+```bash
+pip install fonttools
+python3 tools/patch_cjk.py --release v0.48.10
+curl --digest -u rokudev:PASSWORD \
+     -F "mysubmit=Install" \
+     -F "archive=@playlet-cjk.zip;type=application/octet-stream" \
+     http://ROKU_IP/plugin_install
+```
+
+See the script's `--help` for more options (e.g. building a small channel that
+loads the patched library from your own HTTP server instead of embedding it).
 
 ## Playlet App
 
