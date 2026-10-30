@@ -1230,11 +1230,11 @@
     </message>
     <message>
         <source>Do not show again</source>
-        <translation>No volver a mostrar de nuevo</translation>
+        <translation>No volver a mostrar</translation>
     </message>
     <message>
         <source>Recommended</source>
-        <translation>Recomendados</translation>
+        <translation>Recomendado</translation>
     </message>
     <message>
         <source>Courses</source>
@@ -1258,11 +1258,11 @@
     </message>
     <message>
         <source>Select a service to login</source>
-        <translation>Seleccione un servicio para iniciar sesion</translation>
+        <translation>Seleccione un servicio para iniciar sesión</translation>
     </message>
     <message>
         <source>Login to YouTube</source>
-        <translation>Iniciar sesion en YouTube</translation>
+        <translation>Iniciar sesión en YouTube</translation>
     </message>
     <message>
         <source>Open the link %1 and enter the following code:</source>
@@ -1395,6 +1395,14 @@
     <message>
         <source>Help improve Playlet by enabling diagnostics. This will send anonymous diagnotics data to the developer.</source>
         <translation>Ayuda a mejorar Playlet activando las herramientas de diagnóstico. Esto enviará datos de diagnóstico anónimos al desarrollador.</translation>
+    </message>
+    <message>
+        <source>Backend changed</source>
+        <translation>Backend cambiado</translation>
+    </message>
+    <message>
+        <source>Backend changed to Playlet, because no Invidious instance is set.</source>
+        <translation type="unfinished">Backend cambiado a Playlet, porque no hay ninguna instancia de Invidious colocada.</translation>
     </message>
 </context>
 </TS>
