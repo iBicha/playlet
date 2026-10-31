@@ -3,39 +3,19 @@
 // diagnostics assertions would have run.
 
 import {
-    Button,
     Key,
     check,
     expectField,
     expectPred,
     field,
     finish,
+    focusStatsButton,
     frames,
     group,
     launch,
     press,
 } from './vpd-player-harness';
 import { getLiveVideoId } from './live-id';
-
-async function focusStatsButton(): Promise<void> {
-    if (await field<boolean>('#buttonRow.rowFocused') !== true) {
-        if (await field<boolean>('#trickPlayBar.focused') !== true) {
-            await press(Key.Ok); // reveal -> trackbar
-            await frames(150);
-        }
-        await expectField('#trickPlayBar.focused', true);
-        await press(Key.Up);
-        await frames(150);
-        if (await field<boolean>('#buttonRow.rowFocused') !== true) await press(Key.Up);
-    }
-    await expectField('#buttonRow.rowFocused', true);
-    // The row remembers its last-focused button. Clamp to the left edge first so repeated visits are deterministic.
-    await press(Key.Left);
-    await press(Key.Left);
-    await press(Key.Right);
-    await expectField('#buttonRow.focusedIndex', Button.stats);
-    await expectField('#StatsButton.focused', true);
-}
 
 function timestampSeconds(value: string): number | undefined {
     const parts = value.split(':').map(Number);
@@ -70,19 +50,19 @@ function playbackTimes(value: unknown): { position: number; duration: number } |
     await expectField('#StatsButton.toggleState', true);
     await press(Key.Ok);
     await expectField('#StatsButton.toggleState', false);
-    await expectField('#statsBg.visible', true);
+    await expectField('#statsForNerds.visible', true);
 
     group('Live diagnostics identify the stream and expose decoder facts');
-    await expectField('#line1Value.text', liveId);
-    await expectField('#line2Value.text', 'playing');
-    await expectPred('#line4Value.text', (v) => typeof v === 'string' && v.includes(' x '), 'has viewport dimensions');
-    await expectPred('#line5Value.text', (v) => typeof v === 'string' && v.includes(' x '), 'has stream resolution', 10_000);
-    await expectPred('#line6Value.text', (v) => typeof v === 'string' && v.includes(' / '), 'has video and audio codecs', 10_000);
-    await expectPred('#line7Value.text', (v) => typeof v === 'string' && v.length > 0, 'has bitrate', 10_000);
-    await expectPred('#line8Value.text', (v) => typeof v === 'string' && v.length > 0, 'has container', 10_000);
+    await expectField('#videoIdValue.text', liveId);
+    await expectField('#stateValue.text', 'playing');
+    await expectPred('#viewportValue.text', (v) => typeof v === 'string' && v.includes(' x '), 'has viewport dimensions');
+    await expectPred('#resolutionValue.text', (v) => typeof v === 'string' && v.includes(' x '), 'has stream resolution', 10_000);
+    await expectPred('#codecsValue.text', (v) => typeof v === 'string' && v.includes(' / '), 'has video and audio codecs', 10_000);
+    await expectPred('#bitrateValue.text', (v) => typeof v === 'string' && v.length > 0, 'has bitrate', 10_000);
+    await expectPred('#containerValue.text', (v) => typeof v === 'string' && v.length > 0, 'has container', 10_000);
 
     group('Live playback reports a moving position and live-edge duration');
-    const playbackBefore = await field<string>('#line3Value.text');
+    const playbackBefore = await field<string>('#playbackValue.text');
     const timesBefore = playbackTimes(playbackBefore);
     check(
         'live playback has position / duration',
@@ -90,7 +70,7 @@ function playbackTimes(value: unknown): { position: number; duration: number } |
         playbackBefore,
     );
     await expectPred(
-        '#line3Value.text',
+        '#playbackValue.text',
         (value) => {
             const times = playbackTimes(value);
             return times !== undefined
@@ -108,7 +88,7 @@ function playbackTimes(value: unknown): { position: number; duration: number } |
     await frames(250);
     if (await field<boolean>('#StatsButton.toggleState') !== true) await press(Key.Ok);
     await expectField('#StatsButton.toggleState', true);
-    await expectField('#statsBg.visible', false);
+    await expectField('#statsForNerds.visible', false);
     await expectField('#VideoPlayer.state', 'playing');
 
     await finish();
