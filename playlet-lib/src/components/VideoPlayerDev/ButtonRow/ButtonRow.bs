@@ -9,9 +9,10 @@ const SCREEN_CENTER_X = 640
 const TRACKBAR_RIGHT_X = 1212
 
 function Init()
-    ' Focus order MUST match PlayerCoordinatorLogic.PlayerButton (playPause=0, minimize=1).
+    ' Focus order MUST match PlayerCoordinatorLogic.PlayerButton (playPause=0, stats=1, minimize=2).
     m.buttons = [
         m.top.findNode("PlayPauseButton")
+        m.top.findNode("StatsButton")
         m.top.findNode("MinimizeButton")
     ]
     m.centerCluster = m.top.findNode("CenterCluster")
@@ -19,7 +20,7 @@ function Init()
     LayoutClusters()
     m.top.buttonCount = m.buttons.Count() ' coordinator reads this to clamp focus
 
-    for each field in ["transportMode", "rowFocused", "focusedIndex", "playing"]
+    for each field in ["transportMode", "rowFocused", "focusedIndex", "playing", "statsEnabled"]
         m.top.ObserveField(field, FuncName(Repaint))
     end for
     m.top.ObserveField("nudge", FuncName(OnNudge))
@@ -63,6 +64,7 @@ function Repaint() as void
     m.top.visible = (m.top.transportMode = TransportController.Mode.Idle)
 
     m.buttons[0].toggleState = not m.top.playing ' toggleState false = play icon, true = pause icon
+    m.buttons[1].toggleState = not m.top.statsEnabled ' toggleState false = on icon, true = off icon
 
     for i = 0 to m.buttons.Count() - 1
         m.buttons[i].focused = m.top.rowFocused and i = m.top.focusedIndex

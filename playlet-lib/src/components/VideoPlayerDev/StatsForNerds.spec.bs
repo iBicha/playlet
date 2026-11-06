@@ -1,0 +1,151 @@
+' StatsForNerds @SGNode suite — verifies the passive renderer independently from the player coordinator (which
+' owns `visible`; see VideoPlayerDevSeam.spec).
+
+namespace Tests
+
+    @SGNode("StatsForNerds")
+    @suite
+    class StatsForNerdsTests extends Rooibos.BaseTestSuite
+
+        protected override function beforeEach()
+            ' the suite node is shared across tests: detach the previous test's Video and show the overlay.
+            m.top.video = invalid
+            m.top.visible = true
+        end function
+
+        function BuildVideo() as object
+            content = CreateObject("roSGNode", "ContentNode")
+            content.addField("videoId", "string", false)
+            content.videoId = "jNQXAC9IVRw"
+            content.url = "http://127.0.0.1:8888/api/dash?url=https%3A%2F%2Fexample.test%2Fmanifest"
+
+            video = CreateObject("roSGNode", "Node")
+            video.addFields({
+                content: content
+                state: "paused"
+                position: 53.0
+                duration: 634.0
+                width: 1280.0
+                height: 720.0
+                streamingSegment: { segType: 2, width: 3840, height: 2160, segBitrateBps: 26500000 }
+                videoFormat: "av1"
+                audioFormat: "eac3"
+                streamInfo: { streamBitrate: 30000000 }
+            })
+            return video
+        end function
+
+        function Value(name as string) as string
+            return m.top.findNode(name + "Value").text
+        end function
+
+        @describe("diagnostics")
+
+        @it("renders the available playback diagnostics")
+        function _()
+            m.top.video = m.BuildVideo()
+
+            m.assertEqual(m.Value("videoId"), "jNQXAC9IVRw")
+            m.assertEqual(m.Value("state"), "paused")
+            m.assertEqual(m.Value("playback"), "0:53 / 10:34")
+            m.assertEqual(m.Value("viewport"), "1280 x 720")
+            m.assertEqual(m.Value("resolution"), "3840 x 2160")
+            m.assertEqual(m.Value("codecs"), "av1 / eac3")
+            m.assertEqual(m.Value("bitrate"), "26.5 Mbps", "the playing segment's bitrate wins over streamInfo")
+            m.assertEqual(m.Value("container"), "dash")
+        end function
+
+        @it("truncates playback time like the trackbar and shows a zero position")
+        function _()
+            video = m.BuildVideo()
+            video.position = 59.6
+            m.top.video = video
+            m.assertEqual(m.Value("playback"), "0:59 / 10:34")
+
+            video.position = 0.0
+            video.duration = 0.0
+            m.assertEqual(m.Value("playback"), "0:00", "an unloaded duration is omitted, the start position is not")
+        end function
+
+        @it("audio segments never replace the video segment's resolution or bitrate")
+        function _()
+            video = m.BuildVideo()
+            m.top.video = video
+            video.streamingSegment = { segType: 1, width: 0, height: 0, segBitrateBps: 128000 }
+            m.assertEqual(m.Value("resolution"), "3840 x 2160")
+            m.assertEqual(m.Value("bitrate"), "26.5 Mbps")
+
+            video.streamingSegment = { segType: 2, width: 1920, height: 1080, segBitrateBps: 4000000 }
+            m.assertEqual(m.Value("resolution"), "1920 x 1080")
+            m.assertEqual(m.Value("bitrate"), "4.0 Mbps")
+        end function
+
+        @it("does no label work while hidden and paints the retained video segment on reveal")
+        function _()
+            video = m.BuildVideo()
+            m.top.video = video
+            m.assertEqual(m.Value("playback"), "0:53 / 10:34")
+
+            m.top.visible = false
+            video.position = 120.0
+            video.streamingSegment = { segType: 2, width: 1920, height: 1080, segBitrateBps: 4000000 }
+            video.streamingSegment = { segType: 1, width: 0, height: 0, segBitrateBps: 128000 }
+            m.assertEqual(m.Value("playback"), "0:53 / 10:34", "hidden overlay does no per-second position work")
+            m.assertEqual(m.Value("resolution"), "3840 x 2160", "hidden overlay does no label work")
+
+            m.top.visible = true
+            m.assertEqual(m.Value("playback"), "2:00 / 10:34")
+            m.assertEqual(m.Value("resolution"), "1920 x 1080", "the last video segment survives a later audio one")
+            m.assertEqual(m.Value("bitrate"), "4.0 Mbps")
+        end function
+
+        @it("falls back to streamInfo and the mime param for progressive streams")
+        function _()
+            content = CreateObject("roSGNode", "ContentNode")
+            content.url = "https://example.test/videoplayback?itag=18&mime=video%2Fmp4&expire=1"
+            video = CreateObject("roSGNode", "Node")
+            video.addFields({
+                content: content
+                streamInfo: { streamBitrate: 2500000 }
+            })
+
+            m.top.video = video
+            m.assertEqual(m.Value("resolution"), "", "progressive streams report no segments")
+            m.assertEqual(m.Value("bitrate"), "2.5 Mbps")
+            m.assertEqual(m.Value("container"), "mp4")
+        end function
+
+        @it("follows a stream URL fallback on the same content node")
+        function _()
+            video = m.BuildVideo()
+            m.top.video = video
+            m.assertEqual(m.Value("container"), "dash")
+
+            video.content.url = "http://127.0.0.1:8888/api/hls?url=https%3A%2F%2Fexample.test%2Fx&v=jNQXAC9IVRw"
+            m.assertEqual(m.Value("container"), "hls")
+            m.assertEqual(m.Value("resolution"), "3840 x 2160", "a URL change does not clear decoder diagnostics")
+        end function
+
+        @it("clears every rendered value when the observed Video node is removed")
+        function _()
+            m.top.video = m.BuildVideo()
+            m.assertEqual(m.Value("videoId"), "jNQXAC9IVRw")
+
+            m.top.video = invalid
+
+            for each name in ["videoId", "state", "playback", "viewport", "resolution", "codecs", "bitrate", "container"]
+                m.assertEqual(m.Value(name), "", name)
+            end for
+        end function
+
+        @it("tolerates unavailable optional diagnostics")
+        function _()
+            m.top.video = CreateObject("roSGNode", "Node")
+            for each name in ["videoId", "state", "playback", "viewport", "resolution", "codecs", "bitrate", "container"]
+                m.assertEqual(m.Value(name), "", name)
+            end for
+        end function
+
+    end class
+
+end namespace
