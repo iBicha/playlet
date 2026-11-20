@@ -131,6 +131,23 @@ namespace Tests
             m.assertEqual(handle.translation[1], 22.0)
         end function
 
+        @it("points every glyph, the handle, the track and the LIVE bullet at a bundled file")
+        function _()
+            file = CreateObject("roByteArray")
+            sg = m.top.findNode("scanGlyph")
+            for glyph = TransportController.Glyph.SkipBack to TransportController.Glyph.Replay
+                m.top.glyph = glyph
+                m.assertTrue(file.ReadFile(sg.uri), sg.uri)
+            end for
+            m.top.glyph = TransportController.Glyph.None
+            track = m.top.findNode("trackBg").uri
+            for each res in ["480p", "720p", "1080p"]
+                m.assertTrue(file.ReadFile(track.Replace("$$RES$$", res)), track)
+            end for
+            m.assertTrue(file.ReadFile(m.top.findNode("handle").uri))
+            m.assertTrue(file.ReadFile(m.top.findNode("bullet").uri))
+        end function
+
         @describe("TrickPlayBar — LIVE projection")
 
         @it("BEHIND the edge: fill/playhead are PROPORTIONAL to cursor within the DVR window + offset label")

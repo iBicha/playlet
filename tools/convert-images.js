@@ -1,8 +1,8 @@
-// Description: Converts SVGs to PNGs and resizes them to the correct dimensions. 
+// Description: Converts SVGs to PNGs (optionally framed as 9-patches) and resizes them to the correct dimensions.
 
 const { ArgumentParser, BooleanOptionalAction } = require('argparse')
 const { globSync } = require('glob');
-const { convertFile } = require('convert-svg-to-png');
+const { convert, convertFile } = require('convert-svg-to-png');
 const { existsSync, writeFileSync, readFileSync } = require('fs');
 const json5 = require('json5');
 const md5 = require('crypto-js/md5');
@@ -88,7 +88,8 @@ async function generateImages(svgFile, meta, metafile, force) {
         await generateImage(svgFile.file, output, svgFile.rootDir);
         outputHash = checkFileHash(outputFilePath, output.outputHash);
 
-        console.log(`Generated ${outputFilePath} (${output.width}x${output.height})`);
+        const border = output.ninePatch ? 2 : 0;
+        console.log(`Generated ${outputFilePath} (${output.width + border}x${output.height + border})`);
 
         output.outputHash = outputHash.hash;
         metaChanged = true;
@@ -121,5 +122,35 @@ async function generateImage(inputImage, options, rootDir) {
         ...options
     };
     opts.outputFilePath = path.join(rootDir, opts.outputFilePath);
+    if (opts.ninePatch) {
+        await generateNinePatch(inputImage, opts);
+        return;
+    }
     await convertFile(inputImage, opts);
+}
+
+// ninePatch: { stretchX: [start, end], stretchY: [start, end] } in content pixels, end exclusive. The file
+// is width+2 x height+2: top/left markers span the stretchable region, bottom/right the content region (the
+// same spans). display:block — the converter inlines the SVG in <body>, where a canvas shorter than the line
+// box would sit on the text baseline and render shifted down.
+async function generateNinePatch(inputImage, opts) {
+    const { width, height, ninePatch, outputFilePath, outputHash, ...convertOptions } = opts;
+    const [x0, x1] = ninePatch.stretchX;
+    const [y0, y1] = ninePatch.stretchY;
+    const validSpan = (start, end, size) => Number.isInteger(start) && Number.isInteger(end) && 0 <= start && start < end && end <= size;
+    if (!Number.isInteger(width) || !Number.isInteger(height) || !validSpan(x0, x1, width) || !validSpan(y0, y1, height)) {
+        throw new Error(`${inputImage}: invalid ninePatch ${JSON.stringify(ninePatch)} for ${width}x${height}`);
+    }
+    if (convertOptions.scale !== undefined && convertOptions.scale !== 1) {
+        throw new Error(`${inputImage}: a 9-patch must render at scale 1 (its markers are 1px)`);
+    }
+    const content = readFileSync(inputImage).toString('base64');
+    const marker = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#000"/>`;
+    const framed = `<svg xmlns="http://www.w3.org/2000/svg" width="${width + 2}" height="${height + 2}" shape-rendering="crispEdges" style="display:block">`
+        + `<image href="data:image/svg+xml;base64,${content}" x="1" y="1" width="${width}" height="${height}" preserveAspectRatio="none"/>`
+        + marker(1 + x0, 0, x1 - x0, 1) + marker(0, 1 + y0, 1, y1 - y0)
+        + marker(1 + x0, height + 1, x1 - x0, 1) + marker(width + 1, 1 + y0, 1, y1 - y0)
+        + '</svg>';
+    const png = await convert(framed, { ...convertOptions, width: width + 2, height: height + 2 });
+    writeFileSync(outputFilePath, png);
 }
