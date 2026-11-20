@@ -10,8 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: [self-hosted, roku]
 
     steps:
       - name: Checkout
@@ -28,19 +28,35 @@ jobs:
 
       - name: Run tests
         run: npm run test
-        env:
-          ROKU_DEV_TARGET: ${{ secrets.ROKU_DEV_TARGET }}
-          ROKU_DEV_TARGET_PORT: ${{ secrets.ROKU_DEV_TARGET_PORT }}
-          ROKU_DEVPASSWORD: ${{ secrets.ROKU_DEVPASSWORD }}
-          ROKU_DEV_TARGET_TELNET_PORT: ${{ secrets.ROKU_DEV_TARGET_TELNET_PORT }}
 
       - name: Build Playlet for release
         run: npm run build:release
-        env:
-          ROKU_DEV_TARGET: ${{ secrets.ROKU_DEV_TARGET }}
-          ROKU_DEV_TARGET_PORT: ${{ secrets.ROKU_DEV_TARGET_PORT }}
-          ROKU_DEVPASSWORD: ${{ secrets.ROKU_DEVPASSWORD }}
-          ROKU_SIGN_PASSWORD: ${{ secrets.ROKU_SIGN_PASSWORD }}
+
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: |
+            release/playlet.zip
+            release/playlet.squashfs.pkg
+            release/playlet-lib.zip
+            release/playlet-lib.squashfs.pkg
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release
+        uses: actions/download-artifact@v4
+        with:
+          name: release
+          path: release
 
       - name: Use Java 21
         uses: actions/setup-java@v4
