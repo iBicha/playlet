@@ -79,15 +79,17 @@ process.on('uncaughtException', (error, origin) => {
         await rokuDeploy.publish(options);
 
         console.log('Waiting for test to finish');
-        let data = withoutQuotedLines(await readFromTelnetUntil(telnet, timeout));
-
-        if (reportOnly) {
-            data = parseTestReport(data);
-        }
+        const consoleOutput = withoutQuotedLines(await readFromTelnetUntil(telnet, timeout));
+        const data = reportOnly ? parseTestReport(consoleOutput) : consoleOutput;
 
         fs.writeFileSync(outputFile, data);
 
         success = data.includes('RESULT: Success');
+        // Rooibos stops comparing past a fixed nesting depth and counts the rest as equal.
+        if (consoleOutput.includes('REACHED MAX ITERATIONS DOING COMPARISON')) {
+            console.error('An assertEqual nests deeper than Rooibos compares; compare FormatJson strings instead.');
+            success = false;
+        }
     }
     catch (error) {
         console.error(error);
