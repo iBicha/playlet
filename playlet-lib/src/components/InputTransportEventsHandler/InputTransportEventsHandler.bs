@@ -1,11 +1,14 @@
+import "pkg:/components/JobSystem/Jobs.bs"
+import "pkg:/components/JobSystem/JobSystem.bs"
 import "pkg:/source/utils/Logging.bs"
 import "pkg:/source/utils/StringUtils.bs"
 import "pkg:/source/utils/Types.bs"
 import "TransportEvents.types.bs"
 
 function Init()
-    m.appManager = CreateObject("roAppManager")
-    m.videoQueue = m.top.getScene().findNode("VideoQueue")
+    scene = m.top.getScene()
+    m.videoQueue = scene.findNode("VideoQueue")
+    m.jobQueue = scene.findNode("JobQueue")
 
     ' TODO:P2 ok, forward, rewind, replay, next and skip need support in the player or the queue. Until then they
     ' have no entry here, and answer unhandled.
@@ -102,18 +105,23 @@ end function
 function NowPlayingCommand(_event as object) as string
     player = m.videoQueue.player
     if player = invalid
-        m.appManager.SetNowPlayingContentMetaData(invalid)
+        SetNowPlayingMetadata(invalid)
         return TransportStatus.Success
     end if
 
     content = player.content
     if content = invalid or StringUtils.IsNullOrEmpty(content.title)
-        m.appManager.SetNowPlayingContentMetaData(invalid)
+        SetNowPlayingMetadata(invalid)
         return TransportStatus.ErrorGeneric
     end if
 
-    m.appManager.SetNowPlayingContentMetaData({ title: content.title, contentType: "movie" })
+    SetNowPlayingMetadata({ title: content.title, contentType: "movie" })
     return TransportStatus.Success
+end function
+
+' roAppManager is MAIN|TASK-only
+function SetNowPlayingMetadata(metadata as dynamic) as void
+    JobSystem.QueueJob(m.jobQueue, Jobs.SetNowPlayingMetadataJob, { metadata: metadata })
 end function
 
 function NotSupportedCommand(_event as object) as string
