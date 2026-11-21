@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - DRM playback errors on certain TVs, by filtering out FairPlay-only streams
 - Player seek bar and backdrop missing on some devices
+- Missing titles in shorts
 
 ## [0.48.10] - 2026-10-17
 
